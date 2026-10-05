@@ -20,5 +20,5 @@ Never push. Never spawn subagents.
 |---|---|---|---|---|---|
 | M0.1 | docs | Repo skeleton: CLAUDE.md, DECISIONS.md, STATUS.md, HANDOFF.md, .gitignore | main | DONE | 2026-10-05 |
 | M0.2 | data | Background download of Kaikki Latin, Ancient Greek, English and es.wiktionary extracts into data/raw (gitignored) | main | WIP(main) | logs in data/raw/dl-*.log, flag data/raw/dl-done.flag |
-| M0.3 | docs | Sonnet pre-plan and pre-design: docs/PREPLAN.md, docs/PREDESIGN.md | sonnet | WIP(sonnet) | main agent redoes freely afterwards |
+| M0.3 | docs | Sonnet pre-plan and pre-design: docs/PREPLAN.md, docs/PREDESIGN.md | sonnet | REVIEW | written 2026-10-05; numbers measured with throwaway scripts on data/raw (M1.1 must reproduce them); main agent redoes freely afterwards |
 | M0.4 | docs | DESIGN.md v1 (contracts) written by main agent from the pre-work | main | TODO | |
