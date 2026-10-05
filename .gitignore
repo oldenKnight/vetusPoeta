@@ -1,0 +1,12 @@
+# raw dictionary dumps and build outputs are never committed
+data/raw/
+data/work/
+build/
+build-*/
+dist/
+*.part
+*.gguf
+*.onnx
+__pycache__/
+node_modules/
+.DS_Store
