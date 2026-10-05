@@ -23,3 +23,21 @@ Last updated: 2026-10-05 (session 1, step 1 of the production process).
 
 ## Open items for the owner
 - Upload the Alice subtitle file (acceptance test) and a second subtitle file (held-out test).
+
+## Measured data facts (2026-10-05, full passes over the raw dumps)
+- Latin (en.wiktionary via Kaikki): 892,320 entries; 54,199 lemma entries; 838,121 form-of
+  entries; 61,224 entries with inflection tables; 2,051,746 table forms. Macrons live in
+  `forms[].form` and `head_templates[].expansion`, not in `word` (only 7 words carry one).
+- Ancient Greek: 68,196 entries; 23,169 lemmas; 1,465,603 table forms. Verb tables use
+  `forms[].source == "inflection"` (not "conjugation") and carry dialect variants (Attic,
+  Ionic, Epic): filter by dialect tag when building Attic paradigms. Contract verbs list
+  uncontracted forms in the non-Attic tables.
+- English: 1,492,836 entries; 18,774 distinct English words have a Latin translation
+  (20,003 entries), 11,543 entries have an Ancient Greek translation.
+- Spanish Wiktionary extract: only 7,022 Latin and 278 Greek entries, so Spanish glosses come
+  mainly from the English pivot and the hand-written tier vocabulary (decision D8).
+- Treebank licences: UD_English-EWT, UD_Spanish-GSD, UD_Spanish-AnCora, UD_Latin-LLCT,
+  UD_Latin-CIRCSE are CC BY(-SA) and usable; UD_English-GUM and all Perseus/PROIEL/ITTB Latin
+  and Greek treebanks are CC BY-NC-SA and must not be used.
+- No pull request yet: the repo has no default branch besides ours, so there is no base to
+  open a PR against. The owner should create `main` (or say which base to use).
