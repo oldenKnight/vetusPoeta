@@ -11,7 +11,8 @@ using namespace vp::feat;
 
 namespace {
 
-enum Slot : int { kVOC, kCONN, kS, kIO, kO, kOBL, kADV, kNEG, kV, kPRED, kINF, kWH, kFRONT, kEND, kPRED2, kSlotCount };
+enum Slot : int { kVOC, kCONN, kS, kIO, kO, kOBL, kADV, kNEG, kV, kPRED, kINF, kWH, kFRONT, kEND, kPRED2, kPTC,
+                  kSlotCount };   // kPTC (C18): a circumstantial participle phrase, right after the subject
 
 int slotOf(const std::string& n) {
   static const char* const names[] = {"VOC", "CONN", "S", "IO", "O", "OBL", "ADV", "NEG", "V", "PRED", "INF", "WH"};
@@ -19,7 +20,7 @@ int slotOf(const std::string& n) {
     if (n == names[i]) return i;
   return -1;
 }
-const int kCanon[] = {kFRONT, kWH, kS, kIO, kO, kOBL, kADV, kPRED, kINF, kNEG, kV, kPRED2, kEND};
+const int kCanon[] = {kFRONT, kWH, kS, kPTC, kIO, kO, kOBL, kADV, kPRED, kINF, kNEG, kV, kPRED2, kEND};
 int canonIndex(int s) {
   for (int i = 0; i < (int)(sizeof kCanon / sizeof kCanon[0]); ++i)
     if (kCanon[i] == s) return i;
@@ -451,8 +452,36 @@ void GreekRealiser::verbGroup(const GrcClause& c, const Agree& subj, std::vector
     GWord w;
     if (lemma == kNone) { w.form = "[verb]"; w.missing = true; w.rule = rule; dst.push_back(std::move(w)); return; }
     form(lemma, f, w, rule);
+    // C18: a verb whose table has no aorist (ὑλακτέω: the present system only): the imperfect for a past event in the
+    // indicative (narrative imperfect), the present stem in the other moods
+    if (w.missing && f.tense == Aorist) {
+      Features g = f;
+      g.tense = f.mood == Indicative ? (uint8_t)Imperfect : (uint8_t)Present;
+      GWord w2;
+      form(lemma, g, w2, rule);
+      if (!w2.missing) w = std::move(w2);
+    }
     dst.push_back(std::move(w));
   };
+  if (ctx.participle) {   // C18: circumstantial participle agreeing with the main clause's subject (ctx.ante)
+    GWord w;
+    w.lemma = p.lemma;
+    w.rule = "order.ptc";
+    GenInfo gi;
+    std::string f;
+    const uint8_t t = p.tense == Aorist ? (uint8_t)Aorist : p.tense == Perfect ? (uint8_t)Perfect : (uint8_t)Present;
+    if (p.lemma != kNone && participle(lx_, p.lemma, t, p.voice, ctx.ante.case_ ? ctx.ante.case_ : (uint8_t)Nom,
+                                       ctx.ante.number, ctx.ante.gender, f, &gi)) {
+      w.form = f;
+      w.packed = gi.packed;
+      w.fromRule = gi.fromRule;
+    } else {
+      w.form = "[verb]";
+      w.missing = true;
+    }
+    fin.push_back(std::move(w));
+    return;
+  }
   if (c.type == ClauseType::Imp && ctx.main) {
     const uint8_t num = subj.number;
     if (c.polarity == Polarity::Neg && p.tense == Aorist) {   // μή + aorist subjunctive
@@ -675,6 +704,20 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
     s[kNEG].push_back(std::move(w));
   }
 
+  // C18: circumstantial participles: realised here, placed after the subject (or first when the subject is dropped)
+  for (const GrcSub& sub : c.subs) {
+    if (!sub.participle || sub.clause.empty()) continue;
+    Ctx pctx;
+    pctx.main = false;
+    pctx.participle = true;
+    pctx.negMe = false;
+    pctx.ante = subj;
+    pctx.ante.case_ = subjCase;
+    if (pctx.ante.person <= 2 && pctx.ante.number == Pl) pctx.ante.gender = M;   // "we" / "you" (a group): masculine
+    std::vector<GWord> body;
+    clause(sub.clause[0], o, body, pctx);
+    append(s[kPTC], body);
+  }
   // ---- linearise ----
   std::vector<int> seq;
   auto addTemplate = [&](const std::vector<std::string>& t) {
@@ -708,7 +751,7 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
     append(content, s[kV]);
     orderRule = "order.excl";
   } else if (c.type == ClauseType::Frag) {
-    for (int sl : {kFRONT, kWH, kS, kPRED, kIO, kO, kOBL, kADV, kNEG, kV, kINF, kPRED2, kEND}) append(content, s[sl]);
+    for (int sl : {kFRONT, kWH, kS, kPTC, kPRED, kIO, kO, kOBL, kADV, kNEG, kV, kINF, kPRED2, kEND}) append(content, s[sl]);
   } else if (c.type == ClauseType::Imp && ctx.main && frontGiven) {
     // C16 (order.imp): a fronted sequence adverb puts the imperative last ("πρῶτον τὸ ὄνομά σου γράφε")
     orderRule = prohib ? "order.prohib" : "order.imp";
@@ -749,7 +792,7 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
     } else addTemplate(tmpl(id, {"VOC", "CONN", "S", "IO", "O", "OBL", "ADV", "NEG", "V"}));
   }
   if (content.empty()) {
-    for (int sl : {kWH, kFRONT, kS, kIO, kO, kOBL, kADV, kPRED, kINF, kNEG, kV, kPRED2}) {
+    for (int sl : {kWH, kFRONT, kS, kPTC, kIO, kO, kOBL, kADV, kPRED, kINF, kNEG, kV, kPRED2}) {
       if (s[sl].empty() || std::find(seq.begin(), seq.end(), sl) != seq.end()) continue;
       auto pos = seq.end();
       if (sl == kPRED2) {
@@ -824,7 +867,7 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
   // subordinate clauses
   std::vector<GWord> before, after;
   for (const GrcSub& sub : c.subs) {
-    if (sub.clause.empty()) continue;
+    if (sub.clause.empty() || sub.participle) continue;
     const GrcClause& sc = sub.clause[0];
     std::vector<GWord> sw;
     uint32_t conj = sub.conj;
@@ -835,9 +878,13 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
         case SubRel::Condition: conj = sc.pred.mood == Subjunctive ? k_.ean : k_.ei; break;
         case SubRel::Purpose: conj = k_.hina; break;
         case SubRel::Result: conj = k_.hoste; break;
-        case SubRel::Coord: conj = k_.kai; break;
+        case SubRel::Coord: conj = sub.noConj ? kNone : k_.kai; break;
         default: break;
       }
+    }
+    if (sub.noConj && !sub.before) {   // C18: "..., ὀψὲ γάρ ἐστιν": a comma before the clause with its own particle
+      std::vector<GWord>& prev = after.empty() ? clauseWords : after;
+      if (!prev.empty() && prev.back().punctAfter.empty()) prev.back().punctAfter = ",";
     }
     Ctx sctx;
     sctx.main = false;
@@ -864,7 +911,7 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
       sctx.negMe = true;
     }
     if (sub.rel == SubRel::Condition) sctx.negMe = true;
-    if (sub.rel == SubRel::Result) { sctx.infinitival = true; sctx.negMe = true; }
+    if (sub.rel == SubRel::Result && !sub.finite) { sctx.infinitival = true; sctx.negMe = true; }   // C18: finite = οὐ
     if (sub.rel == SubRel::AccInf) sctx.infinitival = true;
     if (sub.rel == SubRel::Coord && sc.type == ClauseType::Imp) sctx.main = true;
     std::vector<GWord> body;

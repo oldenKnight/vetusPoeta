@@ -71,6 +71,7 @@ Frame parseGreekFrame(std::string_view s) {
   else if (s == "copula") f.kind = FrameKind::Copula;
   else if (s == "impers:acc+inf") f.kind = FrameKind::ImpersAccInf;
   else if (s == "impers:dat+inf") f.kind = FrameKind::ImpersDatInf;
+  else if (s == "purp:inf") f.kind = FrameKind::PurpInf;   // C18
   else if (s.substr(0, 5) == "prep:") {
     std::string_view rest = s.substr(5);
     size_t plus = rest.find('+');

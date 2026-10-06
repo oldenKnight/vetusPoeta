@@ -325,6 +325,9 @@ void sandhi(std::vector<SandhiWord>& ws, const SandhiOptions& o) {
       ws[i].proclitic = nx != nullptr;
     } else if (k == "ἐκ" || k == "ἐξ") {
       ws[i].form = nx && startsWithVowel(nx->form) ? "ἐξ" : "ἐκ";
+    } else if (k == "οὕτωσ" || k == "οὕτω") {
+      // C18: Attic prose οὕτω before a consonant, οὕτως before a vowel and at a pause
+      ws[i].form = nx && !startsWithVowel(nx->form) ? "οὕτω" : "οὕτως";
     }
   }
   // 2. movable nu

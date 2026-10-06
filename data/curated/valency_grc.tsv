@@ -2,6 +2,7 @@
 # Greek verb valency (Attic) for the realiser's case assignment and the checker's A4 (DESIGN §10.2 mirrored).
 # key = the lemma headword as in greek.vpl (greek_key applied by the loader). Frames as valency_la.tsv plus:
 #   acc+acc double accusative; gen / dat objects; prep:<greek>+<case>; impers:acc+inf (δεῖ), impers:dat+inf (ἔξεστι);
+#   purp:inf (C18) = a to-infinitive after the object is a bare infinitive of purpose ("δός μοι ὕδωρ πιεῖν");
 #   mid:<frame> = the frame of the middle voice (πείθομαι + dat, ἅπτομαι + gen); several frames by preference, ";".
 ἄγω	acc	τὸν βοῦν ἄγει	
 αἱρέω	acc	τὴν πόλιν αἱρεῖ	
@@ -34,7 +35,7 @@
 δείκνυμι	dat+acc	τῷ παιδὶ τὴν ὁδὸν δείκνυσιν	
 δέχομαι	acc	τὴν ἐπιστολὴν δέχεται	
 διδάσκω	acc+acc;acc	τοὺς παῖδας τὴν μουσικὴν διδάσκει	double accusative
-δίδωμι	dat+acc	τῷ παιδὶ τὴν σφαῖραν δίδωσιν	
+δίδωμι	dat+acc;purp:inf	τῷ παιδὶ τὴν σφαῖραν δίδωσιν; δός μοι ὕδωρ πιεῖν	C18: purp:inf = a bare infinitive of purpose after the object
 διέρχομαι	intr;acc	διέρχεται	
 διώκω	acc	τὸν λύκον διώκει	
 δοκέω	impers:dat+inf;inf	δοκεῖ μοι ἀπιέναι	
@@ -105,3 +106,4 @@
 χράω	mid:dat	τῷ ξίφει χρῆται	χράομαι "use" + dative
 οἴομαι	acc+inf;inf	ᾤμην Σελήνης ἡμέραν εἶναι	"I thought it was Monday" (C16)
 χρή	impers:acc+inf	ποῖ χρή με ἰέναι;	"should" (C16)
+παρέχω	dat+acc;purp:inf	τοῖς ξένοις σῖτον παρέχει φαγεῖν	C18

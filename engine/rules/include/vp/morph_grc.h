@@ -121,6 +121,14 @@ struct GenInfo {
 // present and the pluperfect for the imperfect.
 bool generate(const lex::Lexicon&, uint32_t lemma, const Features&, std::string& out, GenInfo* info = nullptr);
 
+// C18: the nominative (= vocative) of a participle of `lemma` (tense Present / Aorist / Perfect / Future, voice as
+// generate()), agreeing in number and gender with a subject. The singular is a table cell (the tables list the
+// participles as nominatives singular); the plural is derived from the singular cells by the endings of the third and
+// second declension (τρέχων -> τρέχοντες, ἰδοῦσα -> ἰδοῦσαι, λυόμενος -> λυόμενοι), `info->fromRule` when the lexicon
+// does not list the derived form. False for other cases and for endings the rule does not know.
+bool participle(const lex::Lexicon&, uint32_t lemma, uint8_t tense, uint8_t voice, uint8_t case_, uint8_t number,
+                uint8_t gender, std::string& out, GenInfo* info = nullptr);
+
 // Built-in closed-class tables (Attic). Key = the lemma's greek_key ("ὁ", "ἐγώ", "σύ", "ἡμεῖσ", "ὑμεῖσ", "αὐτόσ",
 // "οὗτοσ", "ἐκεῖνοσ", "ὅσ", "τίσ", "τισ", "οὐδείσ", "μηδείσ", "εἷσ", "δύο", "τρεῖσ", "τέτταρεσ", "πᾶσ").
 // `enclitic` asks for the enclitic personal forms (μου μοι με σου σοι σε). Gender 0 = masculine.

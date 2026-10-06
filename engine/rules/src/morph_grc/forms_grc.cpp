@@ -1,6 +1,7 @@
 // Greek lemma lookup, Attic-first generation, built-in closed-class tables, the rule paradigm for lemmas without a
 // table, and analysis with the Attic filter (vp/morph_grc.h).
 #include <algorithm>
+#include <cstring>
 
 #include "vp/morph_grc.h"
 #include "vp/realise_grc.h"
@@ -576,6 +577,10 @@ bool generate(const lex::Lexicon& lx, uint32_t lemma, const Features& want0, std
     }
   }
   if (best > -1000) {
+    // C18: a compound of προσ- whose table writes the augment before the prefix (ἐπροσκύνησα): Attic augments after
+    // the preposition (προσεκύνησα); the analysis maps the form back (see analyse)
+    if (bestForm.compare(0, std::strlen("ἐπροσ"), "ἐπροσ") == 0 && bestForm.size() > std::strlen("ἐπροσ") + 2)
+      bestForm = "προσε" + bestForm.substr(std::strlen("ἐπροσ"));
     out = bestForm;
     Features pf = unpack(bestPacked);
     gi.attic = (pf.extra & Attic) != 0;
@@ -605,6 +610,103 @@ bool generate(const lex::Lexicon& lx, uint32_t lemma, const Features& want0, std
     }
   }
   return false;
+}
+
+// ---- participles (C18) ----------------------------------------------------------------------------------------------
+namespace {
+
+bool endsNfc(const std::string& w, const char* e) {
+  const std::string t = text::nfc(e);
+  return w.size() > t.size() && w.compare(w.size() - t.size(), t.size(), t) == 0;
+}
+std::string cut(const std::string& w, const char* e) { return w.substr(0, w.size() - text::nfc(e).size()); }
+
+// Nominative plural of a participle from its nominative singular cells (the tables list the participles only as
+// masculine / feminine / neuter nominatives without number). The accent stays on the same vowel: τρέχων -> τρέχοντες,
+// δραμών -> δραμόντες, ποιῶν (ποιοῦσα) -> ποιοῦντες, λύσας -> λύσαντες, λυθείς -> λυθέντες, λελυκώς -> λελυκότες,
+// λυόμενος -> λυόμενοι; feminine: + ι (τρέχουσαι, ἰδοῦσαι), -μένη from the masculine (λυόμεναι); neuter from the
+// masculine (τρέχοντα, λυόμενα). Empty when the ending is not one of these.
+std::string masculinePlural(const std::string& m, const std::string& f) {
+  if (m == text::nfc("ὤν")) return text::nfc("ὄντες");
+  if (endsNfc(m, "ῶν")) {   // contracted present: the feminine stem (ποιοῦσα, τιμῶσα, δηλοῦσα)
+    if (!endsNfc(f, "σα")) return std::string();
+    return cut(f, "σα") + text::nfc("ντες");
+  }
+  if (endsNfc(m, "ών")) return cut(m, "ών") + text::nfc("όντες");
+  if (endsNfc(m, "ων")) return cut(m, "ων") + text::nfc("οντες");
+  if (endsNfc(m, "είς")) return cut(m, "είς") + text::nfc("έντες");
+  if (endsNfc(m, "ώς")) return cut(m, "ώς") + text::nfc("ότες");
+  if (endsNfc(m, "ούς")) return cut(m, "ούς") + text::nfc("όντες");
+  if (endsNfc(m, "άς")) return cut(m, "άς") + text::nfc("άντες");
+  if (endsNfc(m, "ύς")) return cut(m, "ύς") + text::nfc("ύντες");
+  if (endsNfc(m, "ας")) return cut(m, "ας") + text::nfc("αντες");
+  if (endsNfc(m, "μενος") || endsNfc(m, "μένος")) return cut(m, "ος") + text::nfc("οι");
+  return std::string();
+}
+
+}  // namespace
+
+bool participle(const lex::Lexicon& lx, uint32_t lemma, uint8_t tense, uint8_t voice, uint8_t case_, uint8_t number,
+                uint8_t gender, std::string& out, GenInfo* info) {
+  if (case_ != Nom && case_ != Voc) return false;
+  const uint8_t g = gender == F || gender == N ? gender : (uint8_t)M;
+  auto cell = [&](uint8_t gg, std::string& o, GenInfo* gi) {
+    Features f;
+    f.pos = Verb;
+    f.mood = ParticipleMood;
+    f.tense = tense;
+    f.voice = voice;
+    f.gender = gg;
+    f.number = Sg;
+    return generate(lx, lemma, f, o, gi) && !o.empty();
+  };
+  GenInfo gi;
+  if (number != Pl) {
+    if (!cell(g, out, &gi)) return false;
+    Features pf = unpack(gi.packed);
+    pf.case_ = Nom;
+    pf.number = Sg;
+    pf.gender = g;
+    gi.packed = pack(pf);
+    gi.movableNu = false;
+    if (info) *info = gi;
+    return true;
+  }
+  std::string m, f;
+  if (!cell(M, m, &gi)) return false;
+  GenInfo gf;
+  cell(F, f, &gf);
+  const std::string mp = masculinePlural(m, f);
+  if (mp.empty()) return false;
+  if (g == M) out = mp;
+  else if (g == N) {
+    if (endsNfc(mp, "ντες")) out = cut(mp, "ες") + "α";
+    else if (endsNfc(mp, "ότες")) out = cut(mp, "ες") + "α";
+    else if (endsNfc(mp, "οι")) out = cut(mp, "οι") + "α";
+    else return false;
+  } else {
+    if (endsNfc(m, "μενος") || endsNfc(m, "μένος")) out = cut(mp, "οι") + "αι";
+    else if (endsNfc(f, "α")) out = f + "ι";
+    else return false;
+  }
+  out = text::nfc(out);
+  // a form the lexicon does not list (form pages cover only some plurals) is a rule form: Check, never OK
+  morph::Token t;
+  morph::analyseGreek(lx, out, t);
+  bool known = false;
+  for (const lex::Analysis& a : t.analyses) known = known || (a.lemma == lemma && !t.accentInsensitive);
+  Features pf = unpack(gi.packed);
+  pf.case_ = Nom;
+  pf.number = Pl;
+  pf.gender = g;
+  pf.extra = 0;
+  GenInfo r;
+  r.exact = known;
+  r.attic = gi.attic;
+  r.fromRule = !known;
+  r.packed = pack(pf);
+  if (info) *info = r;
+  return true;
 }
 
 // ---- analysis -----------------------------------------------------------------------------------------------------
@@ -665,7 +767,7 @@ std::string restoreElided(std::string_view word) {
 void analyse(const lex::Lexicon& lx, std::string_view word, morph::Token& out) {
   // exact readings of the canonical spellings first: as written, grave -> acute, without the acute an enclitic
   // added, an orthotone enclitic, without a movable nu, an elided word restored
-  std::string cands[7];
+  std::string cands[8];
   int nc = 0;
   const std::string w0 = text::nfc(word);
   const std::string restored = restoreElided(w0);
@@ -675,6 +777,9 @@ void analyse(const lex::Lexicon& lx, std::string_view word, morph::Token& out) {
     if ((b0 == "εστι" || b0 == "εστιν") && accentOf(w0).position == 1) cands[nc++] = "ἐστί";
   }
   cands[nc++] = w0;
+  // C18: προσε- written by generate() for a table's ἐπροσ- (an augment before the prefix): the table's spelling
+  if (w0.compare(0, std::strlen("προσε"), "προσε") == 0 && w0.size() > std::strlen("προσε") + 2)
+    cands[nc++] = "ἐπροσ" + w0.substr(std::strlen("προσε"));
   const std::string w1 = dropEncliticAcute(ultimaToAcute(w0));
   if (w1 != w0) cands[nc++] = w1;
   if (accentOf(w1).accents == 0 && accentOf(w1).syllables >= 2) cands[nc++] = encliticAccented(w1);

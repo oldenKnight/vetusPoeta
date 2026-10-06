@@ -31,8 +31,9 @@ using realise::SubRel;
 using realise::YnBias;
 
 // ---- curated Greek tables ---------------------------------------------------------------------------------------
+// C18 (appended): PurpInf = "purp:inf", the verb takes a bare infinitive of purpose ("δός μοι ὕδωρ πιεῖν").
 enum class FrameKind : uint8_t { Acc, Gen, Dat, DatAcc, AccAcc, AccInf, Inf, Intr, Copula, Prep, ImpersAccInf,
-                                 ImpersDatInf, Other };
+                                 ImpersDatInf, Other, PurpInf };
 struct Frame {
   FrameKind kind = FrameKind::Other;
   bool middle = false;        // "mid:" prefix: the frame of the middle voice
@@ -151,6 +152,14 @@ struct GrcSub {
   bool before = false;
   bool otherwise = false;          // C16: "or (else)" before a counterfactual: "εἰ δὲ μή, οὐκ ἂν ἐνθάδε ἦσθα"
   std::vector<GrcClause> clause;   // exactly one
+  // C18 (additive): `participle` = a circumstantial participle (the clause's verb as a nominative participle agreeing
+  // with the main clause's subject; the clause has no subject of its own), placed after the main subject or first:
+  // "ὁ ποιμὴν ἰδὼν τὸν λύκον ἔφυγεν"; pred.tense Present (simultaneous) or Aorist (prior). `finite` = ὥστε + the
+  // indicative (an actual result, negation οὐ) instead of the infinitive. `noConj` = no conjunction: the clause
+  // carries a postpositive particle of its own (γάρ) and follows a comma.
+  bool participle = false;
+  bool finite = false;
+  bool noConj = false;
 };
 
 struct GrcWh { uint32_t lemma = kNone; Role role = Role::None; uint8_t gender = 0, number = 0; };
@@ -248,6 +257,7 @@ class GreekRealiser {
     bool main = true, relative = false, infinitival = false, negMe = false;
     uint8_t forceMood = 0;     // ἵνα / ἐάν: subjunctive
     Agree ante;                // relative clauses: the antecedent
+    bool participle = false;   // C18: the verb is a participle agreeing with `ante` (the main clause's subject)
   };
   Agree ofNP(const GrcNP&) const;
   uint8_t nounGender(const GrcNP&) const;

@@ -13,7 +13,9 @@
 #         Greek adverb, "prep:<greek>+<case>" = the Greek preposition + the noun (" def" = with the article), "ptc" =
 #         the nominative participle agreeing with the subject, after the verb), weekday (C16: day name -> the god's
 #         name in the genitive + ἡμέρα, "Ἄρεως ἡμέρα"; frame = the day's ordinal counted from Sunday for the
-#         alternative "τρίτη ἡμέρα").
+#         alternative "τρίτη ἡμέρα"), light (C18: a light verb or verb + object idiom, source = verb lemma + object
+#         noun lemma: the noun is the verb's meaning and is not translated, "make a mistake" -> ἁμαρτάνω; frame "mid" =
+#         the middle voice, "obj:<prep>" = the noun of that prepositional phrase is the Greek verb's object).
 #   verb rows, frame (C16): "nonfinite" = used instead of the main row when the verb is an infinitive, a subjunctive,
 #         a future, or inside a subordinate clause / indirect question ("go" -> εἶμι: ἰέναι, ἴωμεν, εἶ); "sub" = used
 #         inside a subordinate clause only ("before she comes" -> πρὶν ἥκειν).
@@ -216,3 +218,37 @@ durative	shake	τρέμω
 durative	teach	διδάσκω		
 durative	know	οἶδα		
 durative	go	εἶμι		εἶμι has the present system only (ἰέναι, ἴωμεν, ἴθι)
+# C18 (quality loop 3): light verbs and verb + object idioms (our own rows); Spanish mirrors after the English ones
+light	make mistake	ἁμαρτάνω		"I made a mistake" -> ἥμαρτον (not ἁμαρτίαν ἐποίησα)
+light	take walk	περιπατέω		"let's take a walk" -> περιπατῶμεν
+light	go walk	περιπατέω		
+light	have rest	ἀναπαύω	mid	"let's have a rest" -> ἀναπαυώμεθα
+light	take rest	ἀναπαύω	mid	
+light	give shout	βοάω		"the boy gave a shout" -> ἐβόησεν
+light	give cry	βοάω		
+light	let out shout	βοάω		
+light	make visit	ἐπισκέπτομαι	obj:to	"make a visit to the king" -> τὸν βασιλέα ἐπεσκέψατο
+light	pay visit	ἐπισκέπτομαι	obj:to	
+light	take bath	λούω	mid	"took a bath" -> ἐλούσατο
+light	have bath	λούω	mid	
+light	have swim	νέω		
+light	take look	σκοπέω	obj:at	"take a look at the map" -> σκόπει τὸν πίνακα
+light	have look	σκοπέω	obj:at	
+light	tell lie	ψεύδω	mid	"don't tell lies" -> μὴ ψεύδου
+light	ask question	ἐρωτάω		
+light	give answer	ἀποκρίνω	mid	
+light	make promise	ὑπισχνέομαι		
+light	have dinner	δειπνέω		
+light	cometer error	ἁμαρτάνω		"cometí un error" -> ἥμαρτον
+light	dar paseo	περιπατέω		"demos un paseo" -> περιπατῶμεν
+light	tomar descanso	ἀναπαύω	mid	
+light	dar grito	βοάω		
+light	hacer visita	ἐπισκέπτομαι	obj:to	
+light	tomar baño	λούω	mid	
+light	decir mentira	ψεύδω	mid	
+light	hacer pregunta	ἐρωτάω		
+light	dar respuesta	ἀποκρίνω	mid	
+light	hacer promesa	ὑπισχνέομαι		
+state	late	ὀψέ	adv	C18: "it is late" -> ὀψέ ἐστιν (frame adv: the Greek adverb with an impersonal copula)
+state	early	πρωΐ	adv	"it is early" -> πρωΐ ἐστιν
+verbprep	bark at	ὑλακτέω	prep:πρός+acc	C18: "the dog barked at the moon" -> πρὸς τὴν σελήνην ὑλάκτει

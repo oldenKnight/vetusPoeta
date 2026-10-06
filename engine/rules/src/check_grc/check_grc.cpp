@@ -101,6 +101,9 @@ struct GreekChecker::Impl {
            (r.lpos == Verb && r.f.mood == ParticipleMood);
   }
   static bool isNominal(const Reading& r) { return isHead(r) || isModifier(r) || isArticle(r); }
+  static bool isParticipleMod(const Reading& r) {   // C18
+    return r.f.case_ != 0 && (r.lpos == Participle || (r.lpos == Verb && r.f.mood == ParticipleMood));
+  }
   // C16: an adverb cell of an adjective (πρῶτον, ἡδέως): "πρῶτον τὴν θύραν ἄνοιξον" is not an agreement fault
   static bool isAdverbCell(const Reading& r) { return r.f.pos == Adv && r.f.case_ == 0; }
   static bool isRelative(const Reading& r) { return r.closed && r.key == "ὅσ"; }
@@ -629,6 +632,23 @@ struct GreekChecker::Impl {
       bool ok = false;
       for (size_t h : cand) ok = ok || agreeTokens(i, h, isModifier);
       if (ok) { attached[i] = 1; continue; }
+      // C18: a circumstantial participle agrees with a head anywhere in its clause (the subject: "ὁ ποιμὴν τὸν λύκον
+      // ὁρῶν ἔφυγεν"), or, with the subject left out, is a nominative of the finite verb's number ("τὴν βασίλειαν
+      // ἰδοῦσα προσεκύνησα")
+      if (any(i, isParticipleMod)) {
+        bool pok = false;
+        for (size_t j = b; j < e && !pok; ++j)
+          if (j != i && strongHead(j) && !isVerb[j]) pok = agreeTokens(i, j, isParticipleMod);
+        for (size_t j = b; j < e && !pok; ++j) {
+          if (!isVerb[j] || j == i) continue;
+          for (const Reading& v : rd[j]) {
+            if (!isFinite(v)) continue;
+            for (const Reading& a : rd[i])
+              if (isParticipleMod(a) && a.f.case_ == Nom && numberCompat(a.f.number, v.f.number)) pok = true;
+          }
+        }
+        if (pok) { attached[i] = 1; continue; }
+      }
       bool copula = false;
       for (size_t j = b; j < e; ++j)
         if (isVerb[j])
