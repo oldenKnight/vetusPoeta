@@ -55,6 +55,10 @@ random ("Elephantus folium dicit."), and tier 2 contains rare nouns; none of thi
   the inclement weather, the expedition continued northward."; Spanish "A pesar del mal tiempo, la expedición siguió
   hacia el norte." -> "Despite the bad weather, the expedition continued north."
 
+Thread oversubscription: the model tests take 44 s on a quiet box but 11.6 min at load average 11 (other builds
+running): llama.cpp's 4-thread pool degrades badly when the cores are shared. On the target the `eco` setting
+(2 threads) is the remedy when other programs are busy.
+
 ## Unverified
 Running on Windows (MinGW build links, not executed), speed and load time on an AVX2 i3 with 2 threads (`eco`),
 cold-cache load time, MSVC build, behaviour on a CPU without AVX2 (only the CPUID branch is unit-tested on a CPU that

@@ -288,8 +288,9 @@ json Server::cmdTranslateStart(const json& p) {
   pendingJob_ = [this, jobId, positions, opt]() {
     // Engine ii: closed-choice advisors that load the model lazily on the engine's first question inside this
     // job; the model is unloaded when the job ends, whatever happens.
-    // TODO(C2): hand `advisors` to the rules engine once the CLI builds it with makeEngine(EngineConfig) and C2's
-    // engine_config.h (vp::rules::Advisors::chooseSense returns int, -1 = no opinion) is committed:
+    // TODO(C8): hand `advisors` to the rules engine when the server adopts makeEngine(EngineConfig) (C2's
+    // engine_config.h: vp::rules::Advisors::chooseSense returns int, -1 = no opinion), e.g. through a Server-owned
+    // forwarding hook set for the duration of this job:
     //   cfg.advisors.chooseSense = [adv](const std::string& q, const std::vector<std::string>& o) {
     //     vp::Result<int> r = adv.chooseSense(q, o, nullptr); return r.ok() ? r.value() : -1; };
     struct UnloadAfter {
