@@ -1,0 +1,45 @@
+# Frame-builder expectations for the Spanish source (C13; our own sentences). Columns: sentence <TAB> expectations
+# (space separated key=value), checked on the first clause unit: kind pred tense aspect mod neg subj obj iobj sub wh
+# exist passive obl particle; subjp = person + number of the subject pronoun ("1sg", "2pl"); imppl = plural
+# imperative (1/0); "phrase" is the pattern of the first phrasebook unit, "units" the number of units. Lemmas stay
+# Spanish; closed classes are the canonical English words of the frame builder.
+El niño lee un libro.	kind=decl pred=leer tense=present aspect=simple neg=0 subj=niño obj=libro
+Las niñas están cantando en el jardín.	kind=decl pred=cantar aspect=progressive subj=niña obl=in:jardín
+Mañana iremos al río.	kind=decl pred=ir tense=future subjp=1pl obl=to:río
+Vamos a cantar una canción.	kind=decl pred=cantar mod=let obj=canción
+Va a llover.	kind=decl pred=llover tense=future
+¿Has visto a mi perro?	kind=yn pred=ver aspect=perfect subjp=2sg obj=perro
+Nunca he visto el mar.	kind=decl pred=ver aspect=perfect neg=1 obj=mar
+Espérame aquí.	kind=imp pred=esperar obj=me
+Cántanos una canción.	kind=imp pred=cantar obj=canción iobj=nos
+Dímelo.	kind=imp pred=decir obj=lo iobj=me
+Siéntate, por favor.	phrase=siéntate units=2
+Me equivoqué.	kind=decl pred=equivocar particle=se tense=past subjp=1sg
+Mi hermana se fue.	kind=decl pred=ir particle=se tense=past subj=hermana
+Te lo digo.	kind=decl pred=decir subjp=1sg obj=lo iobj=te
+Usted es muy amable.	kind=decl pred=be subj=usted subjp=2sg
+¿Ustedes tienen hambre?	kind=yn pred=tener subj=ustedes subjp=2pl obj=hambre
+Me gusta la música.	phrase=me gusta {NP} units=1
+Me duele la cabeza.	kind=decl pred=doler subj=cabeza iobj=me
+Veo a la maestra.	kind=decl pred=ver subjp=1sg obj=maestra
+No sé nada.	kind=decl pred=saber neg=1 obj=nothing
+No tengo ni perros ni gatos.	kind=decl pred=tener neg=1 obj=perro
+Nadie me ayuda.	kind=decl pred=ayudar subj=nobody obj=me
+¿Dónde vive tu abuela?	kind=wh pred=vivir subj=abuela wh=where:adverb
+¿Por qué lloras?	kind=wh pred=llorar subjp=2sg wh=why:adverb
+¿Quién rompió la ventana?	kind=wh pred=romper tense=past obj=ventana wh=who:subject
+¿Cuántos libros tienes?	kind=wh pred=tener subjp=2sg wh=how many:object
+Hay un gato en el jardín.	kind=decl pred=be exist=1 subj=gato obl=in:jardín
+No hay agua.	kind=decl pred=be exist=1 neg=1 subj=agua
+El reloj está roto.	kind=decl pred=romper passive=1 subj=reloj
+Se venden casas.	kind=decl pred=vender passive=1 subj=casa
+El gatito duerme.	kind=decl pred=dormir subj=gato
+Trabajo para que mis hijos coman.	kind=decl pred=trabajar sub=purpose:to
+Aunque llueva, iremos.	kind=decl pred=ir tense=future sub=concession:although
+Creo que tienes razón.	kind=decl pred=creer sub=complement:that
+La niña que canta es mi hermana.	kind=decl pred=be subj=niña
+No tengas miedo.	phrase=no tengas miedo units=1
+Corramos antes de que llegue.	kind=decl pred=correr mod=let sub=time:before
+Bebe el agua.	kind=imp pred=beber obj=agua imppl=0
+¡Que venga el maestro!	kind=decl pred=venir subj=maestro
+¡Todos, inclínense!	kind=imp pred=inclinar particle=se imppl=1

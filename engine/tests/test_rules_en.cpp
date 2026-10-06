@@ -412,7 +412,7 @@ TEST_CASE("rules-en: Spanish source frames (clitics, usted, ¿?, subjunctive by 
     static frame::SemFrame none;
     return none;
   };
-  fb.analyse("¿Dónde está el gato?", s);
+  fb.analyse("¿Dónde duerme el gato?", s);   // "¿Dónde está ...?" is a phrasebook row since C13
   CHECK(s.question);
   CHECK(first().type == frame::Kind::Wh);
   CHECK(first().wh.word == "where");

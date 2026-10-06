@@ -512,6 +512,16 @@ struct LatinChecker::Impl {
         if (copula) issue("A3", (int)i, "predicate '" + T(i) + "' does not agree with the subject / verb");
         continue;
       }
+      // a quantity noun before a partitive genitive ("paulum thēae", "satis aquae"): the noun reading heads (C13)
+      if (any(i, isHead)) {
+        bool gen = !cand.empty();
+        for (size_t h : cand) {
+          bool g = false;
+          for (const Reading& r : rd[h]) g = g || (isHead(r) && r.f.case_ == Gen);
+          gen = gen && h > i && g;
+        }
+        if (gen) continue;
+      }
       bool partial = false;
       for (size_t h : cand) partial = partial || partialPair(i, h);
       const bool afterGoverned = i > 0 && governed[i - 1] && !boundaryBefore[i] && std::find(cand.begin(), cand.end(), i - 1) != cand.end();

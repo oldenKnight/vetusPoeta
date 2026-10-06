@@ -132,8 +132,12 @@ bool Phrasebook::matchFrom(const std::vector<nlp::Token>& toks, const Pattern& p
     case SlotKind::NP: {
       int k = at;
       while (k < n && npToken(toks[(size_t)k])) ++k;
-      for (int x = k; x > at; --x)
-        if (npEnd(toks[(size_t)x - 1])) ends.push_back(x);
+      for (int x = k; x > at; --x) {
+        // a noun phrase ends with a noun, or with adjectives after its noun ("la pintura roja") (C13)
+        bool nounBefore = false;
+        for (int y = at; y < x - 1; ++y) nounBefore = nounBefore || toks[(size_t)y].upos == "NOUN";
+        if (npEnd(toks[(size_t)x - 1]) || (nounBefore && toks[(size_t)x - 1].upos == "ADJ")) ends.push_back(x);
+      }
       break;
     }
     case SlotKind::Name: {

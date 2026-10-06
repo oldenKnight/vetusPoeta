@@ -65,7 +65,8 @@ const char* adverb(const std::string& l, bool motion) {
       {"rather", "potius"},    {"even", "etiam"},          {"ever", "umquam"},        {"long", "diū"},
       {"loudly", "magnā vōce"}, {"truly", "vērē"},         {"together", "ūnā"},       {"up", "sursum"},
       {"down", "deorsum"},     {"forward", "porrō"},       {"why", "cūr"},            {"how", "quōmodo"},
-      {"where", "ubi"},        {"when", "quandō"}};
+      {"where", "ubi"},        {"when", "quandō"},        {"at last", "tandem"},     {"suddenly", "subitō"},
+      {"late", "sērō"},        {"early", "māne"}};
   const char* r = lookup(kAdv, l);
   if (r && std::strchr(r, ' ')) return nullptr;   // multi-word Latin: not an adverb lemma
   return r;
@@ -83,7 +84,12 @@ std::string spanishAdverb(const std::string& l) {
       {"después", "then"},    {"luego", "then"},      {"solo", "only"},       {"sólo", "only"},    {"muy", "very"},
       {"demasiado", "too"},   {"tan", "so"},          {"quizás", "perhaps"},  {"quizá", "perhaps"}, {"rápido", "quickly"},
       {"despacio", "slowly"}, {"juntos", "together"}, {"casi", "almost"},     {"bastante", "enough"}, {"sí", "yes"},
-      {"no", "no"},           {"lejos", "far"},       {"cerca", "near"},      {"otra vez", "again"}};
+      {"no", "no"},           {"lejos", "far"},       {"cerca", "near"},      {"otra vez", "again"},
+      {"a veces", "sometimes"}, {"de nuevo", "again"}, {"a menudo", "often"}, {"en seguida", "immediately"},
+      {"enseguida", "immediately"}, {"tal vez", "perhaps"}, {"de verdad", "really"}, {"por fin", "at last"},
+      {"claro", "certainly"}, {"adónde", "where"}, {"dónde", "where"}, {"cómo", "how"}, {"cuándo", "when"},
+      {"por qué", "why"},     {"acá", "here"},        {"despacio", "slowly"}, {"juntas", "together"},
+      {"temprano", "early"},  {"tarde", "late"},      {"de repente", "suddenly"}, {"sin embargo", "however"}};
   if (const char* r = lookup(kEs, l)) return r;
   return l;
 }
@@ -115,7 +121,9 @@ bool timeNoun(const std::string& l) {
 bool motionVerb(const std::string& l) {
   return in(l, {"go", "come", "run", "walk", "fly", "travel", "hurry", "return", "fall", "jump", "move", "swim",
                 "drive", "ride", "climb", "flee", "escape", "send", "lead", "bring", "carry", "throw", "put", "enter",
-                "ir", "venir", "correr", "caminar", "volver", "llegar", "andar", "subir", "bajar", "entrar", "salir"});
+                "ir", "venir", "correr", "caminar", "volver", "llegar", "andar", "subir", "bajar", "entrar", "salir",
+                "regresar", "caer", "huir", "escapar", "viajar", "volar", "nadar", "saltar", "meter", "poner",
+                "llevar", "traer", "marchar", "acercar"});
 }
 
 bool impersonalAdjective(const std::string& l) {

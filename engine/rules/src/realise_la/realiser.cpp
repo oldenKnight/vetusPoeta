@@ -116,6 +116,7 @@ void LatinRealiser::nameWord(const LaNP& n, uint8_t case_, const RealiseOptions&
 void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, const RealiseOptions& o,
                        std::vector<Word>& out) {
   const bool exclFirst = owner && owner->exclQuam;
+  const size_t start0 = out.size();
   AgreeInfo a = agree_.ofNP(n, cd_);
   a.case_ = case_;
   if (!n.coord.empty()) {   // the head NP alone agrees with its own modifiers
@@ -229,10 +230,15 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
       cw[0].rule = "enclitic.que";
     } else {
       Word et;
-      literal(k_.et, "et", et, "order.decl");
+      literal(n.coordConj != kNone ? n.coordConj : k_.et, "et", et, "order.decl");
       out.push_back(std::move(et));
     }
     append(out, cw);
+  }
+  if (n.coordBoth && n.coordConj != kNone && !n.coord.empty()) {   // "neque canēs neque fēlēs"
+    Word w;
+    literal(n.coordConj, "et", w, "order.decl");
+    out.insert(out.begin() + (long)start0, std::move(w));
   }
 }
 

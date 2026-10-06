@@ -18,7 +18,7 @@ quaero	quaerō	buscar, preguntar
 invenio	inveniō	encontrar
 facio	faciō	hacer
 ago	agō	hacer, actuar
-capio	capiō	tomar, agarrar
+capio	capiō	agarrar, capturar, atrapar
 pono	pōnō	poner
 sedeo	sedeō	estar sentado, sentarse
 sto	stō	estar de pie
@@ -37,11 +37,11 @@ memini	meminī	recordar
 licet	licet	está permitido, se puede
 oportet	oportet	hay que, es necesario
 gaudeo	gaudeō	alegrarse
-rideo	rīdeō	reír
+rideo	rīdeō	reír, sonreír
 fleo	fleō	llorar
 clamo	clāmō	gritar
 taceo	taceō	callar
-ambulo	ambulō	caminar
+ambulo	ambulō	caminar, pasear
 canto	cantō	cantar
 lego	legō	leer
 scribo	scrībō	escribir
@@ -63,7 +63,7 @@ amicus	amīcus	amigo
 amica	amīca	amiga
 rex	rēx	rey
 regina	rēgīna	reina
-domus	domus	casa
+domus	domus	casa, hogar
 hortus	hortus	jardín, huerto
 via	via	camino, calle
 aqua	aqua	agua
@@ -141,7 +141,7 @@ liberi	līberī	hijos
 ianua	iānua	puerta
 cubiculum	cubiculum	recámara, cuarto
 scutum	scūtum	escudo
-pila	pila	pelota
+pila	pila	pelota, bola
 ostium	ōstium	puerta, entrada
 appello	appellō	llamar, nombrar
 pulso	pulsō	tocar, golpear
@@ -158,4 +158,55 @@ horologium	hōrologium	reloj
 thea	thea	té
 placenta	placenta	pastel
 pallium	pallium	abrigo, capa
-charta	charta	hoja de papel, carta
+charta	charta	hoja de papel, naipe
+# C13 additions (Spanish source: the runtime reads these as the teacher's Spanish reverse index, es-MX)
+transeo	trānseō	pasar, cruzar, atravesar
+mirus	mīrus	extraño, maravilloso, asombroso
+carmen	carmen	canción, poema, canto
+sumo	sūmō	tomar, agarrar
+frango	frangō	romper, quebrar
+narro	narrō	contar, narrar, relatar
+fovea	fovea	hoyo, pozo, fosa
+altus	altus	alto, profundo, hondo
+imus	īmus	fondo
+adiuvo	adiuvō	ayudar
+color	color	color, pintura
+agricola	agricola	agricultor, campesino, granjero
+ludus	lūdus	escuela, juego
+pensum	pēnsum	tarea
+epistula	epistula	carta
+accendo	accendō	encender, prender
+obscurus	obscūrus	oscuro
+tenebrae	tenebrae	oscuridad, tinieblas
+benignus	benignus	amable, generoso, bondadoso
+cado	cadō	caer
+tremo	tremō	temblar
+fabula	fābula	cuento, historia, fábula
+cor	cor	corazón
+error	error	error, equivocación
+erro	errō	equivocarse, errar
+mane	māne	mañana (temprano)
+redeo	redeō	regresar, volver
+abeo	abeō	irse, marcharse
+aufugio	aufugiō	escaparse, huir
+loquor	loquor	hablar
+fenestra	fenestra	ventana
+pluit	pluit	llover
+intro	intrō	entrar
+cupio	cupiō	desear
+doceo	doceō	enseñar
+porta	porta	portón, puerta de la ciudad
+caput	caput	cabeza
+abscido	abscīdō	cortar
+ruber	ruber	rojo
+albus	albus	blanco
+niger	niger	negro
+flumen	flūmen	río
+prope	prope	cerca, cerca de
+habito	habitō	vivir, habitar
+magister	magister	maestro, profesor
+iratus	īrātus	enojado, enfadado
+nemo	nēmō	nadie
+sero	serō	plantar, sembrar
+avus	avus	abuelo
+avia	avia	abuela

@@ -88,6 +88,7 @@ struct Transfer::Ctx {
   bool reflObject = false;              // phrasal_en_la.tsv frame refl: "bow" -> inclīnāte vōs
   bool routeObject = false;             // "which way (do I go)": the way is the route (ablative), not an object
   uint8_t phrasalCase = 0;              // phrasal_en_la.tsv frame acc/dat/abl: case of the object
+  bool negConsumed = false;             // an NP carries the clause's negation ("neque ... neque")
   Ctx(const SemSentence& ss, const Settings& t, Memory& m, ClauseOut& o) : s(ss), st(t), mem(m), out(o) {}
   void cover(int tok) { if (tok >= 0) out.covered.push_back(tok); }
   void cover(const std::vector<int>& v) { out.covered.insert(out.covered.end(), v.begin(), v.end()); }
@@ -430,6 +431,12 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
         if ((p == "it" || p == "ello" || p == "lo") && c.mem.lastGender && c.frame && !c.frame->copula &&
             c.frame->pred.lemma != "be")
           g = c.mem.lastGender;
+        else if (c.st.lang == frame::SrcLang::Es && p == "lo")
+          g = N;   // "Dámelo." without an antecedent: it (id)
+        // Spanish él / ella / lo / la of a thing take the Latin gender of that noun, not the Spanish one (C13)
+        if (c.st.lang == frame::SrcLang::Es && c.mem.lastGender && !c.mem.lastAnimate && n.pron.gender &&
+            (p == "él" || p == "ella" || p == "ellos" || p == "ellas" || p == "la" || p == "las" || p == "los"))
+          g = c.mem.lastGender;
         o.pron.gender = g ? g : (uint8_t)M;
       } else {
         o.pron.gender = M;
@@ -511,7 +518,9 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
       tableChoice(o.head, n.head);
       return;
     }
-    const bool inTable = cd_.nameByEnglish(n.head) != nullptr;
+    const curated::NameEntry* esName = c.st.lang == frame::SrcLang::Es && !cd_.nameByEnglish(n.head) && !n.title
+                                       ? cd_.nameByLatin(text::latin_key(n.head)) : nullptr;   // "Alicia" -> Alīcia
+    const bool inTable = cd_.nameByEnglish(n.head) != nullptr || esName != nullptr;
     bool glossary = false;
     if (c.st.context)
       for (const rules::GlossaryEntry& g : c.st.context->glossary)
@@ -521,10 +530,20 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
       Choice ch;
       ch.token = n.token;
       std::string sg = low;
-      if (n.number == 2 && sg.size() > 3 && sg.back() == 's') sg.pop_back();
+      if (n.number == 2 && sg.size() > 3 && sg.back() == 's' && c.st.lang != frame::SrcLang::Es) sg.pop_back();
       o.head = select(sg, Noun, c.context, false, false, c.st, ch);
       c.out.choices.push_back(ch);
-      if (o.head != kNone) { o.capitalise = true; return; }
+      if (o.head != kNone) {
+        o.capitalise = true;
+        for (const SemNP& g : n.genitive) {   // "la Reina de Corazones" -> Rēgīna Cordium (C13)
+          LaNP x;
+          npInto(g, c, x);
+          x.capitalise = x.capitalise || g.isName;
+          o.genitive.push_back(x);
+          break;
+        }
+        return;
+      }
     }
     if (!inTable && !glossary) {
       // a proper name the Latin lexicon knows (Rōma, Iuppiter)
@@ -541,7 +560,7 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
       }
     }
     o.isName = true;
-    o.name = n.head;
+    o.name = esName ? esName->english : n.head;
     Choice ch;
     ch.token = n.token;
     ch.source = n.head;
@@ -558,6 +577,17 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
     }
     return;
   }
+  // Spanish weekday written as a common noun ("Es martes.") -> diēs Mārtis (C13)
+  if (c.st.lang == frame::SrcLang::Es && n.genitive.empty() && n.adjectives.empty())
+    if (const char* day = tables::weekday(text::lower(n.head))) {
+      o.head = latin("diēs", Noun);
+      LaNP g;
+      g.head = latin(day, Name);
+      if (g.head == kNone) { g.isName = true; g.name = day; }
+      o.genitive.push_back(g);
+      tableChoice(o.head, n.head);
+      return;
+    }
   // common nouns
   {
     Choice ch;
@@ -589,6 +619,7 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
       if (l.pos == Noun) {
         c.mem.lastGender = simpleGender(l.gender);
         c.mem.lastNumber = o.number;
+        c.mem.lastAnimate = animate(n);
       }
     }
   }
@@ -618,6 +649,20 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
   else if (d == "few") { addAdj("paucus", d); o.number = Pl; }
   else if (d == "much") addAdj("multus", d);
   else if (d == "another" || d == "other") addAdj("alius", d);
+  else if (d == "a little") {   // "un poco de té" -> paulum thēae (partitive genitive) (C13)
+    const uint32_t paulum = latin("paulum", Noun);
+    if (paulum != kNone && o.head != kNone) {
+      LaNP g = o;
+      g.case_ = Gen;
+      o = LaNP{};
+      o.head = paulum;
+      o.number = Sg;
+      o.gender = N;
+      o.genitive.push_back(g);
+      tableChoice(paulum, "poco");
+      return;
+    }
+  }
   if (n.interrogative) {
     if (n.wh == "how many") o.interrogative = latin("quot");
     else if (n.wh == "how much") o.interrogative = latin("quantus", Adj);
@@ -661,7 +706,7 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
     if (n.relative.empty() && o.relative.empty() && a.adverbs.empty()) {
       LaClause rc;
       const curated::PhraseEntry* pe = nullptr;
-      for (const curated::PhraseEntry& e : cd_.phrasebook())
+      for (const curated::PhraseEntry& e : c.st.lang == frame::SrcLang::Es ? cd_.phrasebookEs() : cd_.phrasebook())
         if (e.reg == "state" && text::lower(e.pattern) == text::lower(a.lemma)) { pe = &e; break; }
       if (pe && latinVerbPhrase(pe->latin, rc)) {
         rc.relRole = realise::Role::Subject;
@@ -741,6 +786,14 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
     npInto(k, c, x);
     o.coord.push_back(x);
   }
+  // "ni perros ni gatos" -> neque canēs neque fēlēs: neque carries the negation (the clause loses its nōn) (C13)
+  if (!o.coord.empty() && n.coordConj == "nor") {
+    o.coordConj = latin("neque", Conj);
+    o.coordBoth = o.coordConj != kNone;
+    if (o.coordBoth) c.negConsumed = true;
+  } else if (!o.coord.empty() && n.coordConj == "or") {
+    o.coordConj = latin("aut", Conj);
+  }
 }
 
 LaNP Transfer::np(const SemNP& n, const SemSentence& s, const Settings& st, Memory& mem, ClauseOut& out) const {
@@ -807,7 +860,7 @@ bool Transfer::obliqueInto(const frame::SemOblique& ob, Ctx& c, LaClause& cl) co
     return bare(Abl);
   }
   // languages: "in Latin" -> Latīnē
-  if ((prep == "in") && n.isName) {
+  if ((prep == "in") && (n.isName || c.st.lang == frame::SrcLang::Es)) {
     if (const char* adv = tables::languageAdverb(head)) {
       realise::LaAdverb a;
       a.lemma = latin(adv, Adv);
@@ -850,6 +903,8 @@ bool Transfer::obliqueInto(const frame::SemOblique& ob, Ctx& c, LaClause& cl) co
     if (person) return withPrep("apud", Acc);
     return withPrep("in", Abl);
   }
+  // Spanish "en" with a verb of motion is "into" ("Cayó en un hoyo" -> in foveam cecidit) (C13)
+  if (prep == "in" && c.motion && !time && c.st.lang == frame::SrcLang::Es) return withPrep("in", Acc);
   if (prep == "in" || prep == "on" || prep == "upon") return time ? bare(Abl) : withPrep("in", Abl);
   if (prep == "into" || prep == "onto") return withPrep("in", Acc);
   if (prep == "of" || prep == "about") return withPrep("dē", Abl);
@@ -1001,7 +1056,7 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     else if (ph->frame == "abl") c.phrasalCase = Abl;
   } else {
     verb = choose(sp.lemma, sp.token, hasObj, personObj);
-    if (!sp.particle.empty()) {
+    if (!sp.particle.empty() && sp.particle != "se") {   // Spanish "se" without a row: the verb as it is (C13)
       realise::LaAdverb a;
       a.lemma = adverb(sp.particle, -1, c, c.motion);
       if (a.lemma != kNone) cl.adverbs.push_back(a);
@@ -1078,7 +1133,8 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     bool agent = false;
     for (const frame::SemOblique& o : f.obliques)
       if (o.prep == "by") agent = true;
-    if (tense == Present && !agent) tense = Perfect;   // "the clock is broken": resultant state
+    // "the clock is broken": resultant state; Spanish passive "se" is a process ("Se venden casas") (C13)
+    if (tense == Present && !agent && sp.particle != "se") tense = Perfect;
   }
   if (sp.deliberative) { tense = Present; p.mood = Subjunctive; }
   if (sp.mood == frame::SrcMood::Conditional) {
@@ -1139,6 +1195,13 @@ void Transfer::clauseInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     cl.hasSubject = true;
     npInto(f.subject, c, cl.subject);
     if (f.subject.pron.emphatic) cl.subject.emphasis = true;
+    // Spanish (C13): a 3rd-person plural question answered with "we" was put to ustedes: 2nd plural (a guess)
+    if (c.st.lang == frame::SrcLang::Es && f.implicitSubject && cl.subject.isPronoun && cl.subject.pron.person == 3 &&
+        cl.subject.pron.number == Pl && c.mem.answerWe && c.question) {
+      cl.subject.pron.person = 2;
+      c.subjPerson = 2;
+      c.mem.addresseeGuess = true;
+    }
     if (f.subject.determiner == "all" && f.subject.isPronoun) cl.pred.person = f.subject.pron.person;
     c.subjGender = cl.subject.isPronoun ? cl.subject.pron.gender
                  : cl.subject.head != kNone ? simpleGender(la_.lemma(cl.subject.head).gender) : 0;
@@ -1233,6 +1296,11 @@ void Transfer::clauseInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
         if (dat && acc) cl.object.case_ = Acc;
       }
   }
+  // "tener miedo de la oscuridad" -> timēre tenebrās: the "de" attribute of the state noun is the object (C13)
+  if (c.objectInVerb && !cl.hasObject && f.hasObject && !f.object.genitive.empty()) {
+    cl.hasObject = true;
+    npInto(f.object.genitive[0], c, cl.object);
+  }
   c.phrasalCase = 0;
   if (f.hasIndirect) {
     cl.hasIndirect = true;
@@ -1240,7 +1308,7 @@ void Transfer::clauseInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
   }
   // obliques
   for (const frame::SemOblique& o : f.obliques) {
-    if (stateVerb && (o.prep == "of" || o.prep == "about") && !cl.hasObject) {
+    if ((stateVerb || c.objectInVerb) && (o.prep == "of" || o.prep == "about") && !cl.hasObject) {
       cl.hasObject = true;
       npInto(o.np, c, cl.object);
       c.cover(o.token);
@@ -1448,7 +1516,8 @@ void Transfer::clauseInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
         if (ls.rel == realise::SubRel::AccInf && sc.hasSubject && sc.subject.isPronoun) sc.subject.emphasis = true;
         // "I thought it was Monday" -> Putābam diem Lūnae esse: an "it" subject with a predicate noun is dropped
         if (ls.rel == realise::SubRel::AccInf && sc.hasSubject && sc.subject.isPronoun && sf.hasSubject &&
-            sf.subject.pronLemma == "it" && !sc.predicative.empty())
+            (sf.subject.pronLemma == "it" || (sf.implicitSubject && sf.subject.pron.person == 3)) &&
+            !sc.predicative.empty())
           sc.hasSubject = false;
         if (ls.rel == realise::SubRel::AccInf && !sc.hasSubject && sc.predicative.empty()) {   // implicit "it"
           sc.hasSubject = true;
@@ -1483,6 +1552,7 @@ void Transfer::clauseInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
   }
   // clause-level negative words from NPs ("no", "nobody", "nothing", "never")
   if (c.negative && !f.negative) cl.polarity = realise::Polarity::Neg;
+  if (c.negConsumed) { cl.polarity = realise::Polarity::Pos; c.negConsumed = false; }
   c.frame = keepFrame;
   c.motion = keepMotion;
   c.negative = keepNeg;

@@ -1,0 +1,194 @@
+# pattern	latin	tier	register	note
+# Spanish phrasebook (C13; teacher-editable; es-MX register). Same columns and syntax as phrasebook_en_la.tsv:
+# lower-case words matched against each token's lower form or lemma (write the inflected form when the Latin is
+# person-specific: "tengo hambre", not "tener hambre"), slots {NP} {NAME} {VP} {ADJ} {NUM} {WH}, optional tokens in
+# (...), alternatives a|b (one word each); contractions_es.tsv applies to patterns ("del" = "de el"). Inverted marks
+# ¿ ¡ are punctuation and never part of a pattern. Enclitic pronouns are written apart and without the written stress
+# ("pasa me {NP}" for "Pásame ..."), as the tokenizer splits them; a one-word row ("siéntate", "ándale") is never split. Our own rows, mirroring the English phrasebook.
+hola	salvē	1	greet	plural: salvēte when addressee count > 1
+buenos días	salvē	1	greet	
+buenas tardes	salvē	1	greet	
+buenas noches	bonam noctem	1	greet	as a farewell before sleep the English row says "bene dormī"
+adiós	valē	1	greet	plural valēte
+hasta luego	valē	1	greet	
+hasta pronto	mox tē vidēbō	1	greet	
+hasta mañana	crās tē vidēbō	1	greet	
+nos vemos	mox tē vidēbō	1	greet	
+nos vemos mañana	crās tē vidēbō	1	greet	
+bienvenido|bienvenida|bienvenidos|bienvenidas	salvē	1	greet	
+gracias	grātiās	1	polite	
+muchas gracias	grātiās tibi maximās agō	1	polite	
+mil gracias	grātiās tibi maximās agō	1	polite	
+de nada	libenter	1	polite	
+por favor	quaesō	1	polite	
+perdón	ignōsce mihi	1	polite	
+perdona|perdóname|disculpa|disculpe	ignōsce mihi	1	polite	
+con permiso	ignōsce mihi	1	polite	es-MX: passing someone
+lo siento	ignōsce mihi	1	polite	
+lo siento mucho	valdē mē paenitet	2	polite	
+sí	ita	1	reply	or "certē", "sīc"
+no	nōn	1	reply	or "minimē"
+claro	certē	1	answer	
+claro que	certē	1	adv	"Claro que podemos hablar." -> Certē loquī possumus.
+claro que sí	certē	1	answer	
+claro que no	minimē	1	answer	
+por supuesto	certē	1	answer	
+de acuerdo	bene	1	answer	
+está bien	bene	1	answer	
+bueno	bene	1	answer	as a reply
+órale	age	1	excl	es-MX: "come on / all right"
+ándale	age	1	imp	es-MX: "go on, hurry"
+ni modo	quid faciam	1	excl	es-MX: "oh well, nothing to be done"
+para nada	minimē	1	answer	
+de ninguna manera	minimē	1	answer	
+quizás|quizá	fortasse	1	answer	
+un poco	paulum	1	answer	as a reply ("un poco de té" is an NP: paulum thēae)
+no sé	nesciō	1	answer	
+ya sé	sciō	1	answer	
+ya veo	intellegō	1	answer	
+no importa	nihil interest	1	answer	
+ya basta	satis est	1	answer	
+basta	satis	1	answer	
+tienes razón	rēctē dīcis	1	answer	
+tiene razón	rēctē dīcis	1	answer	usted
+es todo	id est omne	1	answer	
+muy bien	optimē	1	answer	
+bien hecho	bene fēcistī	1	praise	
+bravo	euge	1	praise	
+qué tal	quid agis	1	q	
+cómo estás	quid agis	1	q	
+cómo está usted	quid agis	1	q	
+cómo te llamas	quid est nōmen tibi	1	q	
+cómo se llama usted	quid est nōmen tibi	1	q	
+me llamo {NAME}	nōmen mihi est {1}	1	intro	
+mi nombre es {NAME}	nōmen mihi est {1}	1	intro	
+soy {NAME}	ego sum {1}	1	intro	
+quién eres	quis es	1	q	
+quién es usted	quis es	1	q	
+qué es eso	quid est illud	1	q	
+qué es esto	quid est hoc	1	q	
+qué pasa	quid est	1	q	
+qué pasó	quid factum est	1	q	
+qué hora es	quota hōra est	1	q	
+qué día es hoy	quī diēs est hodiē	1	q	
+dónde estoy	ubi sum	1	q	
+dónde estás	ubi es	1	q	
+dónde estamos	ubi sumus	1	q	
+a dónde vas	quō īs	1	q	
+adónde vas	quō īs	1	q	
+dónde está {NP}	ubi est {1:nom}	1	q	
+por qué	cūr	1	q	
+por qué no	cūr nōn	1	q	
+qué quieres	quid vīs	1	q	
+qué quieres decir	quid dīcis	1	q	
+entiendes	intellegis	1	q	
+ay	heu	1	excl	"Ay, ay, ..." -> Heu, heu, ...
+ay de mí	ō mē miserum/miseram	1	excl	gender of speaker
+de veras	vērō	1	excl	
+en serio	vērō	1	excl	
+oh	ō	1	excl	
+dios mío	dī bonī	1	excl	
+madre mía	dī bonī	1	excl	
+caramba	papae	1	excl	
+guau	papae	1	excl	
+hurra	iō	1	excl	
+oye|oiga	heus	1	excl	
+mira	ecce	1	excl	when used as attention word ("¡Mira el cielo!" is the verb)
+escucha	audī	1	imp	
+vamos	age	1	imp	"come on"; "vamos a + inf" is a clause
+vámonos	eāmus	1	imp	
+ven aquí|acá	venī hūc	1	imp	
+pasa|adelante	intrā	1	imp	
+vete	abī	1	imp	
+fuera	exī	1	imp	
+sigue	perge	1	imp	
+apúrate	festīnā	1	imp	es-MX
+date prisa	festīnā	1	imp	
+rápido	celeriter	1	imp	
+alto	dēsine	1	imp	
+espera	manē	1	imp	
+espera un momento	manē paulum	1	imp	
+cállate	tacē	1	imp	
+silencio	tacēte	1	imp	
+siéntate	sedē	1	imp	
+levántate	surge	1	imp	
+despierta	ēvigilā	2	imp	
+auxilio|socorro	auxilium	1	excl	as a cry
+ayuda	auxilium	1	excl	as a cry
+ayúdame	adiuvā mē	1	imp	
+cuidado	cavē	1	imp	
+ten cuidado	cavē	1	imp	
+no te preocupes	nōlī timēre	1	imp	
+no tengas miedo	nōlī timēre	1	imp	
+cuídate	cūrā ut valeās	1	imp	
+que le corten {NP}	{1:acc} eius abscīdite	2	imp	command to a group: "¡Que le corten la cabeza!"
+que les corten {NP}	{1:acc} eōrum abscīdite	2	imp	
+es tarde	sērō est	1	state	
+demasiado tarde	nimis sērō	1	answer	
+llego tarde	sērō veniō	1	state	
+llegamos tarde	sērō venīmus	1	state	
+a tiempo	tempore	1	adv	
+ahora mismo	nunc statim	1	adv	
+por fin	tandem	1	adv	
+por cierto	cēterum	1	adv	
+por ejemplo	exemplī grātiā	2	adv	
+en realidad	rē vērā	1	adv	
+primero que nada	prīmum	1	adv	
+y qué	quid tum	1	q	
+para qué	cūr	1	q	
+tonterías	nūgae	1	excl	
+tonto|tonta	stulte	1	insult	vocative; stulta for feminine
+te quiero|amo	tē amō	1	state	
+me gusta {NP}	{1:nom} mihi placet	1	state	plural: placent ("me gustan")
+me gustan {NP}	{1:nom} mihi placent	1	state	
+quiero {NP}	{1:acc} volō	1	state	
+necesito {NP}	{1:abl} mihi opus est	1	state	
+tengo hambre	ēsuriō	1	state	
+tengo sed	sitiō	1	state	
+tengo frío	frīgeō	1	state	
+tengo calor	caleō	1	state	
+tengo miedo	timeō	1	state	
+tengo sueño	dormītō	1	state	
+estoy cansado|cansada	fessus/fessa sum	1	state	
+estoy listo|lista	parātus/parāta sum	1	state	
+estoy feliz|contento|contenta	laetus/laeta sum	1	state	
+estoy triste	trīstis sum	1	state	
+es hora	tempus est	1	state	
+es hora de {VP}	tempus est {1:inf}	1	state	
+a ver	videāmus	1	imp	
+aquí tienes|tiene	ecce	1	give	
+aquí está	ecce venit	1	give	"¡Aquí está!" of someone arriving
+ahí está	ecce	1	give	
+había una vez	ōlim erat	1	narr	"Había una vez una niña." -> Ōlim erat puella.
+érase una vez	ōlim erat	1	narr	
+hace mucho tiempo	ōlim	1	narr	
+fin	fīnis	1	narr	
+feliz cumpleaños	fēlīx diēs nātālis	1	greet	
+feliz navidad	fēlīx diēs nātālis Chrīstī	2	greet	
+su majestad	Māiestās Tua	2	address	vocative phrase
+su alteza	Celsitūdō Tua	2	address	
+mi amor	mea vīta	1	address	
+mi amigo	mī amīce	1	address	
+mi amiga	mea amīca	1	address	
+señor	domine	1	address	
+señora	domina	1	address	
+damas y caballeros	dominae ac dominī	1	address	
+pasa me {NP}	dā mihi {1:acc}	1	imp	
+da me {NP}	dā mihi {1:acc}	1	imp	
+jugar a las cartas	chartīs lūdere	1	vp	"¿Juegas a las cartas?" -> Lūdisne chartīs?
+ir a la escuela	ad lūdum īre	1	vp	
+en la escuela	in lūdō	1	pp	
+en latín	Latīnē	1	adv	
+en griego	Graecē	1	adv	
+en inglés	Anglicē	1	adv	
+en español	Hispānicē	1	adv	
+esto es imposible	hoc fierī nōn potest	1	state	
+eso es imposible	id fierī nōn potest	1	state	
+imposible	fierī nōn potest	1	state	as a one-word reply; also attributive ("cosas imposibles")
+depende de {WH}	id pendet ex eō {1}	1	state	
+eso depende de {WH}	id pendet ex eō {1}	1	state	
+depende	id pendet	1	answer	
+no importa {WH}	nihil interest {1:subj}	1	state	
+qué {NP} tan|más {ADJ}	quam {2} {1:nom}	1	excl	"¡Qué jardín tan extraño!" -> Quam mīrus hortus!
+toma mi abrigo	sūme pallium meum	1	imp	
+tal vez	fortasse	1	answer	

@@ -31,6 +31,9 @@ bool personNoun(const std::string& lemma);        // persons and animals (person
 bool motionVerb(const std::string& lemma);        // ir, venir, caer ... ("en" -> into, "a" -> to)
 bool intransitiveVerb(const std::string& lemma);  // vivir, llegar ... (a post-verbal "object" is the subject)
 bool dativeVerb(const std::string& lemma);        // gustar, dar, decir ... (me / te / nos -> indirect object)
+bool rareLemma(const std::string& lemma);
+bool experiencerVerb(const std::string& lemma);   // gustar, doler ...: "me duele la cabeza" (the thing is the subject)
+bool notDiminutive(const std::string& lemma);     // "señorita", "mosquito" ...: not -ito/-ita of another noun         // dolar (beside doler), vetar (vete) ...: chosen last
 // Multi-word adverbs / prepositions of the clause builder: "a veces" -> "sometimes"; "" when not listed.
 std::string multiwordPrep(const std::string& adv);   // "detrás" (+ de) -> "behind"
 

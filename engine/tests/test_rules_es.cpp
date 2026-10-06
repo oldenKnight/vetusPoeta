@@ -129,8 +129,8 @@ long rssAnonKb() {
   return -1;
 }
 
-std::vector<rules::CueInput> regressionCues(int repeat = 1) {
-  std::ifstream f(repo() / "tests" / "regression" / "own_dialogue.es.srt", std::ios::binary);
+std::vector<rules::CueInput> regressionCues(int repeat = 1, const char* file = "own_dialogue.es.srt") {
+  std::ifstream f(repo() / "tests" / "regression" / file, std::ios::binary);
   std::vector<uint8_t> b((std::istreambuf_iterator<char>(f)), {});
   auto d = subs::parse(b, subs::Format::Srt);
   REQUIRE(d.ok());
@@ -255,7 +255,319 @@ TEST_CASE("rules-es: end to end on own_dialogue.es.srt vs the gold Latin (report
         << confName(r1.value()[i].confidence) << "\n";
   rep << "\nFrames of the mismatches:\n" << frames.str();
   std::ofstream(buildDir() / "regression_report_es.txt") << rep.str();
+  CHECK_MESSAGE(matches >= 85, "Spanish regression below the C13 target: " << matches << " / 100");
   MESSAGE("regression es: " << matches << " / 100 match the gold; confidence ok " << conf["ok"] << " / check "
                             << conf["check"] << " / fix " << conf["fix"] << "; report "
                             << (buildDir() / "regression_report_es.txt").string());
+}
+
+// ================================================================================================================
+TEST_CASE("rules-es: Spanish curated tables (phrasebook, contractions, clitics, glosses, merged states/phrasal/verbprep)") {
+  const curated::CuratedData& d = cur();
+  CHECK(d.phrasebookEs().size() >= 150);
+  CHECK(d.contractionsEs().size() >= 2);
+  REQUIRE(d.clitic("me") != nullptr);
+  CHECK(d.clitic("me")->role == "any");
+  CHECK(d.clitic("lo")->role == "acc");
+  CHECK(d.clitic("le")->role == "dat");
+  CHECK(d.clitic("se")->role == "refl");
+  CHECK(d.clitic("casa") == nullptr);
+  std::vector<const curated::GlossEsEntry*> g;
+  d.glossEsLemmas("pelota", g);
+  REQUIRE(!g.empty());
+  CHECK(g[0]->key == "pila");
+  d.glossEsLemmas("plantar", g);   // homograph rows share the key: serō "plantar" next to sērō "tarde"
+  REQUIRE(g.size() == 1);
+  CHECK(text::nfc(g[0]->head) == text::nfc("serō"));
+  REQUIRE(d.state("tener miedo") != nullptr);   // states_es_la.tsv merged into states()
+  CHECK(d.state("enojado")->latin == "īrātus");
+  REQUIRE(d.phrasal("equivocar", "se") != nullptr);
+  CHECK(d.phrasal("inclinar", "se")->frame == "refl");
+  REQUIRE(d.verbPrep("vivir", "in") != nullptr);
+  CHECK(d.verbPrep("pensar", "in")->latinPrep == "dē");
+  for (const auto& w : d.warnings())
+    if (w.file.find("_es") != std::string::npos) MESSAGE("curated warning: " << w.file << ":" << w.line << " " << w.message);
+
+  // the Spanish tables are optional: a data folder without them loads (with warnings) and English is untouched
+  const stdfs::path dir = stdfs::path(VP_TEST_TMP) / "curated_c13";
+  std::error_code ec;
+  stdfs::remove_all(dir, ec);
+  stdfs::create_directories(dir, ec);
+  for (const auto& e : stdfs::directory_iterator(repo() / "data" / "curated")) {
+    const std::string n = e.path().filename().string();
+    if (n == "phrasebook_es_la.tsv" || n == "clitics_es.tsv" || n == "contractions_es.tsv" || n == "states_es_la.tsv" ||
+        n == "phrasal_es_la.tsv" || n == "verbprep_es_la.tsv")
+      continue;
+    stdfs::copy_file(e.path(), dir / e.path().filename(), stdfs::copy_options::overwrite_existing, ec);
+  }
+  { std::ofstream(dir / "gloss_es_la.tsv", std::ios::app) << "broken row without gloss\nx\n"; }
+  Result<curated::CuratedData> r = curated::CuratedData::load(dir);
+  REQUIRE(r.ok());
+  CHECK(r->phrasebookEs().empty());
+  CHECK(r->clitics().empty());
+  CHECK(!r->phrasebook().empty());
+  int optional = 0;
+  for (const auto& w : r->warnings()) optional += w.message.find("optional Spanish table") != std::string::npos;
+  CHECK(optional == 6);
+}
+
+TEST_CASE("rules-es: tokenizer (clitics split with offsets, contractions, words that stay whole)") {
+  NEED_REAL();
+  frame::FrameBuilder fb(frame::SrcLang::Es, &real().pes, &real().es, cur());
+  std::vector<nlp::Token> t;
+  auto words = [&](const char* s) {
+    fb.tokenize(s, t);
+    std::string out;
+    for (const nlp::Token& x : t) out += (out.empty() ? "" : " ") + x.lower;
+    return out;
+  };
+  CHECK(words("Dámelo.") == "da me lo .");
+  REQUIRE(t.size() == 4);
+  CHECK(t[0].start == 0);
+  CHECK(t[1].start == 0);   // every piece keeps the byte range of the written word
+  CHECK(t[2].end == t[0].end);
+  CHECK(words("Acuéstate.") == "acuesta te .");               // pronominal acostarse
+  CHECK(words("Siéntate.") == "siéntate .");                  // ... but a one-word phrasebook row stays whole
+  CHECK(words("Pásame la pintura.") == "pasa me la pintura .");
+  CHECK(words("Cántanos una canción.") == "canta nos una canción .");
+  CHECK(words("¡Todos, inclínense!") == "¡ todos , inclinen se !");
+  CHECK(words("Enciende la vela.") == "enciende la vela .");   // a noun is never split ("ve la")
+  CHECK(words("Vamos al jardín del rey.") == "vamos a el jardín de el rey .");
+  CHECK(words("¡Ándale!") == "¡ ándale !");                    // a one-word phrasebook row stays whole
+  CHECK(words("Espera.") == "espera .");
+}
+
+TEST_CASE("rules-es: frame builder on 40 own sentences (tests/fixtures/rules_es/frames_es.tsv)") {
+  NEED_REAL();
+  frame::FrameBuilder fb(frame::SrcLang::Es, &real().pes, &real().es, cur());
+  std::ifstream in(stdfs::path(VP_FIXTURES_DIR) / "rules_es" / "frames_es.tsv");
+  REQUIRE(in.good());
+  std::string line;
+  int rows = 0, good = 0;
+  frame::SemSentence s;
+  while (std::getline(in, line)) {
+    if (line.empty() || line[0] == '#') continue;
+    const size_t tab = line.find('\t');
+    REQUIRE(tab != std::string::npos);
+    const std::string sent = line.substr(0, tab);
+    fb.analyse(sent, s);
+    ++rows;
+    const frame::SemFrame* f = nullptr;
+    const frame::PhraseMatch* ph = nullptr;
+    for (const frame::Unit& u : s.units) {
+      if (u.type == frame::Unit::Clause && !f && !u.vocative) f = &u.frame;
+      if (u.type == frame::Unit::Phrase && !ph) ph = &u.phrase;
+    }
+    auto npName = [](const frame::SemNP& n) { return n.isPronoun ? n.pronLemma : n.head; };
+    std::map<std::string, std::string> got;
+    got["units"] = std::to_string(s.units.size());
+    if (ph) got["phrase"] = ph->pattern;
+    if (f) {
+      got["kind"] = frame::kindName(f->type);
+      got["pred"] = f->pred.lemma;
+      got["particle"] = f->pred.particle;
+      got["tense"] = frame::tenseName(f->pred.tense);
+      got["aspect"] = frame::aspectName(f->pred.aspect);
+      got["mod"] = frame::modalityName(f->pred.modality);
+      got["neg"] = f->negative ? "1" : "0";
+      got["exist"] = f->existential ? "1" : "0";
+      got["passive"] = f->pred.voice == frame::Voice::Passive ? "1" : "0";
+      got["imppl"] = f->imperativePlural ? "1" : "0";
+      if (f->hasSubject) got["subj"] = npName(f->subject);
+      if (f->hasSubject && f->subject.isPronoun)
+        got["subjp"] = std::to_string(f->subject.pron.person) + (f->subject.pron.number == 2 ? "pl" : "sg");
+      if (f->hasObject) got["obj"] = npName(f->object);
+      if (f->hasIndirect) got["iobj"] = npName(f->indirectObject);
+      if (!f->subordinate.empty())
+        got["sub"] = std::string(frame::relationName(f->subordinate[0].relation)) + ":" + f->subordinate[0].marker;
+      if (f->type == frame::Kind::Wh) got["wh"] = f->wh.word + ":" + frame::roleName(f->wh.role);
+      if (!f->obliques.empty())
+        got["obl"] = (f->obliques[0].prep.empty() ? std::string("-") : f->obliques[0].prep) + ":" + f->obliques[0].np.head;
+    }
+    // expectations: a value runs to the next " key=" (values may contain spaces: "how many:object")
+    const std::string rest = line.substr(tab + 1);
+    std::vector<std::pair<std::string, std::string>> exp;
+    size_t p = 0;
+    while (p < rest.size()) {
+      while (p < rest.size() && rest[p] == ' ') ++p;
+      const size_t eq = rest.find('=', p);
+      if (eq == std::string::npos) break;
+      size_t end = std::string::npos, next = eq + 1;
+      for (;;) {
+        end = rest.find(' ', next);
+        if (end == std::string::npos) break;
+        const size_t eq2 = rest.find('=', end), sp2 = rest.find(' ', end + 1);
+        if (eq2 != std::string::npos && (sp2 == std::string::npos || eq2 < sp2)) break;
+        next = end + 1;
+      }
+      exp.emplace_back(rest.substr(p, eq - p), rest.substr(eq + 1, end == std::string::npos ? std::string::npos : end - eq - 1));
+      p = end == std::string::npos ? rest.size() : end + 1;
+    }
+    bool all = true;
+    for (const auto& e : exp) {
+      const bool ok = got.count(e.first) && got[e.first] == e.second;
+      CHECK_MESSAGE(ok, sent << ": " << e.first << " expected '" << e.second << "' got '"
+                              << (got.count(e.first) ? got[e.first] : std::string("<none>")) << "'  ["
+                              << frame::describe(s) << "]");
+      all = all && ok;
+    }
+    good += all;
+  }
+  CHECK(rows == 40);
+  MESSAGE("Spanish frame builder: " << good << " / " << rows << " sentences fully as expected");
+}
+
+namespace {
+struct EsOut { std::string text; rules::Confidence conf; std::vector<std::string> flags; };
+std::vector<EsOut> runEs(const std::vector<std::string>& src, char gender = 'f', int fidelity = 2) {
+  static std::unique_ptr<rules::Engine> e = engine();
+  std::vector<rules::CueInput> in;
+  for (size_t i = 0; i < src.size(); ++i) {
+    rules::CueInput c;
+    c.index = (uint32_t)i;
+    c.sourceText = src[i];
+    c.startMs = (int64_t)i * 4000;
+    c.endMs = c.startMs + 3500;
+    in.push_back(c);
+  }
+  auto r = e->translate(in, esOptions(fidelity, gender), rules::Context{}, nullptr, nullptr);
+  REQUIRE(r.ok());
+  std::vector<EsOut> out;
+  for (const auto& c : r.value()) out.push_back(EsOut{flat(c.target), c.confidence, c.flags});
+  return out;
+}
+}  // namespace
+
+TEST_CASE("rules-es: constructions of the Spanish source (one sentence each)") {
+  NEED_REAL();
+  const std::pair<const char*, const char*> cases[] = {
+      {"Dámelo.", "Dā mihi id."},                                   // enclitics: indirect + direct object
+      {"Espérame aquí.", "Manē mē hīc."},                           // clitic as the direct object
+      {"Cántanos una canción.", "Cantā nōbīs carmen."},             // clitic as the indirect object (object present)
+      {"Mi hermana se fue.", "Soror mea abiit."},                   // pronominal irse (phrasal_es_la.tsv)
+      {"¡Todos, inclínense!", "Omnēs, inclīnāte vōs!"},             // ustedes imperative, refl frame
+      {"Usted es muy amable.", "Valdē benignus es."},               // usted -> 2nd person
+      {"¿Ustedes tienen hambre?", "Ēsurītisne?"},                   // ustedes, tener hambre (states_es_la.tsv)
+      {"Va a llover.", "Pluet."},                                   // ir a + infinitive -> future
+      {"Vamos a cantar una canción.", "Carmen cantēmus."},          // vamos a + infinitive -> let us
+      {"Nunca he visto el mar.", "Numquam mare vīdī."},             // perfecto compuesto, nunca
+      {"Las niñas están cantando en el jardín.", "Puellae in hortō cantant."},   // estar + gerundio
+      {"El reloj está roto.", "Hōrologium frāctum est."},           // estar + participle -> resultant passive
+      {"Las puertas están cerradas.", "Iānuae clausae sunt."},
+      {"No hay agua.", "Nūlla aqua est."},                          // hay, negated
+      {"Me duele la cabeza.", "Caput mihi dolet."},                 // dolor-type verb: dative + subject
+      {"Me gusta la música.", "Mūsica mihi placet."},               // phrasebook me gusta {NP}
+      {"Veo a la maestra.", "Magistram videō."},                    // personal "a"
+      {"¿Has visto a mi perro?", "Vīdistīne canem meum?"},
+      {"No sé nada.", "Nihil sciō."},                               // double negation
+      {"No tengo ni perros ni gatos.", "Neque canēs neque fēlēs habeō."},   // ni ... ni
+      {"Nadie me ayuda.", "Nēmō mē adiuvat."},
+      {"¿Por qué lloras?", "Cūr flēs?"},                            // ¿ ? and por qué
+      {"¿Cuántos libros tienes?", "Quot librōs habēs?"},            // the noun "subject" of a 2nd-person verb
+      {"Se venden casas.", "Domūs vēnduntur."},                     // passive se
+      {"El gatito duerme.", "Fēlēs parva dormit."},                 // diminutive -> parvus
+      {"Trabajo para que mis hijos coman.", "Labōrō ut fīliī meī edant."},   // para que + subjunctive
+      {"Aunque llueva, iremos.", "Quamquam pluat, ībimus."},        // aunque
+      {"Corramos antes de que llegue.", "Currāmus antequam veniat."},   // hortative, antes de que
+      {"La niña que canta es mi hermana.", "Puella quae cantat soror mea est."},   // que relative
+      {"No tengas miedo.", "Nōlī timēre."},                         // prohibition
+      {"Bebe el agua.", "Bibe aquam."},                             // 2sg imperative = 3sg indicative form
+      {"¡Que venga el maestro!", "Magister veniat!"},               // jussive que + subjunctive
+      {"Niña, ven aquí.", "Puella, venī hūc."},                     // vocative
+      {"Ven aquí, niño.", "Venī hūc, puer."},
+      {"El gato es pequeño.", "Fēlēs parva est."},                  // no Spanish gender in Latin agreement
+      {"La puerta es grande.", "Iānua magna est."},
+  };
+  int ok = 0;
+  for (const auto& c : cases) {
+    const std::vector<EsOut> o = runEs({c.first});
+    CHECK_MESSAGE(o[0].text == c.second, std::string(c.first) << " -> " << o[0].text << " (expected " << c.second << ")");
+    ok += o[0].text == c.second;
+  }
+  MESSAGE("Spanish constructions: " << ok << " / " << sizeof(cases) / sizeof(cases[0]));
+  // ustedes from the answer: "¿Por qué están pintando las rosas?" + "Plantamos ..." -> 2nd plural, marked as a guess
+  const auto u = runEs({"¿Por qué están pintando las rosas?", "Plantamos rosas blancas."});
+  CHECK(u[0].text == "Cūr rosās pingitis?");
+  CHECK(std::find(u[0].flags.begin(), u[0].flags.end(), "addressee-guess") != u[0].flags.end());
+  // an unknown Spanish word is never guessed: it stays in brackets and the cue is Fix
+  const auto x = runEs({"El zorgle duerme."});
+  CHECK(x[0].text.find("[zorgle]") != std::string::npos);
+  CHECK(x[0].conf == rules::Confidence::Fix);
+}
+
+TEST_CASE("rules-es: lexical selection through es: keywords and the teacher's Spanish glosses") {
+  NEED_REAL();
+  transfer::Transfer tr(real().la, cur());
+  transfer::Settings st;
+  st.lang = frame::SrcLang::Es;
+  st.srcLex = &real().es;
+  auto pick = [&](const char* w, uint8_t pos) {
+    transfer::Choice ch;
+    const uint32_t id = tr.select(w, pos, {}, false, false, st, ch);
+    return id == transfer::kNone ? std::string("-") : std::string(real().la.lemma(id).key);
+  };
+  CHECK(pick("puerta", feat::Noun) == "ianua");   // not porta (city gate)
+  CHECK(pick("pelota", feat::Noun) == "pila");    // es: has no candidate; gloss_es_la.tsv has
+  CHECK(pick("canción", feat::Noun) == "carmen");
+  CHECK(pick("tomar", feat::Verb) == "sumo");
+  CHECK(pick("carta", feat::Noun) == "epistula");
+  CHECK(pick("plantar", feat::Verb) == "sero");
+  CHECK(pick("fondo", feat::Noun) == "imus");     // the adjective as a noun ("in īmō")
+  CHECK(pick("zorgle", feat::Noun) == "-");
+  // Spanish grammatical gender does not choose a Latin word for a thing; for persons it helps (niña -> puella)
+  transfer::Choice a, b;
+  tr.select("puerta", feat::Noun, {}, false, false, st, a, feat::F);
+  tr.select("puerta", feat::Noun, {}, false, false, st, b, 0);
+  REQUIRE(!a.candidates.empty());
+  CHECK(a.lemma == b.lemma);
+}
+
+TEST_CASE("rules-es: the English regression is unchanged by the Spanish work (>= 110 / 114)") {
+  NEED_REAL();
+  std::vector<rules::CueInput> in = regressionCues(1, "own_dialogue.en.srt");
+  REQUIRE(in.size() == 114);
+  rules::Options o;
+  o.fidelity = 2;
+  o.speakerGender = 'f';
+  auto r = engine()->translate(in, o, rules::Context{}, nullptr, nullptr);
+  REQUIRE(r.ok());
+  std::ifstream g(repo() / "tests" / "regression" / "expected" / "own_dialogue.la.gold.txt");
+  std::vector<std::string> gold;
+  std::string line;
+  while (std::getline(g, line))
+    if (!line.empty() && line[0] != '#') gold.push_back(line);
+  REQUIRE(gold.size() == 114);
+  int matches = 0;
+  for (size_t i = 0; i < 114; ++i) {
+    bool m = false;
+    for (const std::string& alt : splitAlt(gold[i])) m = m || norm(alt) == norm(flat(r.value()[i].target));
+    matches += m;
+  }
+  CHECK(matches >= 110);
+  MESSAGE("English regression from the Spanish test: " << matches << " / 114");
+}
+
+TEST_CASE("rules-es: RSS flat over 1,000 Spanish cues (the regression file 10 times)") {
+  NEED_REAL();
+  auto e = engine();
+  std::vector<rules::CueInput> all = regressionCues(10);
+  REQUIRE(all.size() == 1000);
+  const rules::Options o = esOptions();
+  rules::Context ctx;
+  std::vector<rules::CueInput> ten(all.begin(), all.begin() + 10);
+  REQUIRE(e->translate(ten, o, ctx, nullptr, nullptr).ok());
+  REQUIRE(e->translate(ten, o, ctx, nullptr, nullptr).ok());
+  const long after10 = rssAnonKb();
+  for (size_t at = 0; at < all.size(); at += 20) {
+    std::vector<rules::CueInput> b(all.begin() + (long)at, all.begin() + (long)std::min(all.size(), at + 20));
+    if (at) b.front().prevSource = all[at - 1].sourceText;
+    REQUIRE(e->translate(b, o, ctx, nullptr, nullptr).ok());
+  }
+  const long after1000 = rssAnonKb();
+  MESSAGE("RssAnon after 10 cues: " << after10 << " kB, after 1,000 Spanish cues: " << after1000 << " kB");
+#if defined(__SANITIZE_ADDRESS__)
+  MESSAGE("AddressSanitizer build: RSS bound checked in normal builds");
+#else
+  if (after10 > 0) CHECK(after1000 <= after10 + after10 / 20 + 256);
+#endif
 }

@@ -21,6 +21,12 @@ and blank lines are ignored by every loader. Loaders live in tools/build_library
 | `phrasal_en_la.tsv` | verb, particle, latin, frame, note | engine transfer (phrasal verbs) |
 | `verbprep_en_la.tsv` | verb, prep, latin, frame, note | engine transfer (verb + preposition senses) |
 | `states_en_la.tsv` | source, latin, kind, note | engine transfer ("be" + state adjective with a person subject) |
+| `phrasebook_es_la.tsv` | pattern, latin, tier, register, note | engine frame pre-pass, Spanish source (optional file) |
+| `contractions_es.tsv` | form, expansion | engine tokenizer, Spanish source (optional) |
+| `clitics_es.tsv` | form, person, number, gender, role, note | engine tokenizer + frame builder, Spanish clitics (optional) |
+| `states_es_la.tsv` | source, latin, kind, note | as states_en_la.tsv, Spanish lemmas (optional; merged at load) |
+| `phrasal_es_la.tsv` | verb, particle, latin, frame, note | Spanish pronominal verbs: particle `se` (optional; merged) |
+| `verbprep_es_la.tsv` | verb, prep, latin, frame, note | as verbprep_en_la.tsv, Spanish verbs (optional; merged) |
 
 Frames in `valency_la.tsv`: `acc` direct object accusative; `dat` dative object; `abl` ablative object; `gen` genitive
 object; `dat+acc` (dare); `acc+inf`; `inf` (possum, volō); `ut` / `nē` (subjunctive clause); `quod`; `impers:dat+inf`
@@ -61,3 +67,19 @@ the words before it are written as they are. Slot `{WH}`: a wh word and the rest
 indirect question (`that depends on {WH}` -> `id pendet ex eō {1}`; `{1:subj}` asks for the subjunctive). A one-word
 `state` row of an adjective ("impossible" -> fierī nōn potest) is also used for the attributive adjective as a
 relative clause ("sex rēs quae fierī nōn possunt").
+
+Spanish source tables (C13). All six are optional: a missing file is a load warning and Spanish runs without it.
+`phrasebook_es_la.tsv` has the syntax of the English phrasebook; alternatives `a|b` are one word each; enclitic
+pronouns are written apart and without the written stress (`pasa me {NP}` for "Pásame ..."), because the tokenizer
+splits them, while a one-word row (`siéntate`, `ándale`) is never split. `clitics_es.tsv`: person 1-3, number
+sg/pl/-, gender m/f/-, role `acc` (lo la los las), `dat` (le les), `refl` (se), `any` (me te nos os: accusative, dative
+or reflexive by context). `phrasal_es_la.tsv`: a clitic of the verb's own person ("me equivoco", "vete", "inclínense")
+becomes the particle `se` of the verb lemma; a row `equivocar se errō` gives the Latin verb (frames as in
+phrasal_en_la.tsv; `refl` keeps the reflexive object: "inclīnāte vōs"); without a row the clitic is the reflexive
+object (sē). Particle `-` fixes the Latin verb of a bare Spanish verb (`regresar - redeō`). `verbprep_es_la.tsv` uses
+the canonical English prepositions (a -> to, en -> in, de -> of, con -> with, por -> by, para -> for).
+`gloss_es_la.tsv` is also read at run time, backwards: a row whose `gloss_es` lists a Spanish word (a whole comma- or
+semicolon-separated item, parentheses dropped) makes that Latin lemma a candidate for the word, with the teacher's
+bonus (as the English notes of tiers_la.tsv); there is no part-of-speech column, the Latin head is looked up with the
+part of speech asked for (an adjective may stand for a noun: `imus īmus fondo`). Homographs share the key and differ
+by head (`sero sērō tarde`, `sero serō plantar`). Write only real glosses: "puerta (de la ciudad)" lists "puerta".

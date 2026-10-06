@@ -23,6 +23,9 @@ bool in(const std::string& w, std::initializer_list<const char*> set) {
 }
 
 bool isPunctTok(const Token& t) { return t.upos == "PUNCT" || t.upos == "SYM"; }
+// acute vowels (UTF-8) and their plain forms, null-terminated pairs
+const char* const kAcute[] = {"\xC3\xA1", "a", "\xC3\xA9", "e", "\xC3\xAD", "i", "\xC3\xB3", "o", "\xC3\xBA", "u",
+                              nullptr, nullptr};
 
 uint32_t fget(const Token& t, nlp::morph::Shift s) { return nlp::morph::get(t.feats, s); }
 
@@ -159,6 +162,12 @@ bool timeNoun(const std::string& l) {
                 "today", "tomorrow", "yesterday", "monday", "tuesday", "wednesday", "thursday", "friday",
                 "saturday", "sunday", "summer", "winter", "spring", "autumn", "afternoon", "weekend", "noon",
                 "mañana", "tarde", "noche", "día", "semana", "mes", "año", "hora", "momento", "hoy", "ayer"});
+}
+
+// "oscuro", "tarde", "imposible" ...: adjectives said of the situation (neuter "it"), as in transfer's table
+bool transferImpersonal(const std::string& l) {
+  return in(l, {"oscuro", "tarde", "temprano", "frío", "caliente", "verdad", "posible", "imposible", "fácil",
+                "difícil", "importante", "necesario", "claro", "extraño", "bueno", "malo", "cierto", "obvio"});
 }
 
 int numberValue(const std::string& w) {
@@ -406,14 +415,26 @@ void FrameBuilder::tokenize(std::string_view sentence, std::vector<Token>& out) 
       bool firstWord = true;
       for (const Token& o : out)
         if (o.text != "\xC2\xA1" && o.text != "\xC2\xBF" && o.text != "\"" && o.text != "-") firstWord = false;
+      bool nonVerb = false;
       for (const lex::Analysis& x : an) {
         const lex::Lemma l = lex_->lemma(x.lemma);
         const std::string h = text::lower(l.head);
         if (l.pos == feat::Verb && h.size() > 4 && h.compare(h.size() - 2, 2, "se") == 0) tryKnown = true;
+        if (l.pos != feat::Verb) nonVerb = true;
       }
+      if (nonVerb) tryKnown = false;   // "vela" (noun; velarse) stays whole
       bool phraseWord = false;
       for (const curated::PhraseEntry& e : cd_.phrasebookEs())
-        if (e.pattern.find(' ') == std::string::npos && text::lower(e.pattern) == low) phraseWord = true;
+        if (e.pattern.find(' ') == std::string::npos) {
+          const std::string pat = text::lower(e.pattern);
+          size_t a = 0;
+          for (;;) {   // alternatives "perdona|perdóname"
+            const size_t b = pat.find('|', a);
+            if (pat.substr(a, b == std::string::npos ? std::string::npos : b - a) == low) phraseWord = true;
+            if (b == std::string::npos) break;
+            a = b + 1;
+          }
+        }
       if ((an.empty() || tryKnown || firstWord) && !phraseWord) {
         std::vector<std::string> kCl;
         for (const curated::CliticEntry& ce : cd_.clitics()) kCl.push_back(ce.form);
@@ -453,7 +474,16 @@ void FrameBuilder::tokenize(std::string_view sentence, std::vector<Token>& out) 
           if (ok) { split = true; bestBase = b; bestCl = cl; }
         }
         if (split) {
-          push(t, bestBase, cap);
+          // the written stress of the enclitic form goes with the clitics: "pása|me" -> "pasa me", "siénta|te" ->
+          // "sienta te" (one-syllable bases keep theirs: "dé")
+          std::string base = bestBase;
+          int vowels = 0;
+          for (size_t q = 0; q < base.size(); ++q)
+            if (std::strchr("aeiou", base[q]) || (unsigned char)base[q] == 0xC3) ++vowels;
+          if (vowels > 1 || (base != "d\xC3\xA9" && base != "s\xC3\xA9"))   // "dé", "sé" keep theirs
+            for (const char* const* acc = kAcute; *acc; acc += 2)
+              for (size_t at; (at = base.find(acc[0])) != std::string::npos;) base.replace(at, 2, acc[1]);
+          push(t, base, cap);
           for (const std::string& c : bestCl) push(t, c, false);
         }
       }
@@ -520,6 +550,7 @@ std::string FrameBuilder::lemmaOf(const Token& t) const {
       const std::string h = text::lower(lex_->lemma(a.lemma).head);
       if (lex_->lemma(a.lemma).pos == feat::Verb && h.size() > 4 && h.compare(h.size() - 2, 2, "se") == 0) sc -= 1;
       if (esAdjLemma && lex_->lemma(a.lemma).pos != feat::Adj) sc -= 3;
+      if (es::rareLemma(h)) sc -= 1;   // "duele" is doler, not dolar (hew)
     }
     return sc;
   };
@@ -541,6 +572,7 @@ std::string FrameBuilder::lemmaOf(const Token& t) const {
     else if (other.empty()) other = h;
     if (h == rule && ruleHit.empty()) ruleHit = h;
   }
+  if (es && t.upos == "NOUN" && !same.empty() && num != nlp::morph::NumPlur) return same;   // "hermana", "niña", "reina" keep their own lemma
   if (inflected) {
     if (!ruleHit.empty() && ruleHit != t.lower) return ruleHit;
     if (!other.empty()) return other;
@@ -621,8 +653,15 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
         else if (in(w, {"nada"})) w = "nothing";
         else if (in(w, {"alguien"})) w = "someone";
         else if (in(w, {"algo"})) w = "something";
-        else if (in(w, {"esto", "este", "esta"})) w = "this";
-        else if (in(w, {"eso", "ese", "esa", "aquello"})) w = "that";
+        else if (in(w, {"este", "esta", "estos", "estas", "ese", "esa", "esos", "esas", "aquel", "aquella",
+                        "aquellos", "aquellas"})) {
+          // a gendered demonstrative standing alone points at a noun ("Esta sí.", "Este sí puede."): like "this
+          // one", its Latin gender is that noun's, not the Spanish one (C13)
+          np.determiner = w[0] == 'e' && w[1] == 's' && w[2] == 't' ? "this" : "that";
+          w = (w.back() == 's') ? "ones" : "one";
+        }
+        else if (in(w, {"esto"})) w = "this";
+        else if (in(w, {"eso", "aquello"})) w = "that";
         else if (in(w, {"quién", "quiénes"})) w = "who";
         else if (in(w, {"qué"})) w = "what";
         else if (in(w, {"cuál"})) w = "which";
@@ -659,6 +698,87 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
   if (ht.upos == "PROPN") {
     np.isName = true;
     np.head = ht.text;
+    // Spanish (C13): a capitalised word inside the sentence that spanish.vpl knows as a common noun is a title
+    // ("la Reina de Corazones" -> Rēgīna Cordium): its lemma, translated and capitalised
+    bool sentenceFirst = true;
+    for (int q = 0; q < h; ++q) sentenceFirst = sentenceFirst && isPunctTok(c.t(q));
+    if (!en && lex_ && sentenceFirst) {   // "Niña, ven aquí.": a capital only because it opens the sentence
+      std::vector<lex::Analysis> an;
+      lex_->lookup(text::es_key(low), an);
+      bool noun = false, name = cd_.nameByLatin(text::latin_key(ht.text)) != nullptr || cd_.nameByEnglish(ht.text);
+      std::string nl;
+      for (const lex::Analysis& a : an) {
+        const lex::Lemma l = lex_->lemma(a.lemma);
+        if (l.pos == feat::Noun && (nl.empty() || text::lower(l.head) == low)) { noun = true; nl = text::lower(l.head); }
+        if (l.pos == feat::Name) name = true;
+      }
+      if (noun && !name) { np.isName = false; np.head = nl; }
+    }
+    if (!en && lex_ && h > 0 && !isPunctTok(c.t(h - 1))) {
+      std::vector<lex::Analysis> an;
+      lex_->lookup(text::es_key(low), an);
+      for (const lex::Analysis& a : an) {
+        const lex::Lemma l = lex_->lemma(a.lemma);
+        if (l.pos == feat::Noun) {
+          np.title = true;
+          np.head = text::lower(l.head);
+          if (feat::unpack(lex_->feature(a.feat)).number == feat::Pl) np.number = 2;   // "Corazones"
+          break;
+        }
+      }
+    }
+  }
+  // Spanish (C13): an adjective standing for a noun ("La reina quería rojas.") is "red ones"
+  if (!en && !pron && ht.upos == "ADJ") {
+    SemAdj a;
+    a.lemma = np.head;
+    a.token = h;
+    np.adjectives.push_back(a);
+    np.isPronoun = true;
+    np.pronLemma = np.number == 2 ? "ones" : "one";
+    np.pron.person = 3;
+    np.pron.number = np.number;
+    pron = true;
+  }
+  // Spanish diminutives (C13): "gatito" -> gato + pequeño (parvus), "casita" -> casa + pequeño, "florecita" -> flor
+  if (!en && ht.upos == "NOUN" && lex_ && !es::notDiminutive(np.head)) {
+    const std::string& w = np.head;
+    auto ends = [&](const char* suf) {
+      const size_t k = std::strlen(suf);
+      return w.size() > k + 2 && w.compare(w.size() - k, k, suf) == 0;
+    };
+    std::vector<std::string> bases;
+    for (const char* suf : {"ecito", "ecita", "cito", "cita", "ito", "ita"}) {
+      if (!ends(suf)) continue;
+      const std::string stem = w.substr(0, w.size() - std::strlen(suf));
+      const char g = w.back();   // o / a
+      bases = {stem + g, stem + (g == 'o' ? "a" : "o"), stem, stem + "e"};
+      break;
+    }
+    for (const std::string& b : bases) {
+      std::vector<lex::Analysis> an;
+      lex_->lookup(text::es_key(b), an);
+      if (an.empty()) lex_->lookup(text::es_bare(b), an);
+      std::string found;
+      for (const lex::Analysis& a : an) {
+        const lex::Lemma l = lex_->lemma(a.lemma);
+        if (l.pos == feat::Noun && text::es_bare(text::lower(l.head)) == text::es_bare(b)) { found = text::lower(l.head); break; }
+      }
+      if (found.empty()) continue;
+      np.head = found;
+      SemAdj a;
+      a.lemma = "pequeño";
+      a.token = h;
+      np.adjectives.push_back(a);
+      break;
+    }
+  }
+  // Spanish feminine person nouns keep their own head ("hermana" is not hermano: soror, not frāter) (C13)
+  if (!en && ht.upos == "NOUN" && np.head.size() > 1 && np.head.back() == 'o') {
+    std::string sg = low;
+    if (sg.size() > 2 && sg.back() == 's') sg.pop_back();
+    if (sg.size() == np.head.size() && sg.back() == 'a' && sg.compare(0, sg.size() - 1, np.head, 0, np.head.size() - 1) == 0)
+      np.head = sg;
   }
   if (!en && ht.upos == "NOUN" && lex_) {   // source gender of a Spanish noun: the form's features, else its ending
     std::vector<lex::Analysis> an;
@@ -705,6 +825,8 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
         }
       if (poss) continue;
       if (cd == "the") { np.definite = true; c.drop(k, Drop::Article); continue; }
+      // Spanish "un poco de té" (es::normalise hangs "un poco" on the noun): a little (C13)
+      if (!en && np.determiner == "a" && in(kl, {"poco", "poca"})) { np.determiner = "a little"; continue; }
       if (cd == "a") { c.drop(k, Drop::Article); if (np.determiner.empty()) np.determiner = "a"; continue; }
       if (cd == "what" || cd == "which" || cd == "whose" || cd == "how many") {
         // "what a strange garden" (exclamation) vs "what time" / "which way" (question)
@@ -805,6 +927,16 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
       if (kl == "'s" || kl == "'") np.tokens.push_back(k);
       continue;   // the caller reads the preposition
     }
+    if (!en && d == "nmod" && kt.upos == "ADV") {   // "Se venden casas aquí": the adverb belongs to the clause
+      if (c.liftedAdv && c.free(k)) {
+        SemAdverb a;
+        a.lemma = c.lem(k);
+        a.token = k;
+        c.liftedAdv->push_back(a);
+      }
+      c.take(k);
+      continue;
+    }
     if (d == "nmod" || (d == "obl" && kt.upos != "ADV")) {
       // case marker of the attribute
       std::string prep;
@@ -876,6 +1008,14 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
     }
     if (d == "punct") continue;
   }
+  if (!en) {
+    // "todas las mañanas" = every morning (C13)
+    if (np.determiner == "all" && np.number == 2 && timeNoun(np.head)) { np.determiner = "every"; np.number = 1; }
+    // "dos hermanos y una hermana": "una" is the numeral next to another numeral
+    if (!np.numeral.empty())
+      for (SemNP& g : np.coord)
+        if (g.numeral.empty() && g.determiner == "a") { g.numeral = "1"; g.numeralValue = 1; g.determiner.clear(); }
+  }
   std::sort(np.tokens.begin(), np.tokens.end());
   for (int x : np.tokens) c.take(x);
   np.tokens.erase(std::unique(np.tokens.begin(), np.tokens.end()), np.tokens.end());
@@ -888,7 +1028,9 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
   c.subtree(h, sub);
   std::sort(sub.begin(), sub.end());
   f.tokens = sub;
-  const int first = sub.empty() ? h : sub.front();
+  int first = sub.empty() ? h : sub.front();
+  for (int x : sub)   // "¡Entonces juega!": the first word, not the inverted mark
+    if (!isPunctTok(c.t(x))) { first = x; break; }
 
   const bool topLevel = c.par[(size_t)h] < 0 || c.consumed[(size_t)c.par[(size_t)h]];
   // A noun root whose clause the parser hung on it as an acl: re-root.
@@ -965,6 +1107,7 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
   }
   const std::string hu = ht.upos;
   const std::string hl = c.lem(h);
+  bool seImpers = false;   // Spanish impersonal "se" (3rd plural subject)
 
   // ---- predicate --------------------------------------------------------------------------------------------------
 
@@ -1014,6 +1157,53 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
         f.pred.token = cop;
         c.drop(cop, Drop::Copula);
       }
+    }
+  }
+  // Spanish "hay / había / habrá" (haber without a participle) is the existential "there is" (C13)
+  if (!en && verbal && hl == "haber" && hu == "VERB") {
+    f.existential = true;
+    f.pred.lemma = "be";
+  }
+  if (!en && cop >= 0 && c.lem(cop) == "haber") {   // the parser took "había" for a copula: existential too
+    f.existential = true;
+  }
+  // Spanish "estar" + participle (C13): the resultant state of the verb's passive ("El reloj está roto" -> frāctum
+  // est), unless states_es_la.tsv lists the adjective ("cansado", "enojado")
+  if (!en && cop >= 0 && c.lem(cop) == "estar" && lex_ && (hu == "ADJ" || hu == "VERB") && !cd_.state(hl) &&
+      !cd_.state(ht.lower)) {
+    std::vector<lex::Analysis> an;
+    lex_->lookup(text::es_key(ht.lower), an);
+    std::string part;
+    for (const lex::Analysis& a : an) {
+      const lex::Lemma l = lex_->lemma(a.lemma);
+      if (l.pos != feat::Verb || feat::unpack(lex_->feature(a.feat)).mood != feat::ParticipleMood) continue;
+      const std::string hd = text::lower(l.head);
+      if (part.empty() || (part.size() > 2 && part.compare(part.size() - 2, 2, "se") == 0)) part = hd;
+    }
+    // "cerradas" <- the participle lemma "cerrado": the verb is cerrar
+    if (part.size() > 4 && (part.compare(part.size() - 3, 3, "ado") == 0 || part.compare(part.size() - 3, 3, "ido") == 0)) {
+      const std::string stem = part.substr(0, part.size() - 3);
+      const bool ado = part.compare(part.size() - 3, 3, "ado") == 0;
+      for (const char* e : {"ar", "er", "ir"}) {
+        if (ado != (std::string(e) == "ar")) continue;
+        std::vector<lex::Analysis> a2;
+        lex_->lookup(text::es_key(stem + e), a2);
+        bool verb = false;
+        for (const lex::Analysis& x : a2)
+          verb = verb || (lex_->lemma(x.lemma).pos == feat::Verb && text::lower(lex_->lemma(x.lemma).head) == stem + e);
+        if (verb) { part = stem + e; break; }
+      }
+    }
+    if (!part.empty()) {
+      f.copula = false;
+      verbal = true;
+      f.pred.lemma = part;
+      f.pred.token = h;
+      f.pred.voice = Voice::Passive;
+      c.drop(cop, Drop::Aux);
+      if (fget(c.t(cop), nlp::morph::TenseShift) == nlp::morph::TensePast ||
+          fget(c.t(cop), nlp::morph::TenseShift) == nlp::morph::TenseImp)
+        f.pred.tense = Tense::Past;
     }
   }
   const bool adjHead = hu == "ADJ" || (f.copula && hu == "VERB" && cop >= 0);
@@ -1080,7 +1270,7 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
   }
   if (verbal && !ht.text.empty()) {
     const uint32_t vf = fget(ht, nlp::morph::VerbFormShift), tt = fget(ht, nlp::morph::TenseShift);
-    if (beAux && vf == nlp::morph::VfPart && tt == nlp::morph::TensePast) f.pred.voice = Voice::Passive;
+    if (beAux && vf == nlp::morph::VfPart && (tt == nlp::morph::TensePast || !en)) f.pred.voice = Voice::Passive;
     else if (beAux && (vf == nlp::morph::VfGer || (vf == nlp::morph::VfPart && tt != nlp::morph::TensePast)))
       f.pred.aspect = Aspect::Progressive;
     if (auxes.empty() && (tt == nlp::morph::TensePast || tt == nlp::morph::TenseImp)) f.pred.tense = Tense::Past;
@@ -1127,6 +1317,11 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       c.drop(h, Drop::Aux);
     } else if (!en && hl == "ir") {   // "voy a hacer" -> future (in the past: "iba a" -> past)
       if (f.pred.tense != Tense::Past) f.pred.tense = Tense::Future;
+      // "Vamos a cantar." at the start of a statement is "let's sing" (es-MX)
+      if (ht.lower == "vamos" && !c.question && nsubj < 0 && h == first) {
+        f.pred.tense = Tense::Present;
+        f.pred.modality = Modality::Let;
+      }
       f.pred.lemma = xl;
       f.pred.token = xcomp;
       c.drop(h, Drop::Aux);
@@ -1244,6 +1439,12 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
   }
 
   // ---- predicate of copula clauses -----------------------------------------------------------------------------------
+  if (!en && f.copula && f.existential && cop >= 0 && !f.hasSubject && (hu == "NOUN" || hu == "PROPN" || hu == "PRON")) {
+    SemNP p;   // "Había una niña": the noun is what there is
+    buildNP(c, h, p);
+    f.hasSubject = true;
+    f.subject = p;
+  }
   if (f.copula && !f.existential) {
     if (adjHead || (hu == "VERB" && fget(ht, nlp::morph::VerbFormShift) == nlp::morph::VfPart)) {
       SemAdj a;
@@ -1279,6 +1480,29 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       f.existential = whw;
     } else if (hu == "ADP") {
       // "It's in the garden" mis-headed: nothing to do
+    } else if (!en && hu == "NUM" && numberValue(ht.lower) >= 1 && numberValue(ht.lower) <= 12 &&
+               [&] { for (int k : c.kids[(size_t)h]) if (c.ok(k) && in(c.t(k).lower, {"la", "las"})) return true;
+                     return false; }()) {
+      // Spanish clock time (C13): "son las seis" / "es la una" -> hōra sexta est (subject "it", like "six o'clock")
+      SemNP p;
+      p.head = "hour";
+      p.token = h;
+      p.ordinal = true;
+      p.numeral = ht.lower;
+      p.numeralValue = numberValue(ht.lower);
+      p.tokens.push_back(h);
+      for (int k : c.kids[(size_t)h])
+        if (c.ok(k) && c.dep(k) == "det") { p.tokens.push_back(k); c.drop(k, Drop::Article); c.take(k); }
+      c.take(h);
+      f.predicative.push_back(p);
+      f.hasSubject = true;
+      f.subject = SemNP{};
+      f.subject.isPronoun = true;
+      f.subject.pronLemma = "it";
+      f.subject.pron.person = 3;
+      f.subject.pron.number = 1;
+      f.subject.pron.gender = feat::N;
+      f.subject.number = 1;
     } else {
       SemNP p;
       buildNP(c, h, p);
@@ -1289,6 +1513,24 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
         p = wh;
       }
       f.predicative.push_back(p);
+    }
+  } else if (!f.hasPred && !en && ht.lower == "sí") {
+    // Spanish "Esta sí." (C13): an affirmative reply standing for the previous verb ("This one does.")
+    c.drop(h, Drop::Discourse);
+    int dem = -1;
+    for (int k : c.kids[(size_t)h])
+      if (c.ok(k) && (c.t(k).upos == "DET" || c.t(k).upos == "PRON" || c.t(k).upos == "NOUN" || c.t(k).upos == "PROPN"))
+        { dem = k; break; }
+    if (dem >= 0) {
+      buildNP(c, dem, f.subject);
+      f.hasSubject = true;
+      f.hasPred = true;
+      f.pred.lemma = "do";
+      f.pred.ellipsis = true;
+      f.pred.token = h;
+    } else {
+      f.type = Kind::Frag;
+      f.interjections.push_back("sí");
     }
   } else if (!f.hasPred) {
     // fragment / exclamation / vocative
@@ -1347,6 +1589,11 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     if (k == nsubj || k == cop || k == expl) continue;
     if (std::find(auxes.begin(), auxes.end(), k) != auxes.end()) continue;
     if (d == "punct") { c.drop(k, Drop::Punct); continue; }
+    // Spanish clitics normalised by es::normalise (C13): the particle of a pronominal verb, passive / impersonal "se"
+    if (d == "expl:pv") { f.pred.particle = "se"; c.drop(k, Drop::Particle); continue; }
+    if (d == "expl:pass") { f.pred.voice = Voice::Passive; f.pred.particle = "se"; c.drop(k, Drop::Particle); continue; }
+    if (d == "expl:impers") { seImpers = true; c.drop(k, Drop::Particle); continue; }
+    if (!en && kl == "sí" && kt.upos != "PRON") { c.drop(k, Drop::Discourse); continue; }   // emphatic "sí"
     if (d == "obj" && k == obj) {
       SemNP o;
       buildNP(c, k, o);
@@ -1566,6 +1813,17 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       continue;
     }
   }
+  // Spanish existential (C13): "No hay té" -> the "object" of haber is the subject; "Había una niña" (haber read as a
+  // copula) -> the predicate noun is the subject
+  if (!en && f.existential) {
+    if (!f.hasSubject && f.hasObject) { f.hasSubject = true; f.subject = f.object; f.hasObject = false; f.object = SemNP{}; }
+    if (!f.hasSubject && !f.predicative.empty()) { f.hasSubject = true; f.subject = f.predicative[0]; f.predicative.clear(); }
+    f.copula = false;
+    f.pred.lemma = "be";
+    // "No hay té." -> Nūlla thēa est (like "There isn't any tea")
+    if (f.negative && f.hasSubject && !f.subject.isPronoun && f.subject.determiner.empty() && f.subject.numeral.empty())
+      { f.subject.determiner = "no"; f.subject.negative = true; }
+  }
   // lifted obliques and adverbs from NPs
   for (SemOblique& o : lifted) f.obliques.push_back(o);
   for (SemAdverb& a : liftedAdv) {
@@ -1603,20 +1861,82 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     f.hasSubject = false;
     f.subject = SemNP{};
   }
-  // inversion after a fronted oblique ("In the garden lived a cat"): the post-verbal object is the subject
-  if (en && !f.hasSubject && f.hasObject && f.hasPred && !f.copula && f.type == Kind::Decl && !f.obliques.empty() &&
-      f.obliques[0].token < h && f.object.token > h && f.pred.voice == Voice::Active) {
+  // Spanish (C13): person and number of the finite verb (an auxiliary, the clause head, or the predicate), from the
+  // tagger, else from the lexicon when its readings agree ("Puedes")
+  uint32_t esPe = 0, esNu = 0;
+  int esFin = -1;
+  if (!en && f.hasPred) {
+    std::vector<int> cands = auxes;
+    if (cop >= 0) cands.push_back(cop);
+    cands.push_back(h);
+    if (f.pred.token >= 0) cands.push_back(f.pred.token);
+    for (int a : cands)
+      if (fget(c.t(a), nlp::morph::PersonShift)) { esFin = a; break; }
+    if (esFin < 0)
+      for (int a : cands)
+        if (fget(c.t(a), nlp::morph::VerbFormShift) == nlp::morph::VfFin) { esFin = a; break; }
+    if (esFin < 0) esFin = h;
+    esPe = fget(c.t(esFin), nlp::morph::PersonShift);
+    esNu = fget(c.t(esFin), nlp::morph::NumberShift);
+    if (!esPe && lex_) {
+      std::vector<lex::Analysis> an;
+      lex_->lookup(text::es_key(c.t(esFin).lower), an);
+      uint8_t p0 = 0, n0 = 0;
+      bool one = true;
+      for (const lex::Analysis& a : an) {
+        if (lex_->lemma(a.lemma).pos != feat::Verb) continue;
+        const feat::Features ff = feat::unpack(lex_->feature(a.feat));
+        if (!ff.person || ff.mood == feat::Imperative) continue;
+        if (!p0) { p0 = ff.person; n0 = ff.number; }
+        else if (ff.person != p0 || ff.number != n0) one = false;
+      }
+      if (p0 && one) { esPe = p0; esNu = n0 == feat::Pl ? nlp::morph::NumPlur : nlp::morph::NumSing; }
+    }
+    // a noun "subject" of a 1st / 2nd person verb is its object ("¿Cuántos hermanos tienes?")
+    if (f.hasSubject && !f.hasObject && (esPe == 1 || esPe == 2) && !f.copula && !f.existential &&
+        (!f.subject.isPronoun || (f.subject.pron.person == 3 && !f.subject.pronLemma.empty() &&
+                                  f.subject.pronLemma != "everyone"))) {
+      if (timeNoun(f.subject.head)) {   // "Todas las mañanas camino ...": a time oblique
+        SemOblique o;
+        o.np = f.subject;
+        o.token = f.subject.token;
+        o.front = f.subject.token < h;
+        f.obliques.insert(f.obliques.begin(), o);
+      } else {
+        f.hasObject = true;
+        f.object = f.subject;
+      }
+      f.hasSubject = false;
+      f.subject = SemNP{};
+    }
+  }
+  // inversion after a fronted oblique ("In the garden lived a cat"): the post-verbal object is the subject; Spanish
+  // intransitive verbs also without the oblique ("En el jardín vivía un gato", "Llegó el maestro") (C13)
+  if (((en && !f.obliques.empty() && f.obliques[0].token < h) ||
+       (!en && (es::intransitiveVerb(f.pred.lemma) || (es::experiencerVerb(f.pred.lemma) && f.hasIndirect)) &&
+        esPe != 1 && esPe != 2 && !f.object.isPronoun &&
+        ((f.object.number == 2) == (esNu == nlp::morph::NumPlur)))) &&
+      !f.hasSubject && f.hasObject && f.hasPred && !f.copula && f.type == Kind::Decl &&
+      f.object.token > h && f.pred.voice == Voice::Active) {
     f.hasSubject = true;
     f.subject = f.object;
     f.hasObject = false;
     f.object = SemNP{};
-    f.obliques[0].front = true;
+    if (!f.obliques.empty() && f.obliques[0].token < h) f.obliques[0].front = true;
+  }
+  // Spanish passive "se" ("Se venden casas"): an object is the subject
+  if (!en && f.pred.voice == Voice::Passive && !f.hasSubject && f.hasObject) {
+    f.hasSubject = true;
+    f.subject = f.object;
+    f.hasObject = false;
+    f.object = SemNP{};
   }
 
   // ---- clause type -----------------------------------------------------------------------------------------------------
   // questions: "?" or aux/copula before the subject
   if (f.type != Kind::Wh && f.type != Kind::Excl && f.hasPred) {
-    const bool inverted = nsubj >= 0 && ((cop >= 0 && cop < nsubj) || (!auxes.empty() && auxes.front() < nsubj));
+    // English inversion marks a question; Spanish verb-subject order does not ("Son todos muy groseros.") (C13)
+    const bool inverted = en && nsubj >= 0 && ((cop >= 0 && cop < nsubj) || (!auxes.empty() && auxes.front() < nsubj));
     if (f.hasSubject && f.subject.interrogative && f.subject.isPronoun) {
       f.type = Kind::Wh;
       f.wh.word = f.subject.pronLemma;
@@ -1647,6 +1967,7 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     const Token& vt = c.t(f.pred.token >= 0 ? f.pred.token : h);
     const uint32_t md = fget(vt, nlp::morph::MoodShift), tt = fget(vt, nlp::morph::TenseShift);
     // first content token of the clause (skipping connectors, discourse, interjections, "then", "please")
+    const int vtok0 = cop >= 0 ? cop : (f.pred.token >= 0 ? f.pred.token : h);
     int lead = -1;
     for (int i : f.tokens) {
       const Token& x = c.t(i);
@@ -1654,7 +1975,10 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       const std::string xd = x.deprel;
       if (xd == "cc" || xd == "discourse" || xd == "vocative" || xd == "intj" ||
           (xd == "advmod" && in(x.lower, {"then", "now", "so", "just", "please", "first", "also"})) ||
-          (xd == "aux" && in(c.lem(i), {"do"})) || in(x.lower, {"not", "never", "please"}))
+          (xd == "aux" && in(c.lem(i), {"do"})) || in(x.lower, {"not", "never", "please"}) ||
+          (!en && (in(x.lower, {"entonces", "luego", "pues", "ahora", "ya", "no", "bueno", "y", "pero", "sí", "nunca",
+                                "jamás", "por favor", "todos", "todas"}) || xd == "fixed" || xd == "expl:pv" ||
+                   ((xd == "obj" || xd == "iobj") && x.upos == "PRON" && cd_.clitic(x.lower) && i < vtok0))))
         continue;
       lead = i;
       break;
@@ -1678,10 +2002,57 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
         }
       }
       (void)doNot;
-    } else if (!en && (lexImp || ((std::find(f.discourse.begin(), f.discourse.end(), "please") != f.discourse.end() ||
-                                    c.s.text.find("\xC2\xA1") != std::string::npos) &&
-                                   !f.hasSubject && lead == vtok && fget(vt, nlp::morph::PersonShift) != 1))) {
-      f.type = Kind::Imp;
+    } else if (!en && topLevel) {
+      // Spanish (C13). The verb that opens the clause, with no subject of its own (or "todos" set off by a comma):
+      //  - imperative mood (tagger or lexicon), or a 2nd-person imperative reading of a present form ("Bebe esto.",
+      //    "Cierra la ventana."): imperative; "¡" or "por favor" also for other forms
+      //  - "no" + 2nd-person present subjunctive: prohibition ("No tengas miedo." -> Nōlī timēre.)
+      //  - 3rd-person plural present subjunctive: the ustedes imperative ("¡Todos, inclínense!")
+      //  - 1st-person plural present subjunctive: hortative ("Corramos", "Entremos" -> let us)
+      const uint32_t pe = esPe, nu = esNu;
+      const bool everyoneSubj = f.hasSubject && f.subject.isPronoun && f.subject.pronLemma == "everyone";
+      const bool noSubj = !f.hasSubject || everyoneSubj;
+      const bool leads = lead == vtok || (lead >= 0 && lead == vtok0);
+      const bool excl = c.s.text.find("\xC2\xA1") != std::string::npos ||
+                        std::find(f.discourse.begin(), f.discourse.end(), "please") != f.discourse.end();
+      const std::string vl = c.lem(vtok);
+      const bool notAux = !in(vl, {"haber", "ser", "estar", "be", "llover", "nevar"}) && !es::experiencerVerb(vl) &&
+                          f.pred.modality == Modality::None &&
+                          f.pred.tense == Tense::Present && !f.existential;
+      bool imp = false, plural = false;
+      if (leads && noSubj && notAux) {
+        if (lexImp && pe != 1) { imp = true; plural = nu == nlp::morph::NumPlur; }
+        else if (md == nlp::morph::MoodSub && pe == 2 && f.negative) { imp = true; plural = nu == nlp::morph::NumPlur; }
+        else if (md == nlp::morph::MoodSub && pe == 3 && nu == nlp::morph::NumPlur && (excl || everyoneSubj)) {
+          imp = true;
+          plural = true;
+        } else if (md == nlp::morph::MoodSub && pe == 1 && nu == nlp::morph::NumPlur && !f.negative) {
+          f.pred.modality = Modality::Let;
+          f.hasSubject = true;
+          f.implicitSubject = true;
+          f.subject = SemNP{};
+          f.subject.isPronoun = true;
+          f.subject.pronLemma = "we";
+          f.subject.pron.person = 1;
+          f.subject.pron.number = 2;
+          f.subject.number = 2;
+        } else if (md != nlp::morph::MoodSub && pe != 1 && !(pe == 3 && nu == nlp::morph::NumPlur) &&
+                   lex_ && es::hasImperative2(*lex_, vt.lower) && !c.s.text.empty()) {
+          imp = true;
+        } else if (excl && pe != 1 && pe != 3 && md != nlp::morph::MoodSub) {
+          imp = true;
+        }
+      }
+      if (imp) {
+        f.type = Kind::Imp;
+        if (plural) f.imperativePlural = true;
+        if (everyoneSubj) {
+          f.imperativePlural = true;
+          f.vocatives.insert(f.vocatives.begin(), f.subject);
+          f.hasSubject = false;
+          f.subject = SemNP{};
+        }
+      }
     }
     // "Everyone bow!" with a bare verb after an "everyone" subject
     if (en && f.type == Kind::Decl && f.hasSubject && f.subject.isPronoun && f.subject.pronLemma == "everyone" &&
@@ -1692,44 +2063,32 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       f.hasSubject = false;
     }
   }
+  // Spanish "¡Todos, inclínense!": "todos" before an imperative is the addressee (C13)
+  if (!en && f.type == Kind::Imp && f.hasSubject && f.subject.isPronoun && f.subject.pronLemma == "everyone") {
+    f.imperativePlural = true;
+    f.vocatives.insert(f.vocatives.begin(), f.subject);
+    f.hasSubject = false;
+    f.subject = SemNP{};
+  }
   if (f.type == Kind::Imp && f.hasSubject && f.subject.isPronoun && f.subject.pron.number == 2) f.imperativePlural = true;
-  if (!f.hasSubject && f.hasPred && !en && f.type != Kind::Imp) {
-    // the finite verb: an auxiliary, the clause head (a modal or catenative verb), or the predicate
-    std::vector<int> cands = auxes;
-    cands.push_back(h);
-    if (f.pred.token >= 0) cands.push_back(f.pred.token);
-    int fin = -1;
-    for (int a : cands)
-      if (fget(c.t(a), nlp::morph::PersonShift)) { fin = a; break; }
-    if (fin < 0)
-      for (int a : cands)
-        if (fget(c.t(a), nlp::morph::VerbFormShift) == nlp::morph::VfFin) { fin = a; break; }
-    if (fin < 0) fin = h;
-    uint32_t pe = fget(c.t(fin), nlp::morph::PersonShift);
-    uint32_t nu = fget(c.t(fin), nlp::morph::NumberShift);
-    if (!pe && lex_) {   // the tagger left the person out ("Puedes"): the lexicon's analyses, when they agree
-      std::vector<lex::Analysis> an;
-      lex_->lookup(text::es_key(c.t(fin).lower), an);
-      uint8_t p0 = 0, n0 = 0;
-      bool one = true;
-      for (const lex::Analysis& a : an) {
-        if (lex_->lemma(a.lemma).pos != feat::Verb) continue;
-        const feat::Features ff = feat::unpack(lex_->feature(a.feat));
-        if (!ff.person || ff.mood == feat::Imperative) continue;
-        if (!p0) { p0 = ff.person; n0 = ff.number; }
-        else if (ff.person != p0 || ff.number != n0) one = false;
-      }
-      if (p0 && one) { pe = p0; nu = n0 == feat::Pl ? nlp::morph::NumPlur : nlp::morph::NumSing; }
-    }
-    if (pe) {
-      f.hasSubject = true;
-      f.implicitSubject = true;
-      f.subject.isPronoun = true;
-      f.subject.pron.person = (uint8_t)pe;
-      f.subject.pron.number = nu == nlp::morph::NumPlur ? 2 : 1;
-      f.subject.number = f.subject.pron.number;
+  if (!f.hasSubject && f.hasPred && !en && f.type != Kind::Imp && esPe) {
+    f.hasSubject = true;
+    f.implicitSubject = true;
+    f.subject.isPronoun = true;
+    f.subject.pron.person = (uint8_t)esPe;
+    f.subject.pron.number = esNu == nlp::morph::NumPlur ? 2 : 1;
+    if (seImpers) f.subject.pron.number = 2;   // impersonal "se": they
+    f.subject.number = f.subject.pron.number;
+    // "Aquí está oscuro." / "Es tarde.": an impersonal predicate adjective has the neuter "it" as subject
+    if (esPe == 3 && f.subject.pron.number == 1 && f.copula && f.predicative.empty() && f.predAdj.size() == 1 &&
+        transferImpersonal(f.predAdj[0].lemma)) {
+      f.subject.pronLemma = "ello";
+      f.subject.pron.gender = feat::N;
     }
   }
+  // Spanish deliberative question (C13): "¿Qué voy a hacer?" / "¿Qué haré?" -> quid faciam?
+  if (!en && f.type == Kind::Wh && f.pred.tense == Tense::Future && f.pred.modality == Modality::None)
+    f.pred.deliberative = true;
   if (f.type == Kind::Wh && f.pred.deliberative && f.hasSubject && f.subject.isPronoun && f.subject.pron.person == 1)
     f.pred.deliberative = true;
   else f.pred.deliberative = false;
@@ -1956,6 +2315,8 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
     if (u.type == Unit::Clause && nx.type == Unit::Phrase && u.frame.type == Kind::Frag && !u.frame.hasSubject &&
         u.frame.predAdj.empty() && u.frame.adverbs.size() + u.frame.connectors.size() == 1) {
       std::string w = !u.frame.connectors.empty() ? u.frame.connectors[0] : u.frame.adverbs[0].lemma;
+      if (lang_ == SrcLang::Es && !canonConnector(lang_, w).empty()) w = canonConnector(lang_, w);   // entonces
+      if (lang_ == SrcLang::Es && w == "ahora") w = "now";
       if (in(w, {"then", "so", "and", "but", "now"})) {
         bool punctBetween = false;
         for (int k = u.last + 1; k < nx.first; ++k)
@@ -2026,14 +2387,17 @@ void FrameBuilder::repairTree(SemSentence& s) const {
     if (!in(d.deprel, {"obl", "obj", "advmod", "nmod", "amod"})) continue;
     const int p = d.head - 1;
     if (p < 0 || p >= n || (tk[(size_t)p].upos != "VERB" && tk[(size_t)p].upos != "AUX")) continue;
-    bool subj = false, verbal = false, cc = false;
+    bool subj = false, verbal = false, cc = false, mark = false;
     for (int j = 0; j < n; ++j) {
       if (tk[(size_t)j].head != i + 1) continue;
       const std::string& r = tk[(size_t)j].deprel;
       subj = subj || r == "nsubj";
       verbal = verbal || r == "cop" || r == "aux";
       cc = cc || r == "cc";
+      mark = mark || (r == "mark" && tk[(size_t)j].lower == "que");
     }
+    // Spanish pro-drop (C13): "Pensé que era lunes." has no subject but the complementiser "que"
+    if (lang_ == SrcLang::Es && mark && verbal) subj = true;
     if (!subj || !verbal) continue;
     d.deprel = cc ? "conj" : "ccomp";
     if (std::find(s.repairs.begin(), s.repairs.end(), "clause-repair") == s.repairs.end())

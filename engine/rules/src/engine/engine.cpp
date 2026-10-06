@@ -938,6 +938,7 @@ class RulesEngine final : public Engine {
     transfer::Settings st;
     st.lang = lang;
     st.fidelity = std::max(1, std::min(3, opt.fidelity));
+    st.srcLex = lang == frame::SrcLang::Es ? es_ : en_;   // C13: English pivot of Spanish words
     st.speakerGender = opt.speakerGender == 'f' ? 'f' : opt.speakerGender == 'u' ? 'u' : 'm';
     st.context = &ctx;
     size_t reported = 0;
@@ -965,6 +966,15 @@ class RulesEngine final : public Engine {
         const bool we = nx.rfind("we ", 0) == 0 || nx.rfind("we'", 0) == 0 || nx.rfind("we\xE2\x80\x99", 0) == 0 ||
                         nx.rfind("nosotros ", 0) == 0;
         mem.answerWe = you && we && lang == frame::SrcLang::En;
+        // Spanish (C13): a question whose next sentence answers with a 1st-person plural verb ("Plantamos ...") or
+        // "nosotros" was put to "ustedes" (a 3rd-person plural verb without subject: 2nd plural in Latin)
+        if (lang == frame::SrcLang::Es && frame::endsSentence(ss.text) && ss.text.find('?') != std::string::npos) {
+          size_t a = 0;
+          while (a < nx.size() && (nx[a] == '-' || nx[a] == ' ' || (unsigned char)nx[a] == 0xC2)) a += (unsigned char)nx[a] == 0xC2 ? 2 : 1;
+          const size_t b = nx.find_first_of(" ,.!?", a);
+          const std::string w = nx.substr(a, b == std::string::npos ? std::string::npos : b - a);
+          mem.answerWe = w == "nosotros" || w == "nosotras" || (w.size() > 4 && w.compare(w.size() - 3, 3, "mos") == 0);
+        }
       }
       SentOut so;
       memBefore_ = mem;

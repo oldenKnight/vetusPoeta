@@ -53,6 +53,8 @@ struct LaNP {
   bool capitalise = false;        // title words ("Rēgīna Cordium")
   std::vector<LaNP> coord;        // further conjuncts: "X et Y"
   bool coordQue = false;          // enclitic.que: "pater māterque" (flexible mode only)
+  uint32_t coordConj = lex::kNoLemma;   // conjunction between conjuncts instead of et ("neque", "aut") (C13)
+  bool coordBoth = false;         // ... also before the first conjunct: "neque canēs neque fēlēs" (C13)
   std::string literal;            // unknown source word, kept verbatim (marked unknown)
   std::string fixed;              // ready Latin words from the phrasebook ("chartīs"): written as they are (C2b)
 };

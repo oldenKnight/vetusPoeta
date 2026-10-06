@@ -499,7 +499,13 @@ Result<CuratedData> CuratedData::load(const std::filesystem::path& dir) {
   dedupe(d.emoji_, "emoji_la.tsv");
   dedupe(d.emojiGrc_, "emoji_grc.tsv");
   dedupe(d.periphrasis_, "periphrasis_la.tsv");
-  dedupe(d.glossEs_, "gloss_es_la.tsv");
+  sortByKey(d.glossEs_);   // homographs share a key (sērō "tarde", serō "plantar"): a duplicate is key + head
+  for (size_t i = 1; i < d.glossEs_.size(); ++i)
+    for (size_t j = i; j-- > 0 && d.glossEs_[j].key == d.glossEs_[i].key;)
+      if (d.glossEs_[j].head == d.glossEs_[i].head) {
+        d.warnings_.push_back(LoadWarning{"gloss_es_la.tsv", 0, "duplicate key " + d.glossEs_[i].key + " (first row wins)"});
+        break;
+      }
   // the Spanish reverse index of gloss_es_la.tsv (C13): "pelota, bola" -> pelota, bola; parentheses dropped
   for (uint32_t i = 0; i < d.glossEs_.size(); ++i) {
     std::string flat;
