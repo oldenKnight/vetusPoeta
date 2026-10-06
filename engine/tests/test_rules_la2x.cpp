@@ -554,7 +554,11 @@ TEST_CASE("rules-la2x: RSS flat over 1,000 sentences") {
   }
   const long after1000 = rssAnonKbLa2x();
   MESSAGE("RssAnon after 10 sentences: " << after10 << " kB, after 1,000: " << after1000 << " kB");
+#if defined(__SANITIZE_ADDRESS__)
+  MESSAGE("AddressSanitizer build: the quarantine holds freed memory, RSS is reported only");
+#else
   if (after10 > 0 && after1000 > 0) CHECK((double)after1000 <= (double)after10 * 1.05 + 64.0);
+#endif
 }
 
 TEST_CASE("rules-la2x: odd input never crashes") {
