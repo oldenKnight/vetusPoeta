@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>vetus poeta</title>
+  <desc>Arch and macron: a Roman arch in terracotta on an ink-blue tile, a gold macron floating above it like a long-vowel mark, and a parchment quill leaf standing inside the arch. Original artwork drawn from the construction plan in docs/PREDESIGN.md 3.2.</desc>
+  <!-- 1. tile -->
+  <rect x="16" y="16" width="224" height="224" rx="52" fill="#22344A"/>
+  <!-- 2. arch (Latin): centre line x = 128, inner opening 89..167, inner apex y = 89 -->
+  <path d="M76 196 V128 A52 52 0 0 1 180 128 V196" fill="none" stroke="#E2704A" stroke-width="26" stroke-linecap="butt" stroke-linejoin="round"/>
+  <!-- 3. threshold step -->
+  <rect x="62" y="196" width="132" height="12" rx="6" fill="#E2704A"/>
+  <!-- 4. macron (the beam): 15 px above the arch apex, 0.68 of the arch width -->
+  <rect x="84" y="34" width="88" height="14" rx="7" fill="#E8B84A"/>
+  <!-- 5. quill leaf (the poet), leaning 20 degrees to the right, 10 px clear of the inner arc -->
+  <path d="M110 184 C96 149 113 115 141 102 C149 133 136 164 110 184 Z" fill="#FBF7F0"/>
+  <!-- rachis cut (negative line) -->
+  <path d="M110 184 L137 112" fill="none" stroke="#22344A" stroke-width="4" stroke-linecap="round"/>
+  <!-- nib, resting on the threshold -->
+  <path d="M110 184 L104 198" fill="none" stroke="#FBF7F0" stroke-width="5" stroke-linecap="round"/>
+</svg>

@@ -318,3 +318,9 @@ kbd {
   .vp-progress-bar { forced-color-adjust: none; background: Highlight; }
   .vp-tour-spot { outline-color: Highlight; }
 }
+
+/* ------------------------------------------------------------------ brand (C4): sprite icons at 24 px and the SVG wordmark
+   gui/ui/img/icons.svg symbols via <use href="img/icons.svg#id">; assets/logo_wordmark*.svg
+   when the top bar switches from the text wordmark to the lockup. */
+.vp-icon-24 { width: 24px; height: 24px; stroke-width: 2; }
+.vp-wordmark-svg { display: block; height: 28px; width: auto; }
