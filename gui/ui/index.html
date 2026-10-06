@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; font-src 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title data-i18n="app.title">vetus poeta</title>
+<link rel="icon" href="data:,">
+<link rel="preload" href="fonts/GentiumPlus-Regular.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/screens.css">
+</head>
+<body>
+<svg class="vp-sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="vp-i-leaf" viewBox="0 0 16 16"><path d="M2.5 13.5C2.5 7.5 7 3 13.5 2.5C13 9 8.5 13.5 2.5 13.5Z"/></symbol>
+  <symbol id="vp-i-close" viewBox="0 0 16 16"><path d="M4 4L12 12M12 4L4 12"/></symbol>
+  <symbol id="vp-i-offline" viewBox="0 0 16 16"><rect x="2" y="2.5" width="12" height="8.5" rx="1.5"/><path d="M8 11V13.5M5 13.5H11"/></symbol>
+  <symbol id="vp-i-online" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M2 8H14M8 2C10 4 10 12 8 14M8 2C6 4 6 12 8 14"/></symbol>
+</svg>
+<a class="vp-skip" href="#vp-main" data-i18n="app.skip.label"></a>
+<div id="app" class="vp-app" data-autoboot="true">
+  <header class="vp-header">
+    <span class="vp-wordmark" data-i18n="app.name"></span>
+  </header>
+  <main id="vp-main" class="vp-main" tabindex="-1">
+    <p class="vp-loading" data-i18n="app.loading.label"></p>
+  </main>
+  <aside id="vp-aside" class="vp-aside" hidden data-i18n-aria="app.aside.aria"></aside>
+  <footer class="vp-footer">
+    <div id="vp-status" class="vp-statusbar" aria-live="polite" data-i18n-aria="app.status.aria"></div>
+  </footer>
+</div>
+<div id="vp-toasts" class="vp-toasts" role="status" aria-live="polite" data-i18n-aria="toast.region.aria"></div>
+<noscript>
+  <p class="vp-noscript" lang="en-US" data-i18n-static="app.noscript">vetus poeta needs JavaScript. Turn it on and reload the page.</p>
+  <p class="vp-noscript" lang="es-MX" data-i18n-static="app.noscript">vetus poeta necesita JavaScript. Actívalo y vuelve a cargar la página.</p>
+</noscript>
+<script src="js/polyfill_promise.js"></script>
+<script src="js/vp_dom.js"></script>
+<script src="js/vp_timers.js"></script>
+<script src="js/vp_i18n.js"></script>
+<script src="js/vp_bridge.js"></script>
+<script src="js/vp_mock_engine.js"></script>
+<script src="js/vp_store.js"></script>
+<script src="js/vp_history.js"></script>
+<script src="js/vp_keys.js"></script>
+<script src="js/vp_toast.js"></script>
+<script src="js/vp_dialog.js"></script>
+<script src="js/vp_tour.js"></script>
+<script src="js/vp_router.js"></script>
+<script src="js/vp_debug.js"></script>
+<script src="js/vp_app.js"></script>
+</body>
+</html>

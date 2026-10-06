@@ -1,0 +1,18 @@
+{
+  "_about": "Key families the UI builds at run time, so a text search cannot see them (PREDESIGN 5.2). errorCodes: every engine error code of DESIGN section 9 plus the UI-only codes timeout and no_engine; each needs error.<code>.title and error.<code>.hint. families: keys under these prefixes are never reported as unused. Modules may also expose i18nKeys() for keys they build from their own tables (VP_Keys does).",
+  "errorCodes": [
+    "bad_params", "not_found", "io", "unsupported_format", "lexicon_missing", "lexicon_corrupt",
+    "lexicon_version", "project_corrupt", "model_missing", "model_load_failed", "model_unsupported_cpu",
+    "online_disabled", "online_failed", "busy", "internal", "timeout", "no_engine"
+  ],
+  "families": {
+    "error.": "error.<code>.title / .hint, chosen by VP_App.errorText(code)",
+    "key.": "shortcut labels, groups and key names, built by VP_Keys from its table",
+    "app.lexicon.lang.": "language names in the engine status line, by lexicon lang code",
+    "app.theme.": "theme names, by settings value",
+    "confidence.": "confidence chip words and tooltips, by CueView.confidence",
+    "tier.": "tier badge words, by LemmaView.tier",
+    "unit.": "counted units with .one/.other plurals",
+    "tour.demo.": "steps of the placeholder tour, by step id"
+  }
+}

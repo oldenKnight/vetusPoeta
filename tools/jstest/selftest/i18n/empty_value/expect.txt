@@ -1,0 +1,1 @@
+"app.a.label" is empty

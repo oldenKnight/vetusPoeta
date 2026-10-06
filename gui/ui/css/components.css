@@ -1,0 +1,320 @@
+/* components.css - shared controls (PREDESIGN 2.3): buttons, segmented switch, chips,
+   tabs, inputs, cards, toast, dialog, tour spotlight, tier badge, progress bar, status bar.
+   Targets are at least 44 px; one primary button per view. */
+
+/* ------------------------------------------------------------------ buttons */
+.vp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: var(--target);
+  min-width: var(--target);
+  padding: 0 var(--space-2);
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-ui);
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
+}
+.vp-btn-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.vp-btn-primary:hover { background: color-mix(in srgb, var(--accent) 86%, var(--text)); }
+.vp-btn-secondary { border-color: var(--border-strong); background: var(--surface); }
+.vp-btn-secondary:hover { background: var(--surface-2); }
+.vp-btn-tertiary { color: var(--accent); padding: 0 var(--space-1); }
+.vp-btn-tertiary:hover { text-decoration: underline; text-underline-offset: 3px; }
+.vp-btn-icon { padding: 0; width: var(--target); color: var(--muted); }
+.vp-btn-icon:hover { background: var(--surface-2); color: var(--text); }
+.vp-btn[disabled], .vp-btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+
+.vp-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ------------------------------------------------------------------ segmented switch */
+.vp-segmented {
+  display: inline-flex;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  background: var(--surface);
+}
+.vp-seg {
+  min-height: var(--target);
+  min-width: var(--target);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--fs-ui);
+  font-weight: 600;
+  cursor: pointer;
+}
+.vp-seg + .vp-seg { border-left: 1px solid var(--border); }
+.vp-seg:hover { background: var(--surface-2); color: var(--text); }
+.vp-seg[aria-pressed="true"] { background: var(--accent-soft); color: var(--text); border-bottom-color: var(--accent); font-weight: 700; }
+.vp-seg:focus-visible { outline-offset: -3px; }
+
+/* ------------------------------------------------------------------ chips (confidence)
+   Three encodings: colour, shape (circle / triangle / square) and a word. */
+.vp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 2px 10px;
+  border: 1.5px solid currentColor;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: max(12px, var(--fs-mono));
+  font-weight: 700;
+  line-height: 1.2;
+}
+.vp-chip-shape { width: 10px; height: 10px; flex: none; background: currentColor; }
+.vp-chip-ok { color: var(--ok); }
+.vp-chip-ok .vp-chip-shape { border-radius: 50%; }
+.vp-chip-check { color: var(--warn); }
+.vp-chip-check .vp-chip-shape { width: 12px; height: 11px; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.vp-chip-fix { color: var(--bad); }
+.vp-chip-fix .vp-chip-shape { border-radius: 1px; }
+
+/* ------------------------------------------------------------------ tabs */
+.vp-tabs { display: flex; gap: var(--space-half); border-bottom: 1px solid var(--border); }
+.vp-tab {
+  min-height: var(--target);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--fs-ui);
+  font-weight: 600;
+  cursor: pointer;
+}
+.vp-tab:hover { color: var(--text); background: var(--surface-2); }
+.vp-tab[aria-selected="true"] { color: var(--text); background: var(--accent-soft); border-bottom-color: var(--accent); }
+.vp-tab:focus-visible { outline-offset: -3px; }
+
+/* ------------------------------------------------------------------ inputs */
+.vp-field { display: flex; flex-direction: column; gap: var(--space-half); margin: var(--space-2) 0; max-width: 480px; }
+.vp-field label { font-size: var(--fs-ui); font-weight: 600; }
+.vp-input, textarea.vp-input, select.vp-input {
+  min-height: var(--target);
+  padding: 0 12px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+}
+textarea.vp-input { padding: var(--space-1) 12px; resize: vertical; font-family: var(--font-text); font-size: var(--fs-cue); }
+.vp-input::placeholder { color: var(--muted); opacity: 1; }
+.vp-input[aria-invalid="true"] { border-color: var(--bad); }
+
+/* ------------------------------------------------------------------ cards and rows */
+.vp-card {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-1);
+}
+.vp-card > h2 { margin-bottom: var(--space-1); }
+.vp-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin: var(--space-1) 0; }
+.vp-hint, .vp-lead { color: var(--muted); }
+.vp-hint { font-size: var(--fs-ui); }
+.vp-lead { font-size: 1.0625rem; margin: var(--space-1) 0 var(--space-3); }
+.vp-spacer { flex: 1; }
+
+/* status line: parts separated by a middle dot drawn by CSS (no text in code) */
+.vp-status-line { color: var(--text); }
+.vp-status-line > span + span::before { content: "\00B7"; padding: 0 var(--space-1); color: var(--muted); }
+.vp-status-line[data-state="failed"] { color: var(--bad); }
+
+/* ------------------------------------------------------------------ tier badge: three laurel leaves */
+.vp-tier { display: inline-flex; align-items: center; gap: 6px; margin-right: var(--space-2); }
+.vp-tier-leaves { display: inline-flex; align-items: flex-end; color: var(--ok); }
+.vp-leaf {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.vp-leaf-on { fill: currentColor; }
+.vp-tier-leaves .vp-leaf:nth-child(1) { transform: rotate(-35deg); }
+.vp-tier-leaves .vp-leaf:nth-child(2) { transform: translateY(-3px); }
+.vp-tier-leaves .vp-leaf:nth-child(3) { transform: rotate(55deg); }
+.vp-tier-label { font-size: var(--fs-ui); color: var(--muted); }
+
+/* ------------------------------------------------------------------ progress bar */
+.vp-progress {
+  position: relative;
+  height: 8px;
+  margin: var(--space-2) 0;
+  max-width: 480px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+}
+.vp-progress-bar { height: 100%; width: 0; background: var(--accent); transition: width var(--motion) var(--ease); }
+
+/* ------------------------------------------------------------------ status bar */
+.vp-statusbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: var(--space-half) var(--space-3);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: max(12px, var(--fs-mono));
+}
+.vp-net { display: inline-flex; align-items: center; gap: 6px; }
+.vp-net-offline { color: var(--ok); }
+.vp-net-online { color: var(--warn); font-weight: 700; }
+.vp-state-failed, .vp-state-none { color: var(--bad); }
+
+/* ------------------------------------------------------------------ toast */
+.vp-toasts {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-3);
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.vp-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--target);
+  padding: var(--space-half) var(--space-half) var(--space-half) var(--space-2);
+  border-radius: var(--radius-panel);
+  background: var(--text);
+  color: var(--bg);
+  box-shadow: var(--shadow-2);
+  pointer-events: auto;
+  animation: vp-rise var(--motion) var(--ease);
+}
+.vp-toast-error { border-left: 6px solid var(--bad); }
+.vp-toast-success { border-left: 6px solid var(--ok); }
+.vp-toast .vp-btn-tertiary, .vp-toast .vp-btn-icon { color: var(--bg); }
+.vp-toast .vp-btn-tertiary { text-decoration: underline; text-underline-offset: 3px; }
+.vp-toast .vp-btn-icon:hover { background: transparent; color: var(--bg); }
+.vp-toast :focus-visible { outline-color: var(--bg); }
+@keyframes vp-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ------------------------------------------------------------------ dialog */
+.vp-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: var(--space-2);
+  background: var(--overlay);
+  animation: vp-fade var(--motion) var(--ease);
+}
+.vp-dialog {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  background: var(--surface);
+  color: var(--text);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-2);
+}
+.vp-dialog:focus { outline: none; }
+.vp-dialog-wide { width: min(760px, 100%); }
+.vp-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.vp-dialog-title { font-size: 1.25rem; }
+.vp-dialog-body { padding: var(--space-2) var(--space-3); }
+.vp-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-1); padding: var(--space-2) var(--space-3); border-top: 1px solid var(--border); }
+@keyframes vp-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.vp-keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-2) var(--space-3); }
+.vp-keys-group h3 { margin-bottom: var(--space-half); color: var(--muted); font-size: var(--fs-ui); }
+.vp-keys-table td { padding: var(--space-half) var(--space-1) var(--space-half) 0; vertical-align: top; font-size: var(--fs-ui); }
+.vp-keys-combo { white-space: nowrap; }
+kbd {
+  display: inline-block;
+  min-width: 24px;
+  margin: 0 var(--space-half) var(--space-half) 0;
+  padding: 1px 6px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ tour spotlight */
+.vp-tour { position: fixed; inset: 0; z-index: 200; }
+.vp-tour-spot {
+  position: absolute;
+  border-radius: var(--radius-panel);
+  box-shadow: 0 0 0 9999px var(--overlay);
+  outline: 3px solid var(--focus);
+  outline-offset: 0;
+  pointer-events: none;
+  transition: top var(--motion) var(--ease), left var(--motion) var(--ease), width var(--motion) var(--ease), height var(--motion) var(--ease);
+}
+.vp-tour-card {
+  position: absolute;
+  width: min(380px, calc(100vw - 32px));
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-2);
+  transition: top var(--motion) var(--ease), left var(--motion) var(--ease);
+}
+.vp-tour-card-center { top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 9999px var(--overlay), var(--shadow-2); }
+.vp-tour-counter { color: var(--muted); font-size: var(--fs-ui); }
+.vp-tour-title { margin: var(--space-half) 0 var(--space-1); }
+.vp-tour-title:focus { outline: none; }
+.vp-tour-actions { display: flex; align-items: center; gap: var(--space-1); margin-top: var(--space-2); }
+
+/* ------------------------------------------------------------------ forced colours */
+@media (forced-colors: active) {
+  .vp-btn, .vp-seg, .vp-tab, .vp-input, .vp-segmented { border: 1px solid ButtonText; }
+  .vp-seg[aria-pressed="true"], .vp-tab[aria-selected="true"] { border-bottom: 3px solid Highlight; }
+  .vp-chip { border-color: CanvasText; }
+  .vp-chip-shape { forced-color-adjust: none; background: CanvasText; }
+  .vp-leaf { forced-color-adjust: none; stroke: CanvasText; }
+  .vp-leaf-on { fill: CanvasText; }
+  .vp-progress-bar { forced-color-adjust: none; background: Highlight; }
+  .vp-tour-spot { outline-color: Highlight; }
+}

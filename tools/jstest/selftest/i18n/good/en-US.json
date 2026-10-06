@@ -1,0 +1,5 @@
+{
+  "app.a.label": "Open {name}",
+  "app.b.one": "{n} cue",
+  "app.b.other": "{n} cues"
+}
