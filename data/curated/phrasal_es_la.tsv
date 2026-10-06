@@ -1,0 +1,37 @@
+# verb	particle	latin	frame	note
+# Spanish pronominal verbs (C13; teacher-editable): verb lemma + particle "se" -> one Latin verb lemma + frame. The
+# frame builder writes particle "se" when a clitic of the verb's own person stands with it ("me equivoco", "vete",
+# "siéntate", "inclínense", "se escapó"). Same columns and frames as phrasal_en_la.tsv: empty (the Latin verb as it
+# is), refl (adds the reflexive object: "¡Todos, inclínense!" -> Omnēs, inclīnāte vōs!), intr, acc / dat / abl.
+# Particle "-" = the bare verb with a fixed Latin frame. Without a row the reflexive clitic is the object (sē).
+ir	se	abeō		"Vete." -> Abī. "Se fueron." -> Abiērunt.
+irse	se	abeō		
+marchar	se	abeō		
+escapar	se	aufugiō		"Se escapó." -> Aufūgit.
+sentar	se	sedeō		"Siéntate." -> Sedē.
+levantar	se	surgō		"Levántate." -> Surge.
+despertar	se	expergīscor		
+acostar	se	cubō		
+dormir	se	obdormiō		
+equivocar	se	errō		"Te equivocaste." -> Errāvistī.
+inclinar	se	inclīnō	refl	"¡Todos, inclínense!" -> Omnēs, inclīnāte vōs!
+callar	se	taceō		"¡Cállate!" -> Tacē!
+quedar	se	maneō		"Quédate aquí." -> Manē hīc.
+acercar	se	appropinquō		
+alejar	se	discēdō		
+preocupar	se	cūrō		"No te preocupes." (phrasebook: nōlī timēre)
+asustar	se	timeō		
+alegrar	se	gaudeō		
+reír	se	rīdeō		
+caer	se	cadō		"Se cayó." -> Cecidit.
+morir	se	morior		
+regresar	se	redeō		
+volver	se	revertor		
+olvidar	se	oblīvīscor		
+lavar	se	lavō	refl	
+vestir	se	induō	refl	
+esconder	se	lateō		
+quejar	se	queror		
+apurar	se	festīnō		es-MX "¡Apúrate!" -> Festīnā!
+regresar	-	redeō		"¡Regresa aquí!" -> Redī hūc!
+volver	-	redeō		"Vuelve aquí." -> Redī hūc.

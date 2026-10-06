@@ -28,3 +28,10 @@ if(NOT VP_RULES_GRC_ADDED)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/morph_grc/*.cpp)
   target_sources(vp_rules PRIVATE ${VP_RULES_GRC_SRC})
 endif()
+
+# C11 (Latin -> English / Spanish): la2x/ analyser, interlinear and readable sentence. Guarded so the block is idempotent.
+if(NOT VP_RULES_LA2X_ADDED)
+  set(VP_RULES_LA2X_ADDED ON)
+  file(GLOB VP_RULES_LA2X_SRC CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/la2x/*.cpp)
+  target_sources(vp_rules PRIVATE ${VP_RULES_LA2X_SRC})
+endif()

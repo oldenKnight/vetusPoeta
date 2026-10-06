@@ -155,9 +155,35 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
   // teacher glosses: tier rows whose note lists the source lemma ("hole" -> fovea; data/curated/tiers_la.tsv)
   std::vector<const curated::TierEntry*> taught;
   if (!es) cd_.glossTiers(text::lower(sourceLemma), taught);
+  // Spanish (C13): gloss_es_la.tsv rows listing the word are the teacher's Spanish reverse index ("pelota" -> pila)
+  std::vector<const curated::GlossEsEntry*> taughtEs;
+  if (es) cd_.glossEsLemmas(text::nfc(text::lower(sourceLemma)), taughtEs);
+  // English pivot (C13): a Spanish word without a Latin candidate and without a teacher gloss is looked up through
+  // the one-line English gloss of its Spanish lexicon entry (when the library carries one); else it stays unknown
+  std::string pivotVia;
+  if (es && raw.empty() && taughtEs.empty() && st.srcLex) {
+    std::vector<lex::Analysis> an;
+    st.srcLex->lookup(text::es_key(sourceLemma), an);
+    for (const lex::Analysis& a : an) {
+      const lex::Lemma sl = st.srcLex->lemma(a.lemma);
+      if (sl.id == kNone || sl.glossEn.empty()) continue;
+      // the first gloss item: "door; gate (of a city)" -> door
+      std::string g = text::lower(std::string(sl.glossEn));
+      const size_t cut = g.find_first_of(";,(");
+      if (cut != std::string::npos) g = g.substr(0, cut);
+      while (!g.empty() && g.back() == ' ') g.pop_back();
+      if (g.compare(0, 3, "to ") == 0) g = g.substr(3);
+      if (g.empty() || g.find(' ') != std::string::npos) continue;
+      la_.reverse(text::en_key(g), raw);
+      cd_.glossTiers(g, taught);
+      if (!raw.empty() || !taught.empty()) { pivotVia = g; break; }
+    }
+  }
   auto isTaught = [&](const lex::Lemma& l) {
     for (const curated::TierEntry* te : taught)
       if (te->key == l.key && te->pos == curated::CuratedData::tierPos(l.pos)) return true;
+    for (const curated::GlossEsEntry* ge : taughtEs)
+      if (ge->key == l.key && (ge->head.empty() || text::nfc(ge->head) == text::nfc(std::string(l.head)))) return true;
     return false;
   };
   // the teacher's gloss outweighs one tier step at every fidelity except the faithful one
@@ -187,7 +213,8 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
   auto correction = [&](const lex::Lemma& l, double& s, std::string& why) {   // corrections memory (+1.0)
     if (!st.context) return;
     for (const rules::Correction& cr : st.context->corrections)
-      if (text::en_key(cr.sourceKey) == text::en_key(sourceLemma) && text::latin_key(cr.target) == std::string(l.key)) {
+      if ((es ? text::es_key(cr.sourceKey) == text::es_key(sourceLemma) : text::en_key(cr.sourceKey) == text::en_key(sourceLemma)) &&
+          text::latin_key(cr.target) == std::string(l.key)) {
         s += 1.0;
         why += ", correction";
       }
@@ -223,6 +250,7 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
       double ov = 0;
       for (const std::string& kw : words(std::string(se.keywords))) {
         if (kw == sourceLemma) kwHit = true;
+        if (es && k.score >= 51) kwHit = true;   // a Spanish keyword's candidates name the word itself (C13)
         for (const std::string& cx : context)
           if (kw == cx && cx != sourceLemma) ov += 0.1;
       }
@@ -260,6 +288,32 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
     correction(l, s, why);
     sc.push_back(Scored{id, 0, s, why, tier, true, 0.5});
   }
+  // Spanish teacher glosses the reverse index does not list for this word (gloss_es_la.tsv has no part-of-speech
+  // column: the Latin head is looked up with the part of speech asked for, an adjective may stand for a noun)
+  for (const curated::GlossEsEntry* ge : taughtEs) {
+    uint32_t id = morph::findLemma(la_, ge->head, pos == Name ? (uint8_t)Noun : pos);
+    bool substantive = false;
+    if (id == kNone && pos == Adj) id = morph::findLemma(la_, ge->head, Participle);
+    if (id == kNone && pos == Adv) id = morph::findLemma(la_, ge->head, Particle);
+    if (id == kNone && pos == Noun) { id = morph::findLemma(la_, ge->head, Adj); substantive = id != kNone; }
+    if (id == kNone) continue;
+    bool dup = false;
+    for (const Scored& x : sc)
+      if (x.lemma == id) dup = true;
+    if (dup) continue;
+    const lex::Lemma l = la_.lemma(id);
+    std::string why = "teacher gloss (gloss_es_la.tsv: " + ge->glossEs + ")";
+    const uint8_t tier = cd_.effectiveTier(l.key, l.pos, l.tier);
+    double s = 0.5 + taughtBonus + tierTerm(tier, why);
+    if (substantive) { s -= 0.05; why += ", adjective as noun"; }
+    correction(l, s, why);
+    sc.push_back(Scored{id, 0, s, why, tier, true, 0.5});
+  }
+  if (!pivotVia.empty())
+    for (Scored& x : sc) {
+      x.score -= 0.05;   // a pivot reading is one step less certain
+      x.why += ", via English \"" + pivotVia + "\"";
+    }
   std::stable_sort(sc.begin(), sc.end(), [](const Scored& a, const Scored& b) {
     if (a.score != b.score) return a.score > b.score;
     return a.lemma < b.lemma;
@@ -510,7 +564,9 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
     ch.token = n.token;
     uint32_t id = kNone;
     if (n.head == "hour" && n.ordinal) id = latin("hōra", Noun);
-    if (id == kNone) id = select(n.head, Noun, c.context, false, false, c.st, ch, n.srcGender);
+    // the Spanish noun's grammatical gender helps only for persons and animals (hijo -> fīlius, niña -> puella);
+    // for things it would leak into the Latin choice (el gato -> fēlēs f, la puerta -> iānua) (C13)
+    if (id == kNone) id = select(n.head, Noun, c.context, false, false, c.st, ch, animate(n) ? n.srcGender : 0);
     else { ch.source = n.head; ch.lemma = id; ch.kind = "table"; }
     if (id == kNone && !n.head.empty()) {   // substantive adjective ("the dark")
       Choice c2;

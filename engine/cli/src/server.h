@@ -21,8 +21,10 @@
 #include "views.h"
 #include "vp/lex.h"
 #include "vp/llm.h"
+#include "vp/online.h"
 #include "vp/project.h"
 #include "vp/result.h"
+#include "vp/engine_config.h"
 #include "vp/rules.h"
 #include "vp/settings.h"
 #include "vp/subs.h"
@@ -49,8 +51,16 @@ std::string strParam(const json& p, const char* key, const std::string& def, boo
 bool boolParam(const json& p, const char* key, bool def);
 
 struct ServeOptions {
-  std::string dataDir;      // settings.json, unsaved autosaves
-  std::string lexiconDir;   // latin.vpl, greek.vpl, english.vpl, spanish.vpl
+  std::string dataDir;      // settings.json, unsaved autosaves, samples/, online-cache/
+  std::string lexiconDir;   // latin.vpl, greek.vpl, english.vpl, spanish.vpl (+ nlp/, curated/ in the dist)
+  bool stub = false;        // --stub or VP_FORCE_STUB=1: the echo engine of rules_stub.cpp (protocol tests)
+};
+
+// A language pair the engine cannot translate now, with the reason (engine.hello.pairsUnavailable).
+struct PairState {
+  std::string pair;
+  bool available = false;
+  vp::Error why;
 };
 
 class RequestQueue {
@@ -124,7 +134,21 @@ class Server {
   bool writeAutosave();
   void addRecent(const std::string& path);
   const vp::lex::Lexicon* lexFor(vp::rules::Lang l) const;
-  void runJob(int64_t jobId, std::vector<size_t> positions, vp::rules::Options opt, const char* prefix);
+  void runJob(int64_t jobId, std::vector<size_t> positions, vp::rules::Options opt, const char* prefix,
+              std::vector<std::pair<std::string, vp::Error>> warnings);
+  // engine wiring (C8): data folders, pairs, advisors of engines ii/iii, stored per-cue engine data
+  void setupEngine();
+  const std::vector<PairState>& pairStates();
+  void requirePair(const std::string& pair);
+  int adviseSense(const std::string& prompt, const std::vector<std::string>& options);
+  vp::rules::Evidence adviseOnline(const std::string& lemma, const std::string& gloss);
+  void jobWarning(const char* engine, const vp::Error& e);
+  std::vector<vp::rules::TokenView> tokensOf(size_t pos) const;
+  void retarget(size_t pos, const std::string& text);   // user text in place of the target: check, tokens, reasons
+  void storeOutput(size_t pos, const vp::rules::CueOutput& out);
+  bool orbergMode() const;
+  void loadOriginal(const std::string& path);           // Orbergise: the original-language file, aligned to the cues
+  std::vector<size_t> indicesParam(const json& p, bool* given) const;
 
   // commands (DESIGN §9 table)
   json cmdHello(const json&);
@@ -200,6 +224,30 @@ class Server {
   int nextCorrection_ = 1;
   double cpsLimit_ = 17;    // settings cps.adult, refreshed when settings change
   vp::llm::Model model_;    // engine ii: loaded only inside a job or model.test, unloaded after it / 60 s idle
+
+  // engine wiring (C8)
+  bool realEngine_ = false;
+  std::string nlpDir_, curatedDir_;
+  bool nlpEn_ = false, nlpEs_ = false;
+  std::vector<std::pair<std::string, std::string>> samples_;   // (lang, path)
+  std::vector<PairState> pairs_;
+  bool pairsProbed_ = false;
+  json lexTiers_ = json::object();                              // lang -> {t1, t2, t3}
+  // the running job (worker thread): what engines ii/iii may do and what they said for the current batch
+  int64_t jobId_ = 0;
+  vp::llm::Advisors jobModel_;
+  bool jobModelFailed_ = false, jobOnline_ = false, jobOnlineFailed_ = false;
+  vp::rules::Lang jobTarget_ = vp::rules::Lang::La;
+  JobFacts batchFacts_;
+  // engine iii client, created on the first online question of a job when the settings allow it
+  std::unique_ptr<vp::online::Transport> onlineTransport_;
+  std::unique_ptr<vp::online::Wiktionary> onlineClient_;
+  std::unique_ptr<vp::online::Throttle> mockThrottle_;
+  std::string onlineMock_;                                      // VP_ONLINE_MOCK (tests only): "", "1", "disagree"
+  std::atomic<uint64_t> mockCalls_{0};
+  // Orbergise: the original-language cue texts aligned to the project's cues (cue.get .original)
+  std::string originalPath_;
+  std::vector<std::string> originals_;
 };
 
 }  // namespace vpcli

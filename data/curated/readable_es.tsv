@@ -1,0 +1,754 @@
+# Readable Spanish (es-MX) for Latin -> Spanish (la2x, task C11). Our own table; tab-separated; '#' comments.
+# Same columns and kinds as readable_en.tsv. es-MX choices: tú / ustedes (never vosotros, never usted for tú),
+# "ustedes" verbs in the 3rd plural, possessive of vester = su(s), "en la mañana", "recámara", clitic pronouns before
+# the finite verb and attached to affirmative imperatives and infinitives. Determiner rows carry gender.number
+# (m.sg f.sg m.pl f.pl); lex rows: note "estar" = the adjective takes estar as a predicate.
+# ---- personal pronouns ----
+pron	1sg	subj	yo
+pron	1sg	obj	me
+pron	1sg	iobj	me
+pron	1sg	prep	mí
+pron	1sg	poss	mi
+pron	1sg	refl	me
+pron	2sg	subj	tú
+pron	2sg	obj	te
+pron	2sg	iobj	te
+pron	2sg	prep	ti
+pron	2sg	poss	tu
+pron	2sg	refl	te
+pron	3sg.m	subj	él
+pron	3sg.m	obj	lo
+pron	3sg.m	iobj	le
+pron	3sg.m	prep	él
+pron	3sg.m	poss	su
+pron	3sg.m	refl	se
+pron	3sg.f	subj	ella
+pron	3sg.f	obj	la
+pron	3sg.f	iobj	le
+pron	3sg.f	prep	ella
+pron	3sg.f	poss	su
+pron	3sg.f	refl	se
+pron	3sg.n	subj	ello
+pron	3sg.n	obj	lo
+pron	3sg.n	iobj	le
+pron	3sg.n	prep	ello
+pron	3sg.n	poss	su
+pron	3sg.n	refl	se
+pron	1pl	subj	nosotros
+pron	1pl	obj	nos
+pron	1pl	iobj	nos
+pron	1pl	prep	nosotros
+pron	1pl	poss	nuestro
+pron	1pl	refl	nos
+pron	1pl.f	subj	nosotras
+pron	1pl.f	obj	nos
+pron	1pl.f	iobj	nos
+pron	1pl.f	prep	nosotras
+pron	1pl.f	poss	nuestro
+pron	1pl.f	refl	nos
+pron	2pl	subj	ustedes
+pron	2pl	obj	los
+pron	2pl	iobj	les
+pron	2pl	prep	ustedes
+pron	2pl	poss	su
+pron	2pl	refl	se
+pron	2pl.f	subj	ustedes
+pron	2pl.f	obj	las
+pron	2pl.f	iobj	les
+pron	2pl.f	prep	ustedes
+pron	2pl.f	poss	su
+pron	2pl.f	refl	se
+pron	3pl	subj	ellos
+pron	3pl	obj	los
+pron	3pl	iobj	les
+pron	3pl	prep	ellos
+pron	3pl	poss	su
+pron	3pl	refl	se
+pron	3pl.m	subj	ellos
+pron	3pl.m	obj	los
+pron	3pl.m	iobj	les
+pron	3pl.m	prep	ellos
+pron	3pl.m	poss	su
+pron	3pl.m	refl	se
+pron	3pl.f	subj	ellas
+pron	3pl.f	obj	las
+pron	3pl.f	iobj	les
+pron	3pl.f	prep	ellas
+pron	3pl.f	poss	su
+pron	3pl.f	refl	se
+pron	3pl.n	subj	ellos
+pron	3pl.n	obj	los
+pron	3pl.n	iobj	les
+pron	3pl.n	prep	ellos
+pron	3pl.n	poss	su
+pron	3pl.n	refl	se
+# ---- articles ----
+article	def	m.sg	el
+article	def	f.sg	la
+article	def	m.pl	los
+article	def	f.pl	las
+article	indef	m.sg	un
+article	indef	f.sg	una
+article	indef	m.pl	unos
+article	indef	f.pl	unas
+# ---- prepositions ----
+prep	a	abl	de
+prep	a	agent	por
+prep	ab	abl	de
+prep	ab	agent	por
+prep	ad	acc	a
+prep	ante	acc	antes de
+prep	apud	acc	en casa de
+prep	circum	acc	alrededor de
+prep	contra	acc	contra
+prep	cum	abl	con
+prep	de	abl	sobre
+prep	e	abl	de
+prep	ex	abl	de
+prep	extra	acc	fuera de
+prep	in	abl	en
+prep	in	acc	a
+prep	infra	acc	debajo de
+prep	inter	acc	entre
+prep	intra	acc	dentro de
+prep	ob	acc	por
+prep	per	acc	por
+prep	post	acc	después de
+prep	prae	abl	delante de
+prep	praeter	acc	excepto
+prep	pro	abl	por
+prep	prope	acc	cerca de
+prep	propter	acc	por
+prep	sine	abl	sin
+prep	sub	abl	bajo
+prep	sub	acc	bajo
+prep	super	acc	sobre
+prep	supra	acc	sobre
+prep	trans	acc	al otro lado de
+prep	ultra	acc	más allá de
+prep	usque	acc	hasta
+# ---- coordinating conjunctions ----
+conj	et	-	y	
+conj	que	-	y	
+conj	atque	-	y	
+conj	ac	-	y	
+conj	sed	-	pero	
+conj	at	-	pero	
+conj	aut	-	o	
+conj	uel	-	o	
+conj	ue	-	o	
+conj	neque	-	y no	
+conj	nec	-	y no	
+conj	nam	-	pues	
+conj	enim	-	pues	second
+conj	autem	-	pero	second
+conj	igitur	-	por lo tanto	second
+conj	itaque	-	así que	
+conj	ergo	-	por lo tanto	
+conj	tamen	-	sin embargo	
+# ---- subordinating conjunctions ----
+sub	quod	-	porque	cause
+sub	quia	-	porque	cause
+sub	quoniam	-	ya que	cause
+sub	cum	ind	cuando	time
+sub	cum	subj	cuando	time
+sub	si	-	si	condition
+sub	nisi	-	si no	condition
+sub	ut	subj	para que	purpose
+sub	ut	ind	como	manner
+sub	ne	subj	para que no	purpose
+sub	dum	-	mientras	time
+sub	postquam	-	después de que	time
+sub	antequam	-	antes de que	time subj
+sub	priusquam	-	antes de que	time subj
+sub	ubi	-	cuando	time
+sub	quamquam	-	aunque	concession
+sub	etsi	-	aunque	concession
+sub	donec	-	hasta que	time
+# ---- interrogatives ----
+wh	quis	nom	quién
+wh	quis	acc	a quién
+wh	quis	dat	a quién
+wh	quis	gen	de quién
+wh	quis	abl	con quién
+wh	quid	nom	qué
+wh	quid	acc	qué
+wh	qui	-	qué
+wh	ubi	-	dónde
+wh	quo	-	adónde
+wh	unde	-	de dónde
+wh	cur	-	por qué
+wh	quare	-	por qué
+wh	quando	-	cuándo
+wh	quomodo	-	cómo
+wh	quot	-	cuántos
+wh	quantus	-	qué tan grande
+wh	qualis	-	qué clase de
+wh	uter	-	cuál
+# ---- adverbs and particles ----
+adv	non	-	no	neg
+adv	haud	-	no	neg
+adv	numquam	-	nunca	neg pre
+adv	nusquam	-	en ninguna parte	neg end
+adv	semper	-	siempre	pre
+adv	saepe	-	a menudo	end
+adv	iam	-	ya	pre
+adv	nunc	-	ahora	front
+adv	tum	-	entonces	front
+adv	tunc	-	entonces	front
+adv	deinde	-	después	front
+adv	denique	-	por fin	front
+adv	tandem	-	por fin	front
+adv	primum	-	primero	front
+adv	hic	-	aquí	end
+adv	ibi	-	allí	end
+adv	huc	-	aquí	end
+adv	illuc	-	allá	end
+adv	hodie	-	hoy	end time
+adv	cras	-	mañana	end time
+adv	heri	-	ayer	end time
+adv	mane	-	en la mañana	end time
+adv	uesperi	-	en la tarde	end time
+adv	noctu	-	de noche	end time
+adv	ualde	-	muy	intens
+adv	nimis	-	demasiado	intens
+adv	tam	-	tan	intens
+adv	maxime	-	muy	intens
+adv	minime	-	de ningún modo	end
+adv	etiam	-	también	pre
+adv	quoque	-	también	pre
+adv	bene	-	bien	end
+adv	male	-	mal	end
+adv	iterum	-	otra vez	end
+adv	mox	-	pronto	end
+adv	statim	-	enseguida	end
+adv	subito	-	de repente	front
+adv	diu	-	mucho tiempo	end
+adv	procul	-	lejos	end
+adv	intus	-	adentro	end
+adv	foras	-	afuera	end
+adv	foris	-	afuera	end
+adv	ita	-	así	end
+adv	sic	-	así	end
+adv	certe	-	claro	front
+adv	fortasse	-	quizás	front
+adv	sane	-	por supuesto	front
+adv	sero	-	tarde	end
+adv	celeriter	-	rápido	end
+adv	lente	-	despacio	end
+adv	clare	-	claramente	end
+adv	magis	-	más	intens
+adv	plus	-	más	end
+adv	paene	-	casi	pre
+adv	solum	-	solo	pre
+adv	tantum	-	solo	pre
+adv	modo	-	solo	pre
+adv	quam	-	qué	intens
+adv	satis	-	bastante	end
+adv	parum	-	poco	end
+adv	multum	-	mucho	end
+adv	paulum	-	un poco	end
+adv	una	-	juntos	end
+adv	simul	-	juntos	end
+adv	interdum	-	a veces	pre
+adv	nondum	-	todavía no	neg pre
+adv	immo	-	no	front
+adv	ecce	-	mira	front
+adv	latine	-	en latín	end
+adv	mecum	-	conmigo	end
+adv	tecum	-	contigo	end
+adv	secum	-	consigo	end
+adv	nobiscum	-	con nosotros	end
+adv	uobiscum	-	con ustedes	end
+adv	domi	-	en casa	end
+adv	domum	-	a casa	end
+adv	rus	-	al campo	end
+adv	ruri	-	en el campo	end
+adv	rure	-	del campo	end
+adv	quaeso	-	por favor	end
+adv	nonne	-	-	q
+adv	num	-	-	q
+# ---- interjections ----
+intj	o	-	oh
+intj	ecce	-	mira
+intj	heu	-	ay
+intj	eheu	-	ay
+intj	salue	-	hola
+intj	saluete	-	hola
+intj	uale	-	adiós
+intj	ualete	-	adiós
+intj	euge	-	bravo
+intj	age	-	vamos
+intj	agite	-	vamos
+intj	quaeso	-	por favor
+intj	ita	-	sí
+intj	minime	-	no
+# ---- determiners / quantifiers / demonstratives ----
+det	hic	m.sg	este
+det	hic	f.sg	esta
+det	hic	m.pl	estos
+det	hic	f.pl	estas
+det	hic	pron.m.sg	este
+det	hic	pron.f.sg	esta
+det	hic	pron.m.pl	estos
+det	hic	pron.f.pl	estas
+det	hic	pron.n.sg	esto
+det	ille	m.sg	aquel
+det	ille	f.sg	aquella
+det	ille	m.pl	aquellos
+det	ille	f.pl	aquellas
+det	ille	pron.m.sg	él
+det	ille	pron.f.sg	ella
+det	ille	pron.m.pl	ellos
+det	ille	pron.f.pl	ellas
+det	ille	pron.n.sg	eso
+det	iste	m.sg	ese
+det	iste	f.sg	esa
+det	iste	m.pl	esos
+det	iste	f.pl	esas
+det	is	m.sg	ese
+det	is	f.sg	esa
+det	is	m.pl	esos
+det	is	f.pl	esas
+det	idem	m.sg	el mismo
+det	idem	f.sg	la misma
+det	idem	m.pl	los mismos
+det	idem	f.pl	las mismas
+det	ipse	m.sg	mismo
+det	ipse	f.sg	misma
+det	ipse	m.pl	mismos
+det	ipse	f.pl	mismas
+det	omnis	m.sg	cada
+det	omnis	f.sg	cada
+det	omnis	m.pl	todos los
+det	omnis	f.pl	todas las
+det	omnis	pron.m.pl	todos
+det	omnis	pron.f.pl	todas
+det	omnis	pron.n.pl	todo
+det	totus	m.sg	todo el
+det	totus	f.sg	toda la
+det	totus	m.pl	todos los
+det	totus	f.pl	todas las
+det	nullus	m.sg	ningún
+det	nullus	f.sg	ninguna
+det	ullus	m.sg	algún
+det	ullus	f.sg	alguna
+det	alius	m.sg	otro
+det	alius	f.sg	otra
+det	alius	m.pl	otros
+det	alius	f.pl	otras
+det	alter	m.sg	el otro
+det	alter	f.sg	la otra
+det	multus	m.sg	mucho
+det	multus	f.sg	mucha
+det	multus	m.pl	muchos
+det	multus	f.pl	muchas
+det	multus	pron.m.pl	muchos
+det	paucus	m.pl	pocos
+det	paucus	f.pl	pocas
+det	paucus	pron.m.pl	pocos
+det	ceterus	m.pl	los demás
+det	ceterus	f.pl	las demás
+det	quidam	m.sg	cierto
+det	quidam	f.sg	cierta
+det	quidam	m.pl	ciertos
+det	quidam	f.pl	ciertas
+det	aliquis	m.sg	algún
+det	aliquis	f.sg	alguna
+det	aliquis	m.pl	algunos
+det	aliquis	f.pl	algunas
+det	aliquis	pron.sg	alguien
+det	nemo	pron.sg	nadie
+det	nihil	pron.sg	nada
+det	quisque	pron.sg	cada uno
+det	meus	m.sg	mi
+det	meus	f.sg	mi
+det	meus	m.pl	mis
+det	meus	f.pl	mis
+det	tuus	m.sg	tu
+det	tuus	f.sg	tu
+det	tuus	m.pl	tus
+det	tuus	f.pl	tus
+det	noster	m.sg	nuestro
+det	noster	f.sg	nuestra
+det	noster	m.pl	nuestros
+det	noster	f.pl	nuestras
+det	uester	m.sg	su
+det	uester	f.sg	su
+det	uester	m.pl	sus
+det	uester	f.pl	sus
+det	unus	m.sg	un
+det	unus	f.sg	una
+det	duo	pl	dos
+det	tres	pl	tres
+det	quattuor	pl	cuatro
+det	quinque	pl	cinco
+det	sex	pl	seis
+det	septem	pl	siete
+det	octo	pl	ocho
+det	nouem	pl	nueve
+det	decem	pl	diez
+det	centum	pl	cien
+det	mille	pl	mil
+# ---- phrases ----
+phrase	quid agis	-	¿cómo estás?
+phrase	quid agitis	-	¿cómo están?
+phrase	gratias ago	-	gracias
+phrase	gratias tibi ago	-	gracias
+phrase	gratias agimus	-	gracias
+phrase	quota hora est	-	qué hora es
+phrase	o me miserum	-	ay de mí
+phrase	o me miseram	-	ay de mí
+phrase	mihi placet	-	me gusta
+phrase	amabo te	-	por favor
+phrase	ita uero	-	sí, claro
+phrase	bene est	-	está bien
+# ---- content words ----
+lex	puer	noun	niño	person
+lex	puella	noun	niña	person
+lex	femina	noun	mujer	person
+lex	uir	noun	hombre	person
+lex	homo	noun	persona	person
+lex	seruus	noun	esclavo	person
+lex	serua	noun	esclava	person
+lex	dominus	noun	amo	person
+lex	domina	noun	señora	person
+lex	pater	noun	padre	person
+lex	mater	noun	madre	person
+lex	filius	noun	hijo	person
+lex	filia	noun	hija	person
+lex	frater	noun	hermano	person
+lex	soror	noun	hermana	person
+lex	amicus	noun	amigo	person
+lex	amica	noun	amiga	person
+lex	magister	noun	maestro	person
+lex	magistra	noun	maestra	person
+lex	discipulus	noun	alumno	person
+lex	discipula	noun	alumna	person
+lex	agricola	noun	campesino	person
+lex	nauta	noun	marinero	person
+lex	poeta	noun	poeta	person
+lex	miles	noun	soldado	person
+lex	rex	noun	rey	person
+lex	regina	noun	reina	person
+lex	medicus	noun	médico	person
+lex	mercator	noun	comerciante	person
+lex	liberi	noun	hijos	person
+lex	infans	noun	bebé	person
+lex	ancilla	noun	criada	person
+lex	uxor	noun	esposa	person
+lex	maritus	noun	esposo	person
+lex	deus	noun	dios	person
+lex	dea	noun	diosa	person
+lex	hospes	noun	huésped	person
+lex	senex	noun	anciano	person
+lex	iuuenis	noun	joven	person
+lex	populus	noun	pueblo	
+lex	aqua	noun	agua	mass
+lex	uinum	noun	vino	mass
+lex	pecunia	noun	dinero	mass
+lex	cibus	noun	comida	mass
+lex	panis	noun	pan	mass
+lex	lac	noun	leche	mass
+lex	sol	noun	sol	unique
+lex	luna	noun	luna	unique
+lex	caelum	noun	cielo	unique
+lex	terra	noun	tierra	
+lex	mare	noun	mar	
+lex	nox	noun	noche	time:de
+lex	dies	noun	día	time:en
+lex	hora	noun	hora	time:a
+lex	annus	noun	año	time:en
+lex	tempus	noun	tiempo	
+lex	hortus	noun	jardín	
+lex	uilla	noun	casa	
+lex	domus	noun	casa	
+lex	casa	noun	choza	
+lex	uia	noun	camino	
+lex	urbs	noun	ciudad	
+lex	oppidum	noun	pueblo	
+lex	ager	noun	campo	
+lex	silua	noun	bosque	
+lex	flumen	noun	río	
+lex	insula	noun	isla	
+lex	liber	noun	libro	
+lex	epistula	noun	carta	
+lex	rosa	noun	rosa	
+lex	flos	noun	flor	
+lex	arbor	noun	árbol	
+lex	equus	noun	caballo	
+lex	canis	noun	perro	
+lex	feles	noun	gato	
+lex	lupus	noun	lobo	
+lex	auis	noun	pájaro	
+lex	ouis	noun	oveja	
+lex	piscis	noun	pez	
+lex	ianua	noun	puerta	
+lex	mensa	noun	mesa	
+lex	sella	noun	silla	
+lex	cubiculum	noun	recámara	
+lex	porta	noun	puerta	
+lex	fabula	noun	cuento	
+lex	carmen	noun	canción	
+lex	donum	noun	regalo	
+lex	malum	noun	manzana	
+lex	oculus	noun	ojo	
+lex	manus	noun	mano	
+lex	pes	noun	pie	
+lex	caput	noun	cabeza	
+lex	nomen	noun	nombre	
+lex	uox	noun	voz	
+lex	cor	noun	corazón	
+lex	uita	noun	vida	
+lex	bellum	noun	guerra	
+lex	pax	noun	paz	mass
+lex	gladius	noun	espada	
+lex	scutum	noun	escudo	
+lex	nauis	noun	barco	
+lex	murus	noun	muro	
+lex	uestis	noun	ropa	
+lex	schola	noun	escuela	
+lex	pila	noun	pelota	
+lex	ludus	noun	escuela	
+lex	animal	noun	animal	
+lex	mundus	noun	mundo	unique
+lex	patria	noun	patria	
+lex	lingua	noun	lengua	
+lex	saccus	noun	bolsa	
+lex	baculum	noun	bastón	
+lex	lectus	noun	cama	
+lex	ostium	noun	puerta	
+lex	fenestra	noun	ventana	
+lex	templum	noun	templo	
+lex	forum	noun	foro	
+lex	sum	verb	ser	
+lex	possum	verb	poder	
+lex	uolo	verb	querer	
+lex	nolo	verb	no querer	
+lex	debeo	verb	deber	
+lex	habeo	verb	tener	
+lex	uideo	verb	ver	
+lex	audio	verb	oír	
+lex	uenio	verb	venir	
+lex	eo	verb	ir	
+lex	do	verb	dar	
+lex	dico	verb	decir	
+lex	scribo	verb	escribir	
+lex	laudo	verb	alabar	
+lex	amo	verb	amar	
+lex	porto	verb	llevar	
+lex	specto	verb	mirar	
+lex	exspecto	verb	esperar	
+lex	expecto	verb	esperar	
+lex	paro	verb	preparar	
+lex	laboro	verb	trabajar	
+lex	habito	verb	vivir	
+lex	nauigo	verb	navegar	
+lex	pugno	verb	pelear	
+lex	clamo	verb	gritar	
+lex	rogo	verb	preguntar	
+lex	interrogo	verb	preguntar	
+lex	respondeo	verb	responder	
+lex	sedeo	verb	estar sentado	
+lex	sto	verb	estar de pie	
+lex	iaceo	verb	estar acostado	
+lex	dormio	verb	dormir	
+lex	curro	verb	correr	
+lex	ludo	verb	jugar	
+lex	rideo	verb	reír	
+lex	fleo	verb	llorar	
+lex	lacrimo	verb	llorar	
+lex	timeo	verb	temer	
+lex	gaudeo	verb	alegrarse	
+lex	moneo	verb	advertir	
+lex	doceo	verb	enseñar	
+lex	disco	verb	aprender	
+lex	pono	verb	poner	
+lex	mitto	verb	enviar	
+lex	duco	verb	llevar	
+lex	capio	verb	tomar	
+lex	facio	verb	hacer	
+lex	ago	verb	hacer	
+lex	edo	verb	comer	
+lex	bibo	verb	beber	
+lex	quaero	verb	buscar	
+lex	inuenio	verb	encontrar	
+lex	aperio	verb	abrir	
+lex	claudo	verb	cerrar	
+lex	uoco	verb	llamar	
+lex	appello	verb	llamar	
+lex	adiuuo	verb	ayudar	
+lex	iuuo	verb	ayudar	
+lex	pareo	verb	obedecer	
+lex	placeo	verb	agradar	
+lex	credo	verb	creer	
+lex	puto	verb	pensar	
+lex	scio	verb	saber	
+lex	nescio	verb	no saber	
+lex	cogito	verb	pensar	
+lex	intellego	verb	entender	
+lex	ostendo	verb	mostrar	
+lex	numero	verb	contar	
+lex	pulso	verb	tocar	
+lex	salto	verb	bailar	
+lex	nato	verb	nadar	
+lex	maneo	verb	quedarse	
+lex	abeo	verb	irse	
+lex	redeo	verb	regresar	
+lex	exeo	verb	salir	
+lex	ineo	verb	entrar	
+lex	intro	verb	entrar	
+lex	ascendo	verb	subir	
+lex	descendo	verb	bajar	
+lex	cado	verb	caer	
+lex	surgo	verb	levantarse	
+lex	loquor	verb	hablar	
+lex	sequor	verb	seguir	
+lex	conor	verb	intentar	
+lex	uerbero	verb	golpear	
+lex	accipio	verb	recibir	
+lex	emo	verb	comprar	
+lex	uendo	verb	vender	
+lex	aedifico	verb	construir	
+lex	pingo	verb	pintar	
+lex	cupio	verb	desear	
+lex	incipio	verb	empezar	
+lex	soleo	verb	soler	
+lex	desidero	verb	extrañar	
+lex	iubeo	verb	ordenar	
+lex	impero	verb	mandar	
+lex	narro	verb	contar	
+lex	trado	verb	entregar	
+lex	saluto	verb	saludar	
+lex	occido	verb	matar	
+lex	neco	verb	matar	
+lex	terreo	verb	asustar	
+lex	uulnero	verb	herir	
+lex	tango	verb	tocar	
+lex	traho	verb	arrastrar	
+lex	frango	verb	romper	
+lex	lauo	verb	lavar	
+lex	ceno	verb	cenar	
+lex	ambulo	verb	caminar	
+lex	canto	verb	cantar	
+lex	cano	verb	cantar	
+lex	lego	verb	leer	
+lex	magnus	adj	grande	
+lex	paruus	adj	pequeño	
+lex	bonus	adj	bueno	
+lex	malus	adj	malo	
+lex	pulcher	adj	bonito	
+lex	laetus	adj	contento	estar
+lex	tristis	adj	triste	estar
+lex	iratus	adj	enojado	estar
+lex	fessus	adj	cansado	estar
+lex	aeger	adj	enfermo	estar
+lex	longus	adj	largo	
+lex	breuis	adj	corto	
+lex	altus	adj	alto	
+lex	nouus	adj	nuevo	
+lex	uetus	adj	viejo	
+lex	antiquus	adj	antiguo	
+lex	albus	adj	blanco	
+lex	niger	adj	negro	
+lex	ruber	adj	rojo	
+lex	uiridis	adj	verde	
+lex	caeruleus	adj	azul	
+lex	flauus	adj	amarillo	
+lex	clarus	adj	famoso	
+lex	miser	adj	pobre	
+lex	mirus	adj	extraño	
+lex	fortis	adj	valiente	
+lex	celer	adj	rápido	
+lex	facilis	adj	fácil	
+lex	difficilis	adj	difícil	
+lex	dulcis	adj	dulce	
+lex	carus	adj	querido	
+lex	plenus	adj	lleno	estar
+lex	uacuus	adj	vacío	estar
+lex	primus	adj	primero	
+lex	secundus	adj	segundo	
+lex	tertius	adj	tercero	
+lex	ultimus	adj	último	
+lex	romanus	adj	romano	
+lex	latinus	adj	latino	
+lex	graecus	adj	griego	
+lex	sapiens	adj	sabio	
+lex	stultus	adj	tonto	
+lex	ingens	adj	enorme	
+lex	improbus	adj	malvado	
+lex	probus	adj	honrado	
+lex	liber	adj	libre	
+lex	frigidus	adj	frío	estar
+lex	calidus	adj	caliente	estar
+lex	diligens	adj	cuidadoso	
+lex	piger	adj	perezoso	
+lex	inurbanus	adj	grosero	
+lex	asper	adj	áspero	
+lex	dexter	adj	derecho	
+lex	sinister	adj	izquierdo	
+lex	solus	adj	solo	estar
+lex	beatus	adj	feliz	
+lex	diues	adj	rico	
+lex	pauper	adj	pobre	
+# ---- names (Latin name key -> Spanish); others: -us -> -o, initial I + vowel -> J ----
+name	aemilia	-	Emilia
+name	iulia	-	Julia
+name	iulius	-	Julio
+name	marcus	-	Marco
+name	quintus	-	Quinto
+name	roma	-	Roma
+name	syra	-	Sira
+name	lucius	-	Lucio
+name	cornelia	-	Cornelia
+name	alicia	-	Alicia
+lex	luceo	verb	brillar	
+lex	mus	noun	ratón	
+lex	cena	noun	cena	event
+lex	pluo	verb	llover	
+lex	mordeo	verb	morder	
+lex	oppugno	verb	atacar	
+name	maria	-	María
+lex	maneo	verb+obj	esperar	
+phrase	gratias tibi maximas ago	-	muchas gracias
+phrase	gratias maximas ago	-	muchas gracias
+phrase	gratias uobis ago	-	gracias
+lex	erro	verb	equivocarse	
+lex	candela	noun	vela	
+lex	accendo	verb	encender	
+lex	inclino	verb	inclinar	
+lex	inclino	verb+refl	inclinarse	
+lex	facio	verb+wh	hacer	
+lex	lauo	verb+refl	lavarse	
+lex	sextus	adj	sexto	
+lex	tenebrae	noun	oscuridad	mass
+lex	horologium	noun	reloj	
+lex	thea	noun	té	mass
+lex	placenta	noun	pastel	
+lex	fouea	noun	hoyo	
+lex	pallium	noun	abrigo	
+lex	color	noun	color	
+lex	tremo	verb	temblar	
+lex	transeo	verb	pasar	
+lex	sumo	verb	tomar	
+adv	olim	-	una vez	front time
+adv	aliquando	-	a veces	pre
+adv	aliter	-	si no	front
+adv	libenter	-	con gusto	end
+phrase	qua uia	-	por qué camino	wh
+phrase	dies lunae	-	lunes
+phrase	dies martis	-	martes
+phrase	dies mercurii	-	miércoles
+phrase	dies iouis	-	jueves
+phrase	dies ueneris	-	viernes
+phrase	dies saturni	-	sábado
+phrase	dies solis	-	domingo
+prep	post	acc.place	detrás de
+prep	ante	acc.place	delante de
+lex	iratus	adj	enojado	estar
+lex	charta	noun	carta	
+lex	error	noun	error	
+lex	fio	verb	suceder	
+lex	ientaculum	noun	desayuno	event
+lex	prandium	noun	comida	event
+lex	pensum	noun	tarea	mass

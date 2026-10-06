@@ -11,6 +11,10 @@ Layout (docs/BUILD.md "Windows: the dist folder"):
     WebView2Loader.dll    MinGW builds only (MSVC links the static loader)
     ui/ + ui.manifest.json   gui/ui without dev/ and tests/ (tools/pack_ui.py), with SHA-256 per file
     data/*.vpl            lexicons copied from data/work/ when present (the shell passes --lexicons data)
+    data/nlp/*.vpt        English/Spanish analysis models from data/work/nlp/ (the engine finds <lexicons>/nlp)
+    data/curated/*.tsv *.txt  the teacher-editable rule tables from data/curated/ (<lexicons>/curated)
+    samples/sample.<lang>.srt  the 12-cue sample files from tests/samples/ (our own sentences); the engine copies
+                          them to <user data>/samples/ where the UI opens them (engine.hello.samples)
     models/README.txt     where the optional local model file goes
     licenses/             WebView2 SDK licence (when the loader DLL ships)
     THIRD_PARTY_NOTICES.txt  third_party/LICENSES.md, licence texts, and the NOTE section of every .vpl
@@ -204,6 +208,31 @@ def main():
             vpls.append(dst)
     if not vpls:
         warnings.append('no lexicons copied (data/work/*.vpl missing or --no-data): the engine reports lexicon_missing')
+    # NLP models and curated tables next to the lexicons (engine/cli/README.md "Dist layout")
+    if not args.no_data:
+        nlp = os.path.join(work, 'nlp')
+        models = sorted(n for n in os.listdir(nlp) if n.endswith('.vpt')) if os.path.isdir(nlp) else []
+        if models:
+            os.makedirs(os.path.join(out, 'data', 'nlp'), exist_ok=True)
+            for n in models:
+                shutil.copyfile(os.path.join(nlp, n), os.path.join(out, 'data', 'nlp', n))
+        if len(models) < 4:
+            warnings.append('data/work/nlp/*.vpt incomplete (%d of 4): English/Spanish sources are unavailable' % len(models))
+        curated = os.path.join(REPO, 'data', 'curated')
+        tables = sorted(n for n in os.listdir(curated) if n.endswith(('.tsv', '.txt'))) if os.path.isdir(curated) else []
+        os.makedirs(os.path.join(out, 'data', 'curated'), exist_ok=True)
+        for n in tables:
+            shutil.copyfile(os.path.join(curated, n), os.path.join(out, 'data', 'curated', n))
+        if 'order_la.txt' not in tables:
+            warnings.append('data/curated/order_la.txt missing: the rule engine cannot start')
+    samples = os.path.join(REPO, 'tests', 'samples')
+    srts = sorted(n for n in os.listdir(samples) if n.startswith('sample.') and n.endswith('.srt')) if os.path.isdir(samples) else []
+    if srts:
+        os.makedirs(os.path.join(out, 'samples'))
+        for n in srts:
+            shutil.copyfile(os.path.join(samples, n), os.path.join(out, 'samples', n))
+    else:
+        warnings.append('tests/samples/sample.*.srt missing: "Try the sample" has no file')
 
     os.makedirs(os.path.join(out, 'models'))
     with open(os.path.join(out, 'models', 'README.txt'), 'w', encoding='utf-8', newline='\r\n') as f:

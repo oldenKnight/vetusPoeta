@@ -1,0 +1,17 @@
+# verb	prep	latin	frame	note
+# Spanish verb + preposition -> Latin verb and what happens to the prepositional phrase (C13; teacher-editable). Same
+# columns as verbprep_en_la.tsv; the preposition is written as the canonical English one the frame builder maps
+# Spanish prepositions to (a -> to, en -> in, de -> of, con -> with, por -> by, para -> for). The personal "a" before
+# a person object is not a preposition (the frame builder makes it the object), so "esperar a alguien" needs no row.
+vivir	in	habitō	pp	"Vivimos en una casa" -> In casā habitāmus.
+habitar	in	habitō	pp	
+mirar	to	spectō	obj	"mirar a la luna" -> lūnam spectāre
+esperar	to	exspectō	obj	
+buscar	to	quaerō	obj	
+escuchar	to	audiō	obj	
+ver	to	-	obj	
+pensar	in	cōgitō	prep:dē+abl	"pensar en algo" -> dē rē cōgitāre
+hablar	of	loquor	prep:dē+abl	"hablar de algo"
+depender	of	pendeō	prep:ex+abl	"depende de ..." -> pendet ex ...
+ayudar	with	adiuvō	prep:in+abl	
+reír	of	rīdeō	obj	"reírse de alguien" -> aliquem rīdēre

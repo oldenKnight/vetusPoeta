@@ -1,0 +1,337 @@
+# Expected lemma head and features (in words) per token of tests/fixtures/la2x/sentences.tsv, reviewed by hand.
+# Columns: latin sentence	word	lemma head	features. Needs the real latin.vpl (head spellings come from it).
+Puella rosam amat.	Puella	puella	noun, nominative singular
+Puella rosam amat.	rosam	rosa	noun, accusative singular
+Puella rosam amat.	amat	amō	verb, third person singular present indicative active
+Puellae rosās amant.	Puellae	puella	noun, nominative plural
+Puellae rosās amant.	rosās	rosa	noun, accusative plural
+Puellae rosās amant.	amant	amō	verb, third person plural present indicative active
+Puer puellae rosam dat.	Puer	puer	noun, nominative singular
+Puer puellae rosam dat.	puellae	puella	noun, dative singular
+Puer puellae rosam dat.	rosam	rosa	noun, accusative singular
+Puer puellae rosam dat.	dat	dō	verb, third person singular present indicative active
+Mārcus in hortō ambulat.	Mārcus	Mārcus	name, nominative singular
+Mārcus in hortō ambulat.	in	in	preposition
+Mārcus in hortō ambulat.	hortō	hortus	noun, ablative singular
+Mārcus in hortō ambulat.	ambulat	ambulō	verb, third person singular present indicative active
+Iūlia laeta est.	Iūlia	Iūlia	name, nominative singular
+Iūlia laeta est.	laeta	laetus	adjective, nominative singular feminine
+Iūlia laeta est.	est	sum	verb, third person singular present indicative active
+Rosa pulchra est.	Rosa	rosa	noun, nominative singular
+Rosa pulchra est.	pulchra	pulcher	adjective, nominative singular feminine
+Rosa pulchra est.	est	sum	verb, third person singular present indicative active
+Mārcus puer Rōmānus est.	Mārcus	Mārcus	name, nominative singular
+Mārcus puer Rōmānus est.	puer	puer	noun, nominative singular
+Mārcus puer Rōmānus est.	Rōmānus	Rōmānus	adjective, nominative singular masculine
+Mārcus puer Rōmānus est.	est	sum	verb, third person singular present indicative active
+Ubi est Mārcus?	Ubi	ubi	adverb
+Ubi est Mārcus?	est	sum	verb, third person singular present indicative active
+Ubi est Mārcus?	Mārcus	Mārcus	name, nominative singular
+Quis es?	Quis	quis	pronoun, nominative singular masculine
+Quis es?	es	sum	verb, second person singular present indicative active
+Quid legis?	Quid	quis	pronoun, accusative singular neuter
+Quid legis?	legis	legō	verb, second person singular present indicative active
+Quem puella amat?	Quem	quis	pronoun, accusative singular masculine
+Quem puella amat?	puella	puella	noun, nominative singular
+Quem puella amat?	amat	amō	verb, third person singular present indicative active
+Cūr puer lacrimat?	Cūr	cūr	adverb
+Cūr puer lacrimat?	puer	puer	noun, nominative singular
+Cūr puer lacrimat?	lacrimat	lacrimō	verb, third person singular present indicative active
+Quō īs?	Quō	quō	adverb
+Quō īs?	īs	eō	verb, second person singular present indicative active
+Unde venīs?	Unde	unde	adverb
+Unde venīs?	venīs	veniō	verb, second person singular present indicative active
+Quandō venit pater?	Quandō	quando	adverb
+Quandō venit pater?	venit	veniō	verb, third person singular present indicative active
+Quandō venit pater?	pater	pater	noun, nominative singular
+Quot puerī in hortō sunt?	Quot	quot	determiner
+Quot puerī in hortō sunt?	puerī	puer	noun, nominative plural
+Quot puerī in hortō sunt?	in	in	preposition
+Quot puerī in hortō sunt?	hortō	hortus	noun, ablative singular
+Quot puerī in hortō sunt?	sunt	sum	verb, third person plural present indicative active
+Vidēsne puellam?	Vidēsne	videō	verb, second person singular present indicative active
+Vidēsne puellam?	puellam	puella	noun, accusative singular
+Estne Iūlia in hortō?	Estne	sum	verb, third person singular present indicative active
+Estne Iūlia in hortō?	Iūlia	Iūlia	name, nominative singular
+Estne Iūlia in hortō?	in	in	preposition
+Estne Iūlia in hortō?	hortō	hortus	noun, ablative singular
+Num puella rosam amat?	Num	num	adverb
+Num puella rosam amat?	puella	puella	noun, nominative singular
+Num puella rosam amat?	rosam	rosa	noun, accusative singular
+Num puella rosam amat?	amat	amō	verb, third person singular present indicative active
+Nōnne puella rosam amat?	Nōnne	nōnne	adverb
+Nōnne puella rosam amat?	puella	puella	noun, nominative singular
+Nōnne puella rosam amat?	rosam	rosa	noun, accusative singular
+Nōnne puella rosam amat?	amat	amō	verb, third person singular present indicative active
+Mārce, venī!	Mārce	Mārcus	name, vocative singular
+Mārce, venī!	venī	veniō	verb, second person singular present imperative active
+Ō puer, venī hūc!	Ō	o	interjection
+Ō puer, venī hūc!	puer	puer	noun, vocative singular
+Ō puer, venī hūc!	venī	veniō	verb, second person singular present imperative active
+Ō puer, venī hūc!	hūc	hūc	adverb
+Puerī, venīte!	Puerī	puer	noun, vocative plural
+Puerī, venīte!	venīte	veniō	verb, second person plural present imperative active
+Nōlī timēre.	Nōlī	nōlō	verb, second person singular present imperative active
+Nōlī timēre.	timēre	timeō	verb, present infinitive active
+Nōlīte currere!	Nōlīte	nōlō	verb, second person plural present imperative active
+Nōlīte currere!	currere	currō	verb, present infinitive active
+Mihi librum dā!	Mihi	ego	pronoun, dative singular
+Mihi librum dā!	librum	liber	noun, accusative singular
+Mihi librum dā!	dā	dō	verb, second person singular present imperative active
+Salvē, magister!	magister	magister	noun, vocative singular
+Valēte, amīcī!	amīcī	amīcus	noun, vocative plural
+Heu, puer aeger est.	Heu	heu	interjection
+Heu, puer aeger est.	puer	puer	noun, nominative singular
+Heu, puer aeger est.	aeger	aeger	adjective, nominative singular masculine
+Heu, puer aeger est.	est	sum	verb, third person singular present indicative active
+Ecce, puella!	Ecce	ecce	interjection
+Ecce, puella!	puella	puella	noun, nominative singular
+Puella cantat et puer saltat.	Puella	puella	noun, nominative singular
+Puella cantat et puer saltat.	cantat	cantō	verb, third person singular present indicative active
+Puella cantat et puer saltat.	et	et	conjunction
+Puella cantat et puer saltat.	puer	puer	noun, nominative singular
+Puella cantat et puer saltat.	saltat	saltō	verb, third person singular present indicative active
+Puellae puerīque in agrō labōrant.	Puellae	puella	noun, nominative plural
+Puellae puerīque in agrō labōrant.	puerīque	puer	noun, nominative plural
+Puellae puerīque in agrō labōrant.	in	in	preposition
+Puellae puerīque in agrō labōrant.	agrō	ager	noun, ablative singular
+Puellae puerīque in agrō labōrant.	labōrant	labōrō	verb, third person plural present indicative active
+Mārcus Iūliam amat, sed Iūlia Mārcum nōn amat.	Mārcus	Mārcus	name, nominative singular
+Mārcus Iūliam amat, sed Iūlia Mārcum nōn amat.	Iūliam	Iūlia	name, accusative singular
+Mārcus Iūliam amat, sed Iūlia Mārcum nōn amat.	amat	amō	verb, third person singular present indicative active
+Mārcus Iūliam amat, sed Iūlia Mārcum nōn amat.	sed	sed	conjunction
+Mārcus Iūliam amat, sed Iūlia Mārcum nōn amat.	Iūlia	Iūlia	name, nominative singular
+Mārcus Iūliam amat, sed Iūlia Mārcum nōn amat.	Mārcum	Mārcus	name, accusative singular
+Mārcus Iūliam amat, sed Iūlia Mārcum nōn amat.	nōn	nōn	particle
+Mārcus Iūliam amat, sed Iūlia Mārcum nōn amat.	amat	amō	verb, third person singular present indicative active
+Puer et puella in viā ambulābant.	Puer	puer	noun, nominative singular
+Puer et puella in viā ambulābant.	et	et	conjunction
+Puer et puella in viā ambulābant.	puella	puella	noun, nominative singular
+Puer et puella in viā ambulābant.	in	in	preposition
+Puer et puella in viā ambulābant.	viā	via	noun, ablative singular
+Puer et puella in viā ambulābant.	ambulābant	ambulō	verb, third person plural imperfect indicative active
+Mārcus dīcit puellam cantāre.	Mārcus	Mārcus	name, nominative singular
+Mārcus dīcit puellam cantāre.	dīcit	dīcō	verb, third person singular present indicative active
+Mārcus dīcit puellam cantāre.	puellam	puella	noun, accusative singular
+Mārcus dīcit puellam cantāre.	cantāre	cantō	verb, present infinitive active
+Mārcus dīcit sē laetum esse.	Mārcus	Mārcus	name, nominative singular
+Mārcus dīcit sē laetum esse.	dīcit	dīcō	verb, third person singular present indicative active
+Mārcus dīcit sē laetum esse.	sē	suī	pronoun, accusative common
+Mārcus dīcit sē laetum esse.	laetum	laetus	adjective, accusative singular masculine
+Mārcus dīcit sē laetum esse.	esse	sum	verb, present infinitive active
+Puer currere potest.	Puer	puer	noun, nominative singular
+Puer currere potest.	currere	currō	verb, present infinitive active
+Puer currere potest.	potest	possum	verb, third person singular present indicative active
+Iūlia rosam vidēre vult.	Iūlia	Iūlia	name, nominative singular
+Iūlia rosam vidēre vult.	rosam	rosa	noun, accusative singular
+Iūlia rosam vidēre vult.	vidēre	videō	verb, present infinitive active
+Iūlia rosam vidēre vult.	vult	volō	verb, third person singular present indicative active
+Servus labōrāre dēbet.	Servus	servus	noun, nominative singular
+Servus labōrāre dēbet.	labōrāre	labōrō	verb, present infinitive active
+Servus labōrāre dēbet.	dēbet	dēbeō	verb, third person singular present indicative active
+Cum puella vēnit, puer gaudēbat.	Cum	cum	conjunction
+Cum puella vēnit, puer gaudēbat.	puella	puella	noun, nominative singular
+Cum puella vēnit, puer gaudēbat.	vēnit	veniō	verb, third person singular perfect indicative active
+Cum puella vēnit, puer gaudēbat.	puer	puer	noun, nominative singular
+Cum puella vēnit, puer gaudēbat.	gaudēbat	gaudeō	verb, third person singular imperfect indicative active
+Sī venīs, laetus sum.	Sī	sī	conjunction
+Sī venīs, laetus sum.	venīs	veniō	verb, second person singular present indicative active
+Sī venīs, laetus sum.	laetus	laetus	adjective, nominative singular masculine
+Sī venīs, laetus sum.	sum	sum	verb, first person singular present indicative active
+Epistulam legō quod laetus sum.	Epistulam	epistula	noun, accusative singular
+Epistulam legō quod laetus sum.	legō	legō	verb, first person singular present indicative active
+Epistulam legō quod laetus sum.	quod	quod	conjunction
+Epistulam legō quod laetus sum.	laetus	laetus	adjective, nominative singular masculine
+Epistulam legō quod laetus sum.	sum	sum	verb, first person singular present indicative active
+Puella cantat quia laeta est.	Puella	puella	noun, nominative singular
+Puella cantat quia laeta est.	cantat	cantō	verb, third person singular present indicative active
+Puella cantat quia laeta est.	quia	quia	conjunction
+Puella cantat quia laeta est.	laeta	laetus	adjective, nominative singular feminine
+Puella cantat quia laeta est.	est	sum	verb, third person singular present indicative active
+Dum puer dormit, māter labōrat.	Dum	dum	conjunction
+Dum puer dormit, māter labōrat.	puer	puer	noun, nominative singular
+Dum puer dormit, māter labōrat.	dormit	dormiō	verb, third person singular present indicative active
+Dum puer dormit, māter labōrat.	māter	māter	noun, nominative singular
+Dum puer dormit, māter labōrat.	labōrat	labōrō	verb, third person singular present indicative active
+Venit ut puellam videat.	Venit	veniō	verb, third person singular present indicative active
+Venit ut puellam videat.	ut	ut	conjunction
+Venit ut puellam videat.	puellam	puella	noun, accusative singular
+Venit ut puellam videat.	videat	videō	verb, third person singular present subjunctive active
+Servus in casā manet nē dominus eum videat.	Servus	servus	noun, nominative singular
+Servus in casā manet nē dominus eum videat.	in	in	preposition
+Servus in casā manet nē dominus eum videat.	casā	casa	noun, ablative singular
+Servus in casā manet nē dominus eum videat.	manet	maneō	verb, third person singular present indicative active
+Servus in casā manet nē dominus eum videat.	nē	nē	conjunction
+Servus in casā manet nē dominus eum videat.	dominus	dominus	noun, nominative singular
+Servus in casā manet nē dominus eum videat.	eum	is	pronoun, accusative singular masculine
+Servus in casā manet nē dominus eum videat.	videat	videō	verb, third person singular present subjunctive active
+Puella quae in hortō ambulat rosās amat.	Puella	puella	noun, nominative singular
+Puella quae in hortō ambulat rosās amat.	quae	quī	pronoun, nominative singular feminine
+Puella quae in hortō ambulat rosās amat.	in	in	preposition
+Puella quae in hortō ambulat rosās amat.	hortō	hortus	noun, ablative singular
+Puella quae in hortō ambulat rosās amat.	ambulat	ambulō	verb, third person singular present indicative active
+Puella quae in hortō ambulat rosās amat.	rosās	rosa	noun, accusative plural
+Puella quae in hortō ambulat rosās amat.	amat	amō	verb, third person singular present indicative active
+Hīc est puer quem amō.	Hīc	hīc	adverb
+Hīc est puer quem amō.	est	sum	verb, third person singular present indicative active
+Hīc est puer quem amō.	puer	puer	noun, nominative singular
+Hīc est puer quem amō.	quem	quī	pronoun, accusative singular masculine
+Hīc est puer quem amō.	amō	amō	verb, first person singular present indicative active
+Puer quī in viā currit fīlius meus est.	Puer	puer	noun, nominative singular
+Puer quī in viā currit fīlius meus est.	quī	quī	pronoun, nominative singular masculine
+Puer quī in viā currit fīlius meus est.	in	in	preposition
+Puer quī in viā currit fīlius meus est.	viā	via	noun, ablative singular
+Puer quī in viā currit fīlius meus est.	currit	currō	verb, third person singular present indicative active
+Puer quī in viā currit fīlius meus est.	fīlius	fīlius	noun, nominative singular
+Puer quī in viā currit fīlius meus est.	meus	meus	determiner, nominative singular masculine
+Puer quī in viā currit fīlius meus est.	est	sum	verb, third person singular present indicative active
+Rosae quās puella portat pulchrae sunt.	Rosae	rosa	noun, nominative plural
+Rosae quās puella portat pulchrae sunt.	quās	quī	pronoun, accusative plural feminine
+Rosae quās puella portat pulchrae sunt.	puella	puella	noun, nominative singular
+Rosae quās puella portat pulchrae sunt.	portat	portō	verb, third person singular present indicative active
+Rosae quās puella portat pulchrae sunt.	pulchrae	pulcher	adjective, nominative plural feminine
+Rosae quās puella portat pulchrae sunt.	sunt	sum	verb, third person plural present indicative active
+Epistulā scrīptā, puer abiit.	Epistulā	epistula	noun, ablative singular
+Epistulā scrīptā, puer abiit.	scrīptā	scrīptus	participle, ablative singular feminine
+Epistulā scrīptā, puer abiit.	puer	puer	noun, nominative singular
+Epistulā scrīptā, puer abiit.	abiit	abeō	verb, third person singular perfect indicative active
+Servus ā dominō laudātus est.	Servus	servus	noun, nominative singular
+Servus ā dominō laudātus est.	ā	ab	preposition
+Servus ā dominō laudātus est.	dominō	dominus	noun, ablative singular
+Servus ā dominō laudātus est.	laudātus	laudō	verb, perfect participle passive
+Servus ā dominō laudātus est.	est	sum	verb, third person singular present indicative active
+Iūlia ā Mārcō amātur.	Iūlia	Iūlia	name, nominative singular
+Iūlia ā Mārcō amātur.	ā	ab	preposition
+Iūlia ā Mārcō amātur.	Mārcō	Mārcus	name, ablative singular
+Iūlia ā Mārcō amātur.	amātur	amō	verb, third person singular present indicative passive
+Agricola in agrō labōrābat.	Agricola	agricola	noun, nominative singular
+Agricola in agrō labōrābat.	in	in	preposition
+Agricola in agrō labōrābat.	agrō	ager	noun, ablative singular
+Agricola in agrō labōrābat.	labōrābat	labōrō	verb, third person singular imperfect indicative active
+Nautae ad īnsulam nāvigāvērunt.	Nautae	nauta	noun, nominative plural
+Nautae ad īnsulam nāvigāvērunt.	ad	ad	preposition
+Nautae ad īnsulam nāvigāvērunt.	īnsulam	īnsula	noun, accusative singular
+Nautae ad īnsulam nāvigāvērunt.	nāvigāvērunt	nāvigō	verb, third person plural perfect indicative active
+Dominus servum vocāverat.	Dominus	dominus	noun, nominative singular
+Dominus servum vocāverat.	servum	servus	noun, accusative singular
+Dominus servum vocāverat.	vocāverat	vocō	verb, third person singular pluperfect indicative active
+Puellae rosās dabimus.	Puellae	puella	noun, dative singular
+Puellae rosās dabimus.	rosās	rosa	noun, accusative plural
+Puellae rosās dabimus.	dabimus	dō	verb, first person plural future indicative active
+Fēmina fīliō aquam dabit.	Fēmina	fēmina	noun, nominative singular
+Fēmina fīliō aquam dabit.	fīliō	fīlius	noun, dative singular
+Fēmina fīliō aquam dabit.	aquam	aqua	noun, accusative singular
+Fēmina fīliō aquam dabit.	dabit	dō	verb, third person singular future indicative active
+Puella epistulam scrībēbat.	Puella	puella	noun, nominative singular
+Puella epistulam scrībēbat.	epistulam	epistula	noun, accusative singular
+Puella epistulam scrībēbat.	scrībēbat	scrībō	verb, third person singular imperfect indicative active
+Puerī in silvā lupum vīdērunt.	Puerī	puer	noun, nominative plural
+Puerī in silvā lupum vīdērunt.	in	in	preposition
+Puerī in silvā lupum vīdērunt.	silvā	silva	noun, ablative singular
+Puerī in silvā lupum vīdērunt.	lupum	lupus	noun, accusative singular
+Puerī in silvā lupum vīdērunt.	vīdērunt	videō	verb, third person plural perfect indicative active
+Pater fīliō librum dedit.	Pater	pater	noun, nominative singular
+Pater fīliō librum dedit.	fīliō	fīlius	noun, dative singular
+Pater fīliō librum dedit.	librum	liber	noun, accusative singular
+Pater fīliō librum dedit.	dedit	dō	verb, third person singular perfect indicative active
+Puer librum nōn legit.	Puer	puer	noun, nominative singular
+Puer librum nōn legit.	librum	liber	noun, accusative singular
+Puer librum nōn legit.	nōn	nōn	particle
+Puer librum nōn legit.	legit	legō	verb, third person singular present indicative active
+Puella nōn est laeta.	Puella	puella	noun, nominative singular
+Puella nōn est laeta.	nōn	nōn	particle
+Puella nōn est laeta.	est	sum	verb, third person singular present indicative active
+Puella nōn est laeta.	laeta	laetus	adjective, nominative singular feminine
+Nēmō venit.	Nēmō	nēmō	pronoun, nominative singular
+Nēmō venit.	venit	veniō	verb, third person singular present indicative active
+Nihil videō.	Nihil	nihil	pronoun, accusative neuter
+Nihil videō.	videō	videō	verb, first person singular present indicative active
+Numquam lacrimat.	Numquam	numquam	adverb
+Numquam lacrimat.	lacrimat	lacrimō	verb, third person singular present indicative active
+Quam pulchra est rosa!	Quam	quam	adverb
+Quam pulchra est rosa!	pulchra	pulcher	adjective, nominative singular feminine
+Quam pulchra est rosa!	est	sum	verb, third person singular present indicative active
+Quam pulchra est rosa!	rosa	rosa	noun, nominative singular
+Mārcus altior est quam Iūlia.	Mārcus	Mārcus	name, nominative singular
+Mārcus altior est quam Iūlia.	altior	altior	adjective, nominative singular masculine-feminine
+Mārcus altior est quam Iūlia.	est	sum	verb, third person singular present indicative active
+Mārcus altior est quam Iūlia.	quam	quam	conjunction
+Mārcus altior est quam Iūlia.	Iūlia	Iūlia	name, nominative singular
+Crās Rōmam ībimus.	Crās	crās	adverb
+Crās Rōmam ībimus.	Rōmam	Rōma	name, accusative singular
+Crās Rōmam ībimus.	ībimus	eō	verb, first person plural future indicative active
+Mārcus Rōmae habitat.	Mārcus	Mārcus	name, nominative singular
+Mārcus Rōmae habitat.	Rōmae	Rōma	name, locative singular
+Mārcus Rōmae habitat.	habitat	habitō	verb, third person singular present indicative active
+Puer domī manet.	Puer	puer	noun, nominative singular
+Puer domī manet.	domī	domus	noun, locative singular
+Puer domī manet.	manet	maneō	verb, third person singular present indicative active
+Mīles gladiō pugnat.	Mīles	mīles	noun, nominative singular
+Mīles gladiō pugnat.	gladiō	gladius	noun, ablative singular
+Mīles gladiō pugnat.	pugnat	pugnō	verb, third person singular present indicative active
+Hic puer meus fīlius est.	Hic	hic	pronoun, nominative singular masculine
+Hic puer meus fīlius est.	puer	puer	noun, nominative singular
+Hic puer meus fīlius est.	meus	meus	determiner, nominative singular masculine
+Hic puer meus fīlius est.	fīlius	fīlius	noun, nominative singular
+Hic puer meus fīlius est.	est	sum	verb, third person singular present indicative active
+Illa puella soror mea est.	Illa	ille	pronoun, nominative singular feminine
+Illa puella soror mea est.	puella	puella	noun, nominative singular
+Illa puella soror mea est.	soror	soror	noun, nominative singular
+Illa puella soror mea est.	mea	meus	determiner, nominative singular feminine
+Illa puella soror mea est.	est	sum	verb, third person singular present indicative active
+Duo puerī et trēs puellae in viā sunt.	Duo	duo	numeral, nominative plural masculine
+Duo puerī et trēs puellae in viā sunt.	puerī	puer	noun, nominative plural
+Duo puerī et trēs puellae in viā sunt.	et	et	conjunction
+Duo puerī et trēs puellae in viā sunt.	trēs	trēs	numeral, nominative plural masculine-feminine
+Duo puerī et trēs puellae in viā sunt.	puellae	puella	noun, nominative plural
+Duo puerī et trēs puellae in viā sunt.	in	in	preposition
+Duo puerī et trēs puellae in viā sunt.	viā	via	noun, ablative singular
+Duo puerī et trēs puellae in viā sunt.	sunt	sum	verb, third person plural present indicative active
+Omnēs puerī rīdent.	Omnēs	omnis	adjective, nominative plural masculine-feminine
+Omnēs puerī rīdent.	puerī	puer	noun, nominative plural
+Omnēs puerī rīdent.	rīdent	rīdeō	verb, third person plural present indicative active
+Multae rosae in hortō sunt.	Multae	multus	adjective, nominative plural feminine
+Multae rosae in hortō sunt.	rosae	rosa	noun, nominative plural
+Multae rosae in hortō sunt.	in	in	preposition
+Multae rosae in hortō sunt.	hortō	hortus	noun, ablative singular
+Multae rosae in hortō sunt.	sunt	sum	verb, third person plural present indicative active
+Māter fīliam suam amat.	Māter	māter	noun, nominative singular
+Māter fīliam suam amat.	fīliam	fīlia	noun, accusative singular
+Māter fīliam suam amat.	suam	suus	determiner, accusative singular feminine
+Māter fīliam suam amat.	amat	amō	verb, third person singular present indicative active
+Eam videō.	Eam	is	pronoun, accusative singular feminine
+Eam videō.	videō	videō	verb, first person singular present indicative active
+Magister discipulīs fābulam narrat.	Magister	magister	noun, nominative singular
+Magister discipulīs fābulam narrat.	discipulīs	discipulus	noun, dative plural
+Magister discipulīs fābulam narrat.	fābulam	fābula	noun, accusative singular
+Magister discipulīs fābulam narrat.	narrat	narrō	verb, third person singular present indicative active
+Discipulī magistrō pārent.	Discipulī	discipulus	noun, nominative plural
+Discipulī magistrō pārent.	magistrō	magister	noun, dative singular
+Discipulī magistrō pārent.	pārent	pāreō	verb, third person plural present indicative active
+Equus celeriter currit.	Equus	equus	noun, nominative singular
+Equus celeriter currit.	celeriter	celeriter	adverb
+Equus celeriter currit.	currit	currō	verb, third person singular present indicative active
+Canis et fēlēs in casā dormiunt.	Canis	canis	noun, nominative singular
+Canis et fēlēs in casā dormiunt.	et	et	conjunction
+Canis et fēlēs in casā dormiunt.	fēlēs	fēlēs	noun, nominative singular
+Canis et fēlēs in casā dormiunt.	in	in	preposition
+Canis et fēlēs in casā dormiunt.	casā	casa	noun, ablative singular
+Canis et fēlēs in casā dormiunt.	dormiunt	dormiō	verb, third person plural present indicative active
+Puer fessus dormit.	Puer	puer	noun, nominative singular
+Puer fessus dormit.	fessus	fessus	adjective, nominative singular masculine
+Puer fessus dormit.	dormit	dormiō	verb, third person singular present indicative active
+Fīlia mea in urbe habitat.	Fīlia	fīlia	noun, nominative singular
+Fīlia mea in urbe habitat.	mea	meus	determiner, nominative singular feminine
+Fīlia mea in urbe habitat.	in	in	preposition
+Fīlia mea in urbe habitat.	urbe	urbs	noun, ablative singular
+Fīlia mea in urbe habitat.	habitat	habitō	verb, third person singular present indicative active
+Ille vir est pater meus.	Ille	ille	pronoun, nominative singular masculine
+Ille vir est pater meus.	vir	vir	noun, nominative singular
+Ille vir est pater meus.	est	sum	verb, third person singular present indicative active
+Ille vir est pater meus.	pater	pater	noun, nominative singular
+Ille vir est pater meus.	meus	meus	determiner, nominative singular masculine
+Sine pecūniā nōn sum laetus.	Sine	sine	preposition
+Sine pecūniā nōn sum laetus.	pecūniā	pecūnia	noun, ablative singular
+Sine pecūniā nōn sum laetus.	nōn	nōn	particle
+Sine pecūniā nōn sum laetus.	sum	sum	verb, first person singular present indicative active
+Sine pecūniā nōn sum laetus.	laetus	laetus	adjective, nominative singular masculine

@@ -83,8 +83,61 @@ json checkJson(const vp::CueCheck& c);
 json reasonJson(const vp::CueReason& r);
 json altJson(const vp::Alternative& a);
 const char* confidenceName(vp::rules::Confidence c);
-// Stores an engine result in a record (target, confidence, score, alternatives, checks, reasons).
+// Stores an engine result in a record (target, confidence, score, alternatives, checks, reasons, and the hidden
+// tokens and flags).
 void applyOutput(const vp::rules::CueOutput& out, vp::CueRecord& r);
+
+// ---- per-cue engine data kept in the project (hidden CueReason kinds; never shown by cue.get) ----
+// CueRecord (engine/core) has no fields for the tokens, flags and job facts of a translation, so they travel as
+// CueReasons of kind "_tokens" / "_flags" / "_job" with compact data. They are saved with the project, restored
+// by undo/redo and filtered out of every view.
+extern const char* const kTokensKind;
+extern const char* const kFlagsKind;
+extern const char* const kJobKind;
+bool isHiddenReason(const vp::CueReason& r);
+const vp::CueReason* hiddenReason(const vp::CueRecord& r, const char* kind);
+void setHidden(vp::CueRecord& r, const char* kind, std::string data);   // empty data removes it
+// Tokens as a compact JSON array (features as 9 table indices); decode returns false on damaged data.
+std::string encodeTokens(const std::vector<vp::rules::TokenView>& tokens);
+bool decodeTokens(const std::string& data, std::vector<vp::rules::TokenView>& out);
+// FeatureView strings back to the packed vp::feat form (unknown strings -> false; the rest is still filled).
+bool featuresToPacked(const vp::rules::Features& f, uint32_t& packed);
+std::vector<std::string> storedFlags(const vp::CueRecord& r);
+void setStoredFlags(vp::CueRecord& r, const std::vector<std::string>& flags);
+// What a job knew about engines ii/iii and Orbergise when it produced the cue (for the evidence rows).
+struct JobFacts {
+  bool model = false, online = false, orberg = false;
+  std::vector<std::string> modelHeads;                    // headwords the model chose or confirmed
+  std::vector<std::pair<std::string, int>> onlineVerdicts;  // headword -> +1 agrees, -1 disagrees, 0 unknown
+};
+std::string encodeJob(const JobFacts& j);
+bool decodeJob(const std::string& data, JobFacts& out);
+
+// ---- ReasonView in the shapes the UI reads (DESIGN 9.2 "Consumed by the UI") ----
+// The rules engine's reasons are turned into: sense {source, sense, senseEs, context[]}; one candidate reason per
+// candidate {lemmaId, head, form, tier, band, chosen, gloss, score}; form {features, form?}; evidence
+// {source: wiktionary|whitaker|model|online, state: yes|no|off|none} (four rows per dictionary token, from the
+// lexicon and the job facts); orbergise change {was, now, why}; name {form}; correction {target}. Reasons already
+// in a UI shape (objects) pass through.
+struct ReasonViewCtx {
+  const vp::lex::Lexicon* lex = nullptr;   // the target lexicon (Latin or Greek); null: no lexicon facts
+  bool latin = true;                       // candidate forms are generated for Latin only
+  std::string source;                      // the cue's source text (context words)
+};
+json reasonsView(const vp::CueRecord& r, const std::vector<vp::rules::TokenView>& tokens, const ReasonViewCtx& ctx);
+// Orbergise: words of `target` that replace words of `latinSource` (aligned by a longest common subsequence on
+// latin_key), as {tokenIndex, was, now}.
+struct WordChange { int tokenIndex = -1; std::string was, now; };
+std::vector<WordChange> wordChanges(const std::string& latinSource, const std::vector<vp::rules::TokenView>& tokens);
+// Meaning check (DESIGN 10.7): share of the content lemmas (noun, verb, adjective, adverb) of `before` that are
+// still in `after`, and the headwords of the missing ones. percent = 100 when `before` has none.
+struct Meaning { int percent = 100; std::vector<std::string> missing; };
+Meaning meaningCheck(const vp::lex::Lexicon& la, const std::string& before, const std::string& after);
+// Re-attaches reasons to new tokens after an edit: a reason on token k follows the token with the same text (k-th
+// occurrence of that text); reasons whose word is gone are dropped, sentence-level ones are kept.
+std::vector<vp::CueReason> remapReasons(const std::vector<vp::CueReason>& reasons,
+                                        const std::vector<vp::rules::TokenView>& oldTokens,
+                                        const std::vector<vp::rules::TokenView>& newTokens);
 
 // ---- export ----
 struct ExportOptions {

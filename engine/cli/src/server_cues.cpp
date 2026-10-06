@@ -30,6 +30,9 @@ vp::rules::Options Server::engineOptions() const {
   o.fidelity = s.value("defaultFidelity", 2);
   o.emoji = s.value("showEmoji", true);
   o.macrons = s.value("showMacrons", true);
+  // speaker gender of first-person predicates (rules_la_notes decision 1): "m" | "f" | "u"; default "m"
+  const std::string g = s.contains("speakerGender") && s["speakerGender"].is_string() ? s["speakerGender"].get<std::string>() : "m";
+  o.speakerGender = g == "f" ? 'f' : (g == "u" || g == "unknown") ? 'u' : 'm';
   return o;
 }
 
@@ -64,6 +67,14 @@ vp::rules::CueInput Server::cueInput(size_t pos) const {
   }
   if (pos > 0) in.prevSource = sources_[pos - 1];
   if (pos + 1 < sources_.size()) in.nextSource = sources_[pos + 1];
+  // the source cue's text and tag spans, so the cue assembly can keep {\an8} / a whole-cue <i> and report tags it
+  // cannot place (A5)
+  for (const vp::subs::Span& sp : doc_.cues[pos].spans) {
+    vp::rules::SpanIn x;
+    x.tag = sp.kind == vp::subs::Span::Tag;
+    x.raw = sp.kind == vp::subs::Span::Newline ? std::string("\n") : sp.raw;
+    in.spans.push_back(std::move(x));
+  }
   return in;
 }
 
@@ -127,16 +138,30 @@ json Server::cmdCuePage(const json& p) {
 json Server::cmdCueGet(const json& p) {
   const size_t pos = position(p);
   const vp::CueRecord& r = project_.cues[pos];
-  json alts = json::array(), tokens = json::array(), checks = json::array(), reasons = json::array();
+  json alts = json::array(), tokens = json::array(), checks = json::array();
   for (const vp::Alternative& a : r.alternatives) alts.push_back(altJson(a));
   for (const vp::CueCheck& c : r.checks) checks.push_back(checkJson(c));
-  for (const vp::CueReason& x : r.reasons) reasons.push_back(reasonJson(x));
-  if (!r.target.empty()) {
-    vp::Result<vp::rules::CueOutput> out = engine_->check(cueInput(pos), r.target, engineOptions(), engineContext());
-    if (out)
-      for (const vp::rules::TokenView& t : out->tokens) tokens.push_back(tokenJson(t));
+  // the tokens the engine produced (stored with the cue; re-analysed by Engine::check when absent), so reasons'
+  // tokenIndex points into this list
+  const std::vector<vp::rules::TokenView> toks = r.target.empty() ? std::vector<vp::rules::TokenView>() : tokensOf(pos);
+  for (const vp::rules::TokenView& t : toks) tokens.push_back(tokenJson(t));
+  ReasonViewCtx rc;
+  rc.lex = lexFor(langs_.target);
+  rc.latin = langs_.target == vp::rules::Lang::La;
+  rc.source = sources_[pos];
+  json out{{"cue", cueView(pos)}, {"alternatives", alts}, {"tokens", tokens}, {"checks", checks},
+           {"reasons", reasonsView(r, toks, rc)}};
+  JobFacts job;
+  const vp::CueReason* jh = hiddenReason(r, kJobKind);
+  const bool orberg = orbergMode() || (jh && decodeJob(jh->data, job) && job.orberg);
+  if (orberg) {   // Orbergise mode: meaning check against the input Latin, the original-language line
+    if (!r.target.empty() && lexFor(vp::rules::Lang::La)) {
+      const Meaning m = meaningCheck(*lexFor(vp::rules::Lang::La), sources_[pos], r.target);
+      out["meaning"] = json{{"percent", m.percent}, {"missing", m.missing}};
+    }
+    if (pos < originals_.size()) out["original"] = originals_[pos];
   }
-  return json{{"cue", cueView(pos)}, {"alternatives", alts}, {"tokens", tokens}, {"checks", checks}, {"reasons", reasons}};
+  return out;
 }
 
 json Server::cmdCueSet(const json& p) {
@@ -147,25 +172,21 @@ json Server::cmdCueSet(const json& p) {
   if (!remember.empty() && remember != "phrase" && remember != "cue")
     fail(ErrorCode::BadParams, "remember must be phrase, cue or null", "The request was malformed.");
   vp::CueRecord& r = project_.cues[pos];
-  HistoryStep step;
-  step.label = "cue.set";
-  step.before.emplace_back(pos, r);
-  r.target = text;
-  r.state = "edited";
-  r.edited = true;
-  r.reviewed = false;
-  r.chosen = -1;
-  vp::Result<vp::rules::CueOutput> chk = engine_->check(cueInput(pos), text, engineOptions(), engineContext());
-  if (chk) {
-    r.confidence = confidenceName(chk->confidence);
-    r.score = chk->score;
-    r.checks.clear();
-    for (const auto& c : chk->checks) r.checks.push_back(vp::CueCheck{c.id, c.ok, c.detail});
-  } else {
-    logMsg(LogLevel::Warn, "check after edit: " + chk.error().message);
+  // "Add to my corrections" sends the text the cue already has: only the correction is added (no second history
+  // step, no re-check).
+  const bool onlyRemember = !remember.empty() && text == r.target && r.state == "edited";
+  if (!onlyRemember) {
+    HistoryStep step;
+    step.label = "cue.set";
+    step.before.emplace_back(pos, r);
+    retarget(pos, text);
+    r.state = "edited";
+    r.edited = true;
+    r.reviewed = false;
+    r.chosen = -1;
+    step.after.emplace_back(pos, r);
+    pushHistory(std::move(step));
   }
-  step.after.emplace_back(pos, r);
-  pushHistory(std::move(step));
   json out{{"cue", cueView(pos)}};
   if (!remember.empty()) {
     const std::string key = sourceKey(langs_.source, sources_[pos]);
@@ -199,7 +220,8 @@ json Server::cmdCueChoose(const json& p) {
   HistoryStep step;
   step.label = "cue.choose";
   step.before.emplace_back(pos, r);
-  r.target = r.alternatives[static_cast<size_t>(alt)].text;
+  const std::string text = r.alternatives[static_cast<size_t>(alt)].text;
+  retarget(pos, text);
   r.chosen = static_cast<int>(alt);
   if (r.state == "new" || r.state == "stale") r.state = "translated";
   step.after.emplace_back(pos, r);
@@ -243,87 +265,99 @@ json Server::cmdTranslateStart(const json& p) {
   requireProject();
   vp::rules::Options opt = engineOptions();
   opt.fidelity = static_cast<int>(intParam(p, "fidelity", opt.fidelity, 1, 3));
-  json warnings = json::array();
   if (const json* e = param(p, "engines")) {
     if (!e->is_object()) fail(ErrorCode::BadParams, "'engines' must be an object", "The request was malformed.");
     opt.useModel = boolParam(*e, "model", false);
     opt.useOnline = boolParam(*e, "online", false);
   }
+  opt.orbergise = boolParam(p, "orbergise", false);
+  requirePair(project_.manifest.pair);   // e.g. no english.*.vpt -> not_found with a hint, before any work
+  if (opt.orbergise) requirePair("la-la");
+  // A requested engine that cannot run is not dropped silently: the result lists the codes (`warnings`) and the
+  // job starts with one `translate.warning {jobId, engine, code, message, hint}` event per engine.
+  std::vector<std::pair<std::string, vp::Error>> warns;
   if (opt.useModel) {
     std::string why;
     if (!modelUsable(why)) {
       opt.useModel = false;
-      warnings.push_back(why);
+      const ErrorCode c = why == "model_unsupported_cpu" ? ErrorCode::ModelUnsupportedCpu
+                          : why == "model_missing"       ? ErrorCode::ModelMissing
+                                                         : ErrorCode::ModelLoadFailed;
+      const char* hint = c == ErrorCode::ModelUnsupportedCpu ? "This computer's processor lacks the AVX2 instructions the local model needs."
+                         : c == ErrorCode::ModelMissing      ? "The local model is not installed. The rule engine translates on its own."
+                                                             : "The local model file is not the expected one. The rule engine translates on its own.";
+      warns.emplace_back("model", vp::Error{c, "local model not usable: " + why, hint});
     }
   }
   if (opt.useOnline && !vp::online::onlineAllowed(settings_)) {   // engines.online && online.wiktionary
-    warnings.push_back("online_disabled");
     opt.useOnline = false;
+    warns.emplace_back("online", vp::Error{ErrorCode::OnlineDisabled, "online check is turned off in the settings",
+                                           "Turn on the online check in Settings to use it."});
   }
-  // TODO(C8): C2's engine_config.h makes Advisors.onlineCheck a construction-time field (EngineConfig.advisors), so
-  // it is wired where the server adopts makeEngine(EngineConfig): a hook owned by the Server that, when the engine
-  // calls it (worker thread, only for jobs with opt.useOnline), lazily creates
-  // vp::online::makeSystemTransport(settings_) and vp::online::Wiktionary::create(*transport, settings_,
-  // Config{cacheDir = <data>/online-cache}) and adapts the answer:
-  //   const vp::online::Evidence e = vp::online::makeOnlineCheck(*client)("la", lemma, gloss);  // "grc" for Greek
-  //   return vp::rules::Evidence{e.verdict == e.Agrees ? 1 : e.verdict == e.Disagrees ? -1 : 0, "wiktionary",
-  //                              e.summary + " " + e.url};
-  // Evidence only (Disagrees -> Check + an "evidence" reason). Until then no engine calls it: no request is made.
-  opt.orbergise = boolParam(p, "orbergise", false);
-  std::vector<size_t> positions;
-  if (const json* idx = param(p, "indices")) {
-    if (!idx->is_array()) fail(ErrorCode::BadParams, "'indices' must be an array", "The request was malformed.");
-    for (const json& v : *idx) {
-      if (!v.is_number_integer() || v.get<int64_t>() < 0 || v.get<int64_t>() >= static_cast<int64_t>(project_.cues.size()))
-        fail(ErrorCode::BadParams, "bad cue index in 'indices'", "A cue number was out of range.");
-      positions.push_back(static_cast<size_t>(v.get<int64_t>()));
-    }
-    std::sort(positions.begin(), positions.end());
-    positions.erase(std::unique(positions.begin(), positions.end()), positions.end());
-  } else {
+  bool given = false;
+  std::vector<size_t> positions = indicesParam(p, &given);
+  if (!given)
     for (size_t i = 0; i < project_.cues.size(); ++i)
       if (!project_.cues[i].edited && !project_.cues[i].reviewed) positions.push_back(i);
-  }
   const int64_t jobId = nextJob_++;
-  pendingJob_ = [this, jobId, positions, opt]() {
-    // Engine ii: closed-choice advisors that load the model lazily on the engine's first question inside this
-    // job; the model is unloaded when the job ends, whatever happens.
-    // TODO(C8): hand `advisors` to the rules engine when the server adopts makeEngine(EngineConfig) (C2's
-    // engine_config.h: vp::rules::Advisors::chooseSense returns int, -1 = no opinion), e.g. through a Server-owned
-    // forwarding hook set for the duration of this job:
-    //   cfg.advisors.chooseSense = [adv](const std::string& q, const std::vector<std::string>& o) {
-    //     vp::Result<int> r = adv.chooseSense(q, o, nullptr); return r.ok() ? r.value() : -1; };
+  json codes = json::array();
+  for (const auto& w : warns) codes.push_back(vp::errorCodeName(w.second.code));
+  pendingJob_ = [this, jobId, positions, opt, warns]() {
+    // Engine ii: the model is loaded lazily on the engine's first question inside this job and unloaded when the
+    // job ends, whatever happens.
     struct UnloadAfter {
       vp::llm::Model& m;
       ~UnloadAfter() { m.unload(); }
     } guard{model_};
-    const vp::llm::Advisors advisors = opt.useModel ? vp::llm::makeAdvisors(model_, modelConfig()) : vp::llm::Advisors{};
-    (void)advisors;
-    runJob(jobId, positions, opt, "translate");
+    runJob(jobId, positions, opt, "translate", warns);
   };
-  return json{{"jobId", jobId}, {"total", positions.size()}, {"warnings", warnings}};
+  return json{{"jobId", jobId}, {"total", positions.size()}, {"warnings", codes}};
 }
 
 json Server::cmdOrbergiseStart(const json& p) {
   requireProject();
   vp::rules::Options opt = engineOptions();
   opt.orbergise = true;
+  opt.source = vp::rules::Lang::La;
+  opt.target = vp::rules::Lang::La;
   opt.orbergTier = static_cast<int>(intParam(p, "tier", 1, 1, 2));
-  const bool keepNames = boolParam(p, "keepNames", true);
+  boolParam(p, "keepNames", true);   // the rules engine has no switch for these yet (engine/cli/README.md)
   boolParam(p, "simplify", false);
-  strParam(p, "originalPath", "");
-  (void)keepNames;
-  std::vector<size_t> positions;
-  for (size_t i = 0; i < project_.cues.size(); ++i)
-    if (!project_.cues[i].edited && !project_.cues[i].reviewed) positions.push_back(i);
+  const std::string original = strParam(p, "originalPath", "");
+  if (langs_.source != vp::rules::Lang::La)
+    fail(ErrorCode::BadParams, "Orbergise needs a Latin project (pair la-la)", "Open a Latin file to orbergise it.");
+  requirePair("la-la");
+  if (!original.empty()) loadOriginal(original);
+  bool given = false;
+  std::vector<size_t> positions = indicesParam(p, &given);
+  if (!given)
+    for (size_t i = 0; i < project_.cues.size(); ++i)
+      if (!project_.cues[i].edited && !project_.cues[i].reviewed) positions.push_back(i);
   const int64_t jobId = nextJob_++;
-  pendingJob_ = [this, jobId, positions, opt]() { runJob(jobId, positions, opt, "translate"); };
-  return json{{"jobId", jobId}, {"total", positions.size()}};
+  pendingJob_ = [this, jobId, positions, opt]() { runJob(jobId, positions, opt, "translate", {}); };
+  return json{{"jobId", jobId}, {"total", positions.size()}, {"warnings", json::array()}};
 }
 
-void Server::runJob(int64_t jobId, std::vector<size_t> positions, vp::rules::Options opt, const char* prefix) {
+void Server::runJob(int64_t jobId, std::vector<size_t> positions, vp::rules::Options opt, const char* prefix,
+                    std::vector<std::pair<std::string, vp::Error>> warnings) {
   const std::string ev = prefix;
   runningJob_.store(jobId);
+  jobId_ = jobId;
+  for (const auto& w : warnings) jobWarning(w.first.c_str(), w.second);
+  // advisors for this job only (server_engine.cpp); the engine calls them on this thread
+  jobModel_ = opt.useModel ? vp::llm::makeAdvisors(model_, modelConfig()) : vp::llm::Advisors{};
+  jobModelFailed_ = false;
+  jobOnline_ = opt.useOnline;
+  jobOnlineFailed_ = false;
+  jobTarget_ = opt.target;
+  struct ClearJob {
+    Server& s;
+    ~ClearJob() {
+      s.jobModel_ = vp::llm::Advisors{};
+      s.jobOnline_ = false;
+      s.batchFacts_ = JobFacts{};
+    }
+  } clearJob{*this};
   const int64_t t0 = monoMs();
   int64_t lastProgress = 0;
   const size_t total = positions.size();
@@ -352,6 +386,10 @@ void Server::runJob(int64_t jobId, std::vector<size_t> positions, vp::rules::Opt
     inputs.reserve(n);
     for (size_t k = 0; k < n; ++k) inputs.push_back(cueInput(positions[at + k]));
     const size_t base = done;
+    batchFacts_ = JobFacts{};
+    batchFacts_.model = opt.useModel;
+    batchFacts_.online = opt.useOnline;
+    batchFacts_.orberg = opt.orbergise;
     vp::Result<std::vector<vp::rules::CueOutput>> r =
         engine_->translate(inputs, opt, ctx, [&](size_t k) { progressEvent(base + k, false); }, cancelled);
     if (!r) {
@@ -366,7 +404,7 @@ void Server::runJob(int64_t jobId, std::vector<size_t> positions, vp::rules::Opt
       const size_t pos = positions[at + k];
       vp::CueRecord& rec = project_.cues[pos];
       step.before.emplace_back(pos, rec);
-      applyOutput(r.value()[k], rec);
+      storeOutput(pos, r.value()[k]);
       rec.state = "translated";
       rec.edited = false;
       rec.reviewed = false;
@@ -518,24 +556,43 @@ json Server::cmdWordsList(const json& p) {
   const int64_t limit = intParam(p, "limit", 2000, 1, 100000);
   const bool greek = langs_.target == vp::rules::Lang::Grc;
   const bool classical = greek || langs_.target == vp::rules::Lang::La;
-  std::map<uint32_t, int> counts;
-  int known = 0, unknown = 0;
+  std::map<uint32_t, std::pair<int, int>> counts;   // lemma -> (count, effective tier of its first token)
+  int known = 0, unknown = 0, names = 0;
   std::vector<vp::lex::Analysis> an;
+  std::vector<vp::rules::TokenView> toks;
   std::string word;
+  auto count = [&](uint32_t id, int tier) {
+    auto it = counts.find(id);
+    if (it == counts.end()) counts.emplace(id, std::make_pair(1, tier));
+    else ++it->second.first;
+    ++known;
+  };
+  // cues without stored tokens (edited before C8, other engines): the words of the target looked up
   auto flush = [&]() {
     if (word.empty()) return;
     const std::string key = classical ? lexKey(word, greek) : vp::text::lower(word);
     word.clear();
     if (key.empty()) return;
     an.clear();
-    if (lx->lookup(key, an) && !an.empty()) {
-      ++counts[an[0].lemma];
-      ++known;
-    } else {
-      ++unknown;
-    }
+    if (lx->lookup(key, an) && !an.empty()) count(an[0].lemma, lx->lemma(an[0].lemma).tier);
+    else ++unknown;
   };
   for (const vp::CueRecord& r : project_.cues) {
+    if (r.target.empty()) continue;
+    const vp::CueReason* h = hiddenReason(r, kTokensKind);
+    if (h && decodeTokens(h->data, toks)) {   // the engine's own tokens: lemma ids and effective tiers
+      for (const vp::rules::TokenView& t : toks) {
+        if (t.hasLemma && lx->lemma(t.lemmaId).id != vp::lex::kNoLemma) {
+          count(t.lemmaId, t.tier ? t.tier : lx->lemma(t.lemmaId).tier);
+        } else if (!t.unknown && !t.text.empty() && t.text[0] != '[' && (t.text[0] & 0x80 || (t.text[0] >= 'A' && t.text[0] <= 'Z'))) {
+          ++names;   // a capitalised word kept as a name
+          ++known;
+        } else if (!t.text.empty()) {
+          ++unknown;
+        }
+      }
+      continue;
+    }
     for (size_t i = 0; i < r.target.size();) {
       const size_t at = i;
       const char32_t cp = vp::text::decodeUtf8(r.target, i);
@@ -548,18 +605,22 @@ json Server::cmdWordsList(const json& p) {
     }
     flush();
   }
-  std::vector<std::pair<uint32_t, int>> sorted(counts.begin(), counts.end());
+  std::vector<std::pair<uint32_t, std::pair<int, int>>> sorted(counts.begin(), counts.end());
   std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
-    return a.second != b.second ? a.second > b.second : a.first < b.first;
+    return a.second.first != b.second.first ? a.second.first > b.second.first : a.first < b.first;
   });
-  int tiers[4] = {0, 0, 0, 0};   // t1 t2 t3 names
+  int tiers[4] = {0, 0, 0, names};   // t1 t2 t3 names
   json words = json::array();
   for (const auto& kv : sorted) {
     const vp::lex::Lemma l = lx->lemma(kv.first);
-    if (l.flags & vp::lex::ProperName) tiers[3] += kv.second;
-    else if (l.tier >= 1 && l.tier <= 3) tiers[l.tier - 1] += kv.second;
-    if (static_cast<int64_t>(words.size()) < limit)
-      words.push_back(json{{"lemma", lemmaJson(*lx, kv.first)}, {"count", kv.second}, {"tier", l.tier}});
+    const int tier = kv.second.second;
+    if (l.flags & vp::lex::ProperName) tiers[3] += kv.second.first;
+    else if (tier >= 1 && tier <= 3) tiers[tier - 1] += kv.second.first;
+    if (static_cast<int64_t>(words.size()) < limit) {
+      json lemma = lemmaJson(*lx, kv.first);
+      lemma["tier"] = tier;   // the tier the engine used (curated tiers override the lexicon's)
+      words.push_back(json{{"lemma", lemma}, {"count", kv.second.first}, {"tier", tier}});
+    }
   }
   auto share = [known](int n) { return known ? std::round(1000.0 * n / known) / 1000.0 : 0.0; };
   return json{{"words", words},

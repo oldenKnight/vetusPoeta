@@ -248,7 +248,7 @@ struct Loader {
       d.preps_.push_back(std::move(p));
     });
   }
-  void phrasebook(std::string_view data) {
+  void phrasebook(std::string_view data, std::vector<PhraseEntry>& out) {
     forLines(data, [&](int no, std::string_view line) {
       splitTabs(line, cols);
       if (!need(no, 2)) return;
@@ -258,7 +258,27 @@ struct Loader {
       p.tier = cols.size() > 2 && !cols[2].empty() ? tierOf(no, cols[2]) : 0;
       p.reg = col(cols, 3);
       p.note = col(cols, 4);
-      d.phrasebook_.push_back(std::move(p));
+      out.push_back(std::move(p));
+    });
+  }
+  void clitics(std::string_view data) {   // form, person, number, gender, role, note (C13)
+    forLines(data, [&](int no, std::string_view line) {
+      splitTabs(line, cols);
+      if (!need(no, 5)) return;
+      CliticEntry e;
+      e.form = text::nfc(text::lower(cols[0]));
+      const std::string pe = col(cols, 1), nu = col(cols, 2), ge = col(cols, 3);
+      e.role = col(cols, 4);
+      e.note = col(cols, 5);
+      e.person = pe == "1" ? 1 : pe == "2" ? 2 : pe == "3" ? 3 : 0;
+      e.number = nu == "sg" ? 1 : nu == "pl" ? 2 : 0;
+      e.gender = ge == "m" ? feat::M : ge == "f" ? feat::F : ge == "n" ? feat::N : 0;
+      if (!e.person) { warn(no, "person must be 1, 2 or 3"); return; }
+      if (e.role != "acc" && e.role != "dat" && e.role != "refl" && e.role != "any") {
+        warn(no, "role must be acc, dat, refl or any");
+        return;
+      }
+      d.clitics_.push_back(std::move(e));
     });
   }
   void pairs(std::string_view data, std::vector<PairEntry>& out) {
@@ -375,10 +395,18 @@ Result<CuratedData> CuratedData::load(const std::filesystem::path& dir) {
       {"emoji_la.tsv", 4},   {"emoji_grc.tsv", 5},      {"periphrasis_la.tsv", 6},   {"preps_en_la.tsv", 7},
       {"phrasebook_en_la.tsv", 8}, {"contractions_en.tsv", 9}, {"nonverbal_en_la.tsv", 10}, {"gloss_es_la.tsv", 11},
       {"order_la.txt", 12}, {"macron_overrides.tsv", 13}, {"phrasal_en_la.tsv", 14}, {"verbprep_en_la.tsv", 15},
-      {"states_en_la.tsv", 16}};
+      {"states_en_la.tsv", 16},
+      // Spanish source tables (C13): optional (a missing file is a warning; Spanish then runs without it)
+      {"phrasebook_es_la.tsv", 17}, {"contractions_es.tsv", 18}, {"clitics_es.tsv", 19},
+      {"states_es_la.tsv", 16}, {"phrasal_es_la.tsv", 14}, {"verbprep_es_la.tsv", 15}};
   for (const FileSpec& f : files) {
     const std::string path = fs::toU8(dir / f.name);
     Result<std::string> data = fs::readFile(path, 16u << 20);
+    const bool optional = std::strstr(f.name, "_es") != nullptr && std::strcmp(f.name, "gloss_es_la.tsv") != 0;
+    if (!data.ok() && optional && data.error().code == ErrorCode::NotFound) {
+      d.warnings_.push_back(LoadWarning{f.name, 0, "optional Spanish table missing (Spanish source runs without it)"});
+      continue;
+    }
     if (!data.ok()) {
       const bool missing = data.error().code == ErrorCode::NotFound;
       return Error{missing ? ErrorCode::NotFound : ErrorCode::Io,
@@ -400,7 +428,10 @@ Result<CuratedData> CuratedData::load(const std::filesystem::path& dir) {
       case 5: L.emoji(s, d.emojiGrc_, true); break;
       case 6: L.periphrasis(s); break;
       case 7: L.preps(s); break;
-      case 8: L.phrasebook(s); break;
+      case 8: L.phrasebook(s, d.phrasebook_); break;
+      case 17: L.phrasebook(s, d.phrasebookEs_); break;
+      case 18: L.pairs(s, d.contractionsEs_); break;
+      case 19: L.clitics(s); break;
       case 9: L.pairs(s, d.contractions_); break;
       case 10: L.pairs(s, d.nonverbal_); break;
       case 11: L.glossEs(s); break;
@@ -469,6 +500,26 @@ Result<CuratedData> CuratedData::load(const std::filesystem::path& dir) {
   dedupe(d.emojiGrc_, "emoji_grc.tsv");
   dedupe(d.periphrasis_, "periphrasis_la.tsv");
   dedupe(d.glossEs_, "gloss_es_la.tsv");
+  // the Spanish reverse index of gloss_es_la.tsv (C13): "pelota, bola" -> pelota, bola; parentheses dropped
+  for (uint32_t i = 0; i < d.glossEs_.size(); ++i) {
+    std::string flat;
+    int depth = 0;
+    for (char ch : text::lower(d.glossEs_[i].glossEs)) {
+      if (ch == '(') ++depth;
+      else if (ch == ')') { if (depth) --depth; }
+      else if (!depth) flat += ch == ';' ? ',' : ch;
+    }
+    size_t p = 0;
+    while (p <= flat.size()) {
+      const size_t comma = flat.find(',', p);
+      const std::string item(trim(std::string_view(flat).substr(p, comma == std::string::npos ? std::string::npos : comma - p)));
+      if (!item.empty()) d.glossEsIndex_.emplace_back(text::nfc(item), i);
+      if (comma == std::string::npos) break;
+      p = comma + 1;
+    }
+  }
+  std::sort(d.glossEsIndex_.begin(), d.glossEsIndex_.end());
+  std::stable_sort(d.clitics_.begin(), d.clitics_.end(), [](const CliticEntry& a, const CliticEntry& b) { return a.form < b.form; });
   for (uint32_t i = 0; i < d.names_.size(); ++i) d.namesByLatin_.push_back(i);
   d.namesLatinKey_.reserve(d.names_.size());
   for (const NameEntry& n : d.names_) d.namesLatinKey_.push_back(text::latin_key(n.latinNom));
@@ -566,6 +617,17 @@ const EmojiEntry* CuratedData::emoji(std::string_view key) const { return findBy
 const EmojiEntry* CuratedData::emojiGreek(std::string_view key) const { return findByKey(emojiGrc_, key); }
 const PeriphrasisEntry* CuratedData::periphrasis(std::string_view key) const { return findByKey(periphrasis_, key); }
 const GlossEsEntry* CuratedData::glossEs(std::string_view key) const { return findByKey(glossEs_, key); }
+void CuratedData::glossEsLemmas(std::string_view spanish, std::vector<const GlossEsEntry*>& out) const {
+  out.clear();
+  auto it = std::lower_bound(glossEsIndex_.begin(), glossEsIndex_.end(), spanish,
+                             [](const std::pair<std::string, uint32_t>& e, std::string_view k) { return e.first < k; });
+  for (; it != glossEsIndex_.end() && it->first == spanish; ++it) out.push_back(&glossEs_[it->second]);
+}
+const CliticEntry* CuratedData::clitic(std::string_view form) const {
+  auto it = std::lower_bound(clitics_.begin(), clitics_.end(), form, [](const CliticEntry& a, std::string_view k) { return a.form < k; });
+  if (it != clitics_.end() && it->form == form) return &*it;
+  return nullptr;
+}
 
 const NameEntry* CuratedData::nameByEnglish(std::string_view english) const {
   const std::string k = text::en_key(english);

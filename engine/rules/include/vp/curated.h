@@ -70,6 +70,10 @@ struct VerbPrepEntry { std::string verb, prep, latin, frame, note; std::string l
 // kind "verb": the Latin verb replaces be + adjective ("afraid" -> timeō); kind "adj": the Latin adjective is the
 // predicate without a lexicon search ("tired" -> fessus sum). source may be two words ("tener miedo").
 struct StateEntry { std::string source, latin, kind, note; };
+// ---- clitics_es.tsv: Spanish clitic pronouns (C13) ---------------------------------------------------------------------
+// form, person (1-3), number (sg/pl/-), gender (m/f/-), role: acc (lo la los las), dat (le les), refl (se), any (me te
+// nos os: accusative, dative or reflexive by context). The tokenizer splits these off verbs ("dámelo" -> da me lo).
+struct CliticEntry { std::string form, role, note; uint8_t person = 0, number = 0, gender = 0; };
 
 // ---- order_la.txt -----------------------------------------------------------------------------------------------
 struct OrderRule {
@@ -114,6 +118,16 @@ class CuratedData {
   const EmojiEntry* emojiGreek(std::string_view key) const;
   const PeriphrasisEntry* periphrasis(std::string_view key) const;
   const GlossEsEntry* glossEs(std::string_view key) const;
+  // gloss_es_la.tsv read backwards (C13): rows whose gloss_es lists `spanish` (lower case, a whole comma- or
+  // semicolon-separated item, parentheses dropped): the teacher's Spanish reverse index ("pelota" -> pila).
+  void glossEsLemmas(std::string_view spanish, std::vector<const GlossEsEntry*>& out) const;
+  // Spanish source tables (C13). Optional files: a missing one is a warning and leaves the table empty.
+  // states_es_la.tsv / phrasal_es_la.tsv / verbprep_es_la.tsv are merged into states() / phrasals() / verbPreps()
+  // (their source words are Spanish lemmas, so they never collide with the English rows).
+  const std::vector<PhraseEntry>& phrasebookEs() const { return phrasebookEs_; }      // phrasebook_es_la.tsv
+  const std::vector<PairEntry>& contractionsEs() const { return contractionsEs_; }    // contractions_es.tsv
+  const std::vector<CliticEntry>& clitics() const { return clitics_; }                // clitics_es.tsv
+  const CliticEntry* clitic(std::string_view form) const;
   const NameEntry* nameByEnglish(std::string_view english) const;   // case-insensitive (en_key)
   const NameEntry* nameByLatin(std::string_view latinKey) const;    // latin_key of latin_nom
   // Cases a Latin preposition governs according to preps_en_la.tsv (keys "in", "ad", "cum", "a"/"ab", "e"/"ex" ...),
@@ -146,8 +160,10 @@ class CuratedData {
   std::vector<PeriphrasisEntry> periphrasis_;
   std::vector<PrepEntry> preps_;
   std::vector<std::pair<std::string, uint16_t>> prepCases_;   // sorted latin key -> case bits
-  std::vector<PhraseEntry> phrasebook_;
-  std::vector<PairEntry> contractions_, nonverbal_;
+  std::vector<PhraseEntry> phrasebook_, phrasebookEs_;
+  std::vector<PairEntry> contractions_, nonverbal_, contractionsEs_;
+  std::vector<CliticEntry> clitics_;
+  std::vector<std::pair<std::string, uint32_t>> glossEsIndex_;   // Spanish gloss item -> index into glossEs_, sorted
   std::vector<GlossEsEntry> glossEs_;
   std::vector<OrderRule> order_;
   std::vector<MacronOverride> macron_;

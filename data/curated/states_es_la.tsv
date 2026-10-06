@@ -1,0 +1,25 @@
+# source	latin	kind	note
+# Spanish "ser/estar" + state adjective, or verb + state noun ("tener miedo"), with a person subject -> Latin (C13;
+# teacher-editable). Same columns as states_en_la.tsv: kind verb (the Latin verb replaces the construction: "tengo
+# miedo" -> timeō; its "de" phrase becomes the object: "miedo de la oscuridad" -> timēre tenebrās) or adj (this Latin
+# adjective is the predicate: "estoy cansada" -> fessa sum). source: the Spanish adjective lemma (masculine singular)
+# or verb + noun. Our own list.
+asustado	timeō	verb	"Estoy asustado." -> Timeō.
+equivocado	errō	verb	"Estás equivocado." -> Errās.
+cansado	fessus	adj	
+listo	parātus	adj	"¿Estás lista?" -> Parātane es?
+preparado	parātus	adj	
+contento	laetus	adj	
+feliz	laetus	adj	
+alegre	laetus	adj	
+triste	trīstis	adj	
+enojado	īrātus	adj	es-MX: "enojado" (Spain: "enfadado")
+enfadado	īrātus	adj	
+molesto	īrātus	adj	
+enfermo	aeger	adj	
+tener miedo	timeō	verb	"tengo miedo" -> timeō
+tener frío	frīgeō	verb	
+tener hambre	ēsuriō	verb	
+tener sed	sitiō	verb	
+tener calor	caleō	verb	
+tener sueño	dormītō	verb	

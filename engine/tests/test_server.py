@@ -1,11 +1,20 @@
 #!/usr/bin/env python3
 """Integration test for `vpengine serve` (DESIGN section 9): a full session over the JSON-lines protocol, framing
 errors, a 10,000-line ping burst, ping latency during a 5,000-cue job, cancel, kill -9 + project.recover, clean
-exit on EOF, and a check that the binary has no network symbols. Python 3 stdlib only.
+exit on EOF, and a check that the binary has no network symbols. These parts run the stub engine (VP_FORCE_STUB=1)
+on the fixture lexicon, so they are the same on every machine.
+Real engine (C8, skipped with a message when data/work/latin.vpl or data/work/nlp/english.*.vpt are absent): a
+session on tests/samples/sample.en.srt with the rules engine (Latin for all 12 cues, reasons in the UI shapes of
+DESIGN 9.2, word.inspect, words.list, export byte for byte, names.set, corrections, speaker gender), the pair
+report when the NLP models are missing, the online check through the scripted transport (VP_ONLINE_MOCK=1, no
+network), and a local-model run (skipped without a model file or without the local model in the build).
+Python 3 stdlib only.
 
-usage: test_server.py <path/to/vpengine> <work dir>
-Environment: VP_TEST_PING_MS (default 100) ping latency budget during a job.
+usage: test_server.py <path/to/vpengine> <work dir> [--stub-only]
+Environment: VP_TEST_PING_MS (default 100) ping latency budget during a job; VP_TEST_STUB_ONLY=1 = --stub-only;
+VP_MODEL_GGUF or <repo>/models/*.gguf for the model run (VP_LLM_SKIP_MODEL=1 skips it).
 """
+import glob
 import json
 import os
 import queue
@@ -21,6 +30,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 FIXTURE = os.path.join(ROOT, "tests", "fixtures", "cli", "thirty_cues.srt")
 LATIN_VPL = os.path.join(ROOT, "tests", "fixtures", "lex", "latin.vpl")
+WORK = os.path.join(ROOT, "data", "work")
+SAMPLES = os.path.join(ROOT, "tests", "samples")
 SANITIZER_MARKS = ("ERROR: AddressSanitizer", "ERROR: LeakSanitizer", "runtime error:", "ThreadSanitizer")
 
 FAILURES = []
@@ -34,11 +45,16 @@ def check(cond, what):
 
 
 class Engine:
-    def __init__(self, exe, data, lexicons, log_path, extra_env=None):
+    def __init__(self, exe, data, lexicons, log_path, extra_env=None, stub=True):
         env = dict(os.environ)
         env["VP_AUTOSAVE_MS"] = "300"
         env["VP_LOG"] = "info"
         env.pop("VP_STUB_DELAY_US", None)
+        env.pop("VP_ONLINE_MOCK", None)
+        env.pop("VP_MODEL_GGUF", None)
+        env.pop("VP_FORCE_STUB", None)
+        if stub:
+            env["VP_FORCE_STUB"] = "1"
         if extra_env:
             env.update(extra_env)
         self.log_path = log_path
@@ -476,6 +492,287 @@ def part_offline(exe):
     check(not hits, "no network symbols (%s)" % (", ".join(hits) or "none"))
 
 
+# ------------------------------------------------------------------------------------------------ real engine (C8)
+def real_data_missing():
+    need = [os.path.join(WORK, "latin.vpl"), os.path.join(WORK, "nlp", "english.tag.vpt"),
+            os.path.join(WORK, "nlp", "english.dep.vpt")]
+    missing = [p for p in need if not os.path.isfile(p)]
+    return missing
+
+
+def latin_tokens_ok(cue, detail):
+    """The target is Latin made by the engine: not the source, tokens found in order, most words in the lexicon."""
+    t = cue["target"]
+    if not t or t == cue["source"]:
+        return False
+    toks = detail["tokens"]
+    pos = 0
+    for k in toks:
+        at = t.find(k["text"], pos)
+        if at < 0:
+            return False
+        pos = at + len(k["text"])
+    words = [k for k in toks if not k["text"].startswith("[")]
+    known = [k for k in words if "lemmaId" in k]
+    return len(words) > 0 and len(known) * 2 >= len(words)
+
+
+REASON_SHAPES = {
+    "sense": {"source", "sense", "context"},
+    "candidate": {"lemmaId", "head", "form", "tier", "band", "chosen", "gloss"},
+    "form": {"features"},
+    "evidence": {"source", "state"},
+}
+
+
+def check_reason_shapes(detail, what):
+    rs = detail["reasons"]
+    by_kind = {}
+    for r in rs:
+        by_kind.setdefault(r["kind"], []).append(r)
+    ok = True
+    for kind, keys in REASON_SHAPES.items():
+        lst = [r for r in by_kind.get(kind, []) if isinstance(r["data"], dict) and r["tokenIndex"] >= 0]
+        if kind == "candidate":
+            lst = [r for r in lst if "was" not in r["data"]]
+        if not lst:
+            ok = check(False, "%s: a %s reason on a token" % (what, kind)) and ok
+            continue
+        bad = [r for r in lst if not keys <= set(r["data"])]
+        ok = check(not bad, "%s: %s reasons carry %s" % (what, kind, sorted(keys))) and ok
+    ev = [r["data"] for r in by_kind.get("evidence", []) if isinstance(r["data"], dict) and r["tokenIndex"] >= 0]
+    srcs = {e["source"] for e in ev}
+    ok = check(srcs == {"wiktionary", "whitaker", "model", "online"} and
+               all(e["state"] in ("yes", "no", "off", "none") for e in ev),
+               "%s: evidence rows for wiktionary/whitaker/model/online with yes|no|off|none" % what) and ok
+    cands = {}
+    for r in by_kind.get("candidate", []):
+        if isinstance(r["data"], dict) and "was" not in r["data"]:
+            cands.setdefault(r["tokenIndex"], []).append(r["data"]["chosen"])
+    ok = check(all(v.count(True) == 1 for v in cands.values()), "%s: one chosen candidate per token" % what) and ok
+    toks = detail["tokens"]
+    ok = check(all(-1 <= r["tokenIndex"] < len(toks) for r in rs), "%s: reason tokenIndex inside tokens" % what) and ok
+    return ok
+
+
+def part_real(exe, work, _lex):
+    print("real engine: rules engine on tests/samples/sample.en.srt (data/work lexicons and NLP models)")
+    missing = real_data_missing()
+    if missing:
+        print("  SKIP real-engine session: missing " + ", ".join(missing))
+        return
+    data = os.path.join(work, "data")
+    eng = Engine(exe, data, WORK, os.path.join(work, "real.log"), stub=False)
+    hello = eng.req("engine.hello", timeout=60)
+    check(hello.get("engineKind") == "rules", "hello: the rules engine is in use (%s)" % hello.get("engine"))
+    check("en-la" in hello["pairs"] and {"R", "O"} <= set(hello["modes"]), "hello: pairs %s, modes %s" % (hello["pairs"], hello["modes"]))
+    un = {u["pair"]: u for u in hello["pairsUnavailable"]}
+    check(all(u["hint"] and u["code"] != "internal" for u in un.values()), "hello: every unavailable pair has a hint")
+    la = [l for l in hello["lexicons"] if l["lang"] == "la"][0]
+    check(la["available"] and la["tiers"]["t1"] > 100 and la["tiers"]["t3"] > la["tiers"]["t1"], "hello: lexicon tiers %s" % la["tiers"])
+    check(isinstance(hello["model"].get("rerankEnabled"), bool), "hello: model.rerankEnabled")
+    samples = {x["lang"]: x["path"] for x in hello["samples"]}
+    en_sample = os.path.join(data, "samples", "sample.en.srt")
+    check(samples.get("en") == en_sample and os.path.isfile(en_sample) and set(samples) == {"en", "es", "la", "grc"},
+          "hello: samples installed in <dataDir>/samples")
+    with open(en_sample, "rb") as f, open(os.path.join(SAMPLES, "sample.en.srt"), "rb") as g:
+        check(f.read() == g.read(), "installed sample identical to tests/samples")
+
+    proj = eng.req("project.new", {"kind": "subs", "pair": "en-la", "sourcePath": en_sample})["project"]
+    check(proj["stats"]["total"] == 12, "sample: 12 cues")
+    t0 = time.time()
+    tr = eng.req("translate.start", {"engines": {"rules": True, "model": False, "online": False}, "fidelity": 2})
+    done = eng.wait_event("translate.done", lambda e: e["jobId"] == tr["jobId"], timeout=300)
+    check(done["stats"]["done"] == 12 and not eng.events_of("translate.error", tr["jobId"]),
+          "translate: 12 cues in %.1f s" % (time.time() - t0))
+    cues = eng.req("cue.page", {"from": 0, "count": 12})["cues"]
+    details = [eng.req("cue.get", {"index": i}) for i in range(12)]
+    latin = [i for i in range(12) if latin_tokens_ok(cues[i], details[i])]
+    check(len(latin) == 12, "Latin for all 12 cues (%d)" % len(latin))
+    check(all(c["confidence"] in ("ok", "check", "fix") and c["state"] == "translated" for c in cues),
+          "every cue has a confidence (%s)" % [c["confidence"] for c in cues])
+    check(all({"A1", "A3", "A4", "A5", "A8"} <= {x["id"] for x in d["checks"]} for d in details), "every cue has checks A1-A9")
+    check(all("emoji" in c["flags"] for c in cues if any("emoji" in t for t in details[c["index"]]["tokens"])),
+          "cue flag emoji when a token carries an emoji")
+    check(all("cps" in c and isinstance(c["flags"], list) for c in cues), "CueView cps and flags")
+    check_reason_shapes(details[0], "cue 0")
+    off = [r["data"]["state"] for r in details[0]["reasons"] if r["kind"] == "evidence" and isinstance(r["data"], dict)
+           and r["data"].get("source") in ("model", "online") and r["tokenIndex"] >= 0]
+    check(off and all(x == "off" for x in off), "evidence: model and online off when not asked")
+
+    word = next(t for t in details[0]["tokens"] if "lemmaId" in t)
+    insp = eng.req("word.inspect", {"text": word["text"], "lang": "la"})
+    a = insp["analyses"]
+    check(a and any(x["lemma"]["id"] == word["lemmaId"] for x in a) and all("flags" in x["lemma"] for x in a),
+          "word.inspect %s: analyses with the token's lemma" % word["text"])
+    check(any(any(x["features"][k] for k in ("case", "number", "person", "tense")) for x in a),
+          "word.inspect: features in words (%s)" % a[0]["features"])
+    lem = eng.req("lemma.get", {"lang": "la", "id": word["lemmaId"]})
+    check(len(lem["cells"]) >= 5 and isinstance(lem["lemma"]["flags"], list), "lemma.get: paradigm cells")
+    w = eng.req("words.list")
+    share = w["tierShare"]
+    check(w["words"] and share["t1"] > 0.3 and sum(share.values()) <= 1.001 and all(x["tier"] in (0, 1, 2, 3) for x in w["words"]),
+          "words.list: tiers from the engine's tokens %s" % share)
+
+    out = os.path.join(work, "out.srt")
+    ex = eng.req("export.write", {"path": out, "format": "srt", "emoji": False, "macrons": True, "rebreak": True})
+    with open(en_sample, "rb") as f:
+        src = f.read()
+    with open(out, "rb") as f:
+        dst = f.read()
+    sb, db = srt_blocks(src), srt_blocks(dst)
+    check(len(sb) == len(db) == 12 and all(a[0] == b[0] and a[1] == b[1] for a, b in zip(sb, db)),
+          "export: numbering and timing byte-identical")
+    check(db[4][2].startswith(b"{\\an8}") and not db[4][2].startswith(b"{\\an8}The"), "export: the {\\an8} cue keeps its tag")
+    check(db[8][2].startswith(b"<i>") and db[8][-1].endswith(b"</i>"), "export: the italic cue stays italic")
+    check(all(b[2:] != a[2:] for a, b in zip(sb, db)), "export: every text line is the Latin")
+    check(not [x for x in ex["warnings"] if x["kind"] in ("untranslated", "tags_dropped")], "export: no untranslated/tags_dropped warnings")
+
+    ns = eng.req("names.set", {"name": "Marcus", "policy": "translate", "form": "Quīntus"})
+    check(ns["affectedCues"] == [3] and eng.req("cue.get", {"index": 3})["cue"]["state"] == "stale",
+          "names.set: cue 3 affected and stale")
+    j = eng.req("translate.start", {"indices": ns["affectedCues"]})["jobId"]
+    eng.wait_event("translate.done", lambda e: e["jobId"] == j, timeout=120)
+    c3 = eng.req("cue.get", {"index": 3})["cue"]
+    check(c3["state"] == "translated" and "Quīnt" in c3["target"], "names.set: re-translated with the glossary form (%s)" % c3["target"])
+
+    before2 = eng.req("cue.get", {"index": 2})["cue"]["target"]
+    fixed = "Agricola aquam portat."
+    eng.req("cue.set", {"index": 2, "text": fixed})
+    r = eng.req("cue.set", {"index": 2, "text": fixed, "remember": "phrase"})
+    check(r["correctionAdded"]["target"] == fixed and r["cue"]["state"] == "edited", "cue.set {remember}: correction added")
+    u = eng.req("history.undo")
+    check(u["changedIndices"] == [2] and eng.req("cue.get", {"index": 2})["cue"]["target"] == before2,
+          "remember on the same text adds no second history step (one undo restores the translation)")
+    eng.req("history.redo")
+    check(len(eng.req("corrections.list")["corrections"]) == 1, "corrections.list: one correction")
+    j = eng.req("translate.start", {"indices": [2]})["jobId"]
+    eng.wait_event("translate.done", lambda e: e["jobId"] == j, timeout=120)
+    d2 = eng.req("cue.get", {"index": 2})
+    check(d2["cue"]["target"] == fixed and any(x["kind"] == "correction" for x in d2["reasons"]),
+          "the next translation of the cue uses the correction")
+    ed = eng.req("cue.set", {"index": 0, "text": "Puella rosam spectat."})
+    d0 = eng.req("cue.get", {"index": 0})
+    check(ed["cue"]["state"] == "edited" and latin_tokens_ok(d0["cue"], d0) and
+          all(-1 <= x["tokenIndex"] < len(d0["tokens"]) for x in d0["reasons"]), "edit: tokens re-checked, reasons re-attached")
+
+    # speaker gender (settings.speakerGender -> Options.speakerGender) on a text project
+    forms = {}
+    for g in ("m", "f"):
+        eng.req("settings.set", {"patch": {"speakerGender": g}})
+        eng.req("project.new", {"kind": "text", "pair": "en-la", "text": "I am tired."})
+        j = eng.req("translate.start", {})["jobId"]
+        eng.wait_event("translate.done", lambda e, j=j: e["jobId"] == j, timeout=120)
+        forms[g] = eng.req("cue.get", {"index": 0})["cue"]["target"]
+    check(forms["m"] != forms["f"], "speakerGender: m %r, f %r" % (forms["m"], forms["f"]))
+    eng.req("settings.set", {"patch": {"speakerGender": None}})
+
+    # a pair the engine does not serve: a hint, not lexicon_missing
+    if "la-en" not in hello["pairs"]:
+        eng.req("project.new", {"kind": "text", "pair": "la-en", "text": "Puella rosam videt."})
+        e = eng.err("translate.start", {})
+        check(e["code"] != "lexicon_missing" and e["hint"], "unavailable pair la-en: %s (%s)" % (e["code"], e["hint"]))
+    # Orbergise: a Latin project; refused with a hint while the rules engine has no Latin -> Latin rewrite
+    la_sample = samples.get("la")
+    eng.req("project.new", {"kind": "subs", "pair": "la-la", "sourcePath": la_sample})
+    if "la-la" in hello["pairs"]:
+        j = eng.req("orbergise.start", {"tier": 1, "originalPath": en_sample})["jobId"]
+        eng.wait_event("translate.done", lambda e: e["jobId"] == j, timeout=300)
+        d = eng.req("cue.get", {"index": 0})
+        check("meaning" in d and d.get("original") == "The girl sees the rose.", "orbergise: meaning and original")
+    else:
+        e = eng.err("orbergise.start", {"tier": 1, "originalPath": en_sample})
+        check(e["code"] != "internal" and e["hint"], "orbergise refused with a hint (%s: %s)" % (e["code"], e["hint"]))
+    check(eng.shutdown() == 0 and not eng.bad_lines, "real engine: clean shutdown")
+    check(log_clean(eng.log_path), "no sanitizer report in the real-engine log")
+
+    print("real engine: missing NLP models")
+    empty = os.path.join(work, "no-nlp")
+    os.makedirs(empty)
+    eng = Engine(exe, os.path.join(work, "data-nonlp"), WORK, os.path.join(work, "nonlp.log"),
+                 {"VP_NLP_DIR": empty}, stub=False)
+    hello = eng.req("engine.hello", timeout=60)
+    un = {u["pair"]: u for u in hello["pairsUnavailable"]}
+    check("en-la" not in hello["pairs"] and un.get("en-la", {}).get("code") == "not_found" and
+          "english.tag.vpt" in un["en-la"]["hint"], "no NLP: en-la unavailable with a hint naming the files")
+    eng.req("project.new", {"kind": "subs", "pair": "en-la", "sourcePath": os.path.join(SAMPLES, "sample.en.srt")})
+    e = eng.err("translate.start", {})
+    check(e["code"] == "not_found" and "english" in e["hint"], "no NLP: translate.start refused with the hint, not lexicon_missing")
+    check(eng.shutdown() == 0 and log_clean(eng.log_path), "no-NLP engine: clean shutdown")
+
+
+def part_online_mock(exe, work, _lex):
+    print("real engine: online check through the scripted transport (VP_ONLINE_MOCK=1, no network)")
+    if real_data_missing():
+        print("  SKIP (real data missing)")
+        return
+    eng = Engine(exe, os.path.join(work, "data"), WORK, os.path.join(work, "online.log"), {"VP_ONLINE_MOCK": "1"}, stub=False)
+    hello = eng.req("engine.hello", timeout=60)
+    check(hello["online"]["mock"] and not hello["online"]["allowed"], "hello: mock transport, online off by default")
+    eng.req("project.new", {"kind": "subs", "pair": "en-la", "sourcePath": os.path.join(SAMPLES, "sample.en.srt")})
+    tr = eng.req("translate.start", {"indices": [0, 1], "engines": {"rules": True, "online": True}})
+    check(tr["warnings"] == ["online_disabled"], "online asked while off: warning in the result")
+    w = eng.wait_event("translate.warning", lambda e: e["jobId"] == tr["jobId"])
+    check(w["engine"] == "online" and w["code"] == "online_disabled" and w["hint"], "translate.warning event {engine, code, hint}")
+    eng.wait_event("translate.done", lambda e: e["jobId"] == tr["jobId"], timeout=120)
+    check(eng.req("engine.hello")["online"]["mockCalls"] == 0, "online off: no transport call")
+    eng.req("settings.set", {"patch": {"engines.online": True, "online.wiktionary": True}})
+    tr = eng.req("translate.start", {"indices": [0, 1], "engines": {"rules": True, "online": True}})
+    check(tr["warnings"] == [], "online on: no warning")
+    eng.wait_event("translate.done", lambda e: e["jobId"] == tr["jobId"], timeout=180)
+    d = eng.req("cue.get", {"index": 0})
+    st = [r["data"]["state"] for r in d["reasons"] if r["kind"] == "evidence" and isinstance(r["data"], dict)
+          and r["data"].get("source") == "online" and r["tokenIndex"] >= 0]
+    check("yes" in st and "off" not in st, "online evidence rows: %s" % st)
+    check(eng.req("engine.hello")["online"]["mockCalls"] > 0, "the scripted transport answered")
+    check(any(r["kind"] == "evidence" and isinstance(r["data"], dict) and r["data"].get("source") == "online" and
+              r["tokenIndex"] == -1 for r in d["reasons"]), "the engine's own online evidence reason")
+    eng.req("settings.set", {"patch": {"engines.online": None, "online.wiktionary": None}})
+    check(eng.shutdown() == 0 and log_clean(eng.log_path), "online-mock engine: clean shutdown")
+
+
+def find_model():
+    if os.environ.get("VP_LLM_SKIP_MODEL") == "1":
+        return None
+    env = os.environ.get("VP_MODEL_GGUF")
+    if env and os.path.isfile(env):
+        return env
+    found = sorted(glob.glob(os.path.join(ROOT, "models", "*.gguf")))
+    return found[0] if found else None
+
+
+def part_model(exe, work, _lex):
+    print("real engine: local-model advisor run")
+    model = find_model()
+    if real_data_missing() or not model:
+        print("  SKIP (%s)" % ("no model file" if not model else "real data missing"))
+        return
+    eng = Engine(exe, os.path.join(work, "data"), WORK, os.path.join(work, "model.log"), stub=False)
+    hello = eng.req("engine.hello", timeout=60)
+    if hello["model"].get("reason") == "not_built" or not hello["model"]["cpuOk"]:
+        print("  SKIP (local model not in this build or CPU without AVX2)")
+        eng.shutdown()
+        return
+    loc = eng.req("model.locate", {"path": model}, timeout=120)
+    check(loc["available"], "model.locate")
+    check("M" in eng.req("engine.hello")["modes"], "hello: mode M once the model is available")
+    eng.req("project.new", {"kind": "subs", "pair": "en-la", "sourcePath": os.path.join(SAMPLES, "sample.en.srt")})
+    t0 = time.time()
+    # three cues: every closed question scores each option with the model (about 50 s per cue on 4 busy cores)
+    tr = eng.req("translate.start", {"indices": [0, 1, 2], "engines": {"rules": True, "model": True}})
+    check(tr["warnings"] == [], "model run: no warning")
+    eng.wait_event("translate.done", lambda e: e["jobId"] == tr["jobId"], timeout=900)
+    check(not eng.events_of("translate.warning", tr["jobId"]), "model run: no translate.warning (%.1f s)" % (time.time() - t0))
+    states = []
+    for i in range(3):
+        d = eng.req("cue.get", {"index": i})
+        states += [r["data"]["state"] for r in d["reasons"] if r["kind"] == "evidence" and isinstance(r["data"], dict)
+                   and r["data"].get("source") == "model" and r["tokenIndex"] >= 0]
+    check(states and "off" not in states and "yes" in states, "model evidence rows: %d yes of %d" % (states.count("yes"), len(states)))
+    check(eng.req("model.status")["loaded"] is False, "model unloaded after the job")
+    check(eng.shutdown() == 0 and log_clean(eng.log_path), "model engine: clean shutdown")
+
+
 def main():
     if len(sys.argv) < 3:
         print(__doc__)
@@ -487,8 +784,12 @@ def main():
     lex = os.path.join(work, "lexicons")
     os.makedirs(lex)
     shutil.copy(LATIN_VPL, os.path.join(lex, "latin.vpl"))
+    stub_only = "--stub-only" in sys.argv[3:] or os.environ.get("VP_TEST_STUB_ONLY") == "1"
+    parts = [part_session, part_framing, part_long_job, part_crash]
+    if not stub_only:
+        parts += [part_real, part_online_mock, part_model]
     t0 = time.time()
-    for part in (part_session, part_framing, part_long_job, part_crash):
+    for part in parts:
         t = time.time()
         try:
             sub = os.path.join(work, part.__name__)

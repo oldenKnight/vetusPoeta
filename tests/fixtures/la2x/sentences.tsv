@@ -1,0 +1,129 @@
+# Own Latin sentences (beginner style) with the expected readable English and es-MX Spanish (task C11).
+# Columns: latin	english	spanish	construction. Written for this project; plain literal translations.
+Puella rosam amat.	The girl loves a rose.	La niña ama una rosa.	svo
+Puellae rosās amant.	The girls love roses.	Las niñas aman rosas.	plural
+Puer puellae rosam dat.	The boy gives a rose to the girl.	El niño da una rosa a la niña.	dative
+Mārcus in hortō ambulat.	Marcus walks in the garden.	Marco camina en el jardín.	in+abl name
+Iūlia laeta est.	Julia is happy.	Julia está contenta.	copula adj estar
+Rosa pulchra est.	The rose is beautiful.	La rosa es bonita.	copula adj ser
+Mārcus puer Rōmānus est.	Marcus is a Roman boy.	Marco es un niño romano.	copula noun
+Ubi est Mārcus?	Where is Marcus?	¿Dónde está Marco?	wh ubi
+Quis es?	Who are you?	¿Quién eres?	wh quis
+Quid legis?	What do you read?	¿Qué lees?	wh quid
+Quem puella amat?	Whom does the girl love?	¿A quién ama la niña?	wh quem
+Cūr puer lacrimat?	Why does the boy cry?	¿Por qué llora el niño?	wh cur
+Quō īs?	Where do you go?	¿Adónde vas?	wh quo
+Unde venīs?	Where do you come from?	¿De dónde vienes?	wh unde
+Quandō venit pater?	When does the father come?	¿Cuándo viene el padre?	wh quando
+Quot puerī in hortō sunt?	How many boys are in the garden?	¿Cuántos niños están en el jardín?	wh quot
+Vidēsne puellam?	Do you see a girl?	¿Ves a una niña?	-ne
+Estne Iūlia in hortō?	Is Julia in the garden?	¿Julia está en el jardín?	-ne copula
+Num puella rosam amat?	Surely the girl does not love a rose?	¿Acaso la niña ama una rosa?	num
+Nōnne puella rosam amat?	Doesn't the girl love a rose?	¿La niña no ama una rosa?	nonne
+Mārce, venī!	Marcus, come!	¡Marco, ven!	vocative imperative
+Ō puer, venī hūc!	O boy, come here!	¡Oh niño, ven aquí!	o + vocative
+Puerī, venīte!	Boys, come!	¡Niños, vengan!	plural imperative
+Nōlī timēre.	Do not fear.	No temas.	noli + inf
+Nōlīte currere!	Do not run!	¡No corran!	nolite + inf
+Mihi librum dā!	Give me a book!	¡Dame un libro!	imperative clitic
+Salvē, magister!	Hello, teacher!	¡Hola, maestro!	interjection vocative
+Valēte, amīcī!	Goodbye, friends!	¡Adiós, amigos!	interjection plural
+Heu, puer aeger est.	Alas, the boy is sick.	Ay, el niño está enfermo.	interjection
+Ecce, puella!	Look, a girl!	¡Mira, una niña!	ecce
+Puella cantat et puer saltat.	The girl sings and the boy dances.	La niña canta y el niño baila.	coordination clauses
+Puellae puerīque in agrō labōrant.	The girls and the boys work in the field.	Las niñas y los niños trabajan en el campo.	-que
+Mārcus Iūliam amat, sed Iūlia Mārcum nōn amat.	Marcus loves Julia, but Julia does not love Marcus.	Marco ama a Julia, pero Julia no ama a Marco.	sed negation names
+Puer et puella in viā ambulābant.	The boy and the girl were walking in the road.	El niño y la niña caminaban en el camino.	imperfect coordination
+Mārcus dīcit puellam cantāre.	Marcus says that the girl sings.	Marco dice que la niña canta.	acc+inf
+Mārcus dīcit sē laetum esse.	Marcus says that he is happy.	Marco dice que está contento.	acc+inf se
+Puer currere potest.	The boy can run.	El niño puede correr.	possum
+Iūlia rosam vidēre vult.	Julia wants to see a rose.	Julia quiere ver una rosa.	volo
+Servus labōrāre dēbet.	The slave must work.	El esclavo debe trabajar.	debeo
+Cum puella vēnit, puer gaudēbat.	When the girl came, the boy was glad.	Cuando la niña vino, el niño se alegraba.	cum + indicative
+Sī venīs, laetus sum.	If you come, I am happy.	Si vienes, estoy contento.	si
+Epistulam legō quod laetus sum.	I read a letter because I am happy.	Leo una carta porque estoy contento.	quod
+Puella cantat quia laeta est.	The girl sings because she is happy.	La niña canta porque está contenta.	quia
+Dum puer dormit, māter labōrat.	While the boy sleeps, the mother works.	Mientras el niño duerme, la madre trabaja.	dum
+Venit ut puellam videat.	He comes to see a girl.	Viene para ver a una niña.	ut purpose same subject
+Servus in casā manet nē dominus eum videat.	The slave stays in the cottage so that the master does not see him.	El esclavo se queda en la choza para que el amo no lo vea.	ne purpose
+Puella quae in hortō ambulat rosās amat.	The girl who walks in the garden loves roses.	La niña que camina en el jardín ama rosas.	relative subject
+Hīc est puer quem amō.	Here is the boy whom I love.	Aquí está el niño que amo.	relative object
+Puer quī in viā currit fīlius meus est.	The boy who runs in the road is my son.	El niño que corre en el camino es mi hijo.	relative possessive
+Rosae quās puella portat pulchrae sunt.	The roses which the girl carries are beautiful.	Las rosas que la niña lleva son bonitas.	relative plural
+Epistulā scrīptā, puer abiit.	After the letter was written, the boy went away.	Después de que la carta fue escrita, el niño se fue.	ablative absolute
+Servus ā dominō laudātus est.	The slave was praised by the master.	El esclavo fue alabado por el amo.	perfect passive
+Iūlia ā Mārcō amātur.	Julia is loved by Marcus.	Julia es amada por Marco.	present passive
+Agricola in agrō labōrābat.	The farmer was working in the field.	El campesino trabajaba en el campo.	imperfect
+Nautae ad īnsulam nāvigāvērunt.	The sailors sailed to the island.	Los marineros navegaron a la isla.	perfect ad+acc
+Dominus servum vocāverat.	The master had called a slave.	El amo había llamado a un esclavo.	pluperfect
+Puellae rosās dabimus.	We will give roses to the girl.	Daremos rosas a la niña.	future
+Fēmina fīliō aquam dabit.	The woman will give water to the son.	La mujer dará agua al hijo.	future mass noun
+Puella epistulam scrībēbat.	The girl was writing a letter.	La niña escribía una carta.	imperfect
+Puerī in silvā lupum vīdērunt.	The boys saw a wolf in the forest.	Los niños vieron un lobo en el bosque.	perfect
+Pater fīliō librum dedit.	The father gave a book to the son.	El padre dio un libro al hijo.	perfect dative
+Puer librum nōn legit.	The boy does not read a book.	El niño no lee un libro.	negation
+Puella nōn est laeta.	The girl is not happy.	La niña no está contenta.	negation copula
+Nēmō venit.	Nobody comes.	Nadie viene.	nemo
+Nihil videō.	I see nothing.	No veo nada.	nihil
+Numquam lacrimat.	He never cries.	Nunca llora.	numquam restored pronoun
+Quam pulchra est rosa!	How beautiful the rose is!	¡Qué bonita es la rosa!	exclamation
+Mārcus altior est quam Iūlia.	Marcus is taller than Julia.	Marco es más alto que Julia.	comparative quam
+Crās Rōmam ībimus.	Tomorrow we will go to Rome.	Mañana iremos a Roma.	accusative of motion
+Mārcus Rōmae habitat.	Marcus lives in Rome.	Marco vive en Roma.	locative
+Puer domī manet.	The boy stays at home.	El niño se queda en casa.	domi
+Mīles gladiō pugnat.	The soldier fights with a sword.	El soldado pelea con una espada.	ablative of means
+Hic puer meus fīlius est.	This boy is my son.	Este niño es mi hijo.	demonstrative possessive
+Illa puella soror mea est.	That girl is my sister.	Aquella niña es mi hermana.	ille
+Duo puerī et trēs puellae in viā sunt.	Two boys and three girls are in the road.	Dos niños y tres niñas están en el camino.	numerals
+Omnēs puerī rīdent.	All the boys laugh.	Todos los niños ríen.	omnis
+Multae rosae in hortō sunt.	There are many roses in the garden.	Hay muchas rosas en el jardín.	multus
+Māter fīliam suam amat.	The mother loves her daughter.	La madre ama a su hija.	suus
+Eam videō.	I see her.	La veo.	pronoun object clitic
+Magister discipulīs fābulam narrat.	The teacher tells a story to the pupils.	El maestro cuenta un cuento a los alumnos.	dative plural
+Discipulī magistrō pārent.	The pupils obey the teacher.	Los alumnos obedecen al maestro.	dative verb
+Equus celeriter currit.	The horse runs quickly.	El caballo corre rápido.	adverb
+Canis et fēlēs in casā dormiunt.	The dog and the cat sleep in the cottage.	El perro y el gato duermen en la choza.	coordinated subject
+Puer fessus dormit.	The tired boy sleeps.	El niño cansado duerme.	attributive adjective
+Fīlia mea in urbe habitat.	My daughter lives in the city.	Mi hija vive en la ciudad.	possessive third declension
+Ille vir est pater meus.	That man is my father.	Aquel hombre es mi padre.	demonstrative copula
+Sine pecūniā nōn sum laetus.	I am not happy without money.	No estoy contento sin dinero.	sine mass
+# second group: written after the first round of tuning to test generality (first run: 20 of 30 right in both
+# languages; the misses led to the fixes noted in docs/rules_la2x_notes.md)
+Servī in agrīs labōrant.	The slaves work in the fields.	Los esclavos trabajan en los campos.	plural PP
+Dominus servōs vocat.	The master calls slaves.	El amo llama a esclavos.	plural object person
+Fīlius patris librum legit.	The son of the father reads a book.	El hijo del padre lee un libro.	genitive
+Puellae in vīllā cantant.	The girls sing in the house.	Las niñas cantan en la casa.	plural subject
+Rēgīna ancillam laudat.	The queen praises a maid.	La reina alaba a una criada.	person object
+Mīlitēs urbem oppugnant.	The soldiers attack a city.	Los soldados atacan una ciudad.	third declension
+Lupus ovem in silvā videt.	The wolf sees a sheep in the forest.	El lobo ve una oveja en el bosque.	animal object
+Magistra discipulās docet.	The teacher teaches pupils.	La maestra enseña a alumnas.	feminine plural object
+Puer aquam bibit.	The boy drinks water.	El niño bebe agua.	mass object
+Marīa epistulam ad amīcam scrībit.	Maria writes a letter to the friend.	María escribe una carta a la amiga.	ad + person
+Cūr nōn venīs?	Why do you not come?	¿Por qué no vienes?	wh negation
+Ubi sunt puerī?	Where are the boys?	¿Dónde están los niños?	wh plural
+Quis librum habet?	Who has a book?	¿Quién tiene un libro?	wh subject
+Puella quam vidēs soror mea est.	The girl whom you see is my sister.	La niña que ves es mi hermana.	relative object
+Pater dīxit fīlium in hortō esse.	The father said that the son was in the garden.	El padre dijo que el hijo estaba en el jardín.	acc+inf past
+Sī pluit, domī manēmus.	If it rains, we stay at home.	Si llueve, nos quedamos en casa.	impersonal si
+Postquam vēnit, cēnāvimus.	After he came, we had dinner.	Después de que vino, cenamos.	postquam
+Noctū lūna in caelō lūcet.	The moon shines at night in the sky.	La luna brilla de noche en el cielo.	time adverb
+Puerī laetī in viā currunt.	The happy boys run in the road.	Los niños contentos corren en el camino.	adjective plural
+Iūlia et Mārcus in hortō sedent.	Julia and Marcus sit in the garden.	Julia y Marco están sentados en el jardín.	estar sentado
+Nautae nāvem magnam habent.	The sailors have a big ship.	Los marineros tienen un barco grande.	adjective object
+Amīcī meī Rōmae habitant.	My friends live in Rome.	Mis amigos viven en Roma.	locative plural possessive
+Ego et tū amīcī sumus.	I and you are friends.	Yo y tú somos amigos.	coordinated pronouns
+Vōs estis discipulī bonī.	You are good pupils.	Ustedes son alumnos buenos.	ustedes
+Nōs Rōmānī sumus.	We are Roman.	Nosotros somos romanos.	nosotros
+Dā mihi aquam, quaesō.	Give me water, please.	Dame agua, por favor.	quaeso
+Cūr lacrimās, puella?	Why do you cry, girl?	¿Por qué lloras, niña?	vocative question
+Fēlēs mūrem capit.	The cat takes a mouse.	El gato toma un ratón.	third declension object
+Canis puerum mordet.	The dog bites a boy.	El perro muerde a un niño.	animal subject
+Mārcus Iūliae rosam dabit.	Marcus will give a rose to Julia.	Marco dará una rosa a Julia.	dative name future
+Ōlim erat puella parva.	Once there was a small girl.	Una vez había una niña pequeña.	existential
+Nūlla thēa est.	There is no tea.	No hay té.	existential negative
+Quid est nōmen tibi, puella?	What is your name, girl?	¿Cuál es tu nombre, niña?	dative of possession
+Intrēmus.	Let us enter.	Entremos.	hortative
+Quid faciam?	What shall I do?	¿Qué hago?	deliberative
+Omnēs, inclīnāte vōs!	Everyone, bow!	¡Todos, inclínense!	reflexive imperative
+Nesciō.	I do not know.	No sé.	nescio
+Putābam diem Lūnae esse.	I thought that it was Monday.	Pensaba que era lunes.	phrase in acc+inf

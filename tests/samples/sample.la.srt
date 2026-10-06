@@ -1,0 +1,47 @@
+1
+00:00:01,000 --> 00:00:03,500
+Puella rosam videt.
+
+2
+00:00:04,000 --> 00:00:06,500
+Nauta in īnsulā habitat.
+
+3
+00:00:07,000 --> 00:00:09,500
+Agricola aquam portat.
+
+4
+00:00:10,000 --> 00:00:12,500
+Mārcus librum legit.
+
+5
+00:00:13,000 --> 00:00:15,500
+{\an8}Canis in viā dormit.
+
+6
+00:00:16,000 --> 00:00:18,500
+Puerī in hortō lūdunt.
+
+7
+00:00:19,000 --> 00:00:21,500
+Māter fīliam vocat.
+
+8
+00:00:22,000 --> 00:00:24,500
+Sōl in caelō lūcet.
+
+9
+00:00:25,000 --> 00:00:27,500
+<i>Lupus per silvam currit.</i>
+
+10
+00:00:28,000 --> 00:00:30,500
+Discipulī magistrum audiunt.
+
+11
+00:00:31,000 --> 00:00:33,500
+Nāvis ad portum venit.
+
+12
+00:00:34,000 --> 00:00:36,500
+Avis in arbore cantat.

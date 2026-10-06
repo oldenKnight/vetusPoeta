@@ -15,6 +15,7 @@
 #include "vp/curated.h"
 #include "vp/engine_config.h"
 #include "vp/frame.h"
+#include "vp/la2x.h"   // C11 la2x hook
 #include "vp/lex.h"
 #include "vp/morph.h"
 #include "vp/nlp.h"
@@ -151,6 +152,7 @@ class RulesEngine final : public Engine {
                                            const std::function<bool()>& cancelled) override {
     std::lock_guard<std::mutex> lk(m_);
     try {
+      if (la2xPair(opt)) return la2xTranslate(cues, opt, ctx, progress, cancelled);   // C11 la2x hook
       return translateImpl(cues, opt, ctx, progress, cancelled);
     } catch (const std::exception& e) {
       return Result<std::vector<CueOutput>>(ErrorCode::Internal, std::string("rules translate: ") + e.what(),
@@ -175,7 +177,7 @@ class RulesEngine final : public Engine {
   Result<InspectResult> inspect(const std::string& word, Lang lang, const Options& opt) override {
     std::lock_guard<std::mutex> lk(m_);
     try {
-      return inspectImpl(word, lang, opt);
+      return la2xInspect(inspectImpl(word, lang, opt), lang, opt);   // C11 la2x hook
     } catch (const std::exception& e) {
       return Result<InspectResult>(ErrorCode::Internal, std::string("rules inspect: ") + e.what(),
                                    "The word could not be looked up.");
@@ -875,7 +877,7 @@ class RulesEngine final : public Engine {
       }
       o.checks.push_back(a8);
     }
-    o.checks.push_back(Check{"A9", true, "not implemented (needs the Latin -> English task)"});
+    o.checks.push_back(la2xA9(target, latinText, opt));   // C11 la2x hook
     std::stable_sort(o.checks.begin(), o.checks.end(), [](const Check& x, const Check& y) { return x.id < y.id; });
   }
 
@@ -1150,6 +1152,7 @@ class RulesEngine final : public Engine {
           addFlag(o.flags, "tags");
         }
       }
+      la2xSources_ = la2xSourceLemmas(a.choices);   // C11 la2x hook
       runChecks(o.target, o.tokens, opt, cues[i], a.latinText && !a.copied, o, lay.overflow, tagsApprox);
       // A7 source coverage
       {
@@ -1360,6 +1363,90 @@ class RulesEngine final : public Engine {
   std::unique_ptr<frame::FrameBuilder> fbEn_, fbEs_;
   const std::vector<GlossaryEntry>* glossary_ = nullptr;
   transfer::Memory memBefore_;
+
+  // ==== C11 la2x (Latin -> English / Spanish; A9 round trip): BEGIN =================================================
+  // Owned by task C11 (engine/rules/src/la2x). The rest of the engine reaches it only through the one-line hooks
+  // marked "C11 la2x hook": pairs la-en / la-es in translate(), Latin glosses in inspect(), A9 in runChecks() with the
+  // source lemmas set just before runChecks() in translateImpl().
+  std::unique_ptr<la2x::Translator> la2x_;
+  const lex::Lexicon* la2xLex_ = nullptr;
+  std::vector<std::string> la2xSources_;   // EN/ES content lemmas of the cue being checked (consumed by la2xA9)
+  bool la2xSourcesSet_ = false;            // set by the translateImpl hook; check() of an edited cue has no source
+
+  static bool la2xPair(const Options& o) {
+    return o.source == Lang::La && (o.target == Lang::En || o.target == Lang::Es);
+  }
+  la2x::Translator* la2xTranslator(Error* err) {
+    if (!la_) {
+      if (err) *err = Error{ErrorCode::LexiconMissing, "no Latin lexicon", "The Latin dictionary (latin.vpl) is not installed."};
+      return nullptr;
+    }
+    Result<void> c = ensureCurated();
+    if (!c.ok()) {
+      if (err) *err = c.error();
+      return nullptr;
+    }
+    if (la2x_ && la2xLex_ == la_) return la2x_.get();
+    la2x_.reset();
+    const std::vector<stdfs::path> dirs = {cfg_.curatedDir, stdfs::path(cfg_.dataDir) / "curated",
+                                           stdfs::path(cfg_.dataDir) / ".." / "curated",
+                                           stdfs::path(cfg_.dataDir) / ".." / ".." / "data" / "curated"};
+    Result<std::unique_ptr<la2x::Translator>> r = la2x::Translator::create(*la_, *cd_, dirs);
+    if (!r.ok()) {
+      if (err) *err = r.error();
+      return nullptr;
+    }
+    la2x_ = std::move(r.value());
+    la2xLex_ = la_;
+    return la2x_.get();
+  }
+  Result<std::vector<CueOutput>> la2xTranslate(const std::vector<CueInput>& cues, const Options& opt, const Context& ctx,
+                                               const std::function<void(size_t)>& progress,
+                                               const std::function<bool()>& cancelled) {
+    Error err{ErrorCode::Internal, "", ""};
+    la2x::Translator* t = la2xTranslator(&err);
+    if (!t) return Result<std::vector<CueOutput>>(err);
+    return Result<std::vector<CueOutput>>(t->cues(cues, opt, ctx, progress, cancelled));
+  }
+  // word.inspect for Latin: the glosses from the curated tables first (readable_*.tsv, gloss_es_la.tsv)
+  Result<InspectResult> la2xInspect(Result<InspectResult> r, Lang lang, const Options& opt) {
+    (void)opt;
+    if (lang != Lang::La || !r.ok()) return r;
+    la2x::Translator* t = la2xTranslator(nullptr);
+    if (!t) return r;
+    for (Analysis& a : r.value().analyses) {
+      if (a.lemmaId == lex::kNoLemma || a.lemmaId >= la_->lemmaCount()) continue;
+      const std::string en = t->gloss(a.lemmaId, la2x::Target::En);
+      const std::string es = t->gloss(a.lemmaId, la2x::Target::Es);
+      if (!en.empty()) a.glossEn = en;
+      if (!es.empty()) a.glossEs = es;
+    }
+    return r;
+  }
+  std::vector<std::string> la2xSourceLemmas(const std::vector<transfer::Choice>& choices) {
+    la2xSourcesSet_ = true;
+    std::vector<std::string> out;
+    for (const transfer::Choice& c : choices)
+      if (c.kind != "table" && !c.source.empty()) out.push_back(c.source);
+    return out;
+  }
+  Check la2xA9(const std::string& target, bool latinText, const Options& opt) {
+    std::vector<std::string> src;
+    src.swap(la2xSources_);
+    const bool set = la2xSourcesSet_;
+    la2xSourcesSet_ = false;
+    if (!set) return Check{"A9", true, "not implemented for edited cues (no source lemmas in check())"};
+    if (!latinText || opt.target != Lang::La) return Check{"A9", true, "not Latin text"};
+    if (src.empty()) return Check{"A9", true, "no source content words"};
+    la2x::Translator* t = la2xTranslator(nullptr);
+    if (!t) return Check{"A9", true, "round trip not available"};
+    std::string flat = target;
+    std::replace(flat.begin(), flat.end(), '\n', ' ');
+    const double ov = t->roundTripOverlap(flat, src, opt.source == Lang::Es ? la2x::Target::Es : la2x::Target::En);
+    Check c{"A9", ov >= 0.5, "round-trip overlap " + fmt(ov)};
+    return c;
+  }
+  // ==== C11 la2x: END ===============================================================================================
 };
 
 }  // namespace

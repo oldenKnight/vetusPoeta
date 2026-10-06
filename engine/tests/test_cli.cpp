@@ -213,3 +213,162 @@ TEST_CASE("cli: stub engine") {
   REQUIRE(chk.ok());
   CHECK_FALSE(chk.value().checks[0].ok);
 }
+
+// C8: per-cue engine data kept in hidden reasons, and the ReasonView shapes the UI reads (DESIGN 9.2).
+TEST_CASE("cli: stored tokens, flags, job facts and UI reason shapes") {
+  using vp::rules::TokenView;
+  CHECK(lemmaFlagNames(1u << 8) == std::vector<std::string>{"gloss-es-pivot"});
+  auto lxr = vp::lex::Lexicon::open(std::filesystem::path(VP_FIXTURES_DIR) / "lex" / "latin.vpl");
+  REQUIRE(lxr.ok());
+  const vp::lex::Lexicon& lx = lxr.value();
+  std::vector<vp::lex::Analysis> an;
+  REQUIRE(lx.lookup("puellam", an));
+  REQUIRE(!an.empty());
+  const uint32_t puella = an[0].lemma;
+  an.clear();
+  REQUIRE(lx.lookup("amat", an));
+  const uint32_t amo = an[0].lemma;
+  an.clear();
+  REQUIRE(lx.lookup("amor", an));
+  uint32_t amor = vp::lex::kNoLemma;
+  for (const auto& a : an)
+    if (lx.lemma(a.lemma).pos == vp::feat::Noun) amor = a.lemma;
+  REQUIRE(amor != vp::lex::kNoLemma);
+
+  vp::rules::CueOutput out;
+  out.target = "Puellam amat.";
+  TokenView t0, t1;
+  t0.text = t0.display = "Puellam";
+  t0.start = 0;
+  t0.end = 7;
+  t0.lemmaId = puella;
+  t0.hasLemma = true;
+  t0.tier = 1;
+  t0.emoji = "\xF0\x9F\x91\xA7";
+  t0.features.pos = "noun";
+  t0.features.case_ = "accusative";
+  t0.features.number = "singular";
+  t0.features.gender = "feminine";
+  t1.text = t1.display = "amat";
+  t1.start = 8;
+  t1.end = 12;
+  t1.lemmaId = amo;
+  t1.hasLemma = true;
+  t1.features.pos = "verb";
+  t1.features.person = "third";
+  t1.features.number = "singular";
+  t1.features.tense = "present";
+  t1.features.mood = "indicative";
+  t1.features.voice = "active";
+  out.tokens = {t0, t1};
+  out.flags = {"emoji", "cps", "song"};
+  out.reasons.push_back({0, "sense", "\"girl\" -> puella (score 0.900)", ""});
+  out.reasons.push_back({1, "candidate", "candidates for \"loves\"",
+                         "[{\"lemma\":" + std::to_string(amor) + ",\"head\":\"amor\",\"score\":0.2,\"why\":\"base 50\"},"
+                         "{\"lemma\":" + std::to_string(amo) + ",\"head\":\"amō\",\"score\":0.9,\"why\":\"base 205\"}]"});
+  out.reasons.push_back({1, "form", "order.decl", ""});
+  out.reasons.push_back({-1, "evidence", "model: off", ""});
+  out.reasons.push_back({-1, "evidence", "online: puella: Wiktionary: girl", "1"});
+  out.reasons.push_back({0, "phrasebook", "x", "{\"pattern\":\"p\",\"latin\":\"l\",\"tier\":1}"});
+
+  vp::CueRecord rec;
+  applyOutput(out, rec);
+  JobFacts jf;
+  jf.online = true;
+  jf.onlineVerdicts = {{std::string(lx.lemma(puella).head), 1}};
+  setHidden(rec, kJobKind, encodeJob(jf));
+  // hidden data: tokens round-trip, flags without the recomputed ones, job facts
+  REQUIRE(hiddenReason(rec, kTokensKind) != nullptr);
+  std::vector<TokenView> back;
+  REQUIRE(decodeTokens(hiddenReason(rec, kTokensKind)->data, back));
+  REQUIRE(back.size() == 2);
+  CHECK(back[0].text == "Puellam");
+  CHECK(back[0].lemmaId == puella);
+  CHECK(back[0].emoji == t0.emoji);
+  CHECK(back[0].features.case_ == "accusative");
+  CHECK(back[1].features.tense == "present");
+  CHECK(back[1].features.mood == "indicative");
+  CHECK(storedFlags(rec) == std::vector<std::string>{"emoji", "song"});
+  JobFacts jb;
+  REQUIRE(decodeJob(hiddenReason(rec, kJobKind)->data, jb));
+  CHECK(jb.online);
+  CHECK_FALSE(jb.model);
+  CHECK(jb.onlineVerdicts.size() == 1);
+  uint32_t packed = 0;
+  CHECK(featuresToPacked(back[0].features, packed));
+  CHECK(featuresFromPacked(packed).case_ == "accusative");
+
+  // the view never shows hidden reasons; the cue view carries the stored flags
+  ReasonViewCtx ctx;
+  ctx.lex = &lx;
+  ctx.source = "The girl loves love.";
+  const json rv = reasonsView(rec, back, ctx);
+  int sense = 0, cands = 0, chosen = 0, forms = 0, evidence = 0, onlineYes = 0, modelOff = 0;
+  for (const json& r : rv) {
+    const std::string k = r["kind"];
+    CHECK(k[0] != '_');
+    if (k == "sense") {
+      ++sense;
+      CHECK(r["data"]["source"] == "girl");
+      CHECK(r["data"]["sense"] == "girl");
+      CHECK(r["data"]["context"] == json::array({"The", "loves", "love"}));
+    } else if (k == "candidate") {
+      ++cands;
+      for (const char* key : {"lemmaId", "head", "form", "tier", "band", "chosen", "gloss"}) CHECK(r["data"].contains(key));
+      if (r["data"]["chosen"] == true) {
+        ++chosen;
+        CHECK(r["data"]["lemmaId"] == amo);
+        CHECK(r["data"]["form"] == "amat");
+        CHECK(cands == 1);   // the chosen candidate comes first
+      }
+    } else if (k == "form") {
+      ++forms;
+      CHECK(r["data"]["features"]["person"] == "third");
+    } else if (k == "evidence" && r["tokenIndex"] >= 0) {
+      ++evidence;
+      if (r["data"]["source"] == "online" && r["data"]["state"] == "yes") ++onlineYes;
+      if (r["data"]["source"] == "model" && r["data"]["state"] == "off") ++modelOff;
+    } else if (k == "evidence") {
+      CHECK((r["data"]["source"] == "model" || r["data"]["source"] == "online"));
+    } else if (k == "phrasebook") {
+      CHECK(r["data"]["latin"] == "l");
+    }
+  }
+  CHECK(sense == 1);
+  CHECK(cands == 2);
+  CHECK(chosen == 1);
+  CHECK(forms == 1);
+  CHECK(evidence == 8);   // four sources x two dictionary tokens
+  CHECK(onlineYes == 1);  // the verdict was for puella only
+  CHECK(modelOff == 2);
+  subs::Document d = parseSrt("1\n00:00:01,000 --> 00:00:03,000\nThe girl loves love.\n");
+  CueViewCtx vctx;
+  const json v = cueViewJson(d.cues[0], d.cues[0].plainText(), rec, vctx);
+  CHECK(v["flags"] == json::array({"emoji", "song"}));
+
+  // after an edit the reasons follow their words
+  TokenView n0 = t1, n1 = t0;
+  n0.start = 0;
+  n1.start = 5;
+  const std::vector<vp::CueReason> moved = remapReasons(rec.reasons, back, {n0, n1});
+  int onAmat = 0;
+  for (const vp::CueReason& r : moved)
+    if (r.kind == "candidate") onAmat += r.tokenIndex == 0;
+  CHECK(onAmat == 1);
+  CHECK(remapReasons(rec.reasons, back, {}).size() == 5);   // two sentence-level and three hidden ones stay
+
+  // Orbergise helpers
+  const std::vector<WordChange> ch = wordChanges("Puellam amat.", {t0, [] {
+                                                   TokenView x;
+                                                   x.text = "dīligit";
+                                                   return x;
+                                                 }()});
+  REQUIRE(ch.size() == 1);
+  CHECK(ch[0].was == "amat");
+  CHECK(ch[0].now == "dīligit");
+  CHECK(ch[0].tokenIndex == 1);
+  const Meaning m = meaningCheck(lx, "Puella amat.", "Puella dormit.");
+  CHECK(m.percent == 50);
+  REQUIRE(m.missing.size() == 1);
+  CHECK(m.missing[0].rfind("am", 0) == 0);
+}

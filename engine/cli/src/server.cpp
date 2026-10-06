@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 #include "vp/fs.h"
+#include "vp/online.h"
 #include "vp/text.h"
 
 namespace vpcli {
@@ -143,14 +144,7 @@ Server::Server(Output& out, ServeOptions opt)
     }
     lexInfo_.push_back(std::move(info));
   }
-#if defined(VP_HAVE_RULES)
-  engine_ = vp::rules::makeEngine();
-#else
-  engine_ = vp::rules::makeStubEngine();
-#endif
-  vp::Result<void> lr = engine_->setLexicons(lexOk_[0] ? &lex_[0] : nullptr, lexOk_[1] ? &lex_[1] : nullptr,
-                                             lexOk_[2] ? &lex_[2] : nullptr, lexOk_[3] ? &lex_[3] : nullptr);
-  if (!lr) logMsg(LogLevel::Warn, "engine lexicons: " + lr.error().message);
+  setupEngine();   // server_engine.cpp: rules engine (or the stub), data folders, samples, advisors
 }
 
 Server::~Server() = default;
@@ -390,10 +384,33 @@ void Server::noteChange() { autosaver_.noteChange(monoMs()); }
 // ---------------------------------------------------------------------------------------------- engine, settings
 json Server::cmdHello(const json&) {
   const json s = settings_.get();
+  json pairs = json::array(), unavailable = json::array();
+  for (const PairState& st : pairStates()) {
+    if (st.available) pairs.push_back(st.pair);
+    else
+      unavailable.push_back(json{{"pair", st.pair}, {"code", vp::errorCodeName(st.why.code)}, {"message", st.why.message},
+                                 {"hint", st.why.hint}});
+  }
+  const json model = modelStatusJson(false);
+  json modes = json::array();
+  if (!pairs.empty()) modes.push_back("R");
+  if (model.value("available", false) && model.value("cpuOk", false)) modes.push_back("M");
+  modes.push_back("O");   // engine iii is built in; it runs only when the settings turn it on
+  json samples = json::array();
+  for (const auto& sm : samples_) samples.push_back(json{{"lang", sm.first}, {"path", sm.second}});
   return json{{"version", vp::appVersion()},
               {"engine", engine_->version()},
+              {"engineKind", realEngine_ ? "rules" : "stub"},
               {"lexicons", lexInfo_},
-              {"model", modelStatusJson(false)},
+              {"pairs", pairs},
+              {"pairsUnavailable", unavailable},
+              {"modes", modes},
+              {"model", model},
+              {"online", {{"allowed", vp::online::onlineAllowed(settings_)}, {"mock", !onlineMock_.empty()},
+                          {"mockCalls", mockCalls_.load()}}},
+              {"nlp", {{"dir", nlpDir_}, {"en", nlpEn_}, {"es", nlpEs_}}},
+              {"curatedDir", curatedDir_},
+              {"samples", samples},
               {"threads", s.value("eco", false) ? 2 : hardwareThreads()},
               {"dataDir", opt_.dataDir},
               {"lexiconDir", opt_.lexiconDir},
@@ -484,6 +501,17 @@ void Server::installProject(vp::Project&& p, const std::string& path, const std:
   redo_.clear();
   historyRecords_ = 0;
   autosaver_ = vp::Autosaver(autosaveDebounceMs_, std::max<int64_t>(60000, autosaveDebounceMs_));
+  originals_.clear();
+  originalPath_.clear();
+  const json& snap = project_.manifest.settingsSnapshot;
+  if (snap.is_object() && snap.contains("orbergOriginalPath") && snap["orbergOriginalPath"].is_string()) {
+    const std::string orig = snap["orbergOriginalPath"].get<std::string>();
+    try {
+      if (fs::isRegularFile(orig)) loadOriginal(orig);
+    } catch (const CmdError& e) {
+      warnings.push_back("the original-language file could not be read: " + e.error.message);
+    }
+  }
   nextCorrection_ = 1;
   for (const vp::Correction& c : project_.corrections)
     if (c.id.size() > 1 && c.id[0] == 'c') {
@@ -509,6 +537,9 @@ void Server::closeProject(bool discardAutosave) {
   undo_.clear();
   redo_.clear();
   historyRecords_ = 0;
+  originals_.clear();
+  originals_.shrink_to_fit();
+  originalPath_.clear();
   autosaver_ = vp::Autosaver(autosaveDebounceMs_, std::max<int64_t>(60000, autosaveDebounceMs_));
 }
 

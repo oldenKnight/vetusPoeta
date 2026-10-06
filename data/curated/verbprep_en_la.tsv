@@ -2,7 +2,7 @@
 # English verb + preposition -> Latin verb and what happens to the prepositional phrase (C2b; teacher-editable).
 # latin "-" keeps the verb's own translation. frame: obj (the PP object becomes the direct object), pp (the PP is
 # translated as usual), prep:<latin>+<case> (the verb fixes the Latin preposition). Prepositions are the canonical
-# English ones (the Spanish frame builder maps a -> to, en -> in, de -> of). Our own list.
+# English ones (Spanish rows, with the same canonical prepositions: verbprep_es_la.tsv). Our own list.
 live	in	habitō	pp	"We live in a small house" -> In casā parvā habitāmus.
 live	at	habitō	pp	
 live	near	habitō	pp	
@@ -28,9 +28,3 @@ pay	for	-	obj
 call	for	-	obj	
 wish	for	-	obj	
 reach	for	-	obj	
-vivir	in	habitō	pp	Spanish: vivir en
-mirar	to	spectō	obj	Spanish: mirar a
-esperar	to	exspectō	obj	Spanish: esperar a
-buscar	to	-	obj	
-escuchar	to	-	obj	
-ver	to	-	obj	

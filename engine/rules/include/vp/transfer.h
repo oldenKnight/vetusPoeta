@@ -37,6 +37,7 @@ struct Choice {
 // Discourse memory carried from sentence to sentence (and cue to cue) inside one translate call.
 struct Memory {
   uint8_t lastGender = 0, lastNumber = 0;   // last noun mentioned (subject or object): "it", "this one", "red ones"
+  bool lastAnimate = false;                 // ... and it was a person / animal (Spanish él / ella keep their gender)
   uint32_t lastVerb = kNone;                // last main verb: "This one does."
   bool lastMotion = false;                  // that verb was a verb of motion (elliptical "where" -> quō)
   bool lastVerbObject = false;
@@ -54,6 +55,9 @@ struct Settings {
   bool flipSpeakerGender = false;           // alternative: the other first-person gender
   const rules::Context* context = nullptr;  // glossary and corrections
   std::vector<std::pair<int, int>> overrides;   // (token, candidate rank) forced choices for alternatives
+  // Source-language lexicon (C13): for Spanish, the English pivot reads its lemma's one-line English gloss when the
+  // Spanish keyword has no Latin candidate and no teacher gloss. May be null.
+  const lex::Lexicon* srcLex = nullptr;
 };
 
 struct ClauseOut {

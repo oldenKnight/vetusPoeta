@@ -1,0 +1,15 @@
+# form	expansion
+# Spanish contractions and informal es-MX spellings expanded before tagging (C13; teacher-editable). Same format as
+# contractions_en.tsv. The token keeps the byte range of the written word.
+del	de el
+al	a el
+pa'	para
+pa	para
+p'acá	para acá
+p'allá	para allá
+pal	para el
+'tá	está
+'toy	estoy
+q	que
+xq	porque
+porfa	por favor

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstring>
 
+#include "spanish.h"
 #include "vp/features.h"
 #include "vp/frame.h"
 #include "vp/text.h"
@@ -295,9 +296,11 @@ std::string describe(const SemSentence& s) {
 FrameBuilder::FrameBuilder(SrcLang lang, const nlp::Pipeline* pipeline, const lex::Lexicon* srcLex,
                            const curated::CuratedData& cd)
     : lang_(lang), nlp_(pipeline), lex_(srcLex), cd_(cd) {
-  if (lang == SrcLang::En) {
-    book_.build(cd.phrasebook(), cd.contractions());
-    for (const curated::PairEntry& c : cd.contractions()) {
+  {
+    // English: phrasebook_en_la.tsv + contractions_en.tsv; Spanish (C13): phrasebook_es_la.tsv + contractions_es.tsv
+    const std::vector<curated::PairEntry>& contr = lang == SrcLang::En ? cd.contractions() : cd.contractionsEs();
+    book_.build(lang == SrcLang::En ? cd.phrasebook() : cd.phrasebookEs(), contr);
+    for (const curated::PairEntry& c : contr) {
       std::vector<std::string> ws;
       size_t a = 0;
       const std::string e = text::lower(c.b);
@@ -378,24 +381,50 @@ void FrameBuilder::tokenize(std::string_view sentence, std::vector<Token>& out) 
       out.back().lower = low;
       continue;
     }
-    // Spanish: del / al, enclitic pronouns on verbs the lexicon knows only without them
-    if (low == "del" || low == "al") {
-      push(t, low == "del" ? "de" : "a", cap);
-      push(t, "el", false);
-      continue;
+    // Spanish: the contraction table (contractions_es.tsv: del, al, pa' ...), then enclitic pronouns on verbs
+    {
+      auto it = std::lower_bound(contractions_.begin(), contractions_.end(), low,
+                                 [](const auto& e, const std::string& k) { return e.first < k; });
+      if (it != contractions_.end() && it->first == low) {
+        for (size_t k = 0; k < it->second.size(); ++k) push(t, it->second[k], cap && k == 0);
+        continue;
+      }
+      if (contractions_.empty() && (low == "del" || low == "al")) {   // no table: the two obligatory ones
+        push(t, low == "del" ? "de" : "a", cap);
+        push(t, "el", false);
+        continue;
+      }
     }
     bool split = false;
-    if (lex_ && low.size() > 4) {
+    if (lex_ && low.size() > 3) {
       std::vector<lex::Analysis> an;
       lex_->lookup(text::es_key(low), an);
-      if (an.empty()) {
-        static const char* const kCl[] = {"los", "las", "les", "nos", "me", "te", "se", "lo", "la", "le", "os"};
+      // a known word is split when the lexicon reads it as a pronominal verb form ("siéntate" <- sentarse, "vete" <-
+      // irse) or, at the start of the sentence, when its base is a one-syllable imperative ("Dame", "Dime", "Hazlo");
+      // a one-word phrasebook pattern ("ándale") is never split (C13)
+      bool tryKnown = false;
+      bool firstWord = true;
+      for (const Token& o : out)
+        if (o.text != "\xC2\xA1" && o.text != "\xC2\xBF" && o.text != "\"" && o.text != "-") firstWord = false;
+      for (const lex::Analysis& x : an) {
+        const lex::Lemma l = lex_->lemma(x.lemma);
+        const std::string h = text::lower(l.head);
+        if (l.pos == feat::Verb && h.size() > 4 && h.compare(h.size() - 2, 2, "se") == 0) tryKnown = true;
+      }
+      bool phraseWord = false;
+      for (const curated::PhraseEntry& e : cd_.phrasebookEs())
+        if (e.pattern.find(' ') == std::string::npos && text::lower(e.pattern) == low) phraseWord = true;
+      if ((an.empty() || tryKnown || firstWord) && !phraseWord) {
+        std::vector<std::string> kCl;
+        for (const curated::CliticEntry& ce : cd_.clitics()) kCl.push_back(ce.form);
+        if (kCl.empty()) kCl = {"me", "te", "se", "nos", "os", "lo", "la", "los", "las", "le", "les"};
+        std::stable_sort(kCl.begin(), kCl.end(), [](const std::string& x, const std::string& y) { return x.size() > y.size(); });
         std::string b = low, bestBase;
         std::vector<std::string> cl, bestCl;
         for (int round = 0; round < 2; ++round) {   // the deepest split whose base is a verb wins (dámelo -> da me lo)
           bool cut = false;
-          for (const char* c : kCl) {
-            const size_t n = std::strlen(c);
+          for (const std::string& c : kCl) {
+            const size_t n = c.size();
             if (b.size() > n + 1 && b.compare(b.size() - n, n, c) == 0) {
               b = b.substr(0, b.size() - n);
               cl.insert(cl.begin(), c);
@@ -407,11 +436,24 @@ void FrameBuilder::tokenize(std::string_view sentence, std::vector<Token>& out) 
           std::vector<lex::Analysis> a2;
           lex_->lookup(text::es_key(b), a2);
           if (a2.empty()) lex_->lookup(text::es_bare(b), a2);
-          for (const lex::Analysis& x : a2)
-            if (lex_->lemma(x.lemma).pos == feat::Verb) { split = true; bestBase = b; bestCl = cl; break; }
+          bool ok = false;
+          for (const lex::Analysis& x : a2) {
+            if (lex_->lemma(x.lemma).pos != feat::Verb) continue;
+            const uint8_t md = feat::unpack(lex_->feature(x.feat)).mood;
+            // an unknown word: any verb base; a known one: an imperative, infinitive or gerund base
+            if (an.empty() || md == feat::Imperative || md == feat::Infinitive || md == feat::Gerund ||
+                (md == feat::Subjunctive && tryKnown))
+              ok = true;
+          }
+          if (ok && !an.empty() && !tryKnown) {   // sentence start: one-syllable imperatives only (da, di, haz ...)
+            static const char* const kShort[] = {"da", "di", "haz", "pon", "ten", "ve", "ven", "sal", "sé", "dé"};
+            ok = false;
+            for (const char* k : kShort) ok = ok || b == k;
+          }
+          if (ok) { split = true; bestBase = b; bestCl = cl; }
         }
         if (split) {
-          push(t, text::es_bare(bestBase) == bestBase ? bestBase : bestBase, cap);
+          push(t, bestBase, cap);
           for (const std::string& c : bestCl) push(t, c, false);
         }
       }
@@ -457,12 +499,28 @@ std::string FrameBuilder::lemmaOf(const Token& t) const {
   // analyses whose features agree with the tagger's (person, number, mood) are preferred: "sé" = saber 1sg, not
   // the imperative of ser
   const uint32_t tmood = fget(t, nlp::morph::MoodShift);
+  const bool es = lang_ == SrcLang::Es;
+  // Spanish (C13): an adjective form that the lexicon also lists as an adjective lemma keeps it ("extraño", not
+  // extrañar; "profundo", not profundar)
+  bool esAdjLemma = false;
+  if (es && t.upos == "ADJ")
+    for (const lex::Analysis& a : an)
+      if (lex_->lemma(a.lemma).pos == feat::Adj) esAdjLemma = true;
   auto agree = [&](const lex::Analysis& a) {
     const feat::Features f = feat::unpack(lex_->feature(a.feat));
     int sc = 0;   // only disagreements count (a lemma's own headword analysis often has no features)
     if (pers && f.person && f.person != pers) sc -= 2;
     if (num && f.number && f.number != (num == nlp::morph::NumPlur ? feat::Pl : feat::Sg)) sc -= 1;
     if (f.mood == feat::Imperative && tmood && tmood != nlp::morph::MoodImp) sc -= 2;
+    if (es) {
+      // "visto" after haber is ver's participle, not vestir 1sg; a pronominal lemma ("regresarse") only through a
+      // clitic (the clause builder adds the particle "se")
+      if (vf == nlp::morph::VfPart && f.person) sc -= 2;
+      if (vf == nlp::morph::VfPart && f.mood && f.mood != feat::ParticipleMood && !f.person) sc -= 1;
+      const std::string h = text::lower(lex_->lemma(a.lemma).head);
+      if (lex_->lemma(a.lemma).pos == feat::Verb && h.size() > 4 && h.compare(h.size() - 2, 2, "se") == 0) sc -= 1;
+      if (esAdjLemma && lex_->lemma(a.lemma).pos != feat::Adj) sc -= 3;
+    }
     return sc;
   };
   int bestAgree = -100;
@@ -1005,6 +1063,14 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       else if (alem == "deber") f.pred.modality = Modality::Must;
       else if (alem == "querer") f.pred.modality = Modality::Want;
       else if (alem == "ir") f.pred.tense = Tense::Future;
+      // the tense of a modal auxiliary is the clause's ("podía sonreír" -> poterat, "pudo" -> potuit) (C13)
+      if (alem == "poder" || alem == "deber" || alem == "querer") {
+        const uint32_t tt = fget(c.t(a), nlp::morph::TenseShift);
+        if (tt == nlp::morph::TenseImp) { f.pred.tense = Tense::Past; f.pred.pastModal = true; }
+        else if (tt == nlp::morph::TensePast) f.pred.tense = Tense::Past;
+        else if (tt == nlp::morph::TenseFut) f.pred.tense = Tense::Future;
+        if (fget(c.t(a), nlp::morph::MoodShift) == nlp::morph::MoodCnd) f.pred.mood = SrcMood::Conditional;
+      }
     }
   }
   if (f.hasPred && !verbal && cop >= 0 && auxes.empty()) {
@@ -1028,6 +1094,18 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
   }
   (void)haveAux;
 
+  // Spanish "ir a + infinitivo" (C13): the infinitive with the marker "a" is the complement, whatever the parser
+  // called it ("Va a llover", "¿Qué voy a hacer?")
+  if (!en && verbal && hl == "ir") {
+    for (int k : c.kids[(size_t)h]) {
+      if (!c.ok(k) || c.t(k).upos != "VERB" || fget(c.t(k), nlp::morph::VerbFormShift) != nlp::morph::VfInf) continue;
+      bool a = false;
+      for (int g : c.kids[(size_t)k])
+        if (c.ok(g) && c.t(g).lower == "a" && g < k) a = true;
+      if (k > 0 && c.t(k - 1).lower == "a") a = true;
+      if (a) { xcomp = k; break; }
+    }
+  }
   // catenative verbs: want to / have to / going to / let us / know how to / used to
   if (verbal && xcomp < 0) {
     for (int k : c.kids[(size_t)h]) {
@@ -1044,6 +1122,11 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     if (en && hl == "go" && f.pred.aspect == Aspect::Progressive) {   // "going to rain"
       f.pred.tense = Tense::Future;
       f.pred.aspect = Aspect::Simple;
+      f.pred.lemma = xl;
+      f.pred.token = xcomp;
+      c.drop(h, Drop::Aux);
+    } else if (!en && hl == "ir") {   // "voy a hacer" -> future (in the past: "iba a" -> past)
+      if (f.pred.tense != Tense::Past) f.pred.tense = Tense::Future;
       f.pred.lemma = xl;
       f.pred.token = xcomp;
       c.drop(h, Drop::Aux);
@@ -1767,7 +1850,7 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
       if (isPunctTok(s.tokens[(size_t)i])) { ++i; continue; }
       PhraseMatch m;
       if (!book_.match(s.tokens, i, m)) { ++i; continue; }
-      const curated::PhraseEntry& e = cd_.phrasebook()[(size_t)m.entry];
+      const curated::PhraseEntry& e = (lang_ == SrcLang::En ? cd_.phrasebook() : cd_.phrasebookEs())[(size_t)m.entry];
       bool leftOk = m.first == 0 || isPunctTok(s.tokens[(size_t)m.first - 1]) ||
                     s.tokens[(size_t)m.first - 1].upos == "CCONJ";
       if (!leftOk) {
@@ -1856,6 +1939,13 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
       if (u.frame.type == Kind::Frag && u.frame.hasSubject && !u.frame.subject.isPronoun && items.size() > 1 &&
           u.frame.adverbs.empty())
         u.vocative = true;
+      // Spanish (C13): only when a comma (or the sentence edge) sets it off: "Había una vez una niña" has none
+      if (u.vocative && lang_ == SrcLang::Es) {
+        bool comma = false;
+        for (int k = 0; k < n; ++k)
+          if ((k == it.first - 1 || k == it.last + 1) && s.tokens[(size_t)k].text == ",") comma = true;
+        u.vocative = comma;
+      }
     }
     s.units.push_back(std::move(u));
   }
@@ -1891,6 +1981,12 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
     }
     if (ui + 1 == s.units.size()) u.sepAfter.clear();
     if (u.type == Unit::Clause) u.frame.punct = ui + 1 == s.units.size() ? s.finalPunct : "";
+    // Spanish (C13): a greeting followed by a clause of its own is a separate utterance in Latin ("Buenas noches,
+    // duerme bien." -> "Bonam noctem; bene dormī."); before a vocative the comma stays ("Salvē, Māiestās Tua")
+    if (lang_ == SrcLang::Es && u.type == Unit::Phrase && u.phrase.reg == "greet" && u.sepAfter == "," &&
+        ui + 1 < s.units.size() && s.units[ui + 1].type == Unit::Clause && !s.units[ui + 1].vocative &&
+        s.units[ui + 1].frame.hasPred)
+      u.sepAfter = ";";
   }
 }
 
@@ -2040,6 +2136,12 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
       out.repairs.emplace_back("retag");
     }
   }
+  // Spanish (C13): tags and features from spanish.vpl (second-person verbs read as nouns: "¿A dónde vas?", "¿Quién
+  // eres?"; tense / mood the tagger left out: "escribiremos", "entremos"), then a new parse
+  if (nlp_ && lex_ && lang_ == SrcLang::Es && es::retag(tk, *lex_)) {
+    nlp_->parser().parse(tk);
+    out.repairs.emplace_back("retag");
+  }
   if (nlp_) repairTree(out);
   // "Bow!": a one-word exclamation tagged as an interjection that the lexicon knows as a verb -> imperative
   if (nlp_ && lex_ && lang_ == SrcLang::En) {
@@ -2072,8 +2174,15 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
       if (an.empty()) lex_->lookup(text::es_bare(tk[(size_t)firstWord].lower), an);
       for (const lex::Analysis& a : an)
         if (feat::unpack(lex_->feature(a.feat)).mood == feat::Imperative) {
-          tk[(size_t)firstWord].feats = nlp::morph::fromString("VerbForm=Fin|Mood=Imp");
+          const bool same = tk[(size_t)firstWord].upos == "VERB" &&
+                            nlp::morph::get(tk[(size_t)firstWord].feats, nlp::morph::MoodShift) == nlp::morph::MoodImp;
+          const feat::Features ff = feat::unpack(lex_->feature(a.feat));
+          std::string ud = "VerbForm=Fin|Mood=Imp";
+          if (ff.person) ud += "|Person=" + std::to_string((int)ff.person);
+          if (ff.number) ud += ff.number == feat::Pl ? "|Number=Plur" : "|Number=Sing";
+          tk[(size_t)firstWord].feats = nlp::morph::fromString(ud);
           tk[(size_t)firstWord].upos = "VERB";
+          if (!same && nlp_) nlp_->parser().parse(tk);   // the imperative heads the clause (C13)
           break;
         }
     }
@@ -2083,6 +2192,7 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
     if (!nlp_) { t.upos = "X"; t.head = 0; t.deprel = "root"; }
     t.lemma = lemmaOf(t);
   }
+  if (lang_ == SrcLang::Es && nlp_) es::normalise(out, lex_, cd_);   // C13: clitics, personal "a", "por qué" ...
   // "six o'clock": the clock word heads the numeral and stands for "hour" (RULE time.hour)
   for (int i = 1; i < n; ++i) {
     if (tk[(size_t)i].lower != "o'clock" || tk[(size_t)i - 1].upos != "NUM") continue;

@@ -6,6 +6,9 @@
 #include <cstdio>
 
 #include "vp/text.h"
+#if defined(VP_HAVE_RULES)
+#include "vp/morph.h"
+#endif
 
 namespace vpcli {
 
@@ -14,52 +17,37 @@ namespace subs = vp::subs;
 using vp::rules::Features;
 
 // ---------------------------------------------------------------------------------------------- features
-const char* posName(uint8_t pos) {
-  static const char* const k[] = {"",       "noun",   "verb",   "adj",  "adv",    "pron",       "num",
-                                  "prep",   "conj",   "intj",   "det",  "name",   "particle",   "participle",
-                                  "phrase", "suffix", "prefix", "article", "postp", "symbol",    "punct"};
-  if (pos < sizeof k / sizeof k[0]) return k[pos];
-  return "other";
-}
-
-const char* genderName(uint8_t g) {
-  static const char* const k[] = {"",       "masculine",        "feminine",         "neuter",
-                                  "masculine-feminine", "masculine-neuter", "feminine-neuter", "common"};
-  return g < 8 ? k[g] : "";
-}
-
 namespace {
-const char* caseName(uint8_t c) {
-  static const char* const k[] = {"", "nominative", "genitive", "dative", "accusative", "ablative", "vocative",
-                                  "locative"};
-  return c < 8 ? k[c] : "";
+// Name tables in the order of the vp::feat enumerations (the same strings as realise::featureView). kMood carries
+// the two extra-bit moods at 8 and 9 so stored tokens round-trip them.
+const char* const kPos[] = {"",       "noun",   "verb",   "adj",  "adv",    "pron",       "num",
+                            "prep",   "conj",   "intj",   "det",  "name",   "particle",   "participle",
+                            "phrase", "suffix", "prefix", "article", "postp", "symbol",    "punct", "other"};
+const char* const kGender[] = {"",       "masculine",        "feminine",         "neuter",
+                               "masculine-feminine", "masculine-neuter", "feminine-neuter", "common"};
+const char* const kCase[] = {"", "nominative", "genitive", "dative", "accusative", "ablative", "vocative", "locative"};
+const char* const kNumber[] = {"", "singular", "plural", "dual"};
+const char* const kPerson[] = {"", "first", "second", "third"};
+const char* const kTense[] = {"", "present", "imperfect", "future", "perfect", "pluperfect", "future-perfect", "aorist"};
+const char* const kMood[] = {"", "indicative", "subjunctive", "imperative", "infinitive", "participle", "gerund",
+                             "optative", "gerundive", "supine"};
+const char* const kVoice[] = {"", "active", "passive", "middle"};
+const char* const kDegree[] = {"", "positive", "comparative", "superlative"};
+constexpr size_t kPosN = 21;   // kPos without "other"
+
+template <size_t N> const char* nameAt(const char* const (&t)[N], unsigned i) { return i < N ? t[i] : ""; }
+template <size_t N> int indexOf(const char* const (&t)[N], const std::string& v) {
+  for (size_t i = 0; i < N; ++i)
+    if (v == t[i]) return static_cast<int>(i);
+  return -1;
 }
-const char* numberName(uint8_t n) {
-  static const char* const k[] = {"", "singular", "plural", "dual"};
-  return n < 4 ? k[n] : "";
-}
-const char* personName(uint8_t p) {
-  static const char* const k[] = {"", "first", "second", "third"};
-  return p < 4 ? k[p] : "";
-}
-const char* tenseName(uint8_t t) {
-  static const char* const k[] = {"", "present", "imperfect", "future", "perfect", "pluperfect", "future-perfect",
-                                  "aorist"};
-  return t < 8 ? k[t] : "";
-}
-const char* moodName(uint8_t m) {
-  static const char* const k[] = {"", "indicative", "subjunctive", "imperative", "infinitive", "participle",
-                                  "gerund", "optative"};
-  return m < 8 ? k[m] : "";
-}
-const char* voiceName(uint8_t v) {
-  static const char* const k[] = {"", "active", "passive", "middle"};
-  return v < 4 ? k[v] : "";
-}
-const char* degreeName(uint8_t d) {
-  static const char* const k[] = {"", "positive", "comparative", "superlative"};
-  return d < 4 ? k[d] : "";
-}
+const char* caseName(uint8_t c) { return nameAt(kCase, c); }
+const char* numberName(uint8_t n) { return nameAt(kNumber, n); }
+const char* personName(uint8_t p) { return nameAt(kPerson, p); }
+const char* tenseName(uint8_t t) { return nameAt(kTense, t); }
+const char* moodName(uint8_t m) { return m < 8 ? kMood[m] : ""; }
+const char* voiceName(uint8_t v) { return nameAt(kVoice, v); }
+const char* degreeName(uint8_t d) { return nameAt(kDegree, d); }
 
 std::vector<std::string> bitNames(uint32_t bits, const char* const* names, size_t n) {
   std::vector<std::string> out;
@@ -68,6 +56,9 @@ std::vector<std::string> bitNames(uint32_t bits, const char* const* names, size_
   return out;
 }
 }  // namespace
+
+const char* posName(uint8_t pos) { return pos < kPosN ? kPos[pos] : "other"; }
+const char* genderName(uint8_t g) { return nameAt(kGender, g); }
 
 Features featuresFromPacked(uint32_t packed) {
   const feat::Features f = feat::unpack(packed);
@@ -97,9 +88,10 @@ std::vector<std::string> extraNames(uint8_t extra) {
   return bitNames(extra, k, 5);
 }
 std::vector<std::string> lemmaFlagNames(uint16_t flags) {
-  static const char* const k[] = {"proper-name", "indeclinable", "deponent", "impersonal",
-                                  "shared-el",   "plural-only",  "defective", "has-table"};
-  return bitNames(flags, k, 8);
+  // bit8: the Spanish gloss came from the English pivot (tools/build_library/pack.py LF_ES_PIVOT; UI "(via English)")
+  static const char* const k[] = {"proper-name", "indeclinable", "deponent", "impersonal", "shared-el",
+                                  "plural-only", "defective",    "has-table", "gloss-es-pivot"};
+  return bitNames(flags, k, 9);
 }
 std::vector<std::string> analFlagNames(uint16_t flags) {
   static const char* const k[] = {"table",       "form-of",    "whitaker-only", "alternative",
@@ -532,6 +524,7 @@ json cueViewJson(const subs::Cue& src, const std::string& source, const vp::CueR
                                        ? splitLines(r.target)
                                        : displayLines(r.target, ctx.hints, ctx.maxLine, ctx.maxLines, &overflow);
   json flags = json::array();
+  for (const std::string& f : storedFlags(r)) flags.push_back(f);   // engine flags: emoji, unknownName, song, ...
   if (cps > ctx.cpsLimit) flags.push_back("cps");
   if (overflow) flags.push_back("overflow");
   if (r.chosen >= 0) flags.push_back("alternative");
@@ -587,7 +580,493 @@ void applyOutput(const vp::rules::CueOutput& out, vp::CueRecord& r) {
   r.checks.clear();
   for (const auto& c : out.checks) r.checks.push_back(vp::CueCheck{c.id, c.ok, c.detail});
   r.reasons.clear();
-  for (const auto& x : out.reasons) r.reasons.push_back(vp::CueReason{x.tokenIndex, x.kind, x.text, x.data});
+  for (const auto& x : out.reasons)
+    if (x.kind.empty() || x.kind[0] != '_') r.reasons.push_back(vp::CueReason{x.tokenIndex, x.kind, x.text, x.data});
+  if (!out.tokens.empty()) setHidden(r, kTokensKind, encodeTokens(out.tokens));
+  setStoredFlags(r, out.flags);
+}
+
+// ---------------------------------------------------------------------------------------------- stored engine data
+const char* const kTokensKind = "_tokens";
+const char* const kFlagsKind = "_flags";
+const char* const kJobKind = "_job";
+
+bool isHiddenReason(const vp::CueReason& r) { return !r.kind.empty() && r.kind[0] == '_'; }
+
+const vp::CueReason* hiddenReason(const vp::CueRecord& r, const char* kind) {
+  for (const vp::CueReason& x : r.reasons)
+    if (x.kind == kind) return &x;
+  return nullptr;
+}
+
+void setHidden(vp::CueRecord& r, const char* kind, std::string data) {
+  auto it = std::find_if(r.reasons.begin(), r.reasons.end(), [kind](const vp::CueReason& x) { return x.kind == kind; });
+  if (data.empty()) {
+    if (it != r.reasons.end()) r.reasons.erase(it);
+    return;
+  }
+  if (it != r.reasons.end()) {
+    it->data = std::move(data);
+    return;
+  }
+  vp::CueReason h;
+  h.kind = kind;
+  h.data = std::move(data);
+  r.reasons.push_back(std::move(h));
+}
+
+bool featuresToPacked(const Features& f, uint32_t& packed) {
+  feat::Features o;
+  bool ok = true;
+  auto take = [&ok](int i, uint8_t& slot) {
+    if (i < 0) ok = false;
+    else slot = static_cast<uint8_t>(i);
+  };
+  const int pos = f.pos == "other" ? static_cast<int>(feat::PosOther) : indexOf(kPos, f.pos);
+  take(pos >= static_cast<int>(kPosN) && pos != static_cast<int>(feat::PosOther) ? -1 : pos, o.pos);
+  take(indexOf(kCase, f.case_), o.case_);
+  take(indexOf(kNumber, f.number), o.number);
+  take(indexOf(kGender, f.gender), o.gender);
+  take(indexOf(kPerson, f.person), o.person);
+  take(indexOf(kTense, f.tense), o.tense);
+  if (f.mood == "gerundive") {
+    o.mood = feat::ParticipleMood;
+    o.extra = feat::Gerundive;
+  } else if (f.mood == "supine") {
+    o.extra = feat::Supine;
+  } else {
+    take(indexOf(kMood, f.mood), o.mood);
+  }
+  take(indexOf(kVoice, f.voice), o.voice);
+  take(indexOf(kDegree, f.degree), o.degree);
+  packed = feat::pack(o);
+  return ok;
+}
+
+namespace {
+std::string featCode(const Features& f) {
+  if (f.pos.empty() && f.case_.empty() && f.number.empty() && f.gender.empty() && f.person.empty() &&
+      f.tense.empty() && f.mood.empty() && f.voice.empty() && f.degree.empty())
+    return std::string();
+  const int idx[9] = {indexOf(kPos, f.pos),       indexOf(kCase, f.case_), indexOf(kNumber, f.number),
+                      indexOf(kGender, f.gender), indexOf(kPerson, f.person), indexOf(kTense, f.tense),
+                      indexOf(kMood, f.mood),     indexOf(kVoice, f.voice), indexOf(kDegree, f.degree)};
+  std::string c(9, 'a');
+  for (int i = 0; i < 9; ++i) c[static_cast<size_t>(i)] = idx[i] < 0 ? '?' : static_cast<char>('a' + idx[i]);
+  return c;
+}
+Features featFromCode(const std::string& c) {
+  Features f;
+  if (c.size() != 9) return f;
+  auto at = [&c](int i) { return c[static_cast<size_t>(i)] == '?' ? 99u : static_cast<unsigned>(c[static_cast<size_t>(i)] - 'a'); };
+  f.pos = nameAt(kPos, at(0));
+  f.case_ = nameAt(kCase, at(1));
+  f.number = nameAt(kNumber, at(2));
+  f.gender = nameAt(kGender, at(3));
+  f.person = nameAt(kPerson, at(4));
+  f.tense = nameAt(kTense, at(5));
+  f.mood = nameAt(kMood, at(6));
+  f.voice = nameAt(kVoice, at(7));
+  f.degree = nameAt(kDegree, at(8));
+  return f;
+}
+}  // namespace
+
+std::string encodeTokens(const std::vector<vp::rules::TokenView>& tokens) {
+  json a = json::array();
+  for (const vp::rules::TokenView& t : tokens) {
+    const int bits = (t.unknown ? 1 : 0) | (t.fromRule ? 2 : 0);
+    a.push_back(json::array({t.text, t.display == t.text ? json(0) : json(t.display), t.start, t.end,
+                             t.hasLemma ? static_cast<int64_t>(t.lemmaId) : int64_t(-1), t.tier, bits,
+                             featCode(t.features), t.emoji}));
+  }
+  return a.dump(-1, ' ', false, json::error_handler_t::replace);
+}
+
+bool decodeTokens(const std::string& data, std::vector<vp::rules::TokenView>& out) {
+  out.clear();
+  const json a = json::parse(data, nullptr, false);
+  if (!a.is_array()) return false;
+  for (const json& e : a) {
+    if (!e.is_array() || e.size() < 9 || !e[0].is_string() || !e[2].is_number_integer() || !e[3].is_number_integer() ||
+        !e[4].is_number_integer() || !e[5].is_number_integer() || !e[6].is_number_integer() || !e[7].is_string() ||
+        !e[8].is_string())
+      return false;
+    vp::rules::TokenView t;
+    t.text = e[0].get<std::string>();
+    t.display = e[1].is_string() ? e[1].get<std::string>() : t.text;
+    t.start = e[2].get<int>();
+    t.end = e[3].get<int>();
+    const int64_t id = e[4].get<int64_t>();
+    t.hasLemma = id >= 0;
+    t.lemmaId = id >= 0 ? static_cast<uint32_t>(id) : 0;
+    t.tier = static_cast<uint8_t>(std::max(0, std::min(255, e[5].get<int>())));
+    const int bits = e[6].get<int>();
+    t.unknown = (bits & 1) != 0;
+    t.fromRule = (bits & 2) != 0;
+    t.features = featFromCode(e[7].get<std::string>());
+    t.emoji = e[8].get<std::string>();
+    out.push_back(std::move(t));
+  }
+  return true;
+}
+
+std::vector<std::string> storedFlags(const vp::CueRecord& r) {
+  std::vector<std::string> out;
+  const vp::CueReason* h = hiddenReason(r, kFlagsKind);
+  if (!h) return out;
+  const json a = json::parse(h->data, nullptr, false);
+  if (!a.is_array()) return out;
+  for (const json& f : a)
+    if (f.is_string()) out.push_back(f.get<std::string>());
+  return out;
+}
+
+void setStoredFlags(vp::CueRecord& r, const std::vector<std::string>& flags) {
+  std::vector<std::string> keep;
+  for (const std::string& f : flags)
+    if (f != "cps" && f != "overflow" && f != "alternative" && std::find(keep.begin(), keep.end(), f) == keep.end())
+      keep.push_back(f);   // reading speed, line overflow and alternative are recomputed by every view
+  setHidden(r, kFlagsKind, keep.empty() ? std::string() : json(keep).dump());
+}
+
+std::string encodeJob(const JobFacts& j) {
+  if (!j.model && !j.online && !j.orberg) return std::string();
+  json o{{"m", j.model ? 1 : 0}, {"o", j.online ? 1 : 0}, {"r", j.orberg ? 1 : 0}};
+  if (!j.modelHeads.empty()) o["mh"] = j.modelHeads;
+  if (!j.onlineVerdicts.empty()) {
+    json v = json::array();
+    for (const auto& p : j.onlineVerdicts) v.push_back(json::array({p.first, p.second}));
+    o["ov"] = v;
+  }
+  return o.dump(-1, ' ', false, json::error_handler_t::replace);
+}
+
+bool decodeJob(const std::string& data, JobFacts& out) {
+  out = JobFacts();
+  const json o = json::parse(data, nullptr, false);
+  if (!o.is_object()) return false;
+  out.model = o.value("m", 0) != 0;
+  out.online = o.value("o", 0) != 0;
+  out.orberg = o.value("r", 0) != 0;
+  if (o.contains("mh") && o["mh"].is_array())
+    for (const json& h : o["mh"])
+      if (h.is_string()) out.modelHeads.push_back(h.get<std::string>());
+  if (o.contains("ov") && o["ov"].is_array())
+    for (const json& p : o["ov"])
+      if (p.is_array() && p.size() == 2 && p[0].is_string() && p[1].is_number_integer())
+        out.onlineVerdicts.emplace_back(p[0].get<std::string>(), p[1].get<int>());
+  return true;
+}
+
+// ---------------------------------------------------------------------------------------------- reasons for the UI
+namespace {
+// Words of a text (letters, digits, apostrophes inside a word), in order.
+std::vector<std::string> words(const std::string& text) {
+  std::vector<std::string> out;
+  std::string w;
+  for (size_t i = 0; i < text.size();) {
+    const size_t at = i;
+    const char32_t cp = vp::text::decodeUtf8(text, i);
+    const bool letter = cp >= 0x80 ? !(cp == 0x2014 || cp == 0x2013 || cp == 0x00AB || cp == 0x00BB || cp == 0x201C ||
+                                       cp == 0x201D || cp == 0x00BF || cp == 0x00A1 || cp == 0x2026 || cp == 0x266A ||
+                                       cp == 0x00B7 || cp == 0x0387 || cp == 0x00A0)
+                                   : ((cp >= 'a' && cp <= 'z') || (cp >= 'A' && cp <= 'Z') || (cp >= '0' && cp <= '9') ||
+                                      ((cp == '\'' || cp == '-') && !w.empty()));
+    if (letter) {
+      w.append(text, at, i - at);
+    } else if (!w.empty()) {
+      while (!w.empty() && (w.back() == '\'' || w.back() == '-')) w.pop_back();
+      if (!w.empty()) out.push_back(w);
+      w.clear();
+    }
+  }
+  while (!w.empty() && (w.back() == '\'' || w.back() == '-')) w.pop_back();
+  if (!w.empty()) out.push_back(w);
+  return out;
+}
+
+// The first "quoted" part of an engine reason text ("\"girl\" -> puella (score 0.82)" -> girl).
+std::string quoted(const std::string& t) {
+  const size_t a = t.find('"');
+  if (a == std::string::npos) return std::string();
+  const size_t b = t.find('"', a + 1);
+  return b == std::string::npos ? std::string() : t.substr(a + 1, b - a - 1);
+}
+
+json contextWords(const std::string& source, const std::string& word) {
+  const std::vector<std::string> ws = words(source);
+  const std::vector<std::string> target = words(word);
+  const std::string first = target.empty() ? std::string() : vp::text::lower(target[0]);
+  json out = json::array();
+  size_t at = ws.size();
+  for (int pass = 0; pass < 2 && at == ws.size(); ++pass)   // the word itself, then an inflected form ("see" -> "sees")
+    for (size_t i = 0; i < ws.size(); ++i) {
+      const std::string w = vp::text::lower(ws[i]);
+      if (pass == 0 ? w == first : (first.size() >= 3 && w.compare(0, first.size(), first) == 0)) {
+        at = i;
+        break;
+      }
+    }
+  if (at == ws.size()) return out;
+  const size_t span = target.empty() ? 1 : target.size();
+  for (size_t i = at >= 2 ? at - 2 : 0; i < std::min(ws.size(), at + span + 2); ++i)
+    if (i < at || i >= at + span) out.push_back(ws[i]);
+  return out;
+}
+
+const char* bandOf(int tier) { return tier == 1 ? "common" : tier == 2 ? "rarer" : "rare"; }
+
+bool lemmaOk(const vp::lex::Lexicon* lx, uint32_t id) { return lx && lx->lemma(id).id != vp::lex::kNoLemma; }
+
+// The form of `lemma` with the features of `tok` (Latin: morph::generate; "" when the cell does not exist).
+std::string formLike(const vp::lex::Lexicon& lx, uint32_t lemma, const vp::rules::TokenView& tok, bool latin) {
+#if defined(VP_HAVE_RULES)
+  uint32_t packed = 0;
+  if (!latin || tok.features.pos.empty()) return std::string();
+  featuresToPacked(tok.features, packed);
+  std::string out;
+  if (vp::morph::generate(lx, lemma, feat::unpack(packed), out, true)) return vp::morph::displayForm(out, true);
+#else
+  (void)lx;
+  (void)lemma;
+  (void)tok;
+  (void)latin;
+#endif
+  return std::string();
+}
+
+json reasonOut(int tokenIndex, const std::string& kind, const std::string& text, json data) {
+  return json{{"tokenIndex", tokenIndex}, {"kind", kind}, {"text", text}, {"data", std::move(data)}};
+}
+}  // namespace
+
+json reasonsView(const vp::CueRecord& r, const std::vector<vp::rules::TokenView>& tokens, const ReasonViewCtx& ctx) {
+  json out = json::array();
+  JobFacts job;
+  if (const vp::CueReason* h = hiddenReason(r, kJobKind)) decodeJob(h->data, job);
+  const vp::lex::Lexicon* lx = ctx.lex;
+  auto tok = [&tokens](int k) -> const vp::rules::TokenView* {
+    return k >= 0 && static_cast<size_t>(k) < tokens.size() ? &tokens[static_cast<size_t>(k)] : nullptr;
+  };
+  bool hasChange = false;
+  for (const vp::CueReason& x : r.reasons) {
+    if (isHiddenReason(x)) continue;
+    json data = nullptr;
+    if (!x.data.empty()) {
+      data = json::parse(x.data, nullptr, false);
+      if (data.is_discarded()) data = x.data;
+    }
+    const vp::rules::TokenView* t = tok(x.tokenIndex);
+    if (data.is_object()) {   // already a UI shape (phrasebook {pattern, latin, tier}, orbergise {was, now, why})
+      if (data.contains("was")) hasChange = true;
+      out.push_back(reasonOut(x.tokenIndex, x.kind, x.text, std::move(data)));
+      continue;
+    }
+    if (x.kind == "sense") {
+      json d{{"source", quoted(x.text)}};
+      if (t && t->hasLemma && lemmaOk(lx, t->lemmaId)) {
+        const vp::lex::Lemma l = lx->lemma(t->lemmaId);
+        d["sense"] = std::string(l.glossEn);
+        d["senseEs"] = std::string(l.glossEs);
+      }
+      d["context"] = contextWords(ctx.source, d["source"].get<std::string>());
+      out.push_back(reasonOut(x.tokenIndex, x.kind, x.text, std::move(d)));
+    } else if (x.kind == "candidate" && data.is_array()) {
+      const uint32_t chosenId = t && t->hasLemma ? t->lemmaId : vp::lex::kNoLemma;
+      size_t chosen = 0;
+      for (size_t i = 0; i < data.size(); ++i)
+        if (data[i].is_object() && data[i].value("lemma", int64_t(-1)) == static_cast<int64_t>(chosenId)) {
+          chosen = i;
+          break;
+        }
+      std::vector<size_t> order{chosen};
+      for (size_t i = 0; i < data.size(); ++i)
+        if (i != chosen) order.push_back(i);
+      for (size_t i : order) {
+        const json& c = data[i];
+        if (!c.is_object()) continue;
+        const int64_t id = c.value("lemma", int64_t(-1));
+        const bool isChosen = i == chosen;
+        json d{{"lemmaId", id}, {"head", c.value("head", std::string())}, {"chosen", isChosen},
+               {"score", c.value("score", 0.0)}};
+        int tier = 0;
+        std::string form, gloss;
+        if (id >= 0 && lemmaOk(lx, static_cast<uint32_t>(id))) {
+          const vp::lex::Lemma l = lx->lemma(static_cast<uint32_t>(id));
+          d["head"] = std::string(l.head);
+          tier = l.tier;
+          gloss = std::string(l.glossEn);
+          if (!isChosen && t) form = formLike(*lx, static_cast<uint32_t>(id), *t, ctx.latin);
+        }
+        if (isChosen && t) {
+          form = t->text;
+          if (t->tier) tier = t->tier;
+        }
+        d["form"] = form;
+        d["tier"] = tier;
+        d["band"] = bandOf(tier);
+        d["gloss"] = gloss;
+        out.push_back(reasonOut(x.tokenIndex, "candidate", c.value("why", std::string()), std::move(d)));
+      }
+    } else if (x.kind == "form") {
+      json d = json::object();
+      if (t && !t->features.pos.empty()) d["features"] = featureJson(t->features);
+      if (data.is_string() && !data.get<std::string>().empty()) d["form"] = data;
+      out.push_back(reasonOut(x.tokenIndex, x.kind, x.text, std::move(d)));
+    } else if (x.kind == "name") {
+      out.push_back(reasonOut(x.tokenIndex, x.kind, x.text, json{{"form", data.is_string() ? data : json(t ? t->text : "")}}));
+    } else if (x.kind == "correction") {
+      out.push_back(reasonOut(x.tokenIndex, x.kind, x.text, json{{"target", data.is_string() ? data : json("")}}));
+    } else if (x.kind == "evidence" && (x.text.rfind("model:", 0) == 0 || x.text.rfind("online:", 0) == 0)) {
+      const bool model = x.text[0] == 'm';
+      const bool off = x.text.size() >= 5 && x.text.compare(x.text.size() - 5, 5, ": off") == 0;
+      std::string state = off ? "off" : "yes";
+      json d{{"source", model ? "model" : "online"}};
+      if (!model && !off) {
+        const std::string v = data.is_string() ? data.get<std::string>() : data.is_number() ? data.dump() : "0";
+        state = v == "1" ? "yes" : v == "-1" ? "no" : "none";
+      }
+      if (model && x.text.find(": chose ") != std::string::npos) d["preferred"] = true;
+      d["state"] = state;
+      out.push_back(reasonOut(x.tokenIndex, x.kind, x.text, std::move(d)));
+    } else {
+      out.push_back(reasonJson(x));
+    }
+  }
+  // Orbergise: words that replaced the input's words, when the engine did not say so itself.
+  if (job.orberg && !hasChange) {
+    for (const WordChange& c : wordChanges(ctx.source, tokens)) {
+      const vp::rules::TokenView* t = tok(c.tokenIndex);
+      json d{{"was", c.was}, {"now", c.now}, {"why", "vocabulary"}, {"chosen", true}};
+      if (t && t->hasLemma && lemmaOk(lx, t->lemmaId)) {
+        const vp::lex::Lemma l = lx->lemma(t->lemmaId);
+        d["lemmaId"] = t->lemmaId;
+        d["head"] = std::string(l.head);
+        d["tier"] = t->tier ? t->tier : l.tier;
+      }
+      out.push_back(reasonOut(c.tokenIndex, "candidate", c.was + " -> " + c.now, std::move(d)));
+    }
+  }
+  // Evidence rows for every dictionary word: the offline sources from the lexicon, engines ii/iii from the job.
+  if (lx) {
+    for (size_t k = 0; k < tokens.size(); ++k) {
+      const vp::rules::TokenView& t = tokens[k];
+      if (!t.hasLemma || !lemmaOk(lx, t.lemmaId)) continue;
+      const vp::lex::Lemma l = lx->lemma(t.lemmaId);
+      const std::string head(l.head);
+      const int ti = static_cast<int>(k);
+      out.push_back(reasonOut(ti, "evidence", "", json{{"source", "wiktionary"}, {"state", l.glossEn.empty() ? "none" : "yes"}}));
+      out.push_back(reasonOut(ti, "evidence", "",
+                              json{{"source", "whitaker"}, {"state", l.whitFreq >= 'A' && l.whitFreq <= 'Z' ? "yes" : "none"}}));
+      std::string ms = "off";
+      if (job.model) ms = std::find(job.modelHeads.begin(), job.modelHeads.end(), head) != job.modelHeads.end() ? "yes" : "none";
+      out.push_back(reasonOut(ti, "evidence", "", json{{"source", "model"}, {"state", ms}}));
+      std::string os = "off";
+      if (job.online) {
+        os = "none";
+        for (const auto& v : job.onlineVerdicts)
+          if (v.first == head) os = v.second > 0 ? "yes" : v.second < 0 ? "no" : "none";
+      }
+      out.push_back(reasonOut(ti, "evidence", "", json{{"source", "online"}, {"state", os}}));
+    }
+  }
+  return out;
+}
+
+std::vector<WordChange> wordChanges(const std::string& latinSource, const std::vector<vp::rules::TokenView>& tokens) {
+  std::vector<WordChange> out;
+  const std::vector<std::string> src = words(latinSource);
+  std::vector<std::string> a, b;
+  std::vector<int> bTok;
+  for (const std::string& w : src) a.push_back(vp::text::latin_key(w));
+  for (size_t k = 0; k < tokens.size(); ++k) {
+    const std::string key = vp::text::latin_key(tokens[k].text);
+    if (key.empty()) continue;
+    b.push_back(key);
+    bTok.push_back(static_cast<int>(k));
+  }
+  const size_t n = a.size(), m = b.size();
+  if (!n || !m || n * m > 40000) return out;
+  std::vector<std::vector<uint16_t>> L(n + 1, std::vector<uint16_t>(m + 1, 0));
+  for (size_t i = n; i-- > 0;)
+    for (size_t j = m; j-- > 0;)
+      L[i][j] = a[i] == b[j] ? static_cast<uint16_t>(L[i + 1][j + 1] + 1) : std::max(L[i + 1][j], L[i][j + 1]);
+  size_t i = 0, j = 0;
+  std::vector<size_t> gapA, gapB;
+  auto flushGap = [&]() {
+    for (size_t g = 0; g < std::min(gapA.size(), gapB.size()); ++g)
+      out.push_back(WordChange{bTok[gapB[g]], src[gapA[g]], tokens[static_cast<size_t>(bTok[gapB[g]])].text});
+    gapA.clear();
+    gapB.clear();
+  };
+  while (i < n && j < m) {
+    if (a[i] == b[j]) {
+      flushGap();
+      ++i;
+      ++j;
+    } else if (L[i + 1][j] >= L[i][j + 1]) {
+      gapA.push_back(i++);
+    } else {
+      gapB.push_back(j++);
+    }
+  }
+  while (i < n) gapA.push_back(i++);
+  while (j < m) gapB.push_back(j++);
+  flushGap();
+  return out;
+}
+
+Meaning meaningCheck(const vp::lex::Lexicon& la, const std::string& before, const std::string& after) {
+  auto content = [&la](const std::string& text, std::vector<uint32_t>& ids) {
+    std::vector<vp::lex::Analysis> an;
+    for (const std::string& w : words(text)) {
+      an.clear();
+      if (!la.lookup(vp::text::latin_key(w), an) || an.empty()) continue;
+      const vp::lex::Lemma l = la.lemma(an[0].lemma);
+      if (l.pos == feat::Noun || l.pos == feat::Verb || l.pos == feat::Adj || l.pos == feat::Adv)
+        if (std::find(ids.begin(), ids.end(), an[0].lemma) == ids.end()) ids.push_back(an[0].lemma);
+    }
+  };
+  std::vector<uint32_t> a, b;
+  content(before, a);
+  content(after, b);
+  Meaning m;
+  for (uint32_t id : a)
+    if (std::find(b.begin(), b.end(), id) == b.end()) {
+      std::string head(la.lemma(id).head);
+      const size_t comma = head.find(',');
+      m.missing.push_back(comma == std::string::npos ? head : head.substr(0, comma));
+    }
+  if (!a.empty())
+    m.percent = static_cast<int>(std::lround(100.0 * static_cast<double>(a.size() - m.missing.size()) /
+                                             static_cast<double>(a.size())));
+  return m;
+}
+
+std::vector<vp::CueReason> remapReasons(const std::vector<vp::CueReason>& reasons,
+                                        const std::vector<vp::rules::TokenView>& oldTokens,
+                                        const std::vector<vp::rules::TokenView>& newTokens) {
+  std::vector<vp::CueReason> out;
+  for (const vp::CueReason& r : reasons) {
+    if (r.tokenIndex < 0 || isHiddenReason(r)) {
+      out.push_back(r);
+      continue;
+    }
+    if (static_cast<size_t>(r.tokenIndex) >= oldTokens.size()) continue;
+    const std::string& text = oldTokens[static_cast<size_t>(r.tokenIndex)].text;
+    int nth = 0;
+    for (int k = 0; k < r.tokenIndex; ++k)
+      if (oldTokens[static_cast<size_t>(k)].text == text) ++nth;
+    for (size_t k = 0; k < newTokens.size(); ++k)
+      if (newTokens[k].text == text && nth-- == 0) {
+        vp::CueReason x = r;
+        x.tokenIndex = static_cast<int>(k);
+        out.push_back(std::move(x));
+        break;
+      }
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------------------------- export

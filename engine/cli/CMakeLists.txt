@@ -1,15 +1,18 @@
 # vpengine: the engine executable (DESIGN.md §9). `vp_cli_core` holds everything but main() so the doctest
 # executable can test the pure helpers (engine/tests/test_cli.cpp).
-option(VP_HAVE_RULES "Link engine/rules (vp::rules::makeEngine) instead of the stub engine" OFF)
+option(VP_HAVE_RULES "Link engine/rules (vp::rules::makeEngine(EngineConfig)); the stub stays available with --stub" ON)
 
 add_library(vp_cli_core STATIC
   src/cmd_llm.cpp
   src/cmd_serve.cpp
   src/cmd_tools.cpp
+  src/locate.cpp
+  src/online_mock.cpp
   src/serve_io.cpp
   src/rules_stub.cpp
   src/server.cpp
   src/server_cues.cpp
+  src/server_engine.cpp
   src/server_export.cpp
   src/views.cpp)
 target_include_directories(vp_cli_core PUBLIC src ${CMAKE_SOURCE_DIR}/engine/rules/include)
@@ -52,6 +55,9 @@ if(VP_BUILD_TESTS AND NOT CMAKE_CROSSCOMPILING)
     add_test(NAME vpengine_server
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/engine/tests/test_server.py
                      $<TARGET_FILE:vpengine> ${CMAKE_BINARY_DIR}/testtmp/server)
-    set_tests_properties(vpengine_server PROPERTIES TIMEOUT 600)
+    set_tests_properties(vpengine_server PROPERTIES TIMEOUT 1200)
+    if(VP_SANITIZE)   # the local-model part (llama.cpp scoring) runs in release builds only
+      set_tests_properties(vpengine_server PROPERTIES ENVIRONMENT "VP_LLM_SKIP_MODEL=1")
+    endif()
   endif()
 endif()

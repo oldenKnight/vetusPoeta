@@ -18,12 +18,13 @@ void usage() {
   std::fprintf(stderr,
                "vetus poeta engine %s\n"
                "usage:\n"
-               "  vpengine serve [--data <dir>] [--lexicons <dir>]   JSON lines on stdin/stdout (DESIGN section 9)\n"
+               "  vpengine serve [--data <dir>] [--lexicons <dir>] [--stub]   JSON lines on stdin/stdout (DESIGN 9)\n"
                "  vpengine inspect <file.vpl> <word>                 analyses and paradigm cells of a word\n"
                "  vpengine check <file.srt|.vtt|.ass|.txt> [--cps N] format, encoding, cues, warnings, fast cues\n"
                "  vpengine llm-gate <latin.vpl> <model.gguf> [--pairs N] [--json f]  Latin minimal-pair gate\n"
                "  vpengine version\n"
-               "environment: VP_LOG=off|error|warn|info|debug, VP_DATA_DIR, VP_LEXICON_DIR, VP_AUTOSAVE_MS\n",
+               "environment: VP_LOG=off|error|warn|info|debug, VP_DATA_DIR, VP_LEXICON_DIR, VP_NLP_DIR,\n"
+               "  VP_CURATED_DIR, VP_SAMPLES_DIR, VP_AUTOSAVE_MS, VP_FORCE_STUB=1 (tests), VP_ONLINE_MOCK=1 (tests)\n",
                vp::appVersion());
 }
 
