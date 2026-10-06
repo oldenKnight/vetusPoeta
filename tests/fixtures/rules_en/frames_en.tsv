@@ -32,7 +32,7 @@ Give the letter to your mother.	kind=imp pred=give obj=letter obl=to:mother
 They walked to the river with their dog.	kind=decl pred=walk tense=past subj=they obl=to:river
 The soldiers fought with swords.	kind=decl pred=fight tense=past subj=soldier obl=with:sword
 How beautiful the night is!	kind=excl subj=night
-What a big house!	kind=excl subj=house
+What a big house!	phrase=what a {ADJ} {NP} units=1
 Good morning, Anna.	units=2 phrase=good morning
 Thank you, my friend.	units=2 phrase=thank you
 The bread was eaten by the mice.	kind=decl pred=eat passive=1 subj=bread obl=by:mouse

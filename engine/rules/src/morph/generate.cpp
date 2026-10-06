@@ -52,6 +52,7 @@ std::string displayForm(std::string_view form, bool macrons) {
   o.reserve(u.size());
   for (size_t i = 0; i < u.size(); ++i) {
     char32_t c = u[i];
+    if (c >= 0x035C && c <= 0x0362) continue;   // tie bars / double breves ("de͡inde" -> "deinde")
     if (c == 0x0304 || c == 0x0306) {
       size_t j = i;
       bool mac = false, brv = false;

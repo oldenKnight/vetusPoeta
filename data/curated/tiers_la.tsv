@@ -49,7 +49,7 @@ pareo	pāreō	verb	1	derived
 placeo	placeō	verb	1	derived	
 timeo	timeō	verb	1	derived	
 gaudeo	gaudeō	verb	1	derived	
-rideo	rīdeō	verb	1	derived	
+rideo	rīdeō	verb	1	derived	laugh, smile
 fleo	fleō	verb	1	derived	
 ploro	plōrō	verb	1	derived	
 clamo	clāmō	verb	1	derived	
@@ -111,7 +111,7 @@ ostendo	ostendō	verb	1	derived
 monstro	mōnstrō	verb	1	derived	
 promitto	prōmittō	verb	1	derived	
 iuvo	iuvō	verb	1	derived	
-adiuvo	adiuvō	verb	1	derived	
+adiuvo	adiuvō	verb	1	derived	help
 servo	servō	verb	1	derived	
 servio	serviō	verb	1	derived	
 laudo	laudō	verb	1	derived	
@@ -124,7 +124,7 @@ licet	licet	verb	1	derived
 oportet	oportet	verb	1	derived	
 necesse	necesse	adj	1	derived	necesse est
 puella	puella	noun	1	derived	
-puer	puer	noun	1	derived	
+puer	puer	noun	1	derived	boy, child
 vir	vir	noun	1	derived	
 femina	fēmina	noun	1	derived	
 homo	homō	noun	1	derived	
@@ -172,7 +172,7 @@ mensa	mēnsa	noun	1	derived
 sella	sella	noun	1	derived	
 lectus	lectus	noun	1	derived	
 liber	liber	noun	1	derived	book
-epistula	epistula	noun	1	derived	
+epistula	epistula	noun	1	derived	letter (written), epistle
 littera	littera	noun	1	derived	
 verbum	verbum	noun	1	derived	
 vox	vōx	noun	1	derived	
@@ -333,7 +333,7 @@ gratus	grātus	adj	1	derived
 dulcis	dulcis	adj	1	derived	
 calidus	calidus	adj	1	derived	
 frigidus	frīgidus	adj	1	derived	
-mirus	mīrus	adj	1	derived	
+mirus	mīrus	adj	1	derived	wonderful, strange
 clarus	clārus	adj	1	derived	
 ego	ego	pron	1	derived	
 tu	tū	pron	1	derived	
@@ -500,8 +500,8 @@ cum	cum	prep	1	derived
 carmen	carmen	noun	1	derived	song
 horologium	hōrologium	noun	2	derived	clock
 fovea	fovea	noun	2	derived	hole, pit
-pallium	pallium	noun	2	derived	cloak
-tenebrae	tenebrae	noun	1	derived	darkness (plural)
+pallium	pallium	noun	2	derived	cloak, coat
+tenebrae	tenebrae	noun	1	derived	darkness, the dark (plural)
 tremo	tremō	verb	2	derived	shake, tremble
 sumo	sūmō	verb	1	derived	take, pick up
 pingo	pingō	verb	2	derived	paint
@@ -511,3 +511,26 @@ inclino	inclīnō	verb	2	derived	bow, bend
 color	color	noun	1	derived	colour, paint
 imus	īmus	adj	2	derived	lowest, bottom
 inurbanus	inurbānus	adj	2	derived	rude
+thea	thēa	noun	2	derived	tea
+placenta	placenta	noun	2	derived	cake
+ientaculum	ientāculum	noun	2	derived	breakfast
+candela	candēla	noun	2	derived	candle
+pluit	pluit	verb	2	derived	rain (it rains)
+aufugio	aufugiō	verb	2	derived	run away, flee
+frigeo	frīgeō	verb	2	derived	be cold
+cotidie	cotīdiē	adv	1	derived	every day, daily
+antea	anteā	adv	1	derived	before, previously
+maximus	maximus	adj	1	derived	greatest, very great
+latinus	Latīnus	adj	1	derived	Latin
+graecus	Graecus	adj	1	derived	Greek
+quartus	quārtus	num	1	derived	fourth
+quintus	quīntus	num	1	derived	fifth
+sextus	sextus	num	1	derived	sixth
+septimus	septimus	num	1	derived	seventh
+octavus	octāvus	num	1	derived	eighth
+nonus	nōnus	num	1	derived	ninth
+decimus	decimus	num	1	derived	tenth
+quotus	quotus	adj	1	derived	which (in number): quota hōra est
+pensum	pēnsum	noun	2	derived	homework, task
+latine	Latīnē	adv	1	derived	in Latin
+graece	Graecē	adv	1	derived	in Greek

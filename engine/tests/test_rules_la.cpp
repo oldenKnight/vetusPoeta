@@ -780,7 +780,7 @@ std::vector<Row> realisationTable() {
   add(CB().v("nōlō").pers(1).o(n("placenta")), "Placentam nōlō.");
   add(CB(ClauseType::Wh).wh("quis", Role::Subject).v("frangō", Perfect).o(n("hōrologium")), "Quis hōrologium frēgit?");
   add(CB(ClauseType::Imp).v("sedeō").sub(SubRel::Coord, CB(ClauseType::Imp).v("nārrō").io(pr(1)).o(n("fābula"))),
-      "Sedē et narrā mihi fābulam.");
+      "Sedē et nārrā mihi fābulam.");   // macron_overrides.tsv in the Macrons primitive (decision 5)
   add(CB().v("sum", Imperfect).s(with(n("puella"), A("parvus"))).exist().adv("ōlim", AdvPos::Front),
       "Ōlim erat puella parva.");
   add(CB().v("cadō", Perfect).obl("in", with(n("fovea"), A("altus")), false, Acc), "In foveam altam cecidit.");

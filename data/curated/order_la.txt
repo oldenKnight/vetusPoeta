@@ -11,6 +11,7 @@ RULE order.yn         : clause.type = yn                      => Q-ne attached t
 RULE order.yn.nonne   : clause.type = yn & expects yes        => nōnne first, then decl order
 RULE order.yn.num     : clause.type = yn & expects no         => num first, then decl order
 RULE order.wh         : clause.type = wh                      => WH first (quis, quid, ubi, quō, cūr, quōmodo, quandō, quot, quantus), then decl order without the slot WH filled
+RULE order.wh.cop     : clause.type = wh & copula & the wh word is the predicate => WH V rest: "Quī diēs est hodiē?", "Quis es?"; a wh adverb keeps the verb last ("Cūr semper hōra sexta est?")
 RULE order.imp        : clause.type = imp & complements <= 3 (verb not counted) => V first: "Dā mihi pilam", "Venī hūc", "Aperī iānuam"; a fronted adverb (prīmum, deinde, nunc, tum) keeps the verb last: "Prīmum nōmen tuum scrībe"
 RULE order.imp.long   : clause.type = imp & complements > 3    => [VOC,] O OBL V ; "Rosās in hortō nōlī carpere"
 RULE imp.number       : imperative addressee count            => singular by default; plural when the addressee NP is plural (everyone, you all, boys, ladies and gentlemen), when a plural vocative appears in the same or the previous cue, or when the previous cue's speaker addressed a group; a guess from the previous cue is marked Check
@@ -26,7 +27,8 @@ RULE order.poss       : possessive not contrastive            => after the noun 
 RULE order.gen        : genitive modifies noun                => after the noun ("liber puerī"); except partitive quantity words ("multī puerōrum")
 RULE order.num        : cardinal numeral                      => before the noun ("duōs frātrēs")
 RULE order.prep       : prepositional phrase                  => preposition + [adjective] noun; "cum" with personal pronouns becomes enclitic: mēcum, tēcum, sēcum, nōbīscum, vōbīscum, quōcum
-RULE order.adv        : manner adverb                         => directly before the verb ("celeriter currit"); time adverbs (nunc, hodiē, mox, iam, semper, numquam) at clause start or before the verb
+RULE order.adv        : manner adverb                         => directly before the verb ("celeriter currit"); time adverbs (nunc, hodiē, mox, iam, semper, numquam) at clause start when the source puts them first ("Hodiē magister īrātus erat"), else before the verb, several adverbs in the source order ("Semper hīc ..." / "Hīc semper ...")
+RULE order.neg.degree : negated clause with a degree adverb    => nōn before the degree adverb (multum, valdē, magnopere, satis, nimis, paulum, admodum) ; "Nōn multum cūrō quō"
 RULE order.rel        : relative clause                       => right after its antecedent; relative pronoun first in the clause; verb final inside
 RULE order.sub.pre    : subordinate of time/condition/cause (cum, sī, nisi, postquam, quod, quia, dum, antequam) => before the main clause when the source puts it first, else after; connective at the start of its clause
 RULE order.sub.purp   : purpose (ut/nē + subjunctive)         => after the main clause

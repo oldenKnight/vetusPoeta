@@ -39,6 +39,8 @@ bool FormSelector::select(uint32_t lemma, const Features& f, Word& out) const {
   morph::GenInfo gi;
   std::string form;
   if (morph::generate(lx_, lemma, f, form, true, &gi)) {
+    // domus: the lexicon lists the 4th-declension ablative domū first; the readers use domō (C2b)
+    if (l.key == "domus" && f.case_ == Abl && f.number == Sg && text::latin_key(form) == "domu") form = "domō";
     out.form = std::move(form);
     out.packed = gi.packed ? gi.packed : pack(f);
     out.fromRule = gi.fromRule;
@@ -237,12 +239,24 @@ bool Pronouns::dropSubject(const LaClause& c) const {
   if (c.type == ClauseType::Imp) return true;
   if (!c.hasSubject || !c.subject.isPronoun || c.subject.emphasis || !c.subject.coord.empty()) return false;
   // pron.drop (c): "Ego sum Alīcia" keeps ego when a copula introduces the speaker by name
-  if (!c.predicative.empty() && c.predicative[0].isName) return false;
+  // (rule pron.is: a 3rd-person pronoun is dropped before a name too: "Rēgīna Cordium est")
+  if (!c.predicative.empty() && c.predicative[0].isName && c.subject.pron.person != 3) return false;
   return true;   // pron.drop (ego/tū/nōs/vōs) and pron.is (is/ea/id)
 }
 
 // ---- Macrons / Punctuation / Emoji ----------------------------------------------------------------------------------
 std::string Macrons::apply(std::string_view form, bool macrons) { return morph::displayForm(form, macrons); }
+std::string Macrons::apply(std::string_view form, bool macrons, const curated::MacronOverride* ov) {
+  if (!ov || ov->from.empty()) return morph::displayForm(form, macrons);
+  std::string f = text::nfc(form);
+  std::string from = ov->from, to = ov->to;
+  if (f.compare(0, from.size(), from) != 0) {   // a capitalised form ("Narrā" at the start of a sentence)
+    Punctuation::capitaliseFirst(from);
+    Punctuation::capitaliseFirst(to);
+  }
+  if (f.compare(0, from.size(), from) == 0) f = to + f.substr(from.size());
+  return morph::displayForm(f, macrons);
+}
 
 std::string Punctuation::finalMark(const LaClause& c) {
   if (!c.punct.empty()) return c.punct;

@@ -2,6 +2,7 @@
 #include "vp/curated.h"
 
 #include <algorithm>
+#include <cstring>
 
 #include "vp/features.h"
 #include "vp/fs.h"
@@ -190,7 +191,14 @@ struct Loader {
       splitTabs(line, cols);
       if (!need(no, 4)) return;
       TierEntry t;
-      t.key = greek ? text::greek_key(cols[0]) : text::latin_key(cols[0]);
+      // homograph marker ("sero2" = serō "sow", next to sērō adv): key without the digit, identity by key + pos
+      std::string_view k0 = cols[0];
+      if (!greek && k0.size() > 1 && k0.back() >= '1' && k0.back() <= '9') {
+        t.homograph = (uint8_t)(k0.back() - '0');
+        k0.remove_suffix(1);
+      }
+      t.key = greek ? text::greek_key(k0) : text::latin_key(k0);
+      if (t.key.empty()) { warn(no, "empty key"); return; }
       t.head = text::nfc(cols[1]);
       t.pos = col(cols, 2);
       t.tier = tierOf(no, cols[3]);
@@ -260,6 +268,58 @@ struct Loader {
       out.push_back(PairEntry{col(cols, 0), text::nfc(cols[1])});
     });
   }
+  void macrons(std::string_view data) {
+    forLines(data, [&](int no, std::string_view line) {
+      splitTabs(line, cols);
+      if (!need(no, 3) || cols[1].empty() || cols[2].empty()) {
+        if (cols.size() >= 3) warn(no, "empty stem");
+        return;
+      }
+      d.macron_.push_back(MacronOverride{text::latin_key(cols[0]), text::nfc(cols[1]), text::nfc(cols[2]), col(cols, 3)});
+    });
+  }
+  void phrasal(std::string_view data) {
+    forLines(data, [&](int no, std::string_view line) {
+      splitTabs(line, cols);
+      if (!need(no, 3) || cols[2].empty()) { if (cols.size() >= 3 && cols[2].empty()) warn(no, "empty Latin verb"); return; }
+      PhrasalEntry e{text::lower(cols[0]), text::lower(cols[1]), text::nfc(cols[2]), col(cols, 3), col(cols, 4)};
+      if (e.particle.empty()) e.particle = "-";
+      if (!e.frame.empty() && e.frame != "refl" && e.frame != "intr" && e.frame != "acc" && e.frame != "dat" &&
+          e.frame != "abl") {
+        warn(no, "unknown frame '" + e.frame + "' (expected refl, intr, acc, dat, abl or empty)");
+        e.frame.clear();
+      }
+      d.phrasal_.push_back(std::move(e));
+    });
+  }
+  void verbPrep(std::string_view data) {
+    forLines(data, [&](int no, std::string_view line) {
+      splitTabs(line, cols);
+      if (!need(no, 4)) return;
+      VerbPrepEntry e{text::lower(cols[0]), text::lower(cols[1]), text::nfc(cols[2]), col(cols, 3), col(cols, 4), {}, 0};
+      if (e.latin.empty()) e.latin = "-";
+      if (e.frame.compare(0, 5, "prep:") == 0) {
+        const Frame f = parseFrame(e.frame);
+        if (f.kind != FrameKind::Prep || !f.prepCase) { warn(no, "bad frame '" + e.frame + "'"); return; }
+        const size_t plus = e.frame.find('+');
+        e.latinPrep = text::nfc(std::string_view(e.frame).substr(5, plus - 5));
+        e.prepCase = f.prepCase;
+      } else if (e.frame != "obj" && e.frame != "pp") {
+        warn(no, "unknown frame '" + e.frame + "' (expected obj, pp or prep:<latin>+<case>)");
+        return;
+      }
+      d.verbPrep_.push_back(std::move(e));
+    });
+  }
+  void states(std::string_view data) {
+    forLines(data, [&](int no, std::string_view line) {
+      splitTabs(line, cols);
+      if (!need(no, 3)) return;
+      StateEntry e{text::lower(cols[0]), text::nfc(cols[1]), col(cols, 2), col(cols, 3)};
+      if (e.kind != "verb" && e.kind != "adj") { warn(no, "kind must be verb or adj"); return; }
+      d.states_.push_back(std::move(e));
+    });
+  }
   void glossEs(std::string_view data) {
     forLines(data, [&](int no, std::string_view line) {
       splitTabs(line, cols);
@@ -314,7 +374,8 @@ Result<CuratedData> CuratedData::load(const std::filesystem::path& dir) {
       {"valency_la.tsv", 0}, {"names_la.tsv", 1},       {"tiers_la.tsv", 2},         {"tiers_grc.tsv", 3},
       {"emoji_la.tsv", 4},   {"emoji_grc.tsv", 5},      {"periphrasis_la.tsv", 6},   {"preps_en_la.tsv", 7},
       {"phrasebook_en_la.tsv", 8}, {"contractions_en.tsv", 9}, {"nonverbal_en_la.tsv", 10}, {"gloss_es_la.tsv", 11},
-      {"order_la.txt", 12}};
+      {"order_la.txt", 12}, {"macron_overrides.tsv", 13}, {"phrasal_en_la.tsv", 14}, {"verbprep_en_la.tsv", 15},
+      {"states_en_la.tsv", 16}};
   for (const FileSpec& f : files) {
     const std::string path = fs::toU8(dir / f.name);
     Result<std::string> data = fs::readFile(path, 16u << 20);
@@ -343,6 +404,10 @@ Result<CuratedData> CuratedData::load(const std::filesystem::path& dir) {
       case 9: L.pairs(s, d.contractions_); break;
       case 10: L.pairs(s, d.nonverbal_); break;
       case 11: L.glossEs(s); break;
+      case 13: L.macrons(s); break;
+      case 14: L.phrasal(s); break;
+      case 15: L.verbPrep(s); break;
+      case 16: L.states(s); break;
       default: L.order(s); break;
     }
   }
@@ -363,6 +428,42 @@ Result<CuratedData> CuratedData::load(const std::filesystem::path& dir) {
         }
   };
   dedupeTiers(d.tiers_, "tiers_la.tsv");
+  // gloss index of the tier notes: "hole, pit" -> hole, pit; parentheses dropped; leading "the/a/an/to" dropped
+  for (uint32_t i = 0; i < d.tiers_.size(); ++i) {
+    std::string note = text::lower(d.tiers_[i].note);
+    std::string flat;
+    int depth = 0;
+    for (char ch : note) {
+      if (ch == '(') ++depth;
+      else if (ch == ')') { if (depth) --depth; }
+      else if (!depth) flat += ch == ';' ? ',' : ch;
+    }
+    size_t p = 0;
+    while (p <= flat.size()) {
+      size_t comma = flat.find(',', p);
+      std::string item(trim(std::string_view(flat).substr(p, comma == std::string::npos ? std::string::npos : comma - p)));
+      for (const char* art : {"the ", "a ", "an ", "to "})
+        if (item.compare(0, std::strlen(art), art) == 0) item = item.substr(std::strlen(art));
+      if (!item.empty()) d.glossIndex_.emplace_back(item, i);
+      if (comma == std::string::npos) break;
+      p = comma + 1;
+    }
+  }
+  std::sort(d.glossIndex_.begin(), d.glossIndex_.end());
+  auto byVerb = [](const auto& a, const auto& b) { return a.verb < b.verb; };
+  std::stable_sort(d.phrasal_.begin(), d.phrasal_.end(), byVerb);
+  std::stable_sort(d.verbPrep_.begin(), d.verbPrep_.end(), byVerb);
+  std::stable_sort(d.states_.begin(), d.states_.end(), [](const StateEntry& a, const StateEntry& b) { return a.source < b.source; });
+  std::stable_sort(d.macron_.begin(), d.macron_.end(), [](const MacronOverride& a, const MacronOverride& b) { return a.key < b.key; });
+  for (size_t i = 1; i < d.phrasal_.size(); ++i)
+    if (d.phrasal_[i].verb == d.phrasal_[i - 1].verb && d.phrasal_[i].particle == d.phrasal_[i - 1].particle)
+      d.warnings_.push_back(LoadWarning{"phrasal_en_la.tsv", 0, "duplicate " + d.phrasal_[i].verb + " " + d.phrasal_[i].particle + " (first row wins)"});
+  for (size_t i = 1; i < d.verbPrep_.size(); ++i)
+    if (d.verbPrep_[i].verb == d.verbPrep_[i - 1].verb && d.verbPrep_[i].prep == d.verbPrep_[i - 1].prep)
+      d.warnings_.push_back(LoadWarning{"verbprep_en_la.tsv", 0, "duplicate " + d.verbPrep_[i].verb + " " + d.verbPrep_[i].prep + " (first row wins)"});
+  for (size_t i = 1; i < d.states_.size(); ++i)
+    if (d.states_[i].source == d.states_[i - 1].source)
+      d.warnings_.push_back(LoadWarning{"states_en_la.tsv", 0, "duplicate " + d.states_[i].source + " (first row wins)"});
   dedupeTiers(d.tiersGrc_, "tiers_grc.tsv");
   dedupe(d.emoji_, "emoji_la.tsv");
   dedupe(d.emojiGrc_, "emoji_grc.tsv");
@@ -399,6 +500,66 @@ const TierEntry* CuratedData::tier(std::string_view key, std::string_view pos) c
   for (; it != tiers_.end() && it->key == key; ++it)
     if (it->pos == pos) return &*it;
   return tier(key);
+}
+const char* CuratedData::tierPos(uint8_t p) {
+  switch (p) {
+    case feat::Noun: return "noun";
+    case feat::Verb: return "verb";
+    case feat::Adj: case feat::Participle: return "adj";
+    case feat::Adv: return "adv";
+    case feat::Pron: return "pron";
+    case feat::Num: return "num";
+    case feat::Prep: return "prep";
+    case feat::Conj: return "conj";
+    case feat::Intj: return "intj";
+    case feat::Det: return "det";
+    case feat::Particle: return "particle";
+    case feat::Name: return "name";
+    default: return "";
+  }
+}
+const TierEntry* CuratedData::tier(std::string_view key, uint8_t latinPos) const {
+  auto it = std::lower_bound(tiers_.begin(), tiers_.end(), key, [](const TierEntry& a, std::string_view k) { return a.key < k; });
+  const char* pos = tierPos(latinPos);
+  const TierEntry* first = it != tiers_.end() && it->key == key ? &*it : nullptr;
+  for (; it != tiers_.end() && it->key == key; ++it)
+    if (it->pos == pos) return &*it;
+  // a homograph row of another part of speech does not apply ("sero2" verb is not sērō adv)
+  if (first && *pos) {
+    for (auto j = std::lower_bound(tiers_.begin(), tiers_.end(), key, [](const TierEntry& a, std::string_view k) { return a.key < k; });
+         j != tiers_.end() && j->key == key; ++j)
+      if (j->homograph) return nullptr;
+  }
+  return first;
+}
+uint8_t CuratedData::effectiveTier(std::string_view key, uint8_t latinPos, uint8_t lexiconTier) const {
+  if (const TierEntry* t = tier(key, latinPos))
+    if (t->tier) return t->tier;
+  return lexiconTier ? lexiconTier : 3;
+}
+void CuratedData::glossTiers(std::string_view english, std::vector<const TierEntry*>& out) const {
+  out.clear();
+  auto it = std::lower_bound(glossIndex_.begin(), glossIndex_.end(), english,
+                             [](const std::pair<std::string, uint32_t>& e, std::string_view k) { return e.first < k; });
+  for (; it != glossIndex_.end() && it->first == english; ++it) out.push_back(&tiers_[it->second]);
+}
+const MacronOverride* CuratedData::macronOverride(std::string_view key) const { return findByKey(macron_, key); }
+const PhrasalEntry* CuratedData::phrasal(std::string_view verb, std::string_view particle) const {
+  auto it = std::lower_bound(phrasal_.begin(), phrasal_.end(), verb, [](const PhrasalEntry& a, std::string_view k) { return a.verb < k; });
+  for (; it != phrasal_.end() && it->verb == verb; ++it)
+    if (it->particle == particle) return &*it;
+  return nullptr;
+}
+const VerbPrepEntry* CuratedData::verbPrep(std::string_view verb, std::string_view prep) const {
+  auto it = std::lower_bound(verbPrep_.begin(), verbPrep_.end(), verb, [](const VerbPrepEntry& a, std::string_view k) { return a.verb < k; });
+  for (; it != verbPrep_.end() && it->verb == verb; ++it)
+    if (it->prep == prep) return &*it;
+  return nullptr;
+}
+const StateEntry* CuratedData::state(std::string_view source) const {
+  auto it = std::lower_bound(states_.begin(), states_.end(), source, [](const StateEntry& a, std::string_view k) { return a.source < k; });
+  if (it != states_.end() && it->source == source) return &*it;
+  return nullptr;
 }
 const TierEntry* CuratedData::tierGreek(std::string_view key) const { return findByKey(tiersGrc_, key); }
 const EmojiEntry* CuratedData::emoji(std::string_view key) const { return findByKey(emoji_, key); }

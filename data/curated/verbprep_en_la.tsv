@@ -1,0 +1,36 @@
+# verb	prep	latin	frame	note
+# English verb + preposition -> Latin verb and what happens to the prepositional phrase (C2b; teacher-editable).
+# latin "-" keeps the verb's own translation. frame: obj (the PP object becomes the direct object), pp (the PP is
+# translated as usual), prep:<latin>+<case> (the verb fixes the Latin preposition). Prepositions are the canonical
+# English ones (the Spanish frame builder maps a -> to, en -> in, de -> of). Our own list.
+live	in	habitō	pp	"We live in a small house" -> In casā parvā habitāmus.
+live	at	habitō	pp	
+live	near	habitō	pp	
+live	with	habitō	pp	
+look	at	spectō	obj	"Look at the sky!" -> Spectā caelum!
+look	for	quaerō	obj	
+look	after	cūrō	obj	
+search	for	quaerō	obj	
+wait	for	exspectō	obj	"Wait for me" -> Exspectā mē.
+listen	to	audiō	obj	
+laugh	at	rīdeō	obj	
+ask	for	petō	obj	
+depend	on	pendeō	prep:ex+abl	"That depends on ..." -> pendet ex ...
+think	of	cōgitō	prep:dē+abl	
+think	about	cōgitō	prep:dē+abl	
+talk	about	loquor	prep:dē+abl	
+speak	about	loquor	prep:dē+abl	
+help	with	adiuvō	prep:in+abl	"Can you help me with the letter?" -> Potesne mē in epistulā adiuvāre?
+stare	at	-	obj	
+care	for	-	obj	
+hope	for	-	obj	
+pay	for	-	obj	
+call	for	-	obj	
+wish	for	-	obj	
+reach	for	-	obj	
+vivir	in	habitō	pp	Spanish: vivir en
+mirar	to	spectō	obj	Spanish: mirar a
+esperar	to	exspectō	obj	Spanish: esperar a
+buscar	to	-	obj	
+escuchar	to	-	obj	
+ver	to	-	obj	

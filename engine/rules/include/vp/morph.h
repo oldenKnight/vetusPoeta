@@ -73,7 +73,7 @@ uint32_t packedOf(const lex::Lexicon&, const lex::Analysis&);
 // True when gender `have` (a cell or lemma gender, possibly merged: MF, MN, FN, MFN, or 0) admits `want` (M/F/N).
 bool genderAdmits(uint8_t have, uint8_t want);
 // Display cleanup used everywhere a form is shown: NFC, anceps vowels (macron + breve on one vowel, "egō̆") shown
-// plain, and display_latin(macrons).
+// plain, combining tie bars / double breves (U+035C-0362, "de͡inde") dropped, and display_latin(macrons).
 std::string displayForm(std::string_view form, bool macrons);
 // Principal parts parsed from a lemma's `principal` line (both the Wiktionary head line "amō (present infinitive
 // amāre, perfect active amāvī, supine amātum); first conjugation" and the short "amō, amāre, amāvī, amātum").

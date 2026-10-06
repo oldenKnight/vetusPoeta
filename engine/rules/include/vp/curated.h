@@ -37,7 +37,10 @@ struct NameEntry {
 };
 
 // ---- tiers_la.tsv / tiers_grc.tsv ---------------------------------------------------------------------------------
-struct TierEntry { std::string key, head, pos, source, note; uint8_t tier = 0; };
+// `key` is latin_key(head) without the homograph digit of the file ("sero2" -> key "sero", homograph 2); key + pos is
+// the identity (serō verb "sow" vs sērō adv "late"). The note lists English glosses ("hole, pit"): the transfer stage
+// reads them as the teacher's own reverse index (glossTiers).
+struct TierEntry { std::string key, head, pos, source, note; uint8_t tier = 0; uint8_t homograph = 0; };
 // ---- emoji_la.tsv / emoji_grc.tsv --------------------------------------------------------------------------------
 struct EmojiEntry { std::string key, head, emoji, note; };
 // ---- periphrasis_la.tsv -----------------------------------------------------------------------------------------
@@ -52,6 +55,21 @@ struct PrepEntry {
 struct PhraseEntry { std::string pattern, latin, reg, note; uint8_t tier = 0; };
 struct PairEntry { std::string a, b; };                 // contractions (form, expansion), nonverbal (english, latin)
 struct GlossEsEntry { std::string key, head, glossEs; };
+// ---- macron_overrides.tsv (rules_la_notes.md decision 5) -------------------------------------------------------------
+struct MacronOverride { std::string key, from, to, note; };   // stems as NFC with macrons ("narr" -> "nārr")
+// ---- phrasal_en_la.tsv: English verb + particle -> Latin verb lemma + frame (C2b) --------------------------------------
+// particle "-" = the bare verb ("bow" -> inclīnō + refl). frame: "" (as the verb is), "refl" (adds the reflexive object:
+// "inclīnāte vōs"), "intr" (no object), "acc"/"dat"/"abl" (case of the object noun).
+struct PhrasalEntry { std::string verb, particle, latin, frame, note; };
+// ---- verbprep_en_la.tsv: English verb + preposition -> Latin verb + what happens to the PP (C2b) ---------------------
+// latin "-" = keep the verb's own translation. frame: "obj" (the PP object becomes the direct object: "wait for me" ->
+// exspectā mē), "pp" (the PP is translated as usual: "live in" -> habitō in + abl), "prep:<la>+<case>" (the verb fixes
+// the Latin preposition: "depend on" -> pendeō ex + abl; "help with" -> adiuvō in + abl).
+struct VerbPrepEntry { std::string verb, prep, latin, frame, note; std::string latinPrep; uint8_t prepCase = 0; };
+// ---- states_en_la.tsv: "be" + state adjective (or verb + state noun) with a person subject (C2b) ----------------------
+// kind "verb": the Latin verb replaces be + adjective ("afraid" -> timeō); kind "adj": the Latin adjective is the
+// predicate without a lexicon search ("tired" -> fessus sum). source may be two words ("tener miedo").
+struct StateEntry { std::string source, latin, kind, note; };
 
 // ---- order_la.txt -----------------------------------------------------------------------------------------------
 struct OrderRule {
@@ -77,6 +95,20 @@ class CuratedData {
   const Valency* valency(std::string_view key) const;
   const TierEntry* tier(std::string_view key) const;
   const TierEntry* tier(std::string_view key, std::string_view pos) const;   // pos as in the file ("verb", "adv")
+  const TierEntry* tier(std::string_view key, uint8_t latinPos) const;        // vp::feat::Pos of the lemma
+  // The tier that counts: the curated row of key + pos (teacher-editable, wins), else the lexicon's own tier, else 3.
+  uint8_t effectiveTier(std::string_view key, uint8_t latinPos, uint8_t lexiconTier) const;
+  // Tier rows whose note lists `english` (lower case, a whole comma-separated item) as a gloss: "hole" -> fovea.
+  void glossTiers(std::string_view english, std::vector<const TierEntry*>& out) const;
+  // File spelling of a vp::feat::Pos in tiers_la.tsv ("noun", "verb", "adj", "adv", ...); "" when not listed.
+  static const char* tierPos(uint8_t latinPos);
+  const MacronOverride* macronOverride(std::string_view key) const;
+  const PhrasalEntry* phrasal(std::string_view verb, std::string_view particle) const;
+  const VerbPrepEntry* verbPrep(std::string_view verb, std::string_view prep) const;
+  const StateEntry* state(std::string_view source) const;
+  const std::vector<PhrasalEntry>& phrasals() const { return phrasal_; }
+  const std::vector<VerbPrepEntry>& verbPreps() const { return verbPrep_; }
+  const std::vector<StateEntry>& states() const { return states_; }
   const TierEntry* tierGreek(std::string_view key) const;
   const EmojiEntry* emoji(std::string_view key) const;
   const EmojiEntry* emojiGreek(std::string_view key) const;
@@ -118,6 +150,11 @@ class CuratedData {
   std::vector<PairEntry> contractions_, nonverbal_;
   std::vector<GlossEsEntry> glossEs_;
   std::vector<OrderRule> order_;
+  std::vector<MacronOverride> macron_;
+  std::vector<PhrasalEntry> phrasal_;
+  std::vector<VerbPrepEntry> verbPrep_;
+  std::vector<StateEntry> states_;
+  std::vector<std::pair<std::string, uint32_t>> glossIndex_;   // note gloss -> index into tiers_, sorted
   std::vector<LoadWarning> warnings_;
 
   friend struct Loader;

@@ -601,6 +601,12 @@ struct LatinChecker::Impl {
         for (const Reading& h : rd[a])
           if (relOk(r) && isHead(h) && numberCompat(r.f.number, h.f.number) && genderCompat(r.f.gender, headGender(h)))
             ok = true;
+      // "ex eō quō īre vīs": an ablative relative right after an ablative antecedent (C2b)
+      for (const Reading& r : rd[i])
+        for (const Reading& h : rd[a])
+          if (isRelative(r) && r.f.case_ == Abl && h.f.case_ == Abl && isHead(h) && numberCompat(r.f.number, h.f.number) &&
+              genderCompat(r.f.gender, headGender(h)))
+            ok = true;
       // the antecedent may carry modifiers after it: look one more word back
       if (!ok && a > 0 && attached[a])
         for (const Reading& r : rd[i])
@@ -742,14 +748,11 @@ struct LatinChecker::Impl {
           if (rep.tokens[i].start >= h.start && rep.tokens[i].end <= h.end) hinted = h.lemma;
       for (const Reading& r : rd[i]) {
         if (hinted != lex::kNoLemma && r.lemma != hinted) continue;
-        uint8_t t = r.tier;
-        if (!t)
-          if (const curated::TierEntry* te = cd.tier(r.key)) t = te->tier;
-        if (!t) t = 3;
+        const uint8_t t = cd.effectiveTier(r.key, r.lpos, r.tier);
         best = std::min(best, t);
       }
       if (best == 9) {   // hinted lemma not among the readings: the best tier of any reading
-        for (const Reading& r : rd[i]) best = std::min<uint8_t>(best, r.tier ? r.tier : 3);
+        for (const Reading& r : rd[i]) best = std::min<uint8_t>(best, cd.effectiveTier(r.key, r.lpos, r.tier));
       }
       if (best != 9 && best > opt.tierCeiling)
         issue("A6", (int)i, "'" + T(i) + "' is tier " + std::to_string(best) + " (ceiling " +

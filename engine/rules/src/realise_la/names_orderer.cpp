@@ -140,6 +140,7 @@ Orderer::Orderer(const lex::Lexicon& lx, const curated::CuratedData& cd) {
   for (const std::string& q : cd.orderingList("order.adj", "quantity")) before.push_back(q);
   adjBefore_ = resolveWords(lx, before, {Adj, feat::Det, Pron, Num});
   timeAdv_ = resolveWords(lx, cd.orderingList("order.adv", "time adverbs"), {Adv});
+  degreeAdv_ = resolveWords(lx, cd.orderingList("order.neg.degree", "degree adverb"), {Adv});
   encliticCum_ = cd.orderingList("order.prep", "enclitic");
   std::sort(encliticCum_.begin(), encliticCum_.end());
 }
@@ -152,6 +153,7 @@ const std::vector<std::string>& Orderer::slots(std::string_view id) const {
 bool Orderer::connectorSecond(uint32_t l) const { return std::binary_search(connSecond_.begin(), connSecond_.end(), l); }
 bool Orderer::adjectiveBefore(uint32_t l) const { return std::binary_search(adjBefore_.begin(), adjBefore_.end(), l); }
 bool Orderer::timeAdverb(uint32_t l) const { return std::binary_search(timeAdv_.begin(), timeAdv_.end(), l); }
+bool Orderer::degreeAdverb(uint32_t l) const { return std::binary_search(degreeAdv_.begin(), degreeAdv_.end(), l); }
 bool Orderer::encliticCum(std::string_view k) const {
   return std::binary_search(encliticCum_.begin(), encliticCum_.end(), std::string(k));
 }

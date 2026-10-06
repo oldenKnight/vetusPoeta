@@ -90,6 +90,7 @@ void Phrasebook::build(const std::vector<curated::PhraseEntry>& entries,
         else if (k == "vp") e.kind = SlotKind::VP;
         else if (k == "adj") e.kind = SlotKind::Adj;
         else if (k == "num") e.kind = SlotKind::Num;
+        else if (k == "wh") e.kind = SlotKind::Wh;
         else { bad = true; break; }
         p.elems.push_back(std::move(e));
         continue;
@@ -152,6 +153,18 @@ bool Phrasebook::matchFrom(const std::vector<nlp::Token>& toks, const Pattern& p
     case SlotKind::Num:
       if (at < n && toks[(size_t)at].upos == "NUM") ends.push_back(at + 1);
       break;
+    case SlotKind::Wh: {   // a wh word, then the rest of the clause up to punctuation
+      static const char* const kWh[] = {"where", "what", "which", "who", "whom", "whose", "how", "when", "why",
+                                        "whether", "if", "dónde", "qué", "quién", "cómo", "cuándo", "cuál"};
+      bool wh = false;
+      if (at < n)
+        for (const char* w : kWh) wh = wh || toks[(size_t)at].lower == w;
+      if (!wh) break;
+      int k = at + 1;
+      while (k < n && !isPunct(toks[(size_t)k])) ++k;
+      ends.push_back(k);
+      break;
+    }
     case SlotKind::VP: {
       int k = at;
       bool verb = false;

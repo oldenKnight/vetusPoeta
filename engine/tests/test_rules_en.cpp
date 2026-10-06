@@ -20,6 +20,7 @@
 #include "vp/features.h"
 #include "vp/frame.h"
 #include "vp/lex.h"
+#include "vp/morph.h"
 #include "vp/nlp.h"
 #include "vp/realise_la.h"
 #include "vp/rules.h"
@@ -779,8 +780,8 @@ TEST_CASE("rules-en: end to end on own_dialogue.en.srt vs the gold Latin (report
   frame::FrameBuilder fb(frame::SrcLang::En, &real().pen, &real().en, cur());
   transfer::Transfer tr(real().la, cur());
   transfer::Settings st;
-  int matches = 0, t12 = 0, t12clean = 0;
-  std::map<std::string, int> conf;
+  int matches = 0, t12 = 0, t12clean = 0, exact = 0;
+  std::map<std::string, int> conf, checkWhy;
   std::ostringstream table;
   table << "| # | source | gold | ours | checks |\n|---|---|---|---|---|\n";
   int shown = 0;
@@ -789,9 +790,22 @@ TEST_CASE("rules-en: end to end on own_dialogue.en.srt vs the gold Latin (report
     CHECK_MESSAGE(!c.target.empty(), "empty target for cue " << i + 1);
     ++conf[confName(c.confidence)];
     const std::string ours = flat(c.target);
-    bool match = false;
-    for (const std::string& alt : splitAlt(gold[i])) match = match || norm(alt) == norm(ours);
+    bool match = false, exactMatch = false;
+    for (const std::string& alt : splitAlt(gold[i])) {
+      match = match || norm(alt) == norm(ours);
+      exactMatch = exactMatch || text::nfc(alt) == text::nfc(ours);
+    }
     matches += match;
+    exact += exactMatch;
+    if (c.confidence == rules::Confidence::Check) {   // why Check (C2b): flags and failed checks, else the margin
+      bool why = false;
+      for (const char* f : {"frame-fallback", "addressee-guess", "low-tier", "speaker-gender", "name-guessed",
+                            "from-rule", "missing-form", "merged", "tags-approximated", "song", "nonverbal"})
+        if (std::find(c.flags.begin(), c.flags.end(), f) != c.flags.end()) { ++checkWhy[f]; why = true; }
+      for (const auto& k : c.checks)
+        if (!k.ok) { ++checkWhy[k.id]; why = true; }
+      if (!why) ++checkWhy["margin < 0.15"];
+    }
     frame::SemSentence s;
     bool allT12 = true;
     for (const auto& ss : frame::mapSentences({in[i].sourceText})) {
@@ -831,7 +845,11 @@ TEST_CASE("rules-en: end to end on own_dialogue.en.srt vs the gold Latin (report
   rep << "Regression own_dialogue.en.srt -> Latin, fidelity 2, speaker f\n";
   rep << "match rate (normalised: NFC, macron/punctuation/case-insensitive, any gold alternative): " << matches
       << " / 114\n";
+  rep << "exact (macrons and punctuation too): " << exact << " / 114\n";
   rep << "confidence: ok " << conf["ok"] << ", check " << conf["check"] << ", fix " << conf["fix"] << "\n";
+  rep << "check because:";
+  for (const auto& w : checkWhy) rep << " " << w.first << " " << w.second << ";";
+  rep << "\n";
   rep << "cues with T1/T2 candidates for every content word: " << t12 << " (bracket-free: " << t12clean << ")\n\n";
   rep << "First " << shown << " mismatches:\n" << table.str() << "\nAll outputs:\n";
   for (size_t i = 0; i < 114; ++i)
@@ -841,6 +859,295 @@ TEST_CASE("rules-en: end to end on own_dialogue.en.srt vs the gold Latin (report
   MESSAGE("regression: " << matches << " / 114 match the gold; confidence ok " << conf["ok"] << " / check "
                          << conf["check"] << " / fix " << conf["fix"] << "; T1/T2 cues " << t12 << " (clean "
                          << t12clean << "); report " << (buildDir() / "regression_report.txt").string());
+}
+
+// ================================================================================================================
+// C2b (quality loop 1): curated tables, lexical selection, constructions, fallbacks, "you" number, tags, confidence.
+
+TEST_CASE("rules-c: curated loaders take the new tables and odd rows (warnings, never a failed load)") {
+  const curated::CuratedData& d = cur();
+  // the shipped tables
+  const curated::PhrasalEntry* ph = d.phrasal("go", "away");
+  REQUIRE(ph != nullptr);
+  CHECK(ph->latin == "abeō");
+  REQUIRE(d.phrasal("bow", "-") != nullptr);
+  CHECK(d.phrasal("bow", "-")->frame == "refl");
+  const curated::VerbPrepEntry* vp = d.verbPrep("depend", "on");
+  REQUIRE(vp != nullptr);
+  CHECK(vp->latinPrep == "ex");
+  CHECK(vp->prepCase == feat::Abl);
+  REQUIRE(d.verbPrep("help", "with") != nullptr);
+  CHECK(d.verbPrep("wait", "for")->frame == "obj");
+  REQUIRE(d.state("afraid") != nullptr);
+  CHECK(d.state("afraid")->kind == "verb");
+  CHECK(d.state("tired")->kind == "adj");
+  CHECK(d.state("tener miedo")->latin == "timeō");
+  REQUIRE(d.macronOverride("narro") != nullptr);
+  CHECK(d.macronOverride("narro")->to == "nārr");
+  // homograph rows: key without the digit, identity by key + part of speech
+  const curated::TierEntry* sow = d.tier("sero", (uint8_t)feat::Verb);
+  REQUIRE(sow != nullptr);
+  CHECK(sow->homograph == 2);
+  CHECK(sow->tier == 2);
+  const curated::TierEntry* late = d.tier("sero", (uint8_t)feat::Adv);
+  REQUIRE(late != nullptr);
+  CHECK(late->tier == 1);
+  CHECK(d.tier("sero", (uint8_t)feat::Noun) == nullptr);   // a homograph row of another pos does not apply
+  CHECK(d.tier("eo", (uint8_t)feat::Adv)->note == "thither");
+  CHECK(d.tier("eo", (uint8_t)feat::Verb)->tier == 1);
+  CHECK(d.effectiveTier("horologium", feat::Noun, 3) == 2);   // the curated tier wins over the lexicon's
+  CHECK(d.effectiveTier("no_such_word", feat::Noun, 0) == 3);
+  // teacher glosses from the tier notes
+  std::vector<const curated::TierEntry*> g;
+  d.glossTiers("hole", g);
+  REQUIRE(g.size() == 1);
+  CHECK(g[0]->key == "fouea");
+  d.glossTiers("dark", g);   // "darkness, the dark (plural)": article and parentheses dropped
+  REQUIRE(g.size() == 1);
+  CHECK(g[0]->key == "tenebrae");
+  for (const auto& w : d.warnings()) MESSAGE("curated warning: " << w.file << ":" << w.line << " " << w.message);
+
+  // a copy with the main agent's new row shapes and broken rows appended: warnings, never a failed load or a crash
+  const stdfs::path dir = stdfs::path(VP_TEST_TMP) / "curated_c2b";
+  std::error_code ec;
+  stdfs::remove_all(dir, ec);
+  stdfs::create_directories(dir, ec);
+  for (const auto& e : stdfs::directory_iterator(repo() / "data" / "curated"))
+    stdfs::copy_file(e.path(), dir / e.path().filename(), stdfs::copy_options::overwrite_existing, ec);
+  {
+    std::ofstream(dir / "phrasebook_en_la.tsv", std::ios::app)
+        << "what a {ADJ} {NP}\tquam {1} {2:nom}\t1\texcl\t\n"
+        << "bow\tinclīnāte vōs\t1\timp\tplural\n"
+        << "impossible\tfierī nōn potest\t1\tstate\t\n"
+        << "in latin\tLatīnē\t1\tadv\t\n"
+        << "broken {FOO} slot\tx {1}\t1\tq\t\n"
+        << "unbalanced (optional\tx\t1\tq\t\n"
+        << "bad tier\tx\tnine\tq\t\n"
+        << "no latin column\n";
+    std::ofstream(dir / "tiers_la.tsv", std::ios::app)
+        << "cum\tcum\tprep\t1\tderived\t\n"
+        << "ne\t-ne\tparticle\t1\tderived\tquestion enclitic\n"
+        << "hic\thīc\tadv\t1\tderived\there\n"
+        << "eo\teō\tadv\t1\tderived\tthither\n"
+        << "sero2\tserō\tverb\t2\tderived\tsow, plant (homograph of sērō adv)\n"
+        << "2\tdigit only\tnoun\t1\tderived\t\n"
+        << "x\tx\tnoun\tseven\tderived\t\n";
+    std::ofstream(dir / "phrasal_en_la.tsv", std::ios::app) << "go\taway\tabeō\tbogus\t\nlonely\n\tx\ty\t\t\n";
+    std::ofstream(dir / "verbprep_en_la.tsv", std::ios::app) << "x\ty\tz\tprep:nowhere\t\nx\ty\tz\tmaybe\t\nshort\n";
+    std::ofstream(dir / "states_en_la.tsv", std::ios::app) << "glad\tlaetus\tnoun\t\nonly\n";
+    std::ofstream(dir / "macron_overrides.tsv", std::ios::app) << "x\t\tnārr\t\n";
+  }
+  Result<curated::CuratedData> r = curated::CuratedData::load(dir);
+  REQUIRE(r.ok());
+  size_t warned = 0;
+  for (const auto& w : r.value().warnings())
+    if (w.line > 0 || w.message.find("duplicate") != std::string::npos) ++warned;
+  CHECK(warned >= 9);
+  CHECK(r.value().phrasal("go", "away")->latin == "abeō");   // the first row wins
+  CHECK(r.value().state("glad")->kind == "adj");
+  // the phrasebook compiles every odd pattern without a crash; the good ones still match
+  frame::Phrasebook pb;
+  pb.build(r.value().phrasebook(), r.value().contractions());
+  std::vector<nlp::Token> toks(4);
+  const char* w4[] = {"what", "a", "strange", "garden"};
+  const char* u4[] = {"PRON", "DET", "ADJ", "NOUN"};
+  for (int i = 0; i < 4; ++i) { toks[(size_t)i].text = toks[(size_t)i].lower = w4[i]; toks[(size_t)i].upos = u4[i]; }
+  frame::PhraseMatch m;
+  REQUIRE(pb.match(toks, 0, m));
+  CHECK(m.slots.size() == 2);
+  CHECK(m.slots[0].kind == frame::SlotKind::Adj);
+  CHECK(m.slots[1].kind == frame::SlotKind::NP);
+  stdfs::remove(dir / "states_en_la.tsv", ec);
+  Result<curated::CuratedData> r2 = curated::CuratedData::load(dir);
+  REQUIRE(!r2.ok());
+  CHECK(r2.error().hint.find("states_en_la.tsv") != std::string::npos);
+  stdfs::remove_all(dir, ec);
+}
+
+TEST_CASE("rules-c: lexical selection prefers core words of the right sense (fidelity 2) and the teacher's glosses") {
+  NEED_REAL();
+  transfer::Transfer tr(real().la, cur());
+  auto pick = [&](const char* w, uint8_t pos, int fid = 2) {
+    transfer::Settings st;
+    st.fidelity = fid;
+    transfer::Choice ch;
+    const uint32_t id = tr.select(w, pos, {}, false, false, st, ch);
+    return id == lex::kNoLemma ? std::string("-") : text::latin_key(real().la.lemma(id).head);
+  };
+  CHECK(pick("song", feat::Noun) == "carmen");
+  CHECK(pick("clock", feat::Noun) == "horologium");
+  CHECK(pick("smile", feat::Verb) == "rideo");
+  CHECK(pick("smile", feat::Verb, 1) == "subrideo");   // faithful mode keeps the exact word
+  CHECK(pick("hole", feat::Noun) == "fouea");
+  CHECK(pick("bottom", feat::Noun) == "imus");          // a taught adjective as a noun ("in īmō")
+  CHECK(pick("letter", feat::Noun) == "epistula");
+  CHECK(pick("dark", feat::Noun) == "tenebrae");
+  CHECK(pick("shake", feat::Verb) == "tremo");
+  CHECK(pick("strange", feat::Adj) == "mirus");
+  CHECK(pick("child", feat::Noun) == "puer");
+  CHECK(pick("help", feat::Verb) == "adiuuo");
+  CHECK(pick("plant", feat::Verb) == "sero");
+  CHECK(pick("paint", feat::Noun) == "color");
+  CHECK(pick("coat", feat::Noun) == "pallium");
+  CHECK(pick("rude", feat::Adj) == "inurbanus");
+  CHECK(pick("tea", feat::Noun) == "thea");             // not speciēs (a weak sense of "tea")
+  CHECK(pick("card", feat::Noun) == "charta");
+}
+
+namespace {
+struct Out { std::string text; rules::Confidence conf; std::vector<std::string> flags; std::vector<rules::Check> checks; };
+std::vector<Out> run(const std::vector<std::string>& src, char gender = 'f', int fidelity = 2) {
+  static std::unique_ptr<rules::Engine> e = engine();
+  std::vector<rules::CueInput> in;
+  for (size_t i = 0; i < src.size(); ++i) {
+    rules::CueInput c;
+    c.index = (uint32_t)i;
+    c.sourceText = src[i];
+    c.startMs = (int64_t)i * 4000;
+    c.endMs = c.startMs + 3500;
+    in.push_back(c);
+  }
+  rules::Options o;
+  o.speakerGender = gender;
+  o.fidelity = fidelity;
+  auto r = e->translate(in, o, rules::Context{}, nullptr, nullptr);
+  REQUIRE(r.ok());
+  std::vector<Out> out;
+  for (const auto& c : r.value()) out.push_back(Out{flat(c.target), c.confidence, c.flags, c.checks});
+  return out;
+}
+bool hasFlag(const Out& o, const char* f) { return std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end(); }
+}  // namespace
+
+TEST_CASE("rules-c: constructions of quality loop 1 (one sentence each)") {
+  NEED_REAL();
+  const std::pair<const char*, const char*> cases[] = {
+      {"Everyone bow!", "Omnēs, inclīnāte vōs!"},                      // phrasal_en_la.tsv bow - inclīnō refl
+      {"Bow!", "Inclīnā tē!"},                                          // one-word imperative retagged
+      {"Do you play cards?", "Lūdisne chartīs?"},                       // phrasebook vp row inside a clause
+      {"Which way should I go?", "Quā viā īre dēbeō?"},                 // route ablative
+      {"That depends on where you want to go.", "Id pendet ex eō quō īre vīs."},   // {WH} slot
+      {"Then it doesn't matter which way you go.", "Nihil igitur interest quā viā eās."},   // {WH} + subjunctive
+      {"You must be, or you wouldn't be here.", "Certē es; aliter hīc nōn essēs."},
+      {"I thought it was Monday.", "Putābam diem Lūnae esse."},
+      {"What day is it today?", "Quī diēs est hodiē?"},                 // order.wh.cop
+      {"Can you help me with the letter?", "Potesne mē in epistulā adiuvāre?"},   // verbprep help with
+      {"She is the Queen of Hearts.", "Rēgīna Cordium est."},           // 3rd-person pronoun dropped before a name
+      {"Sit down and tell me a story.", "Sedē et nārrā mihi fābulam."}, // macron override in the Macrons primitive
+      {"Have some tea.", "Sūme thēam."},
+      {"I don't know any songs.", "Nūllum carmen sciō."},               // nūllus + singular
+      {"Are you afraid of the dark?", "Timēsne tenebrās?"},             // states_en_la.tsv + plural-only noun
+      {"I believe six impossible things before breakfast.", "Sex rēs quae fierī nōn possunt ante ientāculum crēdō."},
+      {"The teacher is tired.", "Magister fessus est."},                // states_en_la.tsv kind adj
+      {"She's very small and very white.", "Valdē parva et valdē alba est."},   // one copula, coordinated predicates
+      {"Today the teacher was angry.", "Hodiē magister īrātus erat."},  // source starts with today
+      {"The teacher was angry today.", "Magister hodiē īrātus erat."},  // ... and does not
+      {"It's always six o'clock here.", "Semper hīc hōra sexta est."},
+      {"Here the cat always sleeps.", "Hīc fēlēs semper dormit."},      // source order of the adverbs
+      {"What a strange garden!", "Quam mīrus hortus!"},
+      {"We live in a small house near the river.", "In domō parvā prope flūmen habitāmus."},
+  };
+  for (const auto& c : cases) {
+    const std::vector<Out> o = run({c.first});
+    CHECK_MESSAGE(o[0].text == c.second, c.first << " -> " << o[0].text << " (expected " << c.second << ")");
+  }
+  // "child" in address follows the main character's gender
+  CHECK(run({"What is your name, child?"}, 'f')[0].text == "Quid est nōmen tibi, puella?");
+  CHECK(run({"What is your name, child?"}, 'm')[0].text == "Quid est nōmen tibi, puer?");
+  // an elliptical "where" takes the previous clause's motion
+  const auto e = run({"That depends on where you want to go.", "I don't much care where."});
+  CHECK(e[1].text == "Nōn multum cūrō quō.");
+  CHECK(e[1].conf == rules::Confidence::Check);   // the tagger missed the verb: a fallback
+  CHECK(hasFlag(e[1], "frame-fallback"));
+  // fallbacks are Check: buried clause, retag
+  CHECK(run({"I thought it was Monday."})[0].conf == rules::Confidence::Check);
+  CHECK(run({"You must be, or you wouldn't be here."})[0].conf == rules::Confidence::Check);
+}
+
+TEST_CASE("rules-c: parser-failure helpers and the split retry") {
+  CHECK(frame::FrameBuilder::splitPoints("You must be, or you wouldn't be here.") == std::vector<size_t>{13});
+  CHECK(frame::FrameBuilder::splitPoints("Sit down; tell me a story, and then go.") == std::vector<size_t>{10, 27});
+  CHECK(frame::FrameBuilder::splitPoints("Red, white and blue.").empty());
+  NEED_REAL();
+  frame::FrameBuilder fb(frame::SrcLang::En, &real().pen, &real().en, cur());
+  frame::SemSentence s;
+  fb.analyse("The cat could smile.", s);
+  CHECK(!frame::FrameBuilder::troubled(s));
+  CHECK(s.repairs.empty());
+  fb.analyse("I thought it was Monday.", s);
+  CHECK(std::find(s.repairs.begin(), s.repairs.end(), "clause-repair") != s.repairs.end());
+  // a troubled sentence with a split point is translated in pieces, joined with ";", and marked Check
+  fb.analyse("Well, the queen, and the cat sleeps.", s);
+  const auto o = run({"Well, the queen, and the cat sleeps."});
+  CHECK(!o[0].text.empty());
+  if (frame::FrameBuilder::troubled(s)) {
+    CHECK(o[0].conf != rules::Confidence::Ok);
+    CHECK(hasFlag(o[0], "frame-fallback"));
+  }
+}
+
+TEST_CASE("rules-c: \"you\" number from the reply and confidence of guesses and rare words") {
+  NEED_REAL();
+  const auto o = run({"Why are you painting the roses?", "We planted white roses by mistake."});
+  CHECK(o[0].text == "Cūr rosās pingitis?");
+  CHECK(o[0].conf == rules::Confidence::Check);
+  CHECK(hasFlag(o[0], "addressee-guess"));
+  CHECK(run({"Why are you painting the roses?"})[0].text == "Cūr rosās pingis?");   // no reply: singular
+  // fidelity 1 keeps subrīdeō, but a core word of the same sense existed: Check
+  const auto f1 = run({"The cat could smile."}, 'f', 1);
+  CHECK(f1[0].text == "Fēlēs subrīdēre poterat.");
+  CHECK(f1[0].conf == rules::Confidence::Check);
+  CHECK(hasFlag(f1[0], "low-tier"));
+  CHECK(run({"The cat could smile."}, 'f', 2)[0].conf == rules::Confidence::Ok);
+}
+
+TEST_CASE("rules-c: tag policy on CueInput.spans (A5 'tag position approximated' is Check, not Fix)") {
+  NEED_REAL();
+  auto e = engine();
+  auto cueFrom = [](uint32_t idx, const std::string& raw, subs::Format fmt) {
+    rules::CueInput c;
+    c.index = idx;
+    std::string plain;
+    for (const subs::Span& sp : subs::splitSpans(raw, fmt)) {
+      c.spans.push_back(rules::SpanIn{sp.kind == subs::Span::Tag, sp.raw});
+      if (sp.kind == subs::Span::Text) plain += sp.raw;
+    }
+    c.sourceText = plain;
+    c.startMs = idx * 4000;
+    c.endMs = c.startMs + 3500;
+    return c;
+  };
+  std::vector<rules::CueInput> in = {cueFrom(0, "<i>Where are you going?</i>", subs::Format::Srt),
+                                     cueFrom(1, "<i>Open the door, please.</i>", subs::Format::Srt),
+                                     cueFrom(2, "{\\an8}Who are you?", subs::Format::Ass),
+                                     cueFrom(3, "I don't <i>know</i>.", subs::Format::Srt)};
+  auto r = e->translate(in, rules::Options{}, rules::Context{}, nullptr, nullptr);
+  REQUIRE(r.ok());
+  auto a5 = [](const rules::CueOutput& c) {
+    for (const auto& k : c.checks)
+      if (k.id == "A5") return k;
+    return rules::Check{};
+  };
+  for (int i = 0; i < 3; ++i) {
+    CHECK_MESSAGE(a5(r.value()[(size_t)i]).ok, "cue " << i << ": " << a5(r.value()[(size_t)i]).detail);
+    CHECK(std::find(r.value()[(size_t)i].flags.begin(), r.value()[(size_t)i].flags.end(), "tags") !=
+          r.value()[(size_t)i].flags.end());
+  }
+  CHECK(r.value()[0].target == "Quō īs?");
+  const rules::CueOutput& part = r.value()[3];
+  CHECK(!a5(part).ok);
+  CHECK(a5(part).detail == "tag position approximated");
+  CHECK(part.confidence == rules::Confidence::Check);
+  CHECK(std::find(part.flags.begin(), part.flags.end(), "tags-approximated") != part.flags.end());
+}
+
+TEST_CASE("rules-c: displayForm drops tie bars; Macrons applies overrides (also capitalised)") {
+  CHECK(morph::displayForm("de\xCD\xA1inde", true) == "deinde");
+  curated::MacronOverride ov{"narro", "narr", "nārr", ""};
+  CHECK(realise::Macrons::apply("narrā", true, &ov) == "nārrā");
+  CHECK(realise::Macrons::apply("Narrā", true, &ov) == "Nārrā");
+  CHECK(realise::Macrons::apply("narrā", false, &ov) == "narra");
+  CHECK(realise::Macrons::apply("amō", true, nullptr) == "amō");
 }
 
 TEST_CASE("rules-en: RSS flat over 1,026 cues (the regression file 9 times)") {

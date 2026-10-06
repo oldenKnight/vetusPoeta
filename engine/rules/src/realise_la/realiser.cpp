@@ -130,6 +130,25 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
     w.unknown = true;
     w.rule = "unknown";
     out.push_back(std::move(w));
+  } else if (!n.fixed.empty()) {   // phrasebook Latin, written as it is ("chartīs lūdere": chartīs)
+    size_t fa = 0;
+    while (fa < n.fixed.size()) {
+      size_t fb = n.fixed.find(' ', fa);
+      if (fb == std::string::npos) fb = n.fixed.size();
+      if (fb > fa) {
+        Word w;
+        w.form = n.fixed.substr(fa, fb - fa);
+        morph::Token mt;
+        morph::analyseLatin(lx_, w.form, mt);
+        if (!mt.analyses.empty()) {
+          w.lemma = mt.analyses[0].lemma;
+          w.packed = morph::packedOf(lx_, mt.analyses[0]);
+        }
+        w.rule = "phrasebook";
+        out.push_back(std::move(w));
+      }
+      fa = fb + 1;
+    }
   } else {
     // pre-head: determiner, interrogative, numeral, quantity / demonstrative adjectives, contrastive possessive
     auto modifierWord = [&](uint32_t lemma, uint8_t degree, const char* rule) {
@@ -548,6 +567,31 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
       seq.insert(pos, sl);
     }
     seq.push_back(kEND);
+    // order.wh.cop: the copula comes second after an interrogative predicate ("Quī diēs est hodiē?", "Quis es?")
+    bool whPred = c.type == ClauseType::Wh && isSum && c.wh.role == Role::Predicate;
+    for (const LaNP& pn : c.predicative) whPred = whPred || (c.type == ClauseType::Wh && isSum && pn.interrogative != kNone);
+    if (whPred && !s[kV].empty() && !ctx.accInf) {
+      seq.erase(std::remove(seq.begin(), seq.end(), kV), seq.end());
+      const bool neg = std::find(seq.begin(), seq.end(), kNEG) != seq.end();
+      if (neg) seq.erase(std::remove(seq.begin(), seq.end(), kNEG), seq.end());
+      auto at = std::find(seq.begin(), seq.end(), kWH);
+      at = at == seq.end() ? seq.begin() : at + 1;
+      at = seq.insert(at, kV);
+      if (neg) seq.insert(at, kNEG);
+      orderRule = "order.wh.cop";
+    }
+    // order.neg.degree: nōn before a degree adverb that the negation scopes over ("Nōn multum cūrō")
+    if (!s[kNEG].empty() && !s[kADV].empty()) {
+      bool allDegree = true;
+      for (const Word& w : s[kADV]) allDegree = allDegree && w.lemma != kNone && order_.degreeAdverb(w.lemma);
+      if (allDegree) {
+        seq.erase(std::remove(seq.begin(), seq.end(), kNEG), seq.end());
+        auto adv = std::find(seq.begin(), seq.end(), kADV);
+        if (adv != seq.end()) seq.insert(adv, kNEG);
+        else seq.insert(std::find(seq.begin(), seq.end(), kV), kNEG);
+        orderRule = "order.neg.degree";
+      }
+    }
     // yes/no questions: nōnne / num first; otherwise -ne on the verb (or the focused word), moved first
     if (c.type == ClauseType::Yn && !nonne && c.bias != YnBias::ExpectNo) {
       const int host = focus >= 0 && !s[focus].empty() ? focus : !s[kV].empty() ? kV : -1;
@@ -625,7 +669,13 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
     if (sub.before) {
       if (!sw.empty()) sw.back().punctAfter = ",";
       append(before, sw);
-    } else append(after, sw);
+    } else {
+      if (!sub.sep.empty()) {   // "Certē es; aliter hīc nōn essēs"
+        if (!after.empty()) after.back().punctAfter = sub.sep;
+        else if (!clauseWords.empty()) clauseWords.back().punctAfter = sub.sep;
+      }
+      append(after, sw);
+    }
   }
   append(out, before);
   append(out, clauseWords);
@@ -638,8 +688,9 @@ void LatinRealiser::finish(const RealiseOptions& o, std::vector<Word>& words, La
     Word& w = words[i];
     if (i) out.text += ' ';
     rules::TokenView t;
-    t.display = Macrons::apply(w.form, true);
-    t.text = Macrons::apply(w.form, o.macrons);
+    const curated::MacronOverride* ov = w.lemma != kNone ? cd_.macronOverride(lx_.lemma(w.lemma).key) : nullptr;
+    t.display = Macrons::apply(w.form, true, ov);
+    t.text = Macrons::apply(w.form, o.macrons, ov);
     t.start = (int)out.text.size();
     out.text += t.text;
     t.end = (int)out.text.size();
@@ -647,9 +698,7 @@ void LatinRealiser::finish(const RealiseOptions& o, std::vector<Word>& words, La
       t.lemmaId = w.lemma;
       t.hasLemma = true;
       const lex::Lemma l = lx_.lemma(w.lemma);
-      t.tier = l.tier;
-      if (!t.tier)
-        if (const curated::TierEntry* te = cd_.tier(l.key)) t.tier = te->tier;
+      t.tier = cd_.effectiveTier(l.key, l.pos, l.tier);
     }
     t.features = featureView(w.packed);
     t.emoji = w.emoji;

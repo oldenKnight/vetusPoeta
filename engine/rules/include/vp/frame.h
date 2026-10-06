@@ -116,9 +116,16 @@ struct SemPredicate {
   std::string complementVerb;    // xcomp verb with the modal or catenative verb ("want to go": lemma=want, complement=go)
   int complementToken = -1;
   std::vector<int> auxTokens;
+  // A phrasebook row of register "vp" matched on this verb and its complements ("play cards" -> chartīs lūdere):
+  // the Latin (complement words + infinitive) replaces the verb and the complements the row covers.
+  std::string fixedLatin;
+  int fixedEntry = -1;
 };
 
-struct SemAdverb { std::string lemma; int token = -1; bool front = false; };
+struct SemAdverb {
+  std::string lemma; int token = -1; bool front = false;
+  bool ellipticWh = false;       // a clause-final wh word standing for an indirect question ("I don't care where")
+};
 
 struct SemSub;
 struct SemWh { std::string word; Role role = Role::None; int token = -1; };
@@ -152,13 +159,16 @@ struct SemFrame {
 struct SemSub { Relation relation = Relation::Cause; std::string marker; bool before = false; std::vector<SemFrame> frame; };
 
 // ---- phrasebook (§10.1 item 4) -------------------------------------------------------------------------------------
-enum class SlotKind : uint8_t { NP, Name, VP, Adj, Num };
+// WH: a wh word and the rest of its clause ("that depends on {WH}" -> "where you want to go"), realised as an
+// indirect question; the Latin side may ask for the subjunctive with {1:subj}.
+enum class SlotKind : uint8_t { NP, Name, VP, Adj, Num, Wh };
 struct PhraseSlot {
   SlotKind kind = SlotKind::NP;
   int first = 0, last = 0;       // token range [first, last]
   SemNP np;                      // NP / NAME / NUM slots
   std::vector<SemFrame> vp;      // VP slot: the clause frame (no subject)
   SemAdj adj;                    // ADJ slot
+  std::vector<SemFrame> wh;      // WH slot: the clause (type wh)
 };
 struct PhraseMatch {
   int entry = -1;                // index into CuratedData::phrasebook()
@@ -206,7 +216,12 @@ struct SemSentence {
   std::vector<Unit> units;
   std::string finalPunct;               // ".", "?", "!", "...", "" (from the source)
   bool question = false;
-  void clear() { text.clear(); tokens.clear(); drop.clear(); units.clear(); finalPunct.clear(); question = false; }
+  // Fallbacks the analysis used (confidence Check, DESIGN 10.4): "retag" (a verb the tagger missed), "reroot"
+  // (a clause hung on a noun), "clause-repair" (a clause buried under an adverb/oblique relabelled), "split"
+  // (re-analysed as separate clauses), "simplified" (discourse words dropped), "no-verb" (a fragment with a verb).
+  std::vector<std::string> repairs;
+  void clear() { text.clear(); tokens.clear(); drop.clear(); units.clear(); finalPunct.clear(); question = false;
+                 repairs.clear(); }
 };
 
 // ---- frame builder -----------------------------------------------------------------------------------------------------
@@ -218,6 +233,12 @@ class FrameBuilder {
 
   // Full analysis of one sentence.
   void analyse(std::string_view sentence, SemSentence& out) const;
+  // Parser-failure test (C2b): a clause unit without a predicate although the unit holds a verb, a fragment made of
+  // a verb, or a dependent clause the parser could not attach. The engine then retries on simpler pieces.
+  static bool troubled(const SemSentence& s);
+  // Split points for that retry: byte offsets in the sentence where a new clause starts after ", or" / ", and" /
+  // ", but" / ";" (the conjunction stays with the second piece). Empty when there is none.
+  static std::vector<size_t> splitPoints(std::string_view sentence);
 
   // Pieces (exposed for tests).
   // Tokenise + contraction expansion; every expanded token keeps the byte range of the original word.
@@ -233,6 +254,7 @@ class FrameBuilder {
   void buildClause(Ctx& c, int head, SemFrame& f) const;
   void buildNP(Ctx& c, int head, SemNP& np) const;
   void fillSlot(Ctx& c, PhraseSlot& slot) const;
+  void repairTree(SemSentence& s) const;
 
   SrcLang lang_;
   const nlp::Pipeline* nlp_;

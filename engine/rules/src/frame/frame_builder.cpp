@@ -505,7 +505,11 @@ struct FrameBuilder::Ctx {
   std::vector<SemOblique>* lifted = nullptr;  // obliques lifted out of NPs of the clause being built
   std::vector<SemAdverb>* liftedAdv = nullptr;
   bool question = false;
+  std::vector<PhraseMatch> vpHits;            // phrasebook rows of register "vp" (verb + complements)
   explicit Ctx(SemSentence& ss) : s(ss) {}
+  void repair(const char* what) {
+    if (std::find(s.repairs.begin(), s.repairs.end(), what) == s.repairs.end()) s.repairs.emplace_back(what);
+  }
   const Token& t(int i) const { return s.tokens[(size_t)i]; }
   bool ok(int i) const { return i >= 0 && i < (int)s.tokens.size() && !consumed[(size_t)i]; }
   bool free(int i) const { return ok(i) && !taken[(size_t)i]; }
@@ -850,6 +854,7 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       const bool finite = vf == nlp::morph::VfFin || (tt != 0 && vf != nlp::morph::VfPart);
       if (!timeRoot && (subj || relPron || !finite || k < h)) continue;
       if (timeRoot && !subj) continue;
+      c.repair("reroot");
       if (!timeRoot) {
         const char keep = c.consumed[(size_t)k];
         c.consumed[(size_t)k] = 1;
@@ -1103,6 +1108,21 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     f.type = Kind::Decl;
   }
 
+  // phrasebook "vp" rows ("play cards" -> chartīs lūdere): the row starts at the predicate verb; the tokens it covers
+  // are not analysed further (the transfer stage uses the row's Latin)
+  if (verbal && f.pred.token >= 0)
+    for (const PhraseMatch& m : c.vpHits)
+      if (m.first == f.pred.token && m.slots.empty()) {
+        f.pred.fixedLatin = m.latin;
+        f.pred.fixedEntry = m.entry;
+        for (int k = m.first + 1; k <= m.last; ++k) {
+          c.take(k);
+          c.drop(k, Drop::Phrase);
+          if (k == obj) obj = -1;
+        }
+        break;
+      }
+
   // ---- subject -------------------------------------------------------------------------------------------------------
   if (nsubj >= 0) {
     // an "nsubj" with its own preposition is an oblique the parser misread ("Behind the door was a garden")
@@ -1342,8 +1362,20 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
         f.wh.token = k;
         continue;
       }
+      // a clause-final wh word after the verb ("I don't much care where."): an elliptical indirect question
+      if (in(kl, {"where", "when", "why", "how"}) && k > h && f.hasPred && !c.question && c.kids[(size_t)k].empty()) {
+        bool last = true;
+        for (int x : f.tokens)
+          if (x > k && !isPunctTok(c.t(x))) last = false;
+        if (last) {
+          addAdverb(k);
+          f.adverbs.back().ellipticWh = true;
+          continue;
+        }
+      }
       if (en && particleWord(kl) && f.hasPred && f.pred.particle.empty() && k > h && c.kids[(size_t)k].empty()) {
         f.pred.particle = kl;
+        c.drop(k, Drop::Particle);   // accounted for by the phrasal verb (A7)
         continue;
       }
       // "then" / "so" at the start of the clause: connector
@@ -1446,7 +1478,10 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       }
       continue;
     }
-    if (d == "nsubj" || d == "csubj") continue;   // a second subject: ignored (A7 reports it)
+    if (d == "nsubj" || d == "csubj") {   // a second subject: ignored (A7 reports it), an expletive "it" is dropped
+      if (kl == "it" && (f.copula || f.hasSubject)) c.drop(k, Drop::Marker);
+      continue;
+    }
   }
   // lifted obliques and adverbs from NPs
   for (SemOblique& o : lifted) f.obliques.push_back(o);
@@ -1648,6 +1683,40 @@ void FrameBuilder::fillSlot(Ctx& c, PhraseSlot& slot) const {
       slot.vp.push_back(f);
       break;
     }
+    case SlotKind::Wh: {
+      // "which way you go": the parser hangs the clause on the noun as an acl; the noun is the verb's object
+      if (c.t(head).upos == "NOUN")
+        for (int k : std::vector<int>(c.kids[(size_t)head])) {
+          if (!c.ok(k) || c.dep(k) != "acl" || c.t(k).upos != "VERB") continue;
+          auto& hk = c.kids[(size_t)head];
+          hk.erase(std::remove(hk.begin(), hk.end(), k), hk.end());
+          c.par[(size_t)k] = c.par[(size_t)head];
+          c.par[(size_t)head] = k;
+          auto& kk = c.kids[(size_t)k];
+          kk.insert(std::lower_bound(kk.begin(), kk.end(), head), head);
+          c.s.tokens[(size_t)head].deprel = "obj";
+          head = k;
+          break;
+        }
+      SemFrame f;
+      const bool q = c.question;
+      c.question = true;   // an indirect question: wh words are interrogative
+      buildClause(c, head, f);
+      c.question = q;
+      const std::string w = c.t(slot.first).lower;
+      if (f.type != Kind::Wh && in(w, {"where", "when", "why", "how", "dónde", "cuándo", "cómo"})) {
+        f.type = Kind::Wh;
+        f.wh.word = w == "dónde" ? "where" : w == "cuándo" ? "when" : w == "cómo" ? "how" : w;
+        f.wh.role = Role::Adverb;
+        f.wh.token = slot.first;
+        f.adverbs.erase(std::remove_if(f.adverbs.begin(), f.adverbs.end(),
+                                       [&](const SemAdverb& a) { return a.token == slot.first; }),
+                        f.adverbs.end());
+      }
+      if (f.type == Kind::Yn) f.type = Kind::Decl;
+      slot.wh.push_back(f);
+      break;
+    }
   }
   c.consumed = keep;
 }
@@ -1713,6 +1782,15 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
       for (int k = m.first; k <= m.last; ++k) {
         const int p = c.par[(size_t)k];
         if (p < m.first || p > m.last) { top = k; break; }
+      }
+      if (e.reg == "vp") {   // a verb phrase inside a clause: handled by the clause builder
+        m.pattern = e.pattern;
+        m.latin = e.latin;
+        m.reg = e.reg;
+        m.tier = e.tier;
+        c.vpHits.push_back(std::move(m));
+        i = c.vpHits.back().last + 1;
+        continue;
       }
       const std::string topDep = s.tokens[(size_t)top].deprel;
       const bool prefixOk = e.reg == "adv" || e.reg == "narr" ||
@@ -1816,6 +1894,88 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
   }
 }
 
+// A clause the parser buried under a non-clausal dependent of a verb: "I thought it was Monday." (Monday = obl of
+// thought, with its own nsubj + cop) -> ccomp; "You must be, or you wouldn't be here." (here = advmod of the first
+// "be", carrying cc + nsubj + cop of the second clause) -> conj.
+void FrameBuilder::repairTree(SemSentence& s) const {
+  std::vector<nlp::Token>& tk = s.tokens;
+  const int n = (int)tk.size();
+  // "Here the cat always sleeps.": a fronted adverb made the root, the real clause hung on it as advcl -> the verb is
+  // the root, the adverb its (fronted) advmod
+  for (int r = 0; r < n; ++r) {
+    if (tk[(size_t)r].head != 0 || tk[(size_t)r].upos != "ADV") continue;
+    int v = -1;
+    for (int j = 0; j < n; ++j)
+      if (tk[(size_t)j].head == r + 1 && tk[(size_t)j].upos == "VERB" && j > r &&
+          in(tk[(size_t)j].deprel, {"advcl", "parataxis", "ccomp"})) { v = j; break; }
+    if (v < 0) continue;
+    bool mark = false, subj = false;
+    for (int j = 0; j < n; ++j)
+      if (tk[(size_t)j].head == v + 1) {
+        mark = mark || tk[(size_t)j].deprel == "mark";
+        subj = subj || tk[(size_t)j].deprel == "nsubj";
+      }
+    if (mark || !subj) continue;
+    for (int j = 0; j < n; ++j)
+      if (tk[(size_t)j].head == r + 1 && j != v) tk[(size_t)j].head = v + 1;
+    tk[(size_t)v].head = 0;
+    tk[(size_t)v].deprel = "root";
+    tk[(size_t)r].head = v + 1;
+    tk[(size_t)r].deprel = "advmod";
+    s.repairs.emplace_back("reroot");
+    break;
+  }
+  for (int i = 0; i < n; ++i) {
+    nlp::Token& d = tk[(size_t)i];
+    if (!in(d.deprel, {"obl", "obj", "advmod", "nmod", "amod"})) continue;
+    const int p = d.head - 1;
+    if (p < 0 || p >= n || (tk[(size_t)p].upos != "VERB" && tk[(size_t)p].upos != "AUX")) continue;
+    bool subj = false, verbal = false, cc = false;
+    for (int j = 0; j < n; ++j) {
+      if (tk[(size_t)j].head != i + 1) continue;
+      const std::string& r = tk[(size_t)j].deprel;
+      subj = subj || r == "nsubj";
+      verbal = verbal || r == "cop" || r == "aux";
+      cc = cc || r == "cc";
+    }
+    if (!subj || !verbal) continue;
+    d.deprel = cc ? "conj" : "ccomp";
+    if (std::find(s.repairs.begin(), s.repairs.end(), "clause-repair") == s.repairs.end())
+      s.repairs.emplace_back("clause-repair");
+  }
+}
+
+bool FrameBuilder::troubled(const SemSentence& s) {
+  for (const Unit& u : s.units) {
+    if (u.type != Unit::Clause || u.vocative) continue;
+    bool verb = false;
+    for (int k = u.first; k <= u.last && k < (int)s.tokens.size(); ++k)
+      if (s.tokens[(size_t)k].upos == "VERB" && s.drop[(size_t)k] == Drop::No) verb = true;
+    if (verb && (!u.frame.hasPred || u.frame.type == Kind::Frag)) return true;
+  }
+  return false;
+}
+
+std::vector<size_t> FrameBuilder::splitPoints(std::string_view t) {
+  std::vector<size_t> out;
+  for (size_t i = 0; i + 1 < t.size(); ++i) {
+    if (t[i] == ';') {
+      size_t j = i + 1;
+      while (j < t.size() && t[j] == ' ') ++j;
+      if (j < t.size()) out.push_back(j);
+      continue;
+    }
+    if (t[i] != ',') continue;
+    size_t j = i + 1;
+    while (j < t.size() && t[j] == ' ') ++j;
+    for (const char* c : {"or ", "and ", "but ", "o ", "y ", "pero "}) {
+      const size_t m = std::strlen(c);
+      if (t.substr(j, m) == c) { out.push_back(j); break; }
+    }
+  }
+  return out;
+}
+
 void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
   out.clear();
   out.lang = lang_;
@@ -1842,14 +2002,20 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
     int fix = -1;
     uint32_t feats = 0;
     if (!verb) {
-      // "He does not like fish": the word after do + not
-      for (int i = 2; i < n && fix < 0; ++i)
-        if ((tk[(size_t)i - 1].lower == "not" || tk[(size_t)i - 1].lower == "n't") &&
-            in(tk[(size_t)i - 2].lower, {"do", "does", "did"}) && tk[(size_t)i].upos != "VERB" &&
+      // "He does not like fish": the word after do + not; "I don't much care": one degree adverb in between
+      for (int i = 2; i < n && fix < 0; ++i) {
+        int j = i - 1;
+        const bool degree = in(tk[(size_t)j].lower, {"much", "really", "even", "ever", "always", "just", "quite"});
+        if (degree) --j;
+        if (j < 1) continue;
+        if ((tk[(size_t)j].lower == "not" || tk[(size_t)j].lower == "n't") &&
+            in(tk[(size_t)j - 1].lower, {"do", "does", "did"}) && tk[(size_t)i].upos != "VERB" &&
             verbReading(tk[(size_t)i])) {
           fix = i;
           feats = nlp::morph::fromString("VerbForm=Inf");
+          if (degree) { tk[(size_t)i - 1].upos = "ADV"; tk[(size_t)i - 1].feats = 0; }
         }
+      }
     }
     if (!verb && fix < 0) {
       if ((tk[1].upos == "DET" || tk[1].upos == "PRON") && verbReading(tk[0])) {
@@ -1871,6 +2037,29 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
       tk[(size_t)fix].upos = "VERB";
       tk[(size_t)fix].feats = feats;
       nlp_->parser().parse(tk);
+      out.repairs.emplace_back("retag");
+    }
+  }
+  if (nlp_) repairTree(out);
+  // "Bow!": a one-word exclamation tagged as an interjection that the lexicon knows as a verb -> imperative
+  if (nlp_ && lex_ && lang_ == SrcLang::En) {
+    int words = 0, w0 = -1;
+    for (int i = 0; i < n; ++i)
+      if (tk[(size_t)i].upos != "PUNCT") { ++words; if (w0 < 0) w0 = i; }
+    if (words == 1 && tk[(size_t)w0].upos == "INTJ" && sentence.find('!') != std::string_view::npos) {
+      std::vector<lex::Analysis> an;
+      lex_->lookup(text::en_key(tk[(size_t)w0].lower), an);
+      bool verb = false;
+      for (const lex::Analysis& a : an) verb = verb || lex_->lemma(a.lemma).pos == feat::Verb;
+      const bool realIntj = in(tk[(size_t)w0].lower, {"oh", "ah", "hey", "wow", "alas", "ouch", "ow", "hello", "hi", "bye",
+                                                      "yes", "no", "please", "ok", "okay", "well", "hooray", "hurrah",
+                                                      "ugh", "eh", "goodbye", "thanks", "bravo", "hush", "boo"});
+      if (verb && !realIntj) {
+        tk[(size_t)w0].upos = "VERB";
+        tk[(size_t)w0].feats = nlp::morph::fromString("VerbForm=Fin|Mood=Imp");
+        nlp_->parser().parse(tk);
+        out.repairs.emplace_back("retag");
+      }
     }
   }
   // Spanish: a sentence-initial verb that carried enclitics ("Dámelo") is an imperative when the lexicon has one

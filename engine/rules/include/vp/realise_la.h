@@ -54,6 +54,7 @@ struct LaNP {
   std::vector<LaNP> coord;        // further conjuncts: "X et Y"
   bool coordQue = false;          // enclitic.que: "pater māterque" (flexible mode only)
   std::string literal;            // unknown source word, kept verbatim (marked unknown)
+  std::string fixed;              // ready Latin words from the phrasebook ("chartīs"): written as they are (C2b)
 };
 
 struct LaOblique { uint32_t prep = kNone; uint8_t case_ = 0; LaNP np; bool front = false; };
@@ -71,6 +72,7 @@ struct LaSub {
   SubRel rel = SubRel::Cause;
   uint32_t conj = kNone;           // explicit conjunction lemma (default by relation: quia, cum, sī, ut, et ...)
   bool before = false;             // order.sub.pre: before the main clause when the source puts it first
+  std::string sep;                 // punctuation between the main clause and a following sub ("; aliter ...") (C2b)
   std::vector<LaClause> clause;    // exactly one
 };
 
@@ -195,10 +197,11 @@ class Orderer {
   bool connectorSecond(uint32_t lemma) const;
   bool adjectiveBefore(uint32_t lemma) const;    // demonstratives, quantity words (order.adj)
   bool timeAdverb(uint32_t lemma) const;         // order.adv
+  bool degreeAdverb(uint32_t lemma) const;       // order.neg.degree (multum, valdē ...: nōn goes before them)
   bool encliticCum(std::string_view latinKey) const;
  private:
   std::vector<std::pair<std::string, std::vector<std::string>>> templates_;
-  std::vector<uint32_t> connSecond_, adjBefore_, timeAdv_;
+  std::vector<uint32_t> connSecond_, adjBefore_, timeAdv_, degreeAdv_;
   std::vector<std::string> encliticCum_;
   std::vector<std::string> empty_;
 };
@@ -225,7 +228,12 @@ class Pronouns {
 };
 
 // Display: macrons on/off and anceps cleanup (morph::displayForm); sentence capital; final punctuation.
-struct Macrons { static std::string apply(std::string_view form, bool macrons); };
+// With a macron override (data/curated/macron_overrides.tsv, rules_la_notes.md decision 5) the stem is replaced first
+// ("narrā" -> "nārrā", also capitalised); combining tie bars and double breves are dropped (morph::displayForm).
+struct Macrons {
+  static std::string apply(std::string_view form, bool macrons);
+  static std::string apply(std::string_view form, bool macrons, const curated::MacronOverride* override_);
+};
 struct Punctuation {
   static std::string finalMark(const LaClause&);
   static void capitaliseFirst(std::string& text);

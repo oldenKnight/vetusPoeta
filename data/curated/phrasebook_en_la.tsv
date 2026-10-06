@@ -118,7 +118,6 @@ watch out	cavē	1	imp
 take care	cūrā ut valeās	1	imp	
 don't worry	nōlī timēre	1	imp	
 never mind	nihil est	1	answer	
-it doesn't matter	nihil est	1	answer	
 no matter	nihil est	1	answer	
 of course not	minimē	1	answer	
 that's right	rēctē dīcis	1	answer	
@@ -183,7 +182,6 @@ ladies and gentlemen	dominae ac dominī	1	address
 pass me {NP}	dā mihi {1:acc}	1	imp	
 hand me {NP}	dā mihi {1:acc}	1	imp	
 play cards	chartīs lūdere	1	vp	do you play cards -> Lūdisne chartīs?
-bow	inclīnāte vōs	1	imp	plural; singular inclīnā tē
 this is impossible	hoc fierī nōn potest	1	state	
 that is impossible	id fierī nōn potest	1	state	
 impossible	fierī nōn potest	1	state	as a one-word reply
@@ -198,3 +196,9 @@ in latin	Latīnē	1	adv
 in greek	Graecē	1	adv	
 in english	Anglicē	1	adv	
 in spanish	Hispānicē	1	adv	
+that depends on {WH}	id pendet ex eō {1}	1	state	{WH}: indirect question ("where you want to go" -> quō īre vīs)
+it depends on {WH}	id pendet ex eō {1}	1	state	
+that depends	id pendet	1	answer	
+it depends	id pendet	1	answer	
+it doesn't matter {WH}	nihil interest {1:subj}	1	state	"it doesn't matter which way you go" -> nihil interest quā viā eās
+it does not matter {WH}	nihil interest {1:subj}	1	state	

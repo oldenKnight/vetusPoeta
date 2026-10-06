@@ -109,29 +109,6 @@ void rewriteTokens(cue::Latin& l, const std::vector<std::string>& texts) {
   l.text = std::move(out);
 }
 
-struct MacronOverride { std::string key, from, to; };
-
-std::vector<MacronOverride> loadOverrides(const stdfs::path& file) {
-  std::vector<MacronOverride> out;
-  std::ifstream in(file);
-  std::string line;
-  while (std::getline(in, line)) {
-    if (line.empty() || line[0] == '#') continue;
-    if (!line.empty() && line.back() == '\r') line.pop_back();
-    std::vector<std::string> c;
-    size_t a = 0;
-    for (;;) {
-      size_t b = line.find('\t', a);
-      c.push_back(line.substr(a, b == std::string::npos ? std::string::npos : b - a));
-      if (b == std::string::npos) break;
-      a = b + 1;
-    }
-    if (c.size() >= 3 && !c[0].empty() && !c[1].empty())
-      out.push_back(MacronOverride{c[0], text::nfc(c[1]), text::nfc(c[2])});
-  }
-  return out;
-}
-
 // What one sentence produced.
 struct SentOut {
   cue::Latin latin;
@@ -221,7 +198,6 @@ class RulesEngine final : public Engine {
       Result<curated::CuratedData> r = curated::CuratedData::load(p);
       if (!r.ok()) { last = r.error(); continue; }
       cd_ = std::make_unique<curated::CuratedData>(std::move(r.value()));
-      overrides_ = loadOverrides(p / "macron_overrides.tsv");
       return Result<void>();
     }
     return Result<void>(last);
@@ -258,30 +234,12 @@ class RulesEngine final : public Engine {
   }
 
   // ---- display ------------------------------------------------------------------------------------------------------
-  // Macron overrides (data/curated/macron_overrides.tsv) and the macrons option on every token.
+  // The macrons option on every token (overrides and tie bars are applied by realise::Macrons when the form is made).
   void display(cue::Latin& l, bool macrons) const {
     std::vector<std::string> texts;
     texts.reserve(l.tokens.size());
     for (rules::TokenView& t : l.tokens) {
-      std::string d = t.display.empty() ? t.text : t.display;
-      if (t.hasLemma && !overrides_.empty()) {
-        const lex::Lemma lm = la_->lemma(t.lemmaId);
-        for (const MacronOverride& o : overrides_) {
-          if (lm.key != o.key) continue;
-          std::string low = d;
-          decapitalise(low);
-          if (low.compare(0, o.from.size(), o.from) == 0) {
-            const bool cap = low != d;
-            d = o.to + low.substr(o.from.size());
-            if (cap) capitalise(d);
-          }
-        }
-      }
-      // combining marks the reader does not show (tie bar of "de͡inde", double breves)
-      for (const char* m : {"\xCD\x9C", "\xCD\x9D", "\xCD\x9E", "\xCD\x9F", "\xCD\xA0", "\xCD\xA1", "\xCD\xA2"}) {
-        size_t at;
-        while ((at = d.find(m)) != std::string::npos) d.erase(at, 2);
-      }
+      const std::string d = t.display.empty() ? t.text : t.display;
       t.display = d;
       texts.push_back(macrons ? d : text::display_latin(d, false));
     }
@@ -315,13 +273,24 @@ class RulesEngine final : public Engine {
     t.text = word;
     t.display = word;
     if (!mt.analyses.empty()) {
-      const lex::Analysis& a = mt.analyses[0];
+      // the reading of the best tier ("es" = sum, not the letter S; "mē" = ego), first one on ties
+      size_t best = 0;
+      uint8_t bestTier = 9;
+      for (size_t i = 0; i < mt.analyses.size(); ++i) {
+        const lex::Lemma l = la_->lemma(mt.analyses[i].lemma);
+        const uint8_t tr = cd_->effectiveTier(l.key, l.pos, l.tier);
+        if (tr < bestTier) { bestTier = tr; best = i; }
+      }
+      const lex::Analysis& a = mt.analyses[best];
       t.lemmaId = a.lemma;
       t.hasLemma = true;
       t.features = realise::featureView(morph::packedOf(*la_, a));
       const lex::Lemma l = la_->lemma(a.lemma);
-      t.tier = l.tier;
+      t.tier = cd_->effectiveTier(l.key, l.pos, l.tier);
     }
+    if (t.hasLemma)   // phrasebook words get the reader's vowel quantities too (macron_overrides.tsv)
+      if (const curated::MacronOverride* ov = cd_->macronOverride(la_->lemma(t.lemmaId).key))
+        t.text = t.display = realise::Macrons::apply(word, true, ov);
   }
 
   // Phrasebook piece: the Latin template with its slots realised.
@@ -368,7 +337,23 @@ class RulesEngine final : public Engine {
         transfer::ClauseOut co;
         cue::Latin piece;
         std::vector<Reason> pr;
-        if (sl.kind == frame::SlotKind::VP) {
+        if (sl.kind == frame::SlotKind::Wh) {
+          // an indirect question ("that depends on {WH}" -> id pendet ex eō quō īre vīs); {1:subj} asks for the
+          // subjunctive ("nihil interest quā viā eās")
+          if (sl.wh.empty()) continue;
+          xfer_->clause(sl.wh[0], s, st, mem, co);
+          if (cs == "subj") co.clause.pred.mood = feat::Subjunctive;
+          co.clause.punct = ".";
+          realiseClause(co.clause, opt, piece, pr, flags);
+          for (const std::string& f : co.flags) addFlag(flags, f);
+          if (!piece.tokens.empty()) {
+            std::vector<std::string> tx;
+            for (const auto& t : piece.tokens) tx.push_back(t.text);
+            decapitalise(tx[0]);
+            rewriteTokens(piece, tx);
+            decapitalise(piece.tokens[0].display);
+          }
+        } else if (sl.kind == frame::SlotKind::VP) {
           if (sl.vp.empty()) continue;
           xfer_->clause(sl.vp[0], s, st, mem, co);
           realise::LaClause main;
@@ -393,6 +378,13 @@ class RulesEngine final : public Engine {
             a.lemma = id;
             fc.predAdj.push_back(a);
             realiseClause(fc, opt, piece, pr, flags);
+            if (!piece.tokens.empty()) {   // a slot inside a phrase: no sentence capital ("Quam mīrus hortus")
+              std::vector<std::string> tx;
+              for (const auto& t : piece.tokens) tx.push_back(t.text);
+              decapitalise(tx[0]);
+              rewriteTokens(piece, tx);
+              decapitalise(piece.tokens[0].display);
+            }
           } else {
             co.unknownWords.push_back(sl.adj.lemma);
           }
@@ -445,9 +437,9 @@ class RulesEngine final : public Engine {
       cue::Latin one;
       rules::TokenView t;
       tokenInfo(w, t);
-      one.text = w + punct;
+      one.text = t.text + punct;
       t.start = 0;
-      t.end = (int)w.size();
+      t.end = (int)t.text.size();
       one.tokens.push_back(t);
       cue::append(out, one);
     }
@@ -460,10 +452,85 @@ class RulesEngine final : public Engine {
   }
 
   // ---- one sentence ---------------------------------------------------------------------------------------------------
+  // Parser-failure fallback (C2b): the sentence split at ", or" / ", and" / ";" and each piece translated on its own,
+  // joined with ";"; Check.
+  void speechSplit(const std::string& text, const std::vector<size_t>& pts, const frame::FrameBuilder& fb,
+                   const Options& opt, const Context& ctx, transfer::Memory& mem, const transfer::Settings& st,
+                   SentOut& so) {
+    std::vector<size_t> cuts = pts;
+    cuts.push_back(text.size());
+    size_t a = 0;
+    for (size_t cut : cuts) {
+      std::string part = text.substr(a, cut - a);
+      while (!part.empty() && (part.back() == ' ' || part.back() == ',' || part.back() == ';')) part.pop_back();
+      const size_t off = a;
+      a = cut;
+      if (part.empty()) continue;
+      SentOut po;
+      speech(part, fb, opt, ctx, mem, st, po, false, false);
+      if (po.latin.text.empty()) continue;
+      if (!so.latin.text.empty()) {
+        while (!so.latin.text.empty() && endsWithAny(so.latin.text, ".,;:")) so.latin.text.pop_back();
+        so.latin.text += ";";
+        if (!po.latin.tokens.empty() && !(po.latin.tokens[0].hasLemma &&
+                                          (la_->lemma(po.latin.tokens[0].lemmaId).flags & lex::ProperName))) {
+          std::vector<std::string> tx;
+          for (const auto& t : po.latin.tokens) tx.push_back(t.text);
+          decapitalise(tx[0]);
+          rewriteTokens(po.latin, tx);
+          decapitalise(po.latin.tokens[0].display);
+        }
+      }
+      const int base = (int)so.latin.tokens.size();
+      cue::append(so.latin, po.latin);
+      for (int o : po.srcOffset) so.srcOffset.push_back(o >= 0 ? o + (int)off : -1);
+      for (Reason r : po.reasons) { if (r.tokenIndex >= 0) r.tokenIndex += base; so.reasons.push_back(r); }
+      for (const std::string& f : po.flags) addFlag(so.flags, f);
+      so.choices.insert(so.choices.end(), po.choices.begin(), po.choices.end());
+      so.unknown.insert(so.unknown.end(), po.unknown.begin(), po.unknown.end());
+      so.missing.insert(so.missing.end(), po.missing.begin(), po.missing.end());
+      so.minMargin = std::min(so.minMargin, po.minMargin);
+    }
+    addFlag(so.flags, "frame-fallback");
+    so.reasons.push_back(Reason{-1, "form", "the sentence was analysed in pieces (parser fallback): check the structure", ""});
+  }
+
   void speech(const std::string& text, const frame::FrameBuilder& fb, const Options& opt, const Context& ctx,
-              transfer::Memory& mem, const transfer::Settings& st, SentOut& so, bool alternatives) {
+              transfer::Memory& mem, const transfer::Settings& st, SentOut& so, bool alternatives,
+              bool allowSplit = true) {
     SemSentence s;
     fb.analyse(text, s);
+    if (allowSplit && frame::FrameBuilder::troubled(s)) {
+      const std::vector<size_t> pts = frame::FrameBuilder::splitPoints(text);
+      if (!pts.empty()) { speechSplit(text, pts, fb, opt, ctx, mem, st, so); return; }
+      // no split point: drop discourse words ("well", "oh", "so", "just", "really") and analyse again
+      std::string simple;
+      bool changed = false;
+      {
+        size_t i = 0;
+        while (i < text.size()) {
+          size_t j = i;
+          while (j < text.size() && text[j] != ' ') ++j;
+          std::string w = text.substr(i, j - i), low = text::lower(w);
+          while (!low.empty() && (low.back() == ',' )) low.pop_back();
+          const bool drop = low == "well" || low == "oh" || low == "so" || low == "just" || low == "really" ||
+                            low == "um" || low == "uh" || low == "now";
+          if (drop && i == 0 && j < text.size()) { changed = true; }
+          else if (drop && i > 0 && (low == "just" || low == "really" || low == "um" || low == "uh")) { changed = true; }
+          else { if (!simple.empty()) simple += ' '; simple += w; }
+          i = j + 1;
+        }
+      }
+      if (changed && !simple.empty()) {
+        SemSentence s2;
+        fb.analyse(simple, s2);
+        if (!frame::FrameBuilder::troubled(s2)) {
+          s = std::move(s2);
+          s.repairs.emplace_back("simplified");
+        }
+      }
+      if (frame::FrameBuilder::troubled(s)) s.repairs.emplace_back("no-verb");
+    }
     mem.sawFirst = false;
     std::vector<int> covered;
     std::vector<std::string> flags;
@@ -489,6 +556,7 @@ class RulesEngine final : public Engine {
           if (!la) continue;
           rules::TokenView t;
           tokenInfo(la, t);
+          t.text = t.display = la;
           const bool second = std::string(la) == "igitur";
           cue::Latin w;
           w.text = la;
@@ -530,8 +598,12 @@ class RulesEngine final : public Engine {
               if (r.tokenIndex >= 0) ++r.tokenIndex;
             ut.latin = merged;
           }
-          so.choices.push_back(transfer::Choice{u.frame.tokens.empty() ? -1 : u.first, k, t.lemmaId, "table", {}, 1.0,
-                                                false, ""});
+          transfer::Choice cc;
+          cc.token = u.frame.tokens.empty() ? -1 : u.first;
+          cc.source = k;
+          cc.lemma = t.lemmaId;
+          cc.kind = "table";
+          so.choices.push_back(cc);
           covered.push_back(u.first);
         }
       } else {
@@ -622,6 +694,12 @@ class RulesEngine final : public Engine {
         so.reasons.push_back(r);
       }
       if (i + 1 < units.size() && !ut.sep.empty()) L.text += ut.sep;
+    }
+    if (!s.repairs.empty()) {   // the analysis used a fallback: the structure may be wrong (Check)
+      std::string what;
+      for (const std::string& r : s.repairs) what += (what.empty() ? "" : ", ") + r;
+      addFlag(flags, "frame-fallback");
+      so.reasons.push_back(Reason{-1, "form", "sentence analysis fallback (" + what + "): check the structure", ""});
     }
     std::string fp = s.finalPunct;
     if (fp.empty() && frame::endsSentence(text)) fp = ".";
@@ -769,7 +847,10 @@ class RulesEngine final : public Engine {
         if (ch == ')') --rd;
       }
       if (sq != 0 || rd != 0) { a5.ok = false; a5.detail = "unbalanced brackets"; }
-      if (tagsApprox) { a5.ok = false; a5.detail = "tag position approximated"; }
+      if (tagsApprox) {   // DESIGN 10.5: partial tags dropped, Check (not Fix)
+        a5.detail += std::string(a5.ok ? "" : "; ") + "tag position approximated";
+        a5.ok = false;
+      }
       o.checks.push_back(a5);
     }
     // A7 is added by the caller (it knows the source), A8 here
@@ -871,6 +952,18 @@ class RulesEngine final : public Engine {
         mem.addresseeGuess = false;
         lastCueSeen = firstCue;
       }
+      // "you" number from the reply (decision 2): a sentence with "you" whose next sentence starts with "we" was
+      // addressed to a group ("Why are you painting the roses?" - "We planted ...") -> plural, marked as a guess
+      mem.answerWe = false;
+      if (ss.kind == frame::CueKind::Speech && si + 1 < sents.size() && sents[si + 1].kind == frame::CueKind::Speech) {
+        const std::string low = " " + text::lower(ss.text) + " ";
+        const std::string nx = text::lower(sents[si + 1].text);
+        bool you = false;
+        for (const char* w : {" you ", " you?", " you.", " you!", " you,", " your "}) you = you || low.find(w) != std::string::npos;
+        const bool we = nx.rfind("we ", 0) == 0 || nx.rfind("we'", 0) == 0 || nx.rfind("we\xE2\x80\x99", 0) == 0 ||
+                        nx.rfind("nosotros ", 0) == 0;
+        mem.answerWe = you && we && lang == frame::SrcLang::En;
+      }
       SentOut so;
       memBefore_ = mem;
       if (ss.kind == frame::CueKind::Nonverbal) {
@@ -882,6 +975,7 @@ class RulesEngine final : public Engine {
         if (translated) {
           rules::TokenView t;
           tokenInfo(la, t);
+          t.text = t.display = la;
           t.start = (int)ss.prefix.size();
           t.end = t.start + (int)la.size();
           so.latin.tokens.push_back(t);
@@ -1034,7 +1128,29 @@ class RulesEngine final : public Engine {
           if (ev.verdict < 0) onlineDisagree = true;
         }
       }
-      runChecks(o.target, o.tokens, opt, cues[i], a.latinText && !a.copied, o, lay.overflow, false);
+      // tag policy on the source spans (CueInput.spans, filled by the CLI): a cue fully inside one tag pair keeps it,
+      // position tags at the start ({\an8}) are kept, any other tag cannot be placed in the re-broken Latin
+      bool tagsApprox = false;
+      if (!cues[i].spans.empty()) {
+        std::vector<subs::Span> sp;
+        bool anyTag = false;
+        for (const SpanIn& x : cues[i].spans) {
+          subs::Span y;
+          y.kind = x.tag ? subs::Span::Tag : subs::Span::Text;
+          y.raw = x.raw;
+          anyTag = anyTag || x.tag;
+          sp.push_back(std::move(y));
+        }
+        const cue::TagResult tr = cue::applyTags(sp, o.target);
+        tagsApprox = tr.approximated;
+        if (tagsApprox) {
+          addFlag(o.flags, "tags-approximated");
+          o.reasons.push_back(Reason{-1, "form", "a tag inside the source text could not be placed in the Latin: check it", ""});
+        } else if (anyTag) {
+          addFlag(o.flags, "tags");
+        }
+      }
+      runChecks(o.target, o.tokens, opt, cues[i], a.latinText && !a.copied, o, lay.overflow, tagsApprox);
       // A7 source coverage
       {
         Check a7{"A7", true, ""};
@@ -1053,12 +1169,23 @@ class RulesEngine final : public Engine {
       bool unknown = false;
       for (const auto& t : o.tokens) unknown = unknown || t.unknown;
       unknown = unknown || !a.unknown.empty();
-      const bool fix = !checkOk(o, "A1") || !checkOk(o, "A3") || !checkOk(o, "A4") || unknown ||
-                       (!checkOk(o, "A5"));
-      bool chk = !checkOk(o, "A6") || !checkOk(o, "A7") || !checkOk(o, "A8") || !checkOk(o, "A9") ||
+      bool a5fix = false;   // A5 is a Fix unless the only finding is an approximated tag position (Check)
+      for (const Check& k : o.checks)
+        if (k.id == "A5" && !k.ok && k.detail != "tag position approximated") a5fix = true;
+      const bool fix = !checkOk(o, "A1") || !checkOk(o, "A3") || !checkOk(o, "A4") || unknown || a5fix;
+      bool chk = !checkOk(o, "A5") || !checkOk(o, "A6") || !checkOk(o, "A7") || !checkOk(o, "A8") || !checkOk(o, "A9") ||
                  a.minMargin < 0.15 || a.song || a.nonverbal || onlineDisagree;
-      for (const char* f : {"name-guessed", "from-rule", "addressee-guess", "missing-form", "merged"})
+      for (const char* f : {"name-guessed", "from-rule", "addressee-guess", "missing-form", "merged", "frame-fallback"})
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
+      // a tier 3 word chosen while a tier 1/2 word of the same sense existed (fidelity 1, a correction aside)
+      for (const transfer::Choice& c : a.choices)
+        if (c.lowTier) {
+          chk = true;
+          addFlag(o.flags, "low-tier");
+          o.reasons.push_back(Reason{-1, "sense", "\"" + c.source + "\": a rarer word was chosen although a core word "
+                                                  "of the same sense exists", ""});
+          break;
+        }
       if (opt.speakerGender == 'u' && std::find(o.flags.begin(), o.flags.end(), "speaker-gender") != o.flags.end())
         chk = true;
       o.confidence = fix ? Confidence::Fix : chk ? Confidence::Check : Confidence::Ok;
@@ -1107,7 +1234,8 @@ class RulesEngine final : public Engine {
         t.lemmaId = a.lemma;
         t.hasLemma = true;
         t.features = realise::featureView(morph::packedOf(*la_, a));
-        t.tier = la_->lemma(a.lemma).tier;
+        const lex::Lemma l = la_->lemma(a.lemma);
+        t.tier = cd_->effectiveTier(l.key, l.pos, l.tier);
       } else if (!ct.name) {
         t.unknown = ct.analysis.unknown;
       }
@@ -1225,7 +1353,6 @@ class RulesEngine final : public Engine {
   const lex::Lexicon* en_ = nullptr;
   const lex::Lexicon* es_ = nullptr;
   std::unique_ptr<curated::CuratedData> cd_;
-  std::vector<MacronOverride> overrides_;
   std::unique_ptr<realise::LatinRealiser> realiser_;
   std::unique_ptr<check::LatinChecker> checker_;
   std::unique_ptr<transfer::Transfer> xfer_;

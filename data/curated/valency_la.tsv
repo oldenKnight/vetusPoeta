@@ -17,7 +17,7 @@ debeo	inf;dat+acc	venīre dēbet; pecūniam mihi dēbet
 scio	acc;acc+inf;quod	
 nescio	acc;acc+inf	
 puto	acc+inf;acc	putat eum venīre	
-credo	dat;acc+inf	mihi crēde	dative person
+credo	dat;acc;acc+inf	mihi crēde; id crēdō	dative of the person believed, accusative of the thing
 timeo	acc;nē;inf	lupum timet; timet nē veniat	
 quaero	acc;prep:ā+abl	librum quaerit; ā mē quaerit	
 invenio	acc	

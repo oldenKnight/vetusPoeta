@@ -1,0 +1,33 @@
+# source	latin	kind	note
+# "be" + state adjective with a person subject (and Spanish verb + state noun) -> Latin (C2b; teacher-editable).
+# kind verb: the Latin verb replaces be + adjective ("I am afraid" -> timeō, "You were wrong" -> errābās); its "of"
+# phrase becomes the object ("afraid of the dark" -> timēre tenebrās). kind adj: this Latin adjective is the
+# predicate ("I am tired" -> fessa sum). source: an English or Spanish adjective lemma, or verb + noun. Our own list.
+afraid	timeō	verb	
+scared	timeō	verb	
+frightened	timeō	verb	
+cold	frīgeō	verb	"I'm cold." -> Frīgeō.
+hot	caleō	verb	
+hungry	ēsuriō	verb	
+thirsty	sitiō	verb	
+wrong	errō	verb	"You were wrong." -> Errābās.
+mistaken	errō	verb	
+tired	fessus	adj	
+ready	parātus	adj	
+happy	laetus	adj	
+glad	laetus	adj	
+sad	trīstis	adj	
+angry	īrātus	adj	"the teacher was angry" -> magister īrātus erat
+ill	aeger	adj	
+sick	aeger	adj	
+asustado	timeō	verb	Spanish
+equivocado	errō	verb	Spanish
+cansado	fessus	adj	Spanish
+listo	parātus	adj	Spanish
+tener miedo	timeō	verb	Spanish verb + noun ("tengo miedo")
+tener frío	frīgeō	verb	
+tener hambre	ēsuriō	verb	
+tener sed	sitiō	verb	
+tener calor	caleō	verb	
+tener sueño	dormītō	verb	
+have fear	timeō	verb	

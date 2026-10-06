@@ -30,6 +30,7 @@ struct Choice {
   std::vector<Candidate> candidates;   // scored, best first (REVX choices only), at most 6
   double margin = 1.0;             // best - second best (1.0 when there was no competitor)
   bool unknown = false;
+  bool lowTier = false;            // a tier 3 lemma was chosen while a tier 1/2 candidate of the same sense existed
   std::string note;                // human text for the reason
 };
 
@@ -37,10 +38,12 @@ struct Choice {
 struct Memory {
   uint8_t lastGender = 0, lastNumber = 0;   // last noun mentioned (subject or object): "it", "this one", "red ones"
   uint32_t lastVerb = kNone;                // last main verb: "This one does."
+  bool lastMotion = false;                  // that verb was a verb of motion (elliptical "where" -> quō)
   bool lastVerbObject = false;
   bool prevFirst = false;                   // the previous sentence began with "first" -> "then" is deinde
   bool addresseePlural = false;             // the previous cue addressed a group (imp.number)
   bool addresseeGuess = false;              // the current plural comes from the previous cue (Check)
+  bool answerWe = false;                    // the next sentence answers with "we": "you" here is plural (guess, Check)
   bool sawFirst = false, sawPlural = false; // set while translating the current sentence
 };
 
@@ -97,6 +100,8 @@ class Transfer {
   bool obliqueInto(const frame::SemOblique& o, Ctx& c, realise::LaClause& cl) const;
   void predicateInto(const frame::SemFrame& f, Ctx& c, realise::LaClause& cl) const;
   uint32_t adverb(const std::string& lemma, int token, Ctx& c, bool motion) const;
+  bool pluralOnly(uint32_t lemma) const;
+  bool latinVerbPhrase(const std::string& latin, realise::LaClause& rc) const;
 
   const lex::Lexicon& la_;
   const curated::CuratedData& cd_;

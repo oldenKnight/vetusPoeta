@@ -1,0 +1,47 @@
+# verb	particle	latin	frame	note
+# English phrasal verbs (lemma + particle) -> one Latin verb lemma (C2b; teacher-editable). particle "-" = the bare
+# verb with a fixed Latin frame. frame: empty (the Latin verb as it is), refl (adds the reflexive object: "inclīnāte
+# vōs"), intr (no object), acc / dat / abl (case of the object noun). Our own list.
+go	away	abeō		"Then go away." -> Abī igitur.
+go	off	abeō		
+run	away	aufugiō		"It ran away." -> Aufūgit.
+run	off	aufugiō		
+come	back	redeō		"Come back here!" -> Redī hūc!
+go	back	redeō		
+get	back	redeō		
+cut	off	abscīdō		"she'll cut off our heads"
+get	through	trānseō		"I can't get through." -> Trānsīre nōn possum.
+go	through	trānseō		
+sit	down	cōnsīdō		
+stand	up	surgō		
+get	up	surgō		
+go	in	intrō		
+go	inside	intrō		
+come	in	intrō		
+come	inside	intrō		
+go	out	exeō		
+come	out	exeō		
+get	out	exeō		
+run	out	excurrō		
+fall	down	cadō		
+give	back	reddō		
+find	out	cognōscō		
+wake	up	expergīscor		
+pick	up	tollō		
+put	on	induō		
+take	off	exuō		
+throw	away	abiciō		
+go	on	pergō		
+turn	back	revertor		
+go	up	ascendō		
+go	down	dēscendō		
+come	down	dēscendō		
+climb	up	ascendō		
+give	up	dēsinō		
+hurry	up	festīnō		
+shut	up	taceō		
+look	around	circumspiciō		
+come	along	veniō		
+get	along	prōcēdō		
+go	along	prōcēdō		
+bow	-	inclīnō	refl	"Everyone bow!" -> Omnēs, inclīnāte vōs!

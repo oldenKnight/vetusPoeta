@@ -118,35 +118,6 @@ bool motionVerb(const std::string& l) {
                 "ir", "venir", "correr", "caminar", "volver", "llegar", "andar", "subir", "bajar", "entrar", "salir"});
 }
 
-bool prepVerb(const std::string& v, const std::string& p) {
-  static const std::pair<const char*, const char*> kPV[] = {
-      {"wait", "for"},   {"look", "at"},     {"look", "for"},    {"listen", "to"},  {"ask", "for"},
-      {"laugh", "at"},   {"search", "for"},  {"stare", "at"},    {"care", "for"},   {"hope", "for"},
-      {"pay", "for"},    {"call", "for"},    {"look", "after"},  {"wish", "for"},   {"reach", "for"},
-      {"esperar", "to"}, {"mirar", "to"},    {"buscar", "to"},   {"escuchar", "to"}, {"ver", "to"}};
-  for (const auto& e : kPV)
-    if (v == e.first && p == e.second) return true;
-  return false;
-}
-
-const char* verbWithPrep(const std::string& v, const std::string& p, const char*& latinPrep) {
-  struct VP { const char* v; const char* p; const char* la; const char* lp; };
-  static const VP kV[] = {{"live", "in", "habitō", nullptr},   {"live", "at", "habitō", nullptr},
-                          {"live", "near", "habitō", nullptr}, {"live", "with", "habitō", nullptr},
-                          {"look", "at", "spectō", nullptr},   {"look", "for", "quaerō", nullptr},
-                          {"search", "for", "quaerō", nullptr}, {"wait", "for", "exspectō", nullptr},
-                          {"listen", "to", "audiō", nullptr},  {"laugh", "at", "rīdeō", nullptr},
-                          {"ask", "for", "petō", nullptr},     {"depend", "on", "pendeō", "ex"},
-                          {"think", "of", "cōgitō", "dē"},     {"think", "about", "cōgitō", "dē"},
-                          {"talk", "about", "loquor", "dē"},   {"speak", "about", "loquor", "dē"},
-                          {"vivir", "in", "habitō", nullptr},  {"mirar", "to", "spectō", nullptr},
-                          {"esperar", "to", "exspectō", nullptr}};
-  latinPrep = nullptr;
-  for (const VP& e : kV)
-    if (v == e.v && p == e.p) { latinPrep = e.lp; return e.la; }
-  return nullptr;
-}
-
 bool impersonalAdjective(const std::string& l) {
   return in(l, {"dark", "light", "late", "early", "cold", "hot", "warm", "true", "false", "possible", "impossible",
                 "easy", "difficult", "hard", "good", "bad", "important", "necessary", "clear", "strange", "nice",
@@ -162,26 +133,6 @@ const char* verb(const std::string& l) {
   return lookup(kV, l);
 }
 
-const char* phrasal(const std::string& v, const std::string& p) {
-  struct PV { const char* v; const char* p; const char* la; };
-  static const PV kPh[] = {
-      {"go", "away", "abeō"},     {"run", "away", "aufugiō"},  {"come", "back", "redeō"},  {"go", "back", "redeō"},
-      {"get", "back", "redeō"},   {"cut", "off", "abscīdō"},   {"get", "through", "trānseō"},
-      {"go", "through", "trānseō"}, {"sit", "down", "cōnsīdō"}, {"stand", "up", "surgō"},  {"get", "up", "surgō"},
-      {"go", "in", "intrō"},      {"go", "inside", "intrō"},   {"come", "in", "intrō"},  {"come", "inside", "intrō"},
-      {"go", "out", "exeō"},      {"come", "out", "exeō"},     {"get", "out", "exeō"},   {"run", "out", "excurrō"},
-      {"fall", "down", "cadō"},   {"give", "back", "reddō"},   {"find", "out", "cognōscō"},
-      {"wake", "up", "expergīscor"}, {"pick", "up", "tollō"},   {"put", "on", "induō"},   {"take", "off", "exuō"},
-      {"throw", "away", "abiciō"}, {"go", "on", "pergō"},       {"turn", "back", "revertor"},
-      {"run", "off", "aufugiō"},  {"go", "up", "ascendō"},     {"go", "down", "dēscendō"},
-      {"come", "down", "dēscendō"}, {"climb", "up", "ascendō"}, {"give", "up", "dēsinō"},  {"hurry", "up", "festīnō"},
-      {"shut", "up", "taceō"},    {"look", "around", "circumspiciō"}, {"come", "along", "veniō"},
-      {"get", "along", "procēdō"}, {"go", "along", "prōcēdō"}};
-  for (const PV& e : kPh)
-    if (v == e.v && p == e.p) return e.la;
-  return nullptr;
-}
-
 bool stateVerb(std::string_view k) {
   static const char* const kState[] = {"sum", "habeo", "scio", "nescio", "habito", "uiuo", "sedeo", "sto", "iaceo",
                                        "puto", "credo", "amo", "possum", "nolo", "cupio", "timeo", "erro", "memini",
@@ -190,24 +141,6 @@ bool stateVerb(std::string_view k) {
   for (const char* s : kState)
     if (k == s) return true;
   return false;
-}
-
-const char* stateAdjective(const std::string& l) {
-  static const std::pair<const char*, const char*> kSA[] = {
-      {"afraid", "timeō"}, {"scared", "timeō"}, {"frightened", "timeō"}, {"cold", "frīgeō"}, {"hot", "caleō"},
-      {"hungry", "ēsuriō"}, {"thirsty", "sitiō"}, {"wrong", "errō"}, {"mistaken", "errō"},
-      {"asustado", "timeō"}, {"equivocado", "errō"}};
-  return lookup(kSA, l);
-}
-
-const char* stateNoun(const std::string& verb, const std::string& noun) {
-  struct SN { const char* v; const char* n; const char* la; };
-  static const SN kSN[] = {{"tener", "miedo", "timeō"}, {"tener", "frío", "frīgeō"}, {"tener", "hambre", "ēsuriō"},
-                           {"tener", "sed", "sitiō"},   {"tener", "calor", "caleō"}, {"tener", "razón", "rēctē dīcō"},
-                           {"tener", "sueño", "dormītō"}, {"have", "fear", "timeō"}};
-  for (const SN& e : kSN)
-    if (verb == e.v && noun == e.n && !std::strchr(e.la, ' ')) return e.la;
-  return nullptr;
 }
 
 const char* interjection(const std::string& w) {
