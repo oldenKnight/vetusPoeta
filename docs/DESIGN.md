@@ -167,6 +167,9 @@ Byte conventions settled by the reference encoder (`engine/tests/lex_fixture_wri
   each lemma; CAND sorted by score desc, lemma id asc, sense asc; the CAND count is `cand_start[n_kw]`.
 * Required sections: NOTE, STRS, KEYS, ANAL, LEMM, FEAT. Optional: SENS, GENX, REVX. Unknown tags are skipped.
 * A lemma's own headword/canonical analysis never carries ANAL flag bit3 (alternative) or bit4 (non-Attic).
+* REVX holds English and Spanish keywords in one table: Spanish keywords carry the prefix `es:` (`es:agua`), so the
+  engine calls `reverse("es:" + es_key(word))` for Spanish sources. LEMM flag bit8 = `gloss_es` came through the
+  English pivot (the UI shows "(via English)"). English and Spanish morphology files omit multi-word lemmas.
 
 ### 5.1 Reader API (`engine/lex/include/vp/lex.h`)
 ```cpp
