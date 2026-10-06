@@ -1391,7 +1391,7 @@ TEST_CASE("rules-d: constructions of quality loop 2 (one sentence each)") {
       // purpose, complements, modals
       {"I came to see you.", "Vēnī ut tē videam."},
       {"I want to see you.", "Tē vidēre volō."},
-      {"Can you help me find my way?", "Potesne mē adiuvāre ut viam meam inveniam?"},
+      {"Can you help me find my way?", "Potesne mē adiuvāre ut viam inveniam?"},   // C17: phrasebook vp "find my way" (oz gold #4)
       {"I ordered them to build the house.", "Eōs iussī domum aedificāre."},
       {"I ordered them to build this City and my Palace.", "Eōs iussī hanc Urbem et Rēgiam meam aedificāre."},
       {"for you will help to keep away the other wild beasts.", "Nam aliās bēstiās ferās arcēre adiuvābis."},

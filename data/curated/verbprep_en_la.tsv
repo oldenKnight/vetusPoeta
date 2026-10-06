@@ -34,3 +34,7 @@ tell	of	dīcō	prep:dē+abl	"the Great Wizard I told you of" -> dē quō tibi d�
 keep	from	servō	prep:ab+abl	"to keep you from harm" -> ut tē ā malō servem
 get	to	perveniō	pp	"till I get to Oz" -> dum ad Oz perveniam
 live	on	habitō	pp	C15: "The sailor lives on the island."
+# C17 (quality loop 3)
+admit	to	admittō	pp	"He admitted me to his presence." -> Mē ad sē admīsit.
+admit	into	admittō	pp	
+take	from	auferō	dat	"They took the ball from me." -> Pilam mihi abstulērunt. (person only; dative of separation)

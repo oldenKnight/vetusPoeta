@@ -139,6 +139,57 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
   bool anyVerb = false;
   for (const Token& t : tk) anyVerb = anyVerb || t.upos == "VERB";
   auto nominal = [&](int i) { return i >= 0 && isIn(tk[(size_t)i].upos, {"NOUN", "PROPN", "PRON"}); };
+  // a plural noun read as a verb before its own verb ("Only witches wear black hats.", "and only witches and
+  // sorceresses wear white."): not after a subject, and a verb follows (after "and" + nouns)
+  for (int i = 0; i + 1 < n; ++i) {
+    Token& t = tk[(size_t)i];
+    if (t.upos != "VERB" || t.lower.size() < 4 || t.lower.back() != 's') continue;
+    int p = i - 1;
+    while (p >= 0 && (tk[(size_t)p].lower == "only" || tk[(size_t)p].lower == "even" || tk[(size_t)p].lower == "all")) --p;
+    if (p >= 0 && !isIn(tk[(size_t)p].upos, {"CCONJ", "PUNCT", "DET", "ADJ", "SCONJ", "ADP"})) continue;
+    std::vector<lex::Analysis> an;
+    lx.lookup(text::en_key(t.lower), an);
+    bool plural = false;
+    for (const lex::Analysis& a : an)
+      if (lx.lemma(a.lemma).pos == feat::Noun && feat::unpack(lx.feature(a.feat)).number == feat::Pl) plural = true;
+    if (!plural) continue;
+    int j = i + 1;
+    while (j + 1 < n && tk[(size_t)j].upos == "CCONJ" && isIn(tk[(size_t)j + 1].upos, {"NOUN", "PROPN"})) j += 2;
+    if (j >= n || tk[(size_t)j].upos == "PUNCT") continue;
+    std::vector<lex::Analysis> vn;
+    lx.lookup(text::en_key(tk[(size_t)j].lower), vn);
+    bool verbNext = false;
+    for (const lex::Analysis& a : vn) {
+      const feat::Features f = feat::unpack(lx.feature(a.feat));
+      if (lx.lemma(a.lemma).pos == feat::Verb &&
+          (f.tense == feat::Present || f.tense == feat::Perfect || text::lower(std::string(lx.lemma(a.lemma).head)) == tk[(size_t)j].lower))
+        verbNext = true;
+    }
+    if (!verbNext) continue;
+    t.upos = "NOUN";
+    t.feats = nlp::morph::fromString("Number=Plur");
+    Token& v = tk[(size_t)j];
+    if (v.upos != "VERB") {
+      v.upos = "VERB";
+      v.feats = nlp::morph::fromString("Number=Plur|Person=3|Tense=Pres|VerbForm=Fin|Mood=Ind");
+    }
+    changed = true;
+  }
+  // a capitalised word the lexicon does not know, before a verb or inside the sentence, is a name ("Grimbly ate the
+  // cake."): kept as written (names_la.tsv policy: indeclinable, Check)
+  for (int i = 0; i < n; ++i) {
+    Token& t = tk[(size_t)i];
+    if (t.upos == "PROPN" || t.text.empty() || !(t.text[0] >= 'A' && t.text[0] <= 'Z') || t.text.size() < 2) continue;
+    if (t.text.size() > 1 && t.text[1] >= 'A' && t.text[1] <= 'Z') continue;   // abbreviations
+    std::vector<lex::Analysis> an;
+    lx.lookup(text::en_key(t.lower), an);
+    if (!an.empty() || !knownBase(lx, t.lower, std::string()).empty()) continue;
+    const bool verbNext = i + 1 < n && isIn(tk[(size_t)i + 1].upos, {"VERB", "AUX"});
+    if (i == 0 && !verbNext) continue;
+    t.upos = "PROPN";
+    t.feats = nlp::morph::fromString("Number=Sing");
+    changed = true;
+  }
   for (int i = 0; i < n; ++i) {
     Token& t = tk[(size_t)i];
     if (t.lower.empty() || t.text.empty()) continue;

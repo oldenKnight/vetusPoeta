@@ -1107,6 +1107,19 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
         }
         np.adjectives.push_back(a);
         np.tokens.push_back(k);
+        // C17: coordinated adjectives ("the third and last time", "a big and ugly dog")
+        if (en)
+          for (int g : c.kids[(size_t)k]) {
+            if (!c.ok(g) || c.dep(g) != "conj" || c.t(g).upos != "ADJ") continue;
+            SemAdj b;
+            b.lemma = c.lem(g);
+            b.token = g;
+            np.adjectives.push_back(b);
+            np.tokens.push_back(g);
+            c.take(g);
+            for (int q : c.kids[(size_t)g])
+              if (c.ok(q) && c.dep(q) == "cc") { np.tokens.push_back(q); c.take(q); c.drop(q, Drop::Other); }
+          }
         continue;
       }
       // noun compound: "apple tree" -> genitive attribute
@@ -1362,6 +1375,55 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
   const std::string hl = c.lem(h);
   bool seImpers = false;   // Spanish impersonal "se" (3rd plural subject)
 
+  // C17: an adjective standing as the object of an ordinary verb ("you have white in your frock", "witches wear
+  // white"): a substantive (album), not a purpose clause
+  if (en && hu == "VERB" && obj < 0 && xcomp >= 0 && c.t(xcomp).upos == "ADJ" &&
+      in(hl, {"have", "wear", "like", "love", "want", "need", "see", "choose", "prefer", "hate", "find"})) {
+    bool own = false;
+    for (int g : c.kids[(size_t)xcomp])
+      if (c.ok(g) && !in(c.dep(g), {"advmod", "det", "punct", "obl", "nmod"})) own = true;
+    if (!own) {
+      for (int g : c.kids[(size_t)xcomp])   // "in your frock" belongs to the verb
+        if (c.ok(g) && in(c.dep(g), {"obl", "nmod"})) {
+          c.s.tokens[(size_t)g].head = h + 1;
+          c.s.tokens[(size_t)g].deprel = "obl";
+          c.par[(size_t)g] = h;
+          auto& kx = c.kids[(size_t)xcomp];
+          kx.erase(std::remove(kx.begin(), kx.end(), g), kx.end());
+          c.kids[(size_t)h].push_back(g);
+          std::sort(c.kids[(size_t)h].begin(), c.kids[(size_t)h].end());
+        }
+      c.s.tokens[(size_t)xcomp].deprel = "obj";
+      obj = xcomp;
+      xcomp = -1;
+    }
+  }
+  // C17: "become / remain / seem" + a noun or adjective: the predicate of the subject ("I may become the King of
+  // Beasts" -> Rēx Bēstiārum fīam), not a purpose clause
+  if (en && hu == "VERB" && xcomp >= 0 && in(hl, {"become", "remain", "seem", "appear", "grow", "turn", "get"}) &&
+      in(c.t(xcomp).upos, {"NOUN", "PROPN", "ADJ"}) && !(in(hl, {"grow", "turn", "get"}) && c.t(xcomp).upos != "ADJ")) {
+    bool mark = false;
+    for (int g : c.kids[(size_t)xcomp])
+      if (c.ok(g) && c.dep(g) == "mark") mark = true;
+    if (!mark) {
+      if (c.t(xcomp).upos == "ADJ") {
+        SemAdj a;
+        a.lemma = c.lem(xcomp);
+        a.token = xcomp;
+        for (int g : c.kids[(size_t)xcomp])
+          if (c.ok(g) && c.dep(g) == "advmod") { a.adverbs.push_back(c.t(g).lower); a.advTokens.push_back(g); }
+        f.predAdj.push_back(a);
+      } else {
+        SemNP pn;
+        buildNP(c, xcomp, pn);
+        f.predicative.push_back(pn);
+      }
+      std::vector<int> xt;
+      c.subtree(xcomp, xt);
+      for (int q : xt) { c.consumed[(size_t)q] = 1; f.tokens.push_back(q); if (c.t(q).upos == "DET") c.drop(q, Drop::Article); }
+      xcomp = -1;
+    }
+  }
   // C17: the object complement of a factitive verb ("They made him king.", "That doesn't make me any braver.", "The
   // rain made the road wet."): a noun / adjective xcomp, an adjective the parser hung on the verb as a conj without a
   // conjunction, or an adjective after the object noun
@@ -2294,6 +2356,17 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
           if (relationOf(lang_, gl, r, canon)) {
             if (!found || canon == "to") { s.relation = r; marker = canon; found = true; }
           }
+          // C17: "so that" + clause is purpose (ut + subjunctive) when "so" stands right before "that" ("We ran so
+          // that we could catch the bus"; "so tired that" is a result and has the adjective in between)
+          if (en && gl == "that" && g > 0 && c.t(g - 1).lower == "so") {
+            s.relation = Relation::Purpose;
+            marker = "so that";
+            found = true;
+            c.consumed[(size_t)g - 1] = 1;
+            c.drop(g - 1, Drop::Marker);
+          }
+          // C17: "as" after its main clause compares ("as men call me", "as I promised"): ut + indicative
+          if (en && gl == "as" && k > h && found && marker == "because") { s.relation = Relation::Manner; marker = "as"; }
           c.drop(g, Drop::Marker);
         }
       }
@@ -2319,15 +2392,51 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
           marker = "to-obj";
         }
       }
+      // C17: a wh word + to-infinitive ("tell you how to use them", "tell him where to go", "what to do") is an
+      // indirect question in the subjunctive (quōmodo eīs ūtāris), not a purpose clause; after teach / know the
+      // infinitive stays ("docuit nōs nāre")
+      int whTok = -1;
+      if (en && (marker == "to" || marker == "inf" || marker == "to-obj")) {
+        int toTok = -1;
+        for (int g : c.kids[(size_t)k])
+          if (c.dep(g) == "mark" && c.t(g).lower == "to") toTok = g;
+        if (toTok > 0 && in(c.t(toTok - 1).lower, {"how", "where", "what", "which", "when", "who", "whom"})) whTok = toTok - 1;
+      }
+      if (whTok >= 0 && !in(hl, {"teach", "learn", "know"})) {
+        s.relation = Relation::Complement;
+        marker = "towh";
+      }
       s.marker = marker;
       s.before = k < h;
       if (en && s.relation == Relation::Purpose && marker == "to" &&
           !in(hl, {"go", "come", "run", "walk", "hurry", "travel", "return", "send", "get"}))
         c.s.doubt("purpose-guess");
       SemFrame sf;
+      const bool whFree = whTok >= 0 && c.ok(whTok) && c.par[(size_t)whTok] != k;   // "where" hung on the main verb
+      if (whFree) c.consumed[(size_t)whTok] = 1;
       buildClause(c, k, sf);
       // C15: a dependent clause is never a yes/no question of its own ("help me find my way?" -> ut viam inveniam)
       if (sf.type == Kind::Yn) sf.type = Kind::Decl;
+      if (whTok >= 0) {
+        const std::string ww = c.t(whTok).lower;
+        // the wh word belongs to the dependent clause; the main clause loses it
+        f.adverbs.erase(std::remove_if(f.adverbs.begin(), f.adverbs.end(), [&](const SemAdverb& a) { return a.token == whTok; }),
+                        f.adverbs.end());
+        if (marker == "towh") {
+          if (sf.type != Kind::Wh || sf.wh.word.empty()) {
+            sf.type = Kind::Wh;
+            sf.wh.word = ww;
+            sf.wh.token = whTok;
+            sf.wh.role = in(ww, {"what", "which", "who", "whom"}) && !sf.hasObject ? Role::Object : Role::Adverb;
+          }
+          sf.exclQuam = false;
+          if (sf.wh.role == Role::Adverb) c.drop(whTok, Drop::No);
+          sf.tokens.push_back(whTok);
+        } else {   // teach / know how to: the plain infinitive
+          if (sf.type == Kind::Excl || sf.type == Kind::Wh) { sf.type = Kind::Decl; sf.exclQuam = false; sf.wh = SemWh{}; }
+          c.drop(whTok, Drop::Marker);
+        }
+      }
       s.frame.push_back(sf);
       f.subordinate.push_back(s);
       continue;
@@ -2790,6 +2899,21 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
           if (!isPunctTok(s.tokens[(size_t)k]) && !transparent(k)) allT = false;
         leftOk = allT;
       }
+      // C17: after a comma and a transparent connector (", so it will be no trouble to ..."); an adverbial phrase
+      // right after a subordinator ("so that in reality I may ...")
+      if (!leftOk && m.first >= 2 && transparent(m.first - 1) && isPunctTok(s.tokens[(size_t)m.first - 2]))
+        leftOk = true;
+      if (!leftOk && m.first >= 1 && s.tokens[(size_t)m.first - 1].upos == "SCONJ" &&
+          (book[(size_t)m.entry].reg == "adv" || book[(size_t)m.entry].reg == "tail"))
+        leftOk = true;
+      // C17: an adverbial phrase of several words inside a clause, before a verb, adjective or adverb ("I will of
+      // course help you", "She was in fact very kind"); "after all the children ..." is not one
+      if (!leftOk && lang_ == SrcLang::En && (book[(size_t)m.entry].reg == "adv" || book[(size_t)m.entry].reg == "answer") &&
+          m.last > m.first && m.slots.empty() &&
+          ((m.last + 1 < n && in(s.tokens[(size_t)m.last + 1].upos, {"VERB", "AUX", "ADJ", "ADV"})) ||
+           (book[(size_t)m.entry].reg == "adv" && s.tokens[(size_t)m.first].lower != "in" &&
+            (m.last + 1 == n || isPunctTok(s.tokens[(size_t)m.last + 1])))))
+        leftOk = true;   // ... or closing the clause ("We found the house at last.")
       const bool rightOk = m.last == n - 1 || isPunctTok(s.tokens[(size_t)m.last + 1]) ||
                            s.tokens[(size_t)m.last + 1].upos == "CCONJ";
       int top = m.first;
@@ -3030,6 +3154,77 @@ void FrameBuilder::repairTree(SemSentence& s) const {
       }
     }
   }
+  // C17: two subjects of one verb joined by "and" ("The Scarecrow and the Lion were happy."): the second is a
+  // conjunct of the first
+  if (lang_ == SrcLang::En)
+    for (int v = 0; v < n; ++v) {
+      int s1 = -1, s2 = -1;
+      for (int j = 0; j < n; ++j)
+        if (tk[(size_t)j].head == v + 1 && tk[(size_t)j].deprel == "nsubj") { if (s1 < 0) s1 = j; else if (s2 < 0) s2 = j; }
+      if (s1 < 0 || s2 < 0 || s2 < s1) continue;
+      int cc = -1;
+      for (int j = s1 + 1; j < s2; ++j)
+        if (tk[(size_t)j].upos == "CCONJ") cc = j;
+      if (cc < 0) continue;
+      tk[(size_t)s2].head = s1 + 1;
+      tk[(size_t)s2].deprel = "conj";
+      tk[(size_t)cc].head = s2 + 1;
+      tk[(size_t)cc].deprel = "cc";
+    }
+  // C17: "cry a little because ...": "a little" right after a verb is that verb's degree adverb
+  if (lang_ == SrcLang::En)
+    for (int i = 1; i + 1 < n; ++i) {
+      if (tk[(size_t)i].lower != "a" || tk[(size_t)i + 1].lower != "little" || tk[(size_t)i - 1].upos != "VERB") continue;
+      if (i + 2 < n && in(tk[(size_t)i + 2].upos, {"NOUN", "ADJ", "PROPN"})) continue;   // "a little girl", "a little cold"
+      bool kids = false;
+      for (int j = 0; j < n; ++j)
+        if (tk[(size_t)j].head == i + 2 && j != i) kids = true;
+      if (kids) {   // the parser hung a following clause on "little": give it to the verb
+        for (int j = 0; j < n; ++j)
+          if (tk[(size_t)j].head == i + 2 && j != i) tk[(size_t)j].head = i;
+      }
+      tk[(size_t)i + 1].upos = "ADV";
+      tk[(size_t)i + 1].head = i;
+      tk[(size_t)i + 1].deprel = "advmod";
+      tk[(size_t)i].upos = "DET";
+      tk[(size_t)i].head = i + 2;
+      tk[(size_t)i].deprel = "det";
+    }
+  // C17: "(he asked me) what you looked like" / "What does it look like?": "what" is the stranded object of "like";
+  // the look / seem verb heads the (indirect) question
+  if (lang_ == SrcLang::En)
+    for (int i = 0; i + 2 < n; ++i) {
+      if (tk[(size_t)i].lower != "what") continue;
+      int v = -1;
+      for (int j = i + 1; j < n && j <= i + 4; ++j)
+        if (in(tk[(size_t)j].lower, {"look", "looks", "looked", "seem", "seems", "seemed"})) { v = j; break; }
+      if (v < 0 || v + 1 >= n || tk[(size_t)v + 1].lower != "like") continue;
+      const int lk = v + 1;
+      if (lk + 1 < n && !isPunctTok(tk[(size_t)lk + 1])) continue;
+      int m = -1;
+      for (int j = i - 1; j >= 0 && m < 0; --j)
+        if (tk[(size_t)j].upos == "VERB") m = j;
+      for (int j = i + 1; j < v; ++j) {
+        if (in(tk[(size_t)j].upos, {"PRON", "NOUN", "PROPN"})) { tk[(size_t)j].head = v + 1; tk[(size_t)j].deprel = "nsubj"; }
+        else if (tk[(size_t)j].upos == "AUX") { tk[(size_t)j].head = v + 1; tk[(size_t)j].deprel = "aux"; }
+        else if (tk[(size_t)j].upos == "DET") { /* keep */ }
+      }
+      for (int j = 0; j < n; ++j)   // dependents hung on "what" / "like" go to the verb
+        if ((tk[(size_t)j].head == i + 1 || tk[(size_t)j].head == lk + 1) && j != v && j != lk && j != i)
+          tk[(size_t)j].head = v + 1;
+      tk[(size_t)v].upos = "VERB";
+      if (m >= 0) { tk[(size_t)v].head = m + 1; tk[(size_t)v].deprel = "ccomp"; }
+      else { tk[(size_t)v].head = 0; tk[(size_t)v].deprel = "root"; }
+      tk[(size_t)i].head = v + 1;
+      tk[(size_t)i].deprel = "obl";
+      tk[(size_t)lk].upos = "ADP";
+      tk[(size_t)lk].head = i + 1;
+      tk[(size_t)lk].deprel = "case";
+      if (m < 0)
+        for (int j = 0; j < n; ++j)
+          if (j != v && tk[(size_t)j].head == 0) tk[(size_t)j].head = v + 1;
+      break;
+    }
   // "Here the cat always sleeps.": a fronted adverb made the root, the real clause hung on it as advcl -> the verb is
   // the root, the adverb its (fronted) advmod
   for (int r = 0; r < n; ++r) {
@@ -3196,6 +3391,15 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
   out.lang = lang_;
   out.text = std::string(sentence);
   tokenize(sentence, out.tokens);
+  // C17: a cleft wh question ("How was it that you appeared ...?", "Why is it that ...?") is the plain question: the
+  // words "was it that" carry nothing to translate
+  if (lang_ == SrcLang::En && out.tokens.size() > 5) {
+    std::vector<nlp::Token>& t0 = out.tokens;
+    auto low = [&](size_t i) { return text::lower(t0[i].text); };
+    if (in(low(0), {"how", "why", "where", "when", "what"}) && in(low(1), {"was", "is"}) && low(2) == "it" &&
+        low(3) == "that")
+      t0.erase(t0.begin() + 1, t0.begin() + 4);
+  }
   out.drop.assign(out.tokens.size(), Drop::No);
   if (out.tokens.empty()) return;
   if (nlp_) nlp_->analyse(out.tokens);
@@ -3206,7 +3410,19 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
   if (nlp_ && lex_ && lang_ == SrcLang::En) {
     for (nlp::Token& t : tk)
       if (t.lower.empty()) t.lower = nlp::normalise(t.text);
-    if (en::retagForms(tk, *lex_)) nlp_->parser().parse(tk);
+    bool again = en::retagForms(tk, *lex_);
+    // "so that" + clause (purpose): both words are the subordinator, not "so" + the pronoun "that"
+    for (int i = 0; i + 2 < n; ++i)
+      if (tk[(size_t)i].lower == "so" && tk[(size_t)i + 1].lower == "that" &&
+          (i == 0 || !in(tk[(size_t)i - 1].upos, {"ADJ", "ADV"})) &&
+          in(tk[(size_t)i + 2].upos, {"PRON", "PROPN", "NOUN", "DET", "ADP"}) && tk[(size_t)i + 1].upos != "SCONJ") {
+        tk[(size_t)i].upos = "SCONJ";
+        tk[(size_t)i].feats = 0;
+        tk[(size_t)i + 1].upos = "SCONJ";
+        tk[(size_t)i + 1].feats = 0;
+        again = true;
+      }
+    if (again) nlp_->parser().parse(tk);
   }
   // no verb at all in a sentence of three or more words: the tagger probably missed one; retag and re-parse
   // ("Light the candle." -> imperative; "My mother teaches children." -> 3rd person present)

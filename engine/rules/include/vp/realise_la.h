@@ -38,6 +38,7 @@ struct LaAdj {
   // C17: `lemma` is a verb and the adjective is its participle: feat::Perfect (passive; active for deponents),
   // feat::Present (active) or feat::Future; 0 = an ordinary adjective
   uint8_t participle = 0;
+  bool coord = false;             // C17: joined to the adjective before it by et ("canem magnum et foedum")
 };
 
 struct LaNP {

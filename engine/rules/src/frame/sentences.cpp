@@ -108,6 +108,16 @@ void splitCue(const std::string& t, std::vector<Piece>& out) {
     if (c == '[' || c == '(') {
       const char close = c == '[' ? ']' : ')';
       const size_t j = t.find(close, i + 1);
+      // C17: editorial text in square brackets inside speech ("They are rusted [so badly] that ...") stays in the
+      // sentence (translated, brackets kept): an unfinished sentence before it in the cue, lower case, two words or more
+      if (c == '[' && j != std::string::npos && !trim(cur).empty() && !endsSentence(trim(cur))) {
+        const std::string in = trim(t.substr(i + 1, j - i - 1));
+        if (!in.empty() && in[0] >= 'a' && in[0] <= 'z' && in.find(' ') != std::string::npos) {
+          cur += t.substr(i, j - i + 1);
+          i = j + 1;
+          continue;
+        }
+      }
       if (j != std::string::npos) {
         flushSpeech();
         Piece p;

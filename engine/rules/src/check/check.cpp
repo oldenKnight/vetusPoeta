@@ -72,6 +72,7 @@ struct LatinChecker::Impl {
   std::vector<std::vector<Reading>> rd;   // readings per token
   std::vector<char> governed, attached, isVerb, boundaryBefore, relStart;
   std::vector<char> advHint;   // C17: the generator chose an adverb that has an adjective homograph (tantum)
+  std::vector<char> verbHint;  // C17: the generator chose a finite verb that has a participle homograph (habitō)
 
   // ---- reading classes ----
   static bool isFinite(const Reading& r) {
@@ -144,7 +145,7 @@ struct LatinChecker::Impl {
   }
   bool isCopula(size_t i) const {
     for (const Reading& r : rd[i])
-      if (isFinite(r) && r.key == "sum") return true;
+      if (isFinite(r) && (r.key == "sum" || r.key == "fio" || (r.key == "uideo" && r.f.voice == Passive))) return true;   // C17: videor, fīō
     return false;
   }
   void issue(const char* id, int tok, std::string detail, bool warning = false) {
@@ -255,6 +256,7 @@ struct LatinChecker::Impl {
         t.name = true;
     }
     advHint.assign(rep.tokens.size(), 0);
+    verbHint.assign(rep.tokens.size(), 0);
     if (opt.hints)
       for (const TokenHint& h : *opt.hints)
         for (size_t ti = 0; ti < rep.tokens.size(); ++ti) {
@@ -269,9 +271,18 @@ struct LatinChecker::Impl {
               if (hp == Adv || hp == Particle)
                 for (const Reading& r : rd[ti])
                   if (r.lemma == h.lemma) advHint[ti] = 1;
+              if (hp == Verb)
+                for (const Reading& r : rd[ti])
+                  if (r.lemma == h.lemma && isFinite(r)) verbHint[ti] = 1;
             }
           }
         }
+    // C17: coordinated adverbs: "tertium et ultimum" (a neuter accusative adjective after et + an adverb)
+    for (size_t i = 1; i + 1 < rep.tokens.size(); ++i) {
+      if (!advHint[i - 1] || text::latin_key(rep.tokens[i].text) != "et") continue;
+      for (const Reading& r : rd[i + 1])
+        if (isModifier(r) && r.f.case_ == Acc && r.f.number == Sg && r.f.gender == N) advHint[i + 1] = 1;
+    }
   }
 
   void segment() {
@@ -288,10 +299,20 @@ struct LatinChecker::Impl {
         if (conj && keyIs(i, {"quod", "quia", "si", "nisi", "ut", "ne", "antequam", "postquam", "dum", "quamquam"}))
           cut = true;
         if (conj && keyIs(i, {"cum"}) && boundaryBefore[i]) cut = true;   // mid-clause cum is the preposition
+        // C17: an indirect question after its verb ("Nesciō quālis sit", "Rogāvit quid vellem")
+        if (keyIs(i, {"qualis", "quantus", "quis", "quid", "quot", "ubi", "unde", "quo", "cur", "quomodo", "num", "quando"}) &&
+            any(i - 1, isFinite))
+          cut = true;
         bool rel = false;
         for (const Reading& r : rd[i])
           if (isRelative(r)) rel = true;
-        if (rel && any(i - 1, isHead)) { cut = true; relStart[i] = 1; }
+        if (rel && any(i - 1, isHead) && !advHint[i]) { cut = true; relStart[i] = 1; }
+        // C17: a relative after its preposition ("domus in quā habitō"): the clause starts at the preposition
+        if (!cut && i + 1 < n && any(i, [](const Reading& r) { return r.lpos == Prep; }) && any(i - 1, isHead) &&
+            any(i + 1, isRelative) && !advHint[i + 1])
+          cut = true;
+        // C17: an interrogative adverb the generator chose ("Dīc eī quō eat") opens an indirect question
+        if (rel && advHint[i]) cut = true;
       }
       if (cut) ++seg;
       rep.tokens[i].segment = seg;
@@ -309,7 +330,7 @@ struct LatinChecker::Impl {
         imperative = imperative || (isFinite(r) && r.f.mood == Imperative);
       }
       const bool ne = rep.tokens[i].analysis.enclitic && rep.tokens[i].analysis.encliticText == "ne";
-      if ((!nominal && !adv) || last || ne || (imperative && first && !strongHead(i))) isVerb[i] = 1;
+      if ((!nominal && !adv) || last || ne || (imperative && first && !strongHead(i)) || verbHint[i]) isVerb[i] = 1;
     }
     // a segment without a verb takes its only finite candidate
     for (size_t b = 0; b < n;) {
@@ -420,6 +441,16 @@ struct LatinChecker::Impl {
       for (const Reading& r : rd[j])
         if (isHead(r) && (r.f.case_ == Nom || (esse && r.f.case_ == Acc))) subjects.emplace_back(r.f.number, headGender(r));
     }
+    // C17: two subjects joined by et ("puer et puella fessī sunt"): a plural subject, masculine unless both agree
+    for (size_t j = b + 1; j + 1 < e; ++j) {
+      if (text::latin_key(rep.tokens[j].text) != "et") continue;
+      uint8_t g1 = rep.tokens[j - 1].name ? (uint8_t)M : (uint8_t)0, g2 = rep.tokens[j + 1].name ? (uint8_t)M : (uint8_t)0;
+      for (const Reading& r : rd[j - 1])
+        if (isHead(r) && r.f.case_ == Nom) g1 = headGender(r);
+      for (const Reading& r : rd[j + 1])
+        if (isHead(r) && r.f.case_ == Nom) g2 = headGender(r);
+      if (g1 && g2) subjects.emplace_back((uint8_t)Pl, g1 == g2 ? g1 : (uint8_t)M);
+    }
     for (const Reading& r : rd[m]) {
       if (!isModifier(r)) continue;
       if (!(r.f.case_ == Nom || (esse && r.f.case_ == Acc))) continue;
@@ -520,12 +551,24 @@ struct LatinChecker::Impl {
       bool copula = false;
       for (size_t j = b; j < e; ++j) copula = copula || (isVerb[j] && isCopula(j));
       if (copula && predicateOk(i, b, e)) continue;
+      // C17: a participle of a periphrastic infinitive ("sē nōs adiūtūram esse") agrees with the accusative subject,
+      // not with the object next to it
+      bool esse = false;
+      for (size_t j = b; j < e; ++j)
+        for (const Reading& r : rd[j]) esse = esse || (isInfinitive(r) && r.key == "sum");
+      if (esse && !copula && predicateOk(i, b, e)) continue;
       if (cand.empty()) {
         if (copula) issue("A3", (int)i, "predicate '" + T(i) + "' does not agree with the subject / verb");
         continue;
       }
       // a quantity noun before a partitive genitive ("paulum thēae", "satis aquae"): the noun reading heads (C13)
-      if (any(i, isHead)) {
+      // C17: also a neuter singular quantity adjective used as a noun ("multum aquae", "plūs cibī")
+      bool neutQty = false;
+      for (const Reading& r : rd[i])
+        neutQty = neutQty || (isModifier(r) && r.f.number == Sg && r.f.gender == N && (r.f.case_ == Nom || r.f.case_ == Acc) &&
+                              (r.key == "multus" || r.key == "plus" || r.key == "paulus" || r.key == "tantus" ||
+                               r.key == "quantus" || r.key == "nimius" || r.key == "aliquantus"));
+      if (any(i, isHead) || neutQty) {
         bool gen = !cand.empty();
         for (size_t h : cand) {
           bool g = false;
@@ -578,6 +621,10 @@ struct LatinChecker::Impl {
           }
           if (join) { groups.back().first.push_back(j); groups.back().second = true; }
           else groups.push_back({{j}, false});
+          // C17: a name before "et" is a conjunct too ("Terriculum et Leō laetī erant")
+          if (!join && j >= 2 && keyIs(j - 1, {"et", "atque", "ac"}) && rep.tokens[j - 2].name &&
+              rep.tokens[j - 2].segment == rep.tokens[j].segment)
+            groups.back().second = true;
         }
         bool anyAgree = false, allAgree = true;
         size_t bad = subj[0];
@@ -693,8 +740,11 @@ struct LatinChecker::Impl {
         }
         bool accPresent = false, datPresent = false, ablPresent = false;
         size_t defDat = n, defAbl = n, defAcc = n;
+        bool licInf = false;   // C17: "Nāre sciō": an infinitive object is not the ablative of nāris
+        for (const curated::Frame& f : v->frames) licInf = licInf || f.kind == curated::FrameKind::Inf;
         for (size_t j = b; j < e; ++j) {
           if (governed[j] || isVerb[j]) continue;
+          if (licInf && any(j, isInfinitive)) continue;
           const uint16_t m = argMask(j);   // cases of the nominal readings (a non-verb token with a verb homograph is nominal)
           if (!m) continue;
           if ((m & (1u << Acc)) && !attached[j]) accPresent = true;
@@ -854,7 +904,7 @@ LatinChecker::LatinChecker(const lex::Lexicon& lx, const curated::CuratedData& c
 
 void LatinChecker::check(std::string_view text, const Options& o, Report& out) {
   out.clear();
-  Impl im{lx_, cd_, nameKeys_, o, out, {}, {}, {}, {}, {}, {}, {}};
+  Impl im{lx_, cd_, nameKeys_, o, out, {}, {}, {}, {}, {}, {}, {}, {}};
   im.tokenise(text);
   im.analyse(hasMacron(text));
   im.names();

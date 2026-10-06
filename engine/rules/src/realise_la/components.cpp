@@ -84,7 +84,14 @@ uint8_t Agreement::nounGender(const LaNP& np, const curated::CuratedData& cd) co
     if (np.head == kNone) return M;
   }
   if (np.head == kNone) return M;
-  return simpleGender(lx_.lemma(np.head).gender);
+  // C17: a noun of two genders by number (caelum, caelī; locus, loca): the singular follows the nominative ending
+  const lex::Lemma l = lx_.lemma(np.head);
+  if (l.gender == MN && l.key.size() > 2) {
+    const bool um = l.key.compare(l.key.size() - 2, 2, "um") == 0;
+    if (np.number == Pl) return M;   // caelī, locī: the lexicon's plural cells are the masculine ones
+    return um ? N : M;
+  }
+  return simpleGender(l.gender);
 }
 
 AgreeInfo Agreement::ofNP(const LaNP& np, const curated::CuratedData& cd) const {

@@ -373,6 +373,19 @@ class RulesEngine final : public Engine {
           sub.clause.push_back(co.clause);
           main.subs.push_back(sub);
           realiseClause(main, opt, piece, pr, flags);
+          if (!piece.tokens.empty() && !(piece.tokens[0].hasLemma &&
+                                         (la_->lemma(piece.tokens[0].lemmaId).flags & lex::ProperName))) {
+            bool name = false;   // C17: a slot inside a phrase takes no sentence capital ("nōn licet tibi calceum ...")
+            for (const Reason& r : pr)
+              if (r.tokenIndex == 0 && r.kind == "name") name = true;
+            if (!name) {
+              std::vector<std::string> tx;
+              for (const auto& t : piece.tokens) tx.push_back(t.text);
+              decapitalise(tx[0]);
+              rewriteTokens(piece, tx);
+              decapitalise(piece.tokens[0].display);
+            }
+          }
         } else if (sl.kind == frame::SlotKind::Adj) {
           transfer::Choice ch;
           ch.token = sl.adj.token;
@@ -561,7 +574,19 @@ class RulesEngine final : public Engine {
               transfer::Memory& mem, const transfer::Settings& st, SentOut& so, bool alternatives,
               bool allowSplit = true) {
     SemSentence s;
-    fb.analyse(text, s);
+    // C17: editorial text in square brackets ("They are rusted [so badly] that ...") is analysed with the sentence
+    // (the brackets read as spaces, so offsets stay) and its Latin words are put back in brackets at the end
+    std::string parseText = text;
+    std::vector<std::pair<size_t, size_t>> edSpans;
+    if (st.lang == frame::SrcLang::En)
+      for (size_t a0 = parseText.find('['); a0 != std::string::npos; a0 = parseText.find('[', a0 + 1)) {
+        const size_t b0 = parseText.find(']', a0 + 1);
+        if (b0 == std::string::npos) break;
+        edSpans.emplace_back(a0, b0);
+        parseText[a0] = ' ';
+        parseText[b0] = ' ';
+      }
+    fb.analyse(parseText, s);
     if (allowSplit && frame::FrameBuilder::troubled(s)) {
       const std::vector<size_t> pts = frame::FrameBuilder::splitPoints(text);
       if (!pts.empty()) { speechSplit(text, pts, fb, opt, ctx, mem, st, so); return; }
@@ -597,12 +622,17 @@ class RulesEngine final : public Engine {
     std::vector<int> covered;
     std::vector<std::string> flags;
     struct UnitText { cue::Latin latin; std::vector<Reason> reasons; std::string sep; bool nameFirst = false;
-                      int srcStart = -1; size_t choiceFrom = 0, choiceTo = 0; bool connFront = false; };
+                      int srcStart = -1; size_t choiceFrom = 0, choiceTo = 0; bool connFront = false;
+                      int first = 0, last = -1; bool clause = false; std::string reg; };
     std::vector<UnitText> units;
     for (size_t ui = 0; ui < s.units.size(); ++ui) {
       const frame::Unit& u = s.units[ui];
       UnitText ut;
       ut.sep = u.sepAfter;
+      ut.first = u.first;
+      ut.last = u.last;
+      ut.clause = u.type == frame::Unit::Clause && !u.vocative;
+      if (u.type == frame::Unit::Phrase) ut.reg = u.phrase.reg;
       ut.srcStart = u.first < (int)s.tokens.size() ? s.tokens[(size_t)u.first].start : -1;
       ut.choiceFrom = so.choices.size();
       if (u.type == frame::Unit::Phrase) {
@@ -722,6 +752,108 @@ class RulesEngine final : public Engine {
       }
       if (!ut.latin.text.empty()) units.push_back(std::move(ut));
     }
+    // C17: an adverbial phrase that stands inside a clause in the source ("so that in reality I may become ...") goes
+    // into that clause: after its opening conjunction (ut, et, sed ...), else first
+    for (size_t i = 1; i < units.size(); ++i) {
+      if (units[i].clause || (units[i].reg != "adv" && units[i].reg != "answer") || units[i].latin.tokens.empty()) continue;
+      size_t j = i;
+      for (size_t q = 0; q < i; ++q)
+        if (units[q].clause && units[q].first < units[i].first && units[i].last < units[q].last) j = q;
+      if (j == i || units[j].latin.tokens.empty()) continue;
+      cue::Latin& host = units[j].latin;
+      const rules::TokenView& h0 = host.tokens[0];
+      const std::string k0 = text::latin_key(h0.text);
+      const bool conj = k0 == "ut" || k0 == "et" || k0 == "sed" || k0 == "nam" || k0 == "itaque" || k0 == "aut" ||
+                        k0 == "ne" || k0 == "si" || k0 == "quia" || k0 == "cum";
+      const size_t cut = conj ? (size_t)h0.end : 0;
+      cue::Latin head, tail, merged;
+      if (conj) {
+        head.text = host.text.substr(0, cut);
+        head.tokens.push_back(h0);
+      }
+      const size_t b = conj ? std::min(host.text.size(), cut + 1) : 0;
+      tail.text = host.text.substr(b);
+      for (size_t t = conj ? 1 : 0; t < host.tokens.size(); ++t) {
+        rules::TokenView x = host.tokens[t];
+        x.start -= (int)b;
+        x.end -= (int)b;
+        tail.tokens.push_back(x);
+      }
+      if (!conj && !tail.tokens.empty() &&
+          !(tail.tokens[0].hasLemma && (la_->lemma(tail.tokens[0].lemmaId).flags & lex::ProperName))) {
+        bool nm = false;
+        for (const Reason& r : units[j].reasons)
+          if (r.tokenIndex == 0 && r.kind == "name") nm = true;
+        if (!nm) {
+          std::vector<std::string> tt;
+          for (const auto& t : tail.tokens) tt.push_back(t.text);
+          decapitalise(tt[0]);
+          rewriteTokens(tail, tt);
+          decapitalise(tail.tokens[0].display);
+        }
+      }
+      cue::Latin ph = units[i].latin;
+      std::vector<std::string> tx;
+      for (const auto& t : ph.tokens) tx.push_back(t.text);
+      if (!tx.empty() && !(ph.tokens[0].hasLemma && (la_->lemma(ph.tokens[0].lemmaId).flags & lex::ProperName))) {
+        decapitalise(tx[0]);
+        rewriteTokens(ph, tx);
+        decapitalise(ph.tokens[0].display);
+      }
+      while (!ph.text.empty() && endsWithAny(ph.text, ",;:")) ph.text.pop_back();
+      cue::append(merged, head);
+      cue::append(merged, ph);
+      cue::append(merged, tail);
+      for (Reason& r : units[j].reasons)
+        if (r.tokenIndex >= (int)(conj ? 1 : 0)) r.tokenIndex += (int)ph.tokens.size();
+      const int at = conj ? 1 : 0;
+      for (Reason r : units[i].reasons) { if (r.tokenIndex >= 0) r.tokenIndex += at; units[j].reasons.push_back(r); }
+      host = merged;
+      units.erase(units.begin() + (long)i);
+      --i;
+    }
+    // C17: an adverbial phrase that closes its clause in the source ("We found the house at last.", "I cannot move
+    // them at all;") stands before the clause's final verb group in Latin (tandem invēnimus, omnīnō movēre nōn possim)
+    for (size_t i = 1; i < units.size(); ++i) {
+      UnitText& ph = units[i];
+      UnitText& host = units[i - 1];
+      if (ph.clause || ph.reg != "adv" || !host.clause || !host.sep.empty() || ph.latin.tokens.empty() ||
+          host.latin.tokens.size() < 2 || ph.first != host.last + 1)
+        continue;
+      cue::Latin& h = host.latin;
+      size_t k = h.tokens.size();
+      while (k > 0 && (h.tokens[k - 1].features.pos == "verb" || text::latin_key(h.tokens[k - 1].text) == "non")) --k;
+      if (k == h.tokens.size() || k == 0) continue;
+      cue::Latin head, tail, merged;
+      const size_t cut = (size_t)h.tokens[k].start;
+      head.text = h.text.substr(0, cut > 0 ? cut - 1 : 0);
+      for (size_t t = 0; t < k; ++t) head.tokens.push_back(h.tokens[t]);
+      tail.text = h.text.substr(cut);
+      for (size_t t = k; t < h.tokens.size(); ++t) {
+        rules::TokenView x = h.tokens[t];
+        x.start -= (int)cut;
+        x.end -= (int)cut;
+        tail.tokens.push_back(x);
+      }
+      cue::Latin pl = ph.latin;
+      std::vector<std::string> tx;
+      for (const auto& t : pl.tokens) tx.push_back(t.text);
+      decapitalise(tx[0]);
+      rewriteTokens(pl, tx);
+      decapitalise(pl.tokens[0].display);
+      while (!pl.text.empty() && endsWithAny(pl.text, ",;:")) pl.text.pop_back();
+      cue::append(merged, head);
+      cue::append(merged, pl);
+      cue::append(merged, tail);
+      for (Reason& r : host.reasons)
+        if (r.tokenIndex >= (int)k) r.tokenIndex += (int)pl.tokens.size();
+      for (Reason r : ph.reasons) { if (r.tokenIndex >= 0) r.tokenIndex += (int)k; host.reasons.push_back(r); }
+      host.sep = ph.sep;
+      host.last = ph.last;
+      h = merged;
+      units.erase(units.begin() + (long)i);
+      --i;
+    }
     // C15: a connector phrase after a clause opens that clause ("..., however;" -> "Tamen ...;")
     for (size_t i = 1; i < units.size(); ++i)
       if (units[i].connFront) {
@@ -834,6 +966,30 @@ class RulesEngine final : public Engine {
     if (fp == "\xE2\x80\xA6") fp = "...";
     while (!L.text.empty() && endsWithAny(L.text, ",;:")) L.text.pop_back();
     L.text += fp;
+    // C17: brackets back around the Latin of the editorial words (a contiguous run of tokens whose source word lies
+    // inside the brackets); when the words are spread, no brackets and Check
+    for (const auto& sp : edSpans) {
+      addFlag(flags, "editorial");
+      addFlag(so.flags, "editorial");
+      long a1 = -1, b1 = -1;
+      bool gap = false;
+      for (size_t k = 0; k < L.tokens.size() && k < so.srcOffset.size(); ++k) {
+        const int off = so.srcOffset[k];
+        const bool inside = off > (int)sp.first && off < (int)sp.second;
+        if (inside) {
+          if (a1 < 0) a1 = (long)k;
+          else if (b1 != (long)k - 1) gap = true;
+          b1 = (long)k;
+        }
+      }
+      if (a1 < 0 || gap) continue;
+      const int ins0 = L.tokens[(size_t)a1].start;
+      L.text.insert((size_t)ins0, "[");
+      for (size_t k = (size_t)a1; k < L.tokens.size(); ++k) { L.tokens[k].start += 1; L.tokens[k].end += 1; }
+      const int ins1 = L.tokens[(size_t)b1].end;
+      L.text.insert((size_t)ins1, "]");
+      for (size_t k = (size_t)b1 + 1; k < L.tokens.size(); ++k) { L.tokens[k].start += 1; L.tokens[k].end += 1; }
+    }
     for (const std::string& f : flags) addFlag(so.flags, f);
     // A7: source coverage
     std::sort(covered.begin(), covered.end());

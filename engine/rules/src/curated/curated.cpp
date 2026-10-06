@@ -324,8 +324,8 @@ struct Loader {
         const size_t plus = e.frame.find('+');
         e.latinPrep = text::nfc(std::string_view(e.frame).substr(5, plus - 5));
         e.prepCase = f.prepCase;
-      } else if (e.frame != "obj" && e.frame != "pp") {
-        warn(no, "unknown frame '" + e.frame + "' (expected obj, pp or prep:<latin>+<case>)");
+      } else if (e.frame != "obj" && e.frame != "pp" && e.frame != "dat") {   // C17: dat (dative of separation)
+        warn(no, "unknown frame '" + e.frame + "' (expected obj, pp, dat or prep:<latin>+<case>)");
         return;
       }
       d.verbPrep_.push_back(std::move(e));

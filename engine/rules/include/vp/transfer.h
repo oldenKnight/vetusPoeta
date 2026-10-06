@@ -46,6 +46,9 @@ struct Memory {
   bool addresseeGuess = false;              // the current plural comes from the previous cue (Check)
   bool answerWe = false;                    // the next sentence answers with "we": "you" here is plural (guess, Check)
   bool sawFirst = false, sawPlural = false; // set while translating the current sentence
+  // C17: the Latin noun chosen for each English noun in this cue and the cues before it in the batch (consistency:
+  // "witch" stays sāga); at most 32 entries, the oldest is dropped first
+  std::vector<std::pair<std::string, uint32_t>> nounSense;
 };
 
 struct Settings {
@@ -112,6 +115,7 @@ class Transfer {
   void relativeInto(const frame::SemNP& n, Ctx& c, realise::LaNP& o) const;          // C15: shared by names
   bool deponentActive(const frame::SemFrame& in, Ctx& c, frame::SemFrame& out) const; // C15: deponent passives
   uint32_t adjectiveInto(const frame::SemAdj& a, Ctx& c, realise::LaAdj& la, Choice& ch) const;   // C17: participles
+  uint32_t feminineOf(uint32_t noun) const;                                                       // C17: serva, puella
 
   const lex::Lexicon& la_;
   const curated::CuratedData& cd_;

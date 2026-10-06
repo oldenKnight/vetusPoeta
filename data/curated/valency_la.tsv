@@ -14,7 +14,7 @@ volo	inf;acc	venīre vult; pecūniam vult
 nolo	inf	venīre nōn vult	
 malo	inf	
 debeo	inf;dat+acc	venīre dēbet; pecūniam mihi dēbet	
-scio	acc;acc+inf;quod	
+scio	acc;acc+inf;quod;inf	
 nescio	acc;acc+inf	
 puto	acc+inf;acc	putat eum venīre	
 credo	dat;acc;acc+inf	mihi crēde; id crēdō	dative of the person believed, accusative of the thing

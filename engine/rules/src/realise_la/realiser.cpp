@@ -150,8 +150,13 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
         morph::Token mt;
         morph::analyseLatin(lx_, w.form, mt);
         if (!mt.analyses.empty()) {
-          w.lemma = mt.analyses[0].lemma;
-          w.packed = morph::packedOf(lx_, mt.analyses[0]);
+          size_t pick = 0;   // C17: an adverb reading first ("tertium et postrēmum", "aliquem" stays a pronoun)
+          for (size_t q = 0; q < mt.analyses.size(); ++q) {
+            const uint8_t lp = lx_.lemma(mt.analyses[q].lemma).pos;
+            if (lp == Adv || lp == Particle) { pick = q; break; }
+          }
+          w.lemma = mt.analyses[pick].lemma;
+          w.packed = morph::packedOf(lx_, mt.analyses[pick]);
         }
         w.rule = "phrasebook";
         out.push_back(std::move(w));
@@ -212,8 +217,11 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
       out.push_back(std::move(w));
     }
     // post-head: adjectives, possessive, genitive, relative clause
+    bool postAdj = false;
     for (const LaAdj& ad : n.adjectives) {
       if (order_.adjectiveBefore(ad.lemma) || exclFirst || ad.before) continue;
+      if (ad.coord && postAdj) { Word et; literal(k_.et, "et", et, "order.adj"); out.push_back(std::move(et)); }
+      postAdj = true;
       for (uint32_t adv : ad.adverbs) { Word w; literal(adv, "?", w, "order.adv"); out.push_back(std::move(w)); }
       out.push_back(modifierWord(ad.lemma, ad.degree, "order.adj", ad.participle));
       if (ad.capitalise) Punctuation::capitaliseFirst(out.back().form);
@@ -330,7 +338,17 @@ void LatinRealiser::verbGroup(const LaClause& c, const AgreeInfo& subj, std::vec
       push(fin, p.modal, morph::infinitive(infTense(p.tense), Active), "order.acc.inf");
       push(inf, p.lemma, morph::infinitive(p.infTense, p.infVoice), "order.inf");
     } else {
-      push(fin, p.lemma, morph::infinitive(infTense(p.tense), p.voice), "order.acc.inf");
+      // C17: the future infinitive agrees with the accusative subject ("sē nōs adiūtūram esse")
+      std::string fp;
+      const Features pf = morph::participle(Future, Active, Acc, subj.number ? subj.number : (uint8_t)Sg,
+                                            subj.gender ? subj.gender : (uint8_t)M);
+      if (infTense(p.tense) == Future && p.voice == Active && p.lemma != kNone && k_.sum != kNone &&
+          morph::generate(lx_, p.lemma, pf, fp, true)) {
+        push(fin, p.lemma, pf, "order.acc.inf");
+        push(fin, k_.sum, morph::infinitive(Present, Active), "order.acc.inf");
+      } else {
+        push(fin, p.lemma, morph::infinitive(infTense(p.tense), p.voice), "order.acc.inf");
+      }
     }
     return;
   }
@@ -481,6 +499,13 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
       s[kPRED].push_back(std::move(w));
     }
   }
+  // C17: "What does it look like?" -> Quāle est?: an interrogative predicate adjective is the wh word
+  bool whQualis = false;
+  if (c.type == ClauseType::Wh && c.wh.lemma == kNone && c.predAdj.size() == 1 &&
+      lx_.lemma(c.predAdj[0].lemma).key == "qualis") {
+    append(s[kWH], s[kPRED]);
+    whQualis = true;
+  }
   // Wh word
   if (c.type == ClauseType::Wh && c.wh.lemma != kNone) {
     Word w;
@@ -608,7 +633,7 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
     }
     seq.push_back(kEND);
     // order.wh.cop: the copula comes second after an interrogative predicate ("Quī diēs est hodiē?", "Quis es?")
-    bool whPred = c.type == ClauseType::Wh && isSum && c.wh.role == Role::Predicate;
+    bool whPred = c.type == ClauseType::Wh && isSum && (c.wh.role == Role::Predicate || whQualis);
     for (const LaNP& pn : c.predicative) whPred = whPred || (c.type == ClauseType::Wh && isSum && pn.interrogative != kNone);
     if (whPred && !s[kV].empty() && !ctx.accInf) {
       seq.erase(std::remove(seq.begin(), seq.end(), kV), seq.end());
