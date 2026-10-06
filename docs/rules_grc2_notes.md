@@ -229,3 +229,12 @@ GreekTransfer::setWeekdayOrdinal(bool) (const, a mutable switch used by the engi
    ἅπτε/ἅψον, so either aspect matches. Gold alternatives #52, #107, #112 accepted.
 Note: the C16 constructions case "If you see the cat, call me" fails on the committed tree (36/37) because the
 conditional path depends on C15's uncommitted frame changes; re-checked when C15 lands.
+
+## After B4c (main agent, 2026-10-06)
+- greek.vpl now has διδασκαλεῖον, λάθος, εὔνους (data/curated/lexicon_supplement_grc.tsv). The transfer still says
+  πρὸς τὸν διδάσκαλον and χρηστός on the gold lines; both are gold alternatives, so nothing changes.
+- λάθος "mistake" is post-classical. With the supplement alone "It was a mistake." became Λάθος ἦν. A tiers_grc.tsv
+  row for ἁμαρτία (tier 2, gloss "mistake, error, fault") restores Ἁμαρτία ἦν; λάθος stays tier 3 for reading.
+- οἴομαι: the lexicon imperfect cell is now ᾠόμην; the engine override in forms_grc.cpp writes ᾤμην. Both are Attic
+  and the contracted form is the usual one in prose, so the override stays.
+- Greek loop 3 candidates: "I made a mistake" -> Ἁμαρτίαν ἐποίησα should be ἥμαρτον (light verb "make a mistake").
