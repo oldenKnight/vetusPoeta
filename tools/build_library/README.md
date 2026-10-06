@@ -191,3 +191,27 @@ lemma ids renumbered densely. NOTE carries the licences above and the Kaikki dum
 * gloss: inputs now declare `en/lemma_index.tsv` and `es/lemma_index.tsv` (the lemmatiser read them silently).
 * tiers: curated rows with tier 2 now give tier 2 (before only tier-1 rows were read); teacher review sheets
   `<out>/review_tier_sheet_{la,grc}.csv` (docs/TEACHER_REVIEW.md).
+
+## B4c (LIB-4) additions (counts and the swap procedure: docs/LIBRARY_CHANGES.md, "B4c")
+    python3 tools/build_library/build.py --raw data/raw --out data/work --next --lang grc --stage kaikki,resolve,pack
+    python3 tools/build_library/build.py --raw data/raw --out data/work --next --lang es --stage kaikki,resolve,pack
+    python3 tools/build_library/coverage.py --gloss-en data/work/next/spanish.vpl tests/regression/own_dialogue.es.txt
+* Greek supplement (`supplement.py`): `data/curated/lexicon_supplement_grc.tsv` (key, head, pos, gender, cls, tier,
+  gloss_en, gloss_es, cells, note; cells = `;`-separated `tags=form`) adds whole lemmas Wiktionary lacks. The cells are
+  read as an Attic table (marker "Attic [contracted ]declension-<cls>"), so LEMM (has_table, one sense, a Kaikki-style
+  head line), GENX and ANAL come out as for a Kaikki lemma; REVX keywords from both glosses (EN, `es:` ES) score 100 +
+  60 per head word, 35 per other content word, +20 tier 1, -30 when the parentheses of gloss_en name a register
+  ("(post-classical)" -> SENS Medieval bit). New ids follow the Kaikki ones; a key Kaikki already has is skipped.
+* Greek overrides, new kinds: `old` = `alt [forms]` (the replaced cell form, or the listed forms, get ANAL bit3 for
+  that cell) and `drop [forms]` (their analysis of that cell is removed); lemma rows `@gender <words>` and
+  `@alt-table <marker>` (that table's rows rank after the other tables for GENX; its analyses that no other table
+  gives get bit3; the headword never does, DESIGN 5).
+* Spanish (`esgloss.py`): LEMM.gloss_en of spanish.vpl from `en/translations_es.tsv` (inverted) and the new
+  `es/translations_en.tsv` (the kaikki stage now also writes the English translations of Spanish entries); scoring in
+  the module docstring; the pack stage reads the UD English treebank lemma counts (`data/raw/ud/en_ewt-ud-*.conllu`)
+  as a commonness signal.
+* `coverage.py --gloss-en`: share of lemmas with an English gloss and of the known tokens / types of a file whose
+  analyses reach one (numbers only).
+* pack (every language): `clean_head` strips leading / trailing characters that are not letters, digits, combining
+  marks, apostrophes or hyphens from LEMM.head ("((caelum" -> caelum); a final period after a letter stays
+  (abbreviations); a punctuation-only head becomes empty. Counts `heads_cleaned` / `heads_dropped` in pack.json.

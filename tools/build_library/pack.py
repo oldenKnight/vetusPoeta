@@ -21,6 +21,14 @@ B4b additions (docs/LIBRARY_CHANGES.md):
     stays the dictionary's); Whitaker-only analyses (whitaker_gen.py, ANAL bit2) for keys Kaikki does not know;
   * English / Spanish: only the lemmas morphcut.py selects (UD treebanks + frequency proxy + curated words), ANAL
     display = key (display strings dropped).
+B4c additions (docs/LIBRARY_CHANGES.md, "B4c"):
+  * Greek: whole lemmas from data/curated/lexicon_supplement_grc.tsv (supplement.py), appended after the Kaikki ids;
+  * Greek overrides: `old` = "alt [forms]" / "drop [forms]" (the replaced cell form, or the listed forms, become an
+    alternative (ANAL bit3) / lose their analysis of that cell); "@gender" sets the lemma gender; "@alt-table <marker>"
+    ranks a whole table of the lemma as an alternative (its cells lose to the other tables, its analyses that no other
+    table gives get bit3);
+  * Spanish: LEMM.gloss_en from the English edition's translations (inverted) and the Spanish edition's English
+    translations (esgloss.py).
 """
 import array
 import collections
@@ -31,12 +39,15 @@ import re
 import struct
 import sys
 import time
+import unicodedata
 
+import esgloss
 import features as F
 import grcfix
 import lexdata
 import morphcut
 import resolve as R
+import supplement
 import tagmap
 import vptext
 import whitaker_gen
@@ -289,6 +300,27 @@ def _gender(rec):
     return tagmap.GENDER_FROM_BITS[bits]
 
 
+HEAD_KEEP = frozenset("'\u2019\u02bc\u1fbd\u1fbf-\u2010")  # apostrophes (also Greek koronis / psili), hyphens
+
+
+def _head_char(ch):
+    return unicodedata.category(ch)[0] in "LNM" or ch in HEAD_KEEP
+
+
+def clean_head(s):
+    """Headword without leading / trailing characters that are not letters, digits, combining marks, apostrophes or
+    hyphens ("((caelum" -> caelum, "*dia" -> dia, "ōh!" -> ōh); a final period right after a letter or digit stays (an
+    abbreviation: "e.g.", "lat."). A head of punctuation only becomes "" (dropped). B4c."""
+    i, j = 0, len(s)
+    while i < j and not _head_char(s[i]):
+        i += 1
+    while j > i and not _head_char(s[j - 1]):
+        if s[j - 1] == "." and j - 1 > i and unicodedata.category(s[j - 2])[0] in "LN":
+            break
+        j -= 1
+    return s[i:j]
+
+
 def lemma_flags(rec):
     cl = set(rec.get("class") or [])
     for s in rec.get("senses") or []:
@@ -313,8 +345,9 @@ def lemma_flags(rec):
     return fl
 
 
-def cell_rows(lang, rows, pos, base):
-    """Table rows of one lemma -> [(packed, display, flags, rank)] exactly as the resolve stage derives them."""
+def cell_rows(lang, rows, pos, base, alt_markers=frozenset()):
+    """Table rows of one lemma -> [(packed, display, flags, rank)] exactly as the resolve stage derives them.
+    alt_markers: table markers whose rows count as alternative (FLAG_ALT, so they lose the GENX choice; B4c)."""
     parsed = {}
     contracted_twins = set()
     for row in rows:
@@ -331,6 +364,8 @@ def cell_rows(lang, rows, pos, base):
         tense, dialects, contracted, toks = parsed[marker]
         fl = base | R.tag_flags(tl, lang)
         fl |= R.FLAG_TABLE if source != "head" else 0
+        if marker in alt_markers:
+            fl |= R.FLAG_ALT
         extra = 0
         if lang == "grc":
             dfl, dex = R.dialect_flags(dialects)
@@ -404,12 +439,23 @@ def deponent_signal(lang, fpos, head, key, cells):
     return False
 
 
-def fill_cells(lang, lid, rows, lemmas, recs, c, displays=None):
-    """GENX cells of one lemma from its table rows; the deponent flag from the same rows."""
+def fill_cells(lang, lid, rows, lemmas, recs, c, displays=None, alt_tables=None, alt_only=None):
+    """GENX cells of one lemma from its table rows; the deponent flag from the same rows. alt_tables {lid: markers}
+    (override "@alt-table"): those tables' rows rank as alternatives; alt_only[lid] receives the (key, packed) pairs
+    that only those tables give (their analyses get bit3)."""
     base = (R.FLAG_ALT if recs[lid][1] == "alttable" else 0) | (R.FLAG_LATE if recs[lid][2] else 0)
     l = lemmas[lid]
     fpos = FPOS_NAME.get(l.pos, "other")
-    cr = cell_rows(lang, rows, fpos, base)
+    alt_m = (alt_tables or {}).get(lid, frozenset())
+    cr = cell_rows(lang, rows, fpos, base, alt_m)
+    if alt_m and alt_only is not None:
+        main, alt = set(), set()
+        for row in rows:
+            m = row[5] if len(row) > 5 else ""
+            for packed, _d, _f, _r in cell_rows(lang, [row], fpos, base):
+                (alt if m in alt_m else main).add((row[2], packed))
+        alt_only[lid] = alt - main
+        c["override_alt_table_pairs"] += len(alt_only[lid])
     l.cells = choose_cells(cr)
     c["genx_cells"] += len(l.cells)
     if not l.flags & LF_DEPONENT and deponent_signal(lang, fpos, l.head, l.key, cr):
@@ -431,23 +477,52 @@ def stash_rows(path, ids):
     return out
 
 
+def parse_old(text):
+    """`old` column -> (mode, [form keys]): keep | dialect | alt [forms] | drop [forms] (B4c: alt / drop)."""
+    parts = (text or "keep").split()
+    mode = parts[0] if parts and parts[0] in ("keep", "dialect", "alt", "drop") else None
+    if mode is None:
+        return None, []
+    return mode, [vptext.greek_key(x) for x in parts[1:]]
+
+
 def load_grc_overrides(cdir, lemmas, c):
-    """data/curated/lexicon_overrides_grc.tsv -> {"cells": [(lid, [packed], form, old)], "compounds": {lid: (simplex
-    lid, prefix, tenses)}}. Columns: key (greek_key of the lemma headword), tags (Kaikki-style, with the tense and
-    "Attic" when the table cell is Attic-marked) or "@from <tense> ...", form (or "<prefix>+<simplex key>"), old
-    ("dialect": the replaced form's analysis of this cell gets ANAL bit4; "keep"), note."""
-    res = {"cells": [], "compounds": {}}
+    """data/curated/lexicon_overrides_grc.tsv -> {"cells": [(lid, [packed], form, (mode, forms))], "compounds": {lid:
+    (simplex lid, prefix, tenses)}, "gender": {lid: gender}, "alt_tables": {lid: frozenset(markers)}}. Columns: key
+    (greek_key of the lemma headword), tags (Kaikki-style, with the tense and "Attic" when the table cell is
+    Attic-marked) or "@from <tense> ...", "@gender", "@alt-table", form (or "<prefix>+<simplex key>", the gender words,
+    the table marker), old ("dialect": the other forms' analyses of this cell get ANAL bit4; "alt [forms]": the replaced
+    form, or the listed forms, get bit3 for this cell; "drop [forms]": their analyses of this cell are removed;
+    "keep"), note."""
+    res = {"cells": [], "compounds": {}, "gender": {}, "alt_tables": {}}
     by_key = {}
     for i, l in enumerate(lemmas):
         if l.pos == F.POS["verb"] or l.flags & LF_TABLE:
             by_key.setdefault(l.key, []).append(i)
     for row in lexdata.read_curated(os.path.join(cdir, GRC_OVERRIDES)):
         row = (row + [""] * 5)[:5]
-        key, tags, form, old = vptext.greek_key(row[0]), row[1], vptext.nfc(row[2]), row[3] or "keep"
+        key, tags, form = vptext.greek_key(row[0]), row[1], vptext.nfc(row[2])
+        old = parse_old(row[3])
         ids = [i for i in by_key.get(key, []) if lemmas[i].flags & LF_TABLE or tags.startswith("@from")]
-        if not ids or not form:
+        if not ids or not form or old[0] is None:
             c["override_rows_unmatched"] += 1
-            log("[grc pack] override row without a lemma: %s" % row[0])
+            log("[grc pack] override row without a lemma (or a bad `old`): %s" % row[0])
+            continue
+        if tags == "@gender":
+            bits = 0
+            for g in form.split():
+                bits |= tagmap.GENDER_BITS.get(g, 0)
+            if not bits:
+                c["override_rows_unmatched"] += 1
+                continue
+            for i in ids:
+                res["gender"][i] = tagmap.GENDER_FROM_BITS[bits]
+            c["override_gender_rows"] += 1
+            continue
+        if tags == "@alt-table":
+            for i in ids:
+                res["alt_tables"][i] = res["alt_tables"].get(i, frozenset()) | frozenset([form])
+            c["override_alt_table_rows"] += 1
             continue
         if tags.startswith("@from"):
             tenses = frozenset(tags.split()[1:])
@@ -497,10 +572,11 @@ def compound_rows(lid, rows, compounds, simplex_rows, extra_anal, c):
 
 
 def apply_cell_overrides(cells_ov, lemmas, extra_anal, displays, c):
-    """Set the overridden GENX cells; ANAL rows for the new forms; returns {(lid, packed): new key} for the cells
-    whose old form is demoted to non-Attic."""
-    demote = {}
-    for lid, packs, form, old in cells_ov:
+    """Set the overridden GENX cells; ANAL rows for the new forms. Returns (demote, marks): demote {(lid, packed): new
+    key} for the cells whose other forms are demoted to non-Attic ("dialect"); marks {(lid, packed, form key): "alt" |
+    "drop"} for the replaced (or listed) forms."""
+    demote, marks = {}, {}
+    for lid, packs, form, (mode, forms) in cells_ov:
         l = lemmas[lid]
         key = vptext.greek_key(form)
         disp = displays.get(lid, {}).get(key, form)
@@ -512,10 +588,14 @@ def apply_cell_overrides(cells_ov, lemmas, extra_anal, displays, c):
             if prev == disp:
                 c["override_cells_unchanged"] += 1
             extra_anal.append((key, lid, packed, R.FLAG_TABLE, disp))
-            if old == "dialect":
+            if mode == "dialect":
                 demote[(lid, packed)] = key
+            elif mode in ("alt", "drop"):
+                for k in (forms or ([vptext.greek_key(prev)] if prev is not None else [])):
+                    if k != key:
+                        marks[(lid, packed, k)] = mode
         l.cells = sorted(cells.items())
-    return demote
+    return demote, marks
 
 
 def load_macron_overrides(cdir, lemmas, c):
@@ -623,6 +703,7 @@ def build_lang(lang, out, raw, c, curated=None, select=True):
     # tokens and phrases go through the phrasebook. Their ids are renumbered densely (new_id).
     new_id = {}
     n_in = 0
+    es_recs = []  # Spanish: (index, key, Kaikki pos, fpos) for the English glosses (esgloss)
     for r in lexdata.iter_lemma_records(out, lang):
         if r["id"] != n_in:
             raise ValueError("lemma ids are not sequential at %d" % r["id"])
@@ -634,7 +715,13 @@ def build_lang(lang, out, raw, c, curated=None, select=True):
             c["lemmas_not_selected"] += 1
             continue
         new_id[r["id"]] = len(lemmas)
-        l = Lemma(head=r.get("head", ""), key=r["key"], pos=lexdata.pos_code(r.get("fpos", "other")),
+        head = r.get("head", "")
+        ch = clean_head(head)
+        if ch != head:
+            c["heads_cleaned"] += 1
+            if not ch:
+                c["heads_dropped"] += 1
+        l = Lemma(head=ch, key=r["key"], pos=lexdata.pos_code(r.get("fpos", "other")),
                   gender=_gender(r), flags=lemma_flags(r))
         if not morph:
             l.cls = _cls(r)
@@ -644,9 +731,16 @@ def build_lang(lang, out, raw, c, curated=None, select=True):
                          bool(r.get("has_table"))))
         else:
             recs.append((r.get("word", ""), "", 0, r.get("fpos", "other"), False))
+            if lang == "es":
+                es_recs.append((len(lemmas), r["key"], r.get("pos", ""), r.get("fpos", "other")))
         lemmas.append(l)
     log("[%s pack] %d lemmas" % (lang, len(lemmas)))
+    if lang == "es":
+        esgloss.apply(out, es_recs, lemmas, c, raw)
+        log("[es pack] gloss_en for %d of %d lemmas" % (c["gloss_en_covered"], len(lemmas)))
+    del es_recs
     candidates = []
+    demote, marks, alt_only = {}, {}, {}
     if not morph:
         for r in lexdata.read_rows(os.path.join(d, "gloss.tsv")):
             l = lemmas[int(r[0])]
@@ -663,23 +757,31 @@ def build_lang(lang, out, raw, c, curated=None, select=True):
         for name, prefix in (("revx_en.tsv", ""), ("revx_es.tsv", ES_PREFIX)):
             for r in lexdata.read_rows(os.path.join(d, name)):
                 candidates.append((prefix + r[0], int(r[1]), int(r[2]), int(r[3]), int(r[4])))
+        # Greek supplement lemmas (B4c): appended after the Kaikki ids, with their cells, analyses and candidates
+        extra_anal = []
+        if lang == "grc":
+            supplement.add_to(lemmas, recs, extra_anal, candidates, cdir, c, Lemma, cell_rows, choose_cells, LF_TABLE)
         # GENX cells (+ compound tenses built from a simplex, Greek overrides)
-        ov = load_grc_overrides(cdir, lemmas, c) if lang == "grc" else {"cells": [], "compounds": {}}
+        ov = load_grc_overrides(cdir, lemmas, c) if lang == "grc" else {"cells": [], "compounds": {}, "gender": {},
+                                                                         "alt_tables": {}}
+        for lid, g in sorted(ov["gender"].items()):
+            if lemmas[lid].gender != g:
+                lemmas[lid].gender = g
+                c["override_gender_set"] += 1
         table_path = os.path.join(d, "table_forms.tsv")
         simplex_rows = stash_rows(table_path, set(s for s, _, _ in ov["compounds"].values()))
-        extra_anal = []
         seen = set()
         displays = {lid: {} for lid, _p, _f, _o in ov["cells"]}
         for lid, rows in iter_table_groups(table_path):
             seen.add(lid)
             rows = rows + compound_rows(lid, rows, ov["compounds"], simplex_rows, extra_anal, c)
-            fill_cells(lang, lid, rows, lemmas, recs, c, displays)
+            fill_cells(lang, lid, rows, lemmas, recs, c, displays, ov["alt_tables"], alt_only)
         for lid in sorted(ov["compounds"]):
             if lid not in seen:
                 rows = compound_rows(lid, [], ov["compounds"], simplex_rows, extra_anal, c)
                 if rows:
-                    fill_cells(lang, lid, rows, lemmas, recs, c, displays)
-        demote = apply_cell_overrides(ov["cells"], lemmas, extra_anal, displays, c)
+                    fill_cells(lang, lid, rows, lemmas, recs, c, displays, ov["alt_tables"], alt_only)
+        demote, marks = apply_cell_overrides(ov["cells"], lemmas, extra_anal, displays, c)
         if lang == "la":
             macron = load_macron_overrides(cdir, lemmas, c)
             for lid, (frm, to) in sorted(macron.items()):
@@ -707,6 +809,17 @@ def build_lang(lang, out, raw, c, curated=None, select=True):
         elif (lid, packed) in demote and key != demote[(lid, packed)]:
             fl |= R.FLAG_DIALECT
             c["override_demoted_analyses"] += 1
+        if marks or alt_only:
+            mk = marks.get((lid, packed, key))
+            if mk == "drop":
+                c["override_dropped_analyses"] += 1
+                continue
+            if mk == "alt":
+                fl |= R.FLAG_ALT
+                c["override_alt_analyses"] += 1
+            if lid in alt_only and (key, packed) in alt_only[lid]:
+                fl |= R.FLAG_ALT
+                c["override_alt_table_analyses"] += 1
         if fl & (R.FLAG_ALT | R.FLAG_DIALECT):
             l = lemmas[lid]
             if display == l.head or display == recs[lid][0] or vptext.nfc(display) == vptext.nfc(l.head):

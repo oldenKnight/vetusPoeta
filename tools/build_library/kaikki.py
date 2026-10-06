@@ -6,7 +6,7 @@ Outputs in <out>/<lang>/ (all UTF-8, LF, one record per line, deterministic orde
   formpages.tsv     word, key, display, target_key, tags, pos, kind (form|alt), target (as written)
   en/translations_{la,grc,es}.tsv   English word, pos, sense text, target word, tags
   es/latin_glosses.tsv              word, pos, gloss, lang (la|grc), sense_index, form_of target
-  es/translations_{la,grc}.tsv      Spanish word, pos, sense_index, target word, tags
+  es/translations_{la,grc,en}.tsv   Spanish word, pos, sense_index, target word, tags (en: B4c)
 Entry classification (PREPLAN 1.1): a sense is a form sense when it has form_of / alt_of, the tag form-of /
 alt-of, or its gloss reads like "second-person plural present passive indicative of X". An entry is
   lemma      at least one real sense (its form senses still go to formpages.tsv)
@@ -484,9 +484,11 @@ class KaikkiStage(object):
             self.c["translations_" + code] += 1
 
     def es_translations(self, e, word, kpos):
+        # B4c: the English translations of Spanish entries too (translations_en.tsv), one source of the gloss_en of
+        # spanish.vpl lemmas (pack / esgloss.py)
         for t in e.get("translations") or []:
             code = t.get("lang_code")
-            if code in ("la", "grc") and t.get("word"):
+            if code in ("la", "grc", "en") and t.get("word"):
                 self.writer("translations_%s.tsv" % code).write(
                     word, kpos, t.get("sense_index", ""), vptext.nfc(t["word"]), " ".join(sorted(t.get("tags") or [])))
                 self.c["es_translations_" + code] += 1
@@ -536,9 +538,10 @@ def run(lang, raw_dir, out_dir, input_path=None):
                 st.c["other_lang"] += 1
                 continue
             st.entry(e)
-        for name in ("translations_la.tsv", "translations_grc.tsv", "translations_es.tsv", "latin_glosses.tsv"):
+        for name in ("translations_la.tsv", "translations_grc.tsv", "translations_es.tsv", "translations_en.tsv",
+                     "latin_glosses.tsv"):
             if (lang == "en" and name.startswith("translations")) or (lang == "es" and name in (
-                    "translations_la.tsv", "translations_grc.tsv", "latin_glosses.tsv")):
+                    "translations_la.tsv", "translations_grc.tsv", "translations_en.tsv", "latin_glosses.tsv")):
                 st.writer(name)  # create even when empty
     finally:
         st.close()

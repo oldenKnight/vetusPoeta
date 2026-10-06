@@ -1,13 +1,18 @@
 # key	tags	form	old	note
 # Lexicon overrides applied by tools/build_library/pack.py (B4b; docs/LIBRARY_CHANGES.md). Written by the project.
-# key   = greek_key of the lemma headword (final sigma written σ). The row applies to every lemma with that key that has
+# key   = greek_key of the lemma headword (final sigma σ or ς; the packer folds it). The row applies to every lemma with that key that has
 #         an inflection table.
 # tags  = the cell, as Kaikki-style tags: tense, voice, mood, person, number (+ "Attic" when the lemma's table is
 #         Attic-marked, so the feature word is the table's own). "@from <tense> ..." builds the compound's cells of
 #         these tenses from the simplex (only when the compound has no table of that tense).
 # form  = the Attic form for the cell (the display is taken from the lemma's table when it lists the same form with
 #         length marks); for "@from" rows: <prefix>+<simplex headword>.
-# old   = "dialect": the replaced form's analysis for this cell gets ANAL bit4 (non-Attic); "keep": stays as it is.
+# old   = "dialect": the other forms' analyses for this cell get ANAL bit4 (non-Attic); "keep": they stay as they
+#         are; "alt [forms]": the replaced form (or the listed forms) become an alternative for this cell (ANAL bit3);
+#         "drop [forms]": their analyses of this cell are removed (a table error). (alt / drop: B4c)
+# Lemma rows (B4c): tags "@gender", form = gender words: sets the lemma gender; tags "@alt-table", form = a table
+#         marker of the lemma (as in table_forms.tsv, e.g. "Attic declension-3"): that table's cells rank after the
+#         other tables' and its analyses that no other table gives get ANAL bit3 (the headword itself never does).
 # πίνω aorist imperative: no row. The cell πίε stays: LSJ s.v. πίνω gives "imper. πίε Od. 9.347, Men. 151 ...; also
 # πῖθι Cratin., Ar. V. 1489, Antiph. ..." (both Attic; πίε is LSJ's first form). The engine's attested override
 # (πῖθι) remains its own choice.
@@ -19,3 +24,31 @@
 βούλομαι	indicative mediopassive present second-person singular	βούλει	keep	Attic -ει (the table lists βούλῃ first)
 οἴομαι	Attic indicative middle present second-person singular	οἴει	keep	Attic -ει (the table lists οἴῃ first)
 ἀποφεύγω	@from aorist	ἀπο+φεύγω	keep	the lexicon has only the present of ἀποφεύγω
+# B4c (Greek loop 2 gaps, docs/rules_grc2_notes.md):
+οἴομαι	Attic indicative middle imperfect first-person singular	ᾠόμην	drop	the Attic table's first cell ᾤομην is misaccented (a long ultima allows no acute on the antepenult); ᾤμην stays an Attic analysis
+εὑρίσκω	active indicative aorist first-person singular	ηὗρον	alt	augmented ηὑρ- is the Attic aorist (inscriptions, Attic prose); εὑρ- stays as an alternative
+εὑρίσκω	active indicative aorist second-person singular	ηὗρες	alt	
+εὑρίσκω	active indicative aorist third-person singular	ηὗρε	alt εὗρε εὗρεν	
+εὑρίσκω	active indicative aorist dual second-person	ηὕρετον	alt	
+εὑρίσκω	active indicative aorist dual third-person	ηὑρέτην	alt	
+εὑρίσκω	active indicative aorist first-person plural	ηὕρομεν	alt	
+εὑρίσκω	active indicative aorist second-person plural	ηὕρετε	alt	
+εὑρίσκω	active indicative aorist third-person plural	ηὗρον	alt	
+εὑρίσκω	indicative middle aorist first-person singular	ηὑρόμην	alt	
+εὑρίσκω	indicative middle aorist second-person singular	ηὕρου	alt	
+εὑρίσκω	indicative middle aorist third-person singular	ηὕρετο	alt	
+εὑρίσκω	indicative middle aorist dual second-person	ηὕρεσθον	alt	
+εὑρίσκω	indicative middle aorist dual third-person	ηὑρέσθην	alt	
+εὑρίσκω	indicative middle aorist first-person plural	ηὑρόμεθα	alt	
+εὑρίσκω	indicative middle aorist second-person plural	ηὕρεσθε	alt	
+εὑρίσκω	indicative middle aorist third-person plural	ηὕροντο	alt	
+βούλομαι	Attic indicative middle passive imperfect first-person singular	ἐβουλόμην	alt	classical Attic augments ἐ-; the Attic-marked table has the later ἠ- forms, kept as alternatives
+βούλομαι	Attic indicative middle passive imperfect second-person singular	ἐβούλου	alt	
+βούλομαι	Attic indicative middle passive imperfect third-person singular	ἐβούλετο	alt	
+βούλομαι	Attic indicative middle passive imperfect dual second-person	ἐβούλεσθον	alt	
+βούλομαι	Attic indicative middle passive imperfect dual third-person	ἐβουλέσθην	alt	
+βούλομαι	Attic indicative middle passive imperfect first-person plural	ἐβουλόμεθα	alt	
+βούλομαι	Attic indicative middle passive imperfect second-person plural	ἐβούλεσθε	alt	
+βούλομαι	Attic indicative middle passive imperfect third-person plural	ἐβούλοντο	alt	
+σκότος	@gender	masculine	keep	ὁ σκότος is the classical Attic gender (LSJ: σκότος, ὁ; later also τό)
+σκότος	@alt-table	Attic declension-3	keep	the neuter table (τὸ σκότος, τοῦ σκότους) is attested and kept as an alternative

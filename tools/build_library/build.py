@@ -33,12 +33,12 @@ STAGE_CODE = {"kaikki": ("kaikki.py", "common.py", "vptext.py", "tagmap.py", "fe
                         "stopwords_en.txt", "stopwords_es.txt"),
               "tiers": ("tiers.py", "lexdata.py", "common.py", "vptext.py"),
               "pack": ("pack.py", "resolve.py", "lexdata.py", "common.py", "vptext.py", "tagmap.py", "features.py",
-                       "grcfix.py", "morphcut.py", "whitaker_gen.py")}
+                       "grcfix.py", "morphcut.py", "whitaker_gen.py", "supplement.py", "esgloss.py", "gloss.py")}
 # stages that exist only for some languages
 STAGE_LANGS = {"import_aux": ("la", "grc"), "gloss": ("la", "grc"), "tiers": ("la", "grc")}
 CURATED = os.path.normpath(os.path.join(HERE, "..", "..", "data", "curated"))
 KAIKKI_OUTPUTS = {"la": [], "grc": [], "en": ["translations_la.tsv", "translations_grc.tsv", "translations_es.tsv"],
-                  "es": ["latin_glosses.tsv", "translations_la.tsv", "translations_grc.tsv"]}
+                  "es": ["latin_glosses.tsv", "translations_la.tsv", "translations_grc.tsv", "translations_en.tsv"]}
 BASE_OUTPUTS = ["lemmas.jsonl", "table_forms.tsv", "formpages.tsv"]
 RESOLVE_OUTPUTS = ["analyses.tsv", "lemma_index.tsv"]
 EXPECTED_PATH = os.path.join(HERE, "expected_counts.json")
@@ -47,7 +47,7 @@ DRIFT = 0.15
 CHECKED = {"kaikki": ("entries", "lemma_records", "lemmas_with_table", "form_pages", "formpage_rows", "table_rows",
                       "head_rows", "kind_lemma", "kind_form", "kind_alt", "kind_formtable", "kind_alttable",
                       "translations_la", "translations_grc", "translations_es", "es_glosses_la", "es_glosses_grc",
-                      "es_entries_la", "es_entries_grc", "es_translations_la", "es_translations_grc", "el_desc",
+                      "es_entries_la", "es_entries_grc", "es_translations_la", "es_translations_grc", "es_translations_en", "el_desc",
                       "el_same"),
            "resolve": ("lemmas", "analyses", "distinct_keys", "formpage_rows", "unresolved_rows",
                        "unresolved_pages", "lemma_self_analyses"),
@@ -57,7 +57,7 @@ CHECKED = {"kaikki": ("entries", "lemma_records", "lemmas_with_table", "form_pag
                      "gloss_es_curated", "senses", "revx_en_keywords", "revx_en_candidates", "revx_es_keywords",
                      "revx_es_candidates", "pivot_rows_joined"),
            "tiers": ("tier1", "tier2", "tier3", "tier0", "emoji_matched", "freq_rank_whitaker", "shared_el"),
-           "pack": ("lemmas", "analyses", "senses", "candidates", "genx_cells", "size")}
+           "pack": ("lemmas", "analyses", "senses", "candidates", "genx_cells", "size", "gloss_en_covered")}
 MIN_EXPECTED = 100
 
 
@@ -113,9 +113,12 @@ def stage_inputs(stage, lang, raw, out):
             names += ["whitaker.tsv", "whitaker_inflects.tsv"]
             extra = _curated([pack.LA_MACRONS])
         elif lang == "grc":
-            extra = _curated([pack.GRC_OVERRIDES])
+            extra = _curated([pack.GRC_OVERRIDES, pack.supplement.FILE])
         else:
             extra = morphcut.input_files(out, raw, CURATED, lang)
+            if lang == "es":
+                import esgloss
+                extra += [p for p in esgloss.input_files(out, raw) if p not in extra]
         return _work(out, lang, names) + extra
     raise ValueError(stage)
 
