@@ -1,0 +1,118 @@
+# Gold Latin for tests/regression/own_dialogue.en.txt, one line per cue, written and reviewed by the main agent.
+# Style: beginner reader (Orberg-like): common words, simple clauses, verb final, macrons on long vowels.
+# Where two renderings are acceptable, the preferred one comes first, alternatives after " | ".
+# Speaker: Alice is a girl, so first-person adjectives are feminine where the sentence is hers.
+Quō īs?
+Sērō veniō! Sērō veniō!
+Ō mē miseram, ō mē miseram, quid faciam?
+Redī hūc!
+Manē mē, quaesō. | Exspectā mē, quaesō.
+Quis es?
+Nesciō.
+Vīdistīne fēlem meam?
+Parva est et alba. | Valdē parva est et valdē alba.
+Nōlī timēre.
+Aperī iānuam, quaesō.
+Iānua nimis parva est.
+Trānsīre nōn possum.
+Bibe hoc.
+Nunc nimis magna sum!
+Nunc nimis parva sum.
+Quō omnēs abiērunt?
+Quam mīrus hortus!
+Flōrēs loquī nōn possunt.
+Certē loquī possumus.
+Cane nōbīs carmen. | Cantā nōbīs carmen.
+Nūllum carmen sciō.
+Abī igitur.
+Omnēs valdē inurbānī estis. | Omnēs valdē asperī estis.
+Rēgīna venit!
+Omnēs, inclīnāte vōs! | Omnēs caput inclīnāte!
+Caput eius abscīdite! | Abscīdite eī caput!
+Rēgīna Cordium est.
+Lūdisne chartīs?
+Numquam anteā lūsī.
+Dā mihi pilam.
+Ubi est pila?
+Aufūgit.
+Pilae nōn currunt.
+Haec currit.
+Sūme thēam. | Bibe thēam.
+Nūlla thēa est. | Thēa nōn est.
+Sūme igitur placentam.
+Placentam nōlō.
+Quota hōra est?
+Hīc semper hōra sexta est.
+Cūr semper hōra sexta est?
+Quia hōrologium frāctum est.
+Quis hōrologium frēgit?
+Nēmō scit.
+Sedē et nārrā mihi fābulam.
+Ōlim erat puella parva.
+In foveam altam cecidit.
+In īmō iānuam invēnit.
+Post iānuam hortus erat.
+In hortō fēlēs habitābat.
+Fēlēs rīdēre poterat.
+Possuntne fēlēs rīdēre?
+Haec potest.
+Quā viā īre dēbeō? | Quō īre dēbeō?
+Id pendet ex eō quō īre vīs. | Hoc pendet: quō īre vīs?
+Nōn multum cūrō quō.
+Tum nihil interest quā viā eās.
+Omnēs hīc īnsānī sunt.
+Sumne īnsāna? | Egone īnsāna sum?
+Certē es; aliter hīc nōn essēs.
+Salvē, Māiestās Tua.
+Cūr rosās pingitis?
+Rosās albās errōre sēvimus.
+Rēgīna rubrās voluit.
+Sī rosās albās videt, capita nostra abscīdet.
+Adiuvāte nōs, quaesō!
+Dā mihi colōrem rubrum.
+Ecce.
+Grātiās tibi maximās agō.
+Libenter.
+Currāmus antequam veniat.
+Sērō. Ecce venit.
+Quid est nōmen tibi, puella?
+Nōmen mihi est Alīcia, Māiestās Tua.
+Scīsne lūdere?
+Paulum.
+Lūde igitur!
+Hoc fierī nōn potest.
+Sī modo id crēdis.
+Sex rēs quae fierī nōn possunt ante ientāculum crēdō.
+Quot frātrēs habēs?
+Duōs frātrēs et ūnam sorōrem habeō.
+Pater meus agricola est.
+Māter mea puerōs docet.
+In casā parvā prope flūmen habitāmus.
+Cotīdiē māne ad lūdum ambulō. | Omnī māne ad scholam ambulō.
+Hodiē magister īrātus erat.
+Nēmō pēnsum fēcerat.
+Crās epistulam Latīnē scrībēmus.
+Potesne mē in epistulā adiuvāre? | Potesne mē adiuvāre cum epistulā?
+Ita, libenter.
+Prīmum nōmen tuum scrībe.
+Deinde diem scrībe.
+Quī diēs est hodiē?
+Diēs Mārtis est.
+Putābam diem Lūnae esse.
+Errābās.
+Numquam errō.
+Omnēs aliquandō errant.
+Spectā caelum!
+Pluet. | Mox pluet.
+Intrēmus. | Eāmus intrō.
+Claude fenestram.
+Accende candēlam.
+Hīc obscūrum est.
+Timēsne tenebrās?
+Minimē.
+Cūr igitur tremis?
+Frīgeō.
+Sūme pallium meum.
+Valdē benignus es. | Valdē benigna es.
+Bene dormī. | Bonam noctem; bene dormī.
+Crās tē vidēbō.

@@ -17,9 +17,16 @@ Last updated: 2026-10-05 (session 1, step 1 of the production process).
   404 MB, English 3.3 GB, es.wiktionary extract 103 MB gz. If `data/raw/dl-done.flag` is
   missing, check `data/raw/dl-*.log` and rerun the curl commands (they resume with `-C -`).
 
-## Next step
-- M0.3: Sonnet pre-plan. Then M0.4: main agent writes DESIGN.md with [CONTRACT] sections and
-  opens implementation tasks (M1, M2) for Opus implementers.
+## Next step (updated 2026-10-06)
+- Waves A/B are running (see STATUS.md). Done: A1 BUILD, A2 CORE, A3 SUBS. Running: A4 LIB (kaikki + resolve
+  stages), B1 LEX reader, B2 NLP trainers + reader, B3 UI core. Max 4 implementers active.
+- Then: LIB stages gloss/tiers/pack (needs B1's fixture writer to compare bytes), RULES (two implementers:
+  morph+frame+transfer, realise_la+check+cue), CLI server, UI screens, shell port, brand, llm, online, eval.
+- Review protocol used so far: `git archive HEAD | tar -x -C <scratch>` then build + ctest + xcompile there, so
+  other implementers' uncommitted files do not pollute the verification. Commit the ledger with
+  `git commit docs/STATUS.md -m ...` (pathspec) so staged files of implementers are not swept in (this happened
+  once: core files landed in commit 1c2e9f9; harmless).
+- Gold Latin for the regression sentences: tests/regression/expected/own_dialogue.la.gold.txt (main agent).
 
 ## Open items for the owner
 - Upload the Alice subtitle file (acceptance test) and a second subtitle file (held-out test).
