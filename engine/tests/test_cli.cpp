@@ -78,7 +78,8 @@ TEST_CASE("cli: target text transforms") {
   CHECK(stripAddedEmoji("plain", "") == "plain");
   CHECK(greekMonotonic("ὁ ἄνθρωπος") == "ο άνθρωπος");
   CHECK(greekMonotonic("τῇ οἰκίᾳ") == "τη οικία");
-  CHECK(greekMonotonic("καὶ πού; ἢ πῶς") == "και πού; ή πώς");
+  // interrogative ποῦ keeps its accent; the enclitic indefinite πού "somewhere" loses it (vp::grc::toMonotonic)
+  CHECK(greekMonotonic("καὶ ποῦ; ἢ πῶς") == "και πού; ή πώς");
   CHECK(greekMonotonic("Ἀθηνᾶ") == "Αθηνά");
   CHECK(flattenLines(" a\nb  c\r\n") == "a b c");
   CHECK(splitLines("a\r\nb") == std::vector<std::string>{"a", "b"});
@@ -371,4 +372,76 @@ TEST_CASE("cli: stored tokens, flags, job facts and UI reason shapes") {
   CHECK(m.percent == 50);
   REQUIRE(m.missing.size() == 1);
   CHECK(m.missing[0].rfind("am", 0) == 0);
+}
+
+TEST_CASE("cli: Orbergise original alignment, language detection, stored facts, monotonic export") {
+  auto t = [](const char* s, int64_t a, int64_t b) {
+    TimedText x;
+    x.text = s;
+    x.start = a;
+    x.end = b;
+    x.timed = true;
+    return x;
+  };
+  const std::vector<TimedText> cues = {t("Puella rosam videt.", 1000, 3500), t("Nauta habitat.", 4000, 6500),
+                                       t("Agricola aquam portat.", 7000, 9500)};
+  // 1. same number of cues: by index, whatever the timing says
+  std::vector<TimedText> same = {t("A", 0, 10), t("B", 20, 30), t("C", 40, 50)};
+  CHECK(alignOriginal(cues, same) == std::vector<std::string>{"A", "B", "C"});
+  // untimed original (a .txt): by index, missing ones empty
+  std::vector<TimedText> txt(2);
+  txt[0].text = "one";
+  txt[1].text = "two";
+  CHECK(alignOriginal(cues, txt) == std::vector<std::string>{"one", "two", ""});
+  // 2. different counts: by time overlap (two halves of cue 1 joined; cue 2 gets the best partial overlap)
+  std::vector<TimedText> split = {t("The girl sees the rose.", 1000, 3400), t("The sailor", 4000, 5200),
+                                  t("lives there.", 5200, 6500), t("The farmer", 9300, 12000)};
+  CHECK(alignOriginal(cues, split) ==
+        std::vector<std::string>{"The girl sees the rose.", "The sailor lives there.", "The farmer"});
+  std::vector<TimedText> far = {t("x", 50000, 51000), t("y", 52000, 53000)};
+  CHECK(alignOriginal(cues, far) == std::vector<std::string>{"", "", ""});
+  CHECK(alignOriginal(cues, {}) == std::vector<std::string>{"", "", ""});
+
+  CHECK(detectOriginalLang({"The girl sees the rose.", "The sailor lives on the island."}) == "en");
+  CHECK(detectOriginalLang({"La niña ve la rosa.", "El marinero vive en la isla."}) == "es");
+  CHECK(detectOriginalLang({"¿Dónde está?"}) == "es");
+  CHECK(detectOriginalLang({}) == "en");
+  CHECK(detectOriginalLang({"OK"}) == "en");
+
+  OrbergFacts f;
+  CHECK(encodeOrberg(f).empty());
+  f.percent = 67;
+  f.missing = {"urbs"};
+  f.original = "The city is taken.";
+  OrbergFacts g;
+  REQUIRE(decodeOrberg(encodeOrberg(f), g));
+  CHECK(g.percent == 67);
+  CHECK(g.missing == std::vector<std::string>{"urbs"});
+  CHECK(g.original == "The city is taken.");
+  CHECK_FALSE(decodeOrberg("[1]", g));
+
+  // applyOutput keeps the engine's meaning facts hidden; the stub path (meaningPercent -1, no original) keeps none
+  vp::rules::CueOutput out;
+  out.target = "Puella rosam videt.";
+  out.meaningPercent = 100;
+  out.original = "The girl sees the rose.";
+  out.reasons.push_back(vp::rules::Reason{0, "orbergise", "spectat -> videt (vocabulary)",
+                                          "{\"was\":\"spectat\",\"now\":\"videt\",\"why\":\"vocabulary\"}"});
+  vp::CueRecord r;
+  applyOutput(out, r);
+  const vp::CueReason* h = hiddenReason(r, kOrbergKind);
+  REQUIRE(h != nullptr);
+  REQUIRE(decodeOrberg(h->data, g));
+  CHECK(g.percent == 100);
+  CHECK(g.original == "The girl sees the rose.");
+  vp::CueRecord r2;
+  applyOutput(vp::rules::CueOutput(), r2);
+  CHECK(hiddenReason(r2, kOrbergKind) == nullptr);
+
+  // export greek:"monotonic" on a Greek target: no breathing, circumflex, grave or iota subscript left
+  const std::string mono = greekMonotonic("Ἡ κόρη τὸ ῥόδον ὁρᾷ. Ὁ ναύτης ἐν τῇ νήσῳ οἰκεῖ.");
+  CHECK(mono == "Η κόρη το ρόδον ορά. Ο ναύτης εν τη νήσω οικεί.");
+  ExportOptions eo;
+  eo.monotonic = true;
+  CHECK(exportText("Ὁ γεωργὸς ὕδωρ φέρει.", "The farmer carries water.", eo) == "Ο γεωργός ύδωρ φέρει.");
 }

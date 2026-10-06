@@ -106,6 +106,10 @@ class Transfer {
   uint32_t adverb(const std::string& lemma, int token, Ctx& c, bool motion) const;
   bool pluralOnly(uint32_t lemma) const;
   bool latinVerbPhrase(const std::string& latin, realise::LaClause& rc) const;
+  bool nameTableInto(const frame::SemNP& n, Ctx& c, realise::LaNP& o) const;          // C15: names_la.tsv phrases
+  bool latinNameNP(const std::string& latin, realise::LaNP& o) const;                 // C15: "Leō Timidus" as an NP
+  bool titleNoun(const frame::SemNP& n, Ctx& c, realise::LaNP& o) const;              // C15: "the kind Stork"
+  bool deponentActive(const frame::SemFrame& in, Ctx& c, frame::SemFrame& out) const; // C15: deponent passives
 
   const lex::Lexicon& la_;
   const curated::CuratedData& cd_;

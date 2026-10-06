@@ -85,8 +85,13 @@ class GreekTransfer {
   GreekTransfer(const lex::Lexicon& grc, const curated::CuratedData& cd, const GreekData& gd, const GreekTables& gt);
 
   // One clause frame -> one Greek clause (subordinates, relative clauses and coordinations included).
+  // `subordinate` (C16): the clause is an indirect question or another dependent clause of a phrasebook slot (verb
+  // rows of frame "nonfinite" / "sub" apply: "which way you go" -> ποίαν ὁδὸν εἶ).
   void clause(const frame::SemFrame& f, const frame::SemSentence& s, const transfer::Settings& st,
-              transfer::Memory& mem, GrcClauseOut& out) const;
+              transfer::Memory& mem, GrcClauseOut& out, bool subordinate = false) const;
+  // Weekday names (C16): false = the god's name in the genitive ("Ἄρεως ἡμέρα", the default), true = the ordinal
+  // counted from Sunday ("τρίτη ἡμέρα", offered as an alternative by the engine).
+  void setWeekdayOrdinal(bool on) const { weekdayOrdinal_ = on; }
   // A bare NP addressed to someone -> a fragment clause with the NP as a vocative.
   void vocative(const frame::SemNP& np, const frame::SemSentence& s, const transfer::Settings& st,
                 transfer::Memory& mem, GrcClauseOut& out) const;
@@ -112,6 +117,7 @@ class GreekTransfer {
   void predicateInto(const frame::SemFrame& f, Ctx& c, GrcClause& cl) const;
   uint32_t adverb(const std::string& lemma, int token, Ctx& c, bool motion, bool* front = nullptr) const;
   uint32_t lexRowLemma(const LexRow* r, uint8_t pos) const;
+  uint32_t adjAdverb(const char* form) const;   // the adjective whose adverb cell is `form` (πρῶτον -> πρῶτος)
   bool fixedVerbPhrase(const std::string& greek, Ctx& c, GrcClause& cl) const;
   std::string english(const std::string& sourceLemma, const transfer::Settings& st) const;   // pivot for ES rows
   bool durative(const std::string& sourceLemma, uint32_t greekLemma, const transfer::Settings& st) const;
@@ -121,6 +127,7 @@ class GreekTransfer {
   const GreekData& gd_;
   const GreekTables& gt_;
   mutable std::vector<std::pair<std::string, uint32_t>> cache_;   // closed-class lookups (sorted, bounded)
+  mutable bool weekdayOrdinal_ = false;
 };
 
 // ---- cue helpers ----------------------------------------------------------------------------------------------------

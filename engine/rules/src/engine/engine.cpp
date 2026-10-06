@@ -543,7 +543,7 @@ class RulesEngine final : public Engine {
     std::vector<int> covered;
     std::vector<std::string> flags;
     struct UnitText { cue::Latin latin; std::vector<Reason> reasons; std::string sep; bool nameFirst = false;
-                      int srcStart = -1; size_t choiceFrom = 0, choiceTo = 0; };
+                      int srcStart = -1; size_t choiceFrom = 0, choiceTo = 0; bool connFront = false; };
     std::vector<UnitText> units;
     for (size_t ui = 0; ui < s.units.size(); ++ui) {
       const frame::Unit& u = s.units[ui];
@@ -552,6 +552,7 @@ class RulesEngine final : public Engine {
       ut.srcStart = u.first < (int)s.tokens.size() ? s.tokens[(size_t)u.first].start : -1;
       ut.choiceFrom = so.choices.size();
       if (u.type == frame::Unit::Phrase) {
+        ut.connFront = u.phrase.reg == "conn" && ui > 0;   // C15: "..., however;" -> Tamen ...
         renderPhrase(u.phrase, s, st, mem, opt, ut.latin, ut.reasons, flags, so.choices, covered, so.unknown);
         // connectors carried by the phrase ("Then go away." -> Abī igitur.)
         for (const std::string& k : u.frame.connectors) {
@@ -667,20 +668,31 @@ class RulesEngine final : public Engine {
       }
       if (!ut.latin.text.empty()) units.push_back(std::move(ut));
     }
+    // C15: a connector phrase after a clause opens that clause ("..., however;" -> "Tamen ...;")
+    for (size_t i = 1; i < units.size(); ++i)
+      if (units[i].connFront) {
+        const std::string after = units[i].sep;
+        units[i].sep.clear();
+        units[i - 1].sep = after;
+        std::swap(units[i - 1], units[i]);
+        units[i - 1].connFront = false;
+      }
     // join the units with the source separators
     cue::Latin& L = so.latin;
+    bool capNext = false;
     for (size_t i = 0; i < units.size(); ++i) {
       UnitText& ut = units[i];
       if (ut.latin.tokens.empty() && ut.latin.text.empty()) continue;
       std::vector<std::string> tx;
       for (const auto& t : ut.latin.tokens) tx.push_back(t.text);
       if (!tx.empty()) {
-        if (L.text.empty()) capitalise(tx[0]);
+        if (L.text.empty() || capNext) capitalise(tx[0]);
         else if (!ut.nameFirst) decapitalise(tx[0]);
         rewriteTokens(ut.latin, tx);
-        if (L.text.empty()) capitalise(ut.latin.tokens[0].display);
+        if (L.text.empty() || capNext) capitalise(ut.latin.tokens[0].display);
         else if (!ut.nameFirst) decapitalise(ut.latin.tokens[0].display);
       }
+      capNext = false;
       const int base = (int)L.tokens.size();
       cue::append(L, ut.latin);
       // source offsets: the source word of the choice that produced each lemma, else the unit's start
@@ -701,7 +713,10 @@ class RulesEngine final : public Engine {
         if (r.tokenIndex >= 0) r.tokenIndex += base;
         so.reasons.push_back(r);
       }
-      if (i + 1 < units.size() && !ut.sep.empty()) L.text += ut.sep;
+      // a unit that ends with its own question / exclamation mark ("Quid?") takes no separator; the next is a
+      // sentence of its own (C15)
+      if (endsWithAny(L.text, "?!")) capNext = i + 1 < units.size();
+      else if (i + 1 < units.size() && !ut.sep.empty()) L.text += ut.sep;
     }
     if (!s.repairs.empty()) {   // the analysis used a fallback: the structure may be wrong (Check)
       std::string what;

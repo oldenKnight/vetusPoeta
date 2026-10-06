@@ -6,7 +6,17 @@
 #         this Greek adjective is the predicate), realia (no Attic word: the nearest hypernym, confidence Check,
 #         rules_grc_notes.md decision 1), verb (a fixed choice for a frequent English verb; frame "past" = only in
 #         the past tense), durative (imperatives and infinitives of this verb take the present stem: continuing or
-#         general action, decision 8; every other verb takes the aorist for a single act).
+#         general action, decision 8; every other verb takes the aorist for a single act; a state verb of the kind
+#         "state" in the past: imperfect when durative, else aorist), perfect (C16: the perfect active of this Greek
+#         verb has the intransitive / passive sense: "the clock is broken" -> κατέαγεν), pp (C16: a fixed prepositional
+#         or adverbial phrase, source = preposition + determiner + noun as written in lower case: frame "adv" = the
+#         Greek adverb, "prep:<greek>+<case>" = the Greek preposition + the noun (" def" = with the article), "ptc" =
+#         the nominative participle agreeing with the subject, after the verb), weekday (C16: day name -> the god's
+#         name in the genitive + ἡμέρα, "Ἄρεως ἡμέρα"; frame = the day's ordinal counted from Sunday for the
+#         alternative "τρίτη ἡμέρα").
+#   verb rows, frame (C16): "nonfinite" = used instead of the main row when the verb is an infinitive, a subjunctive,
+#         a future, or inside a subordinate clause / indirect question ("go" -> εἶμι: ἰέναι, ἴωμεν, εἶ); "sub" = used
+#         inside a subordinate clause only ("before she comes" -> πρὶν ἥκειν).
 #   source: English (or Spanish) lemma(s), lower case. greek: the Greek lemma as in greek.vpl (headword without length
 #   marks). Spanish sources mirror the English rows (the Spanish frame builder keeps Spanish content lemmas).
 phrasal	come back	ἐπανέρχομαι		
@@ -32,7 +42,7 @@ verbprep	wait for	μένω	obj	"wait for me" -> μένε με
 verbprep	look for	ζητέω	obj	
 verbprep	ask for	αἰτέω	obj	
 verbprep	listen to	ἀκούω	obj	person in the genitive by valency_grc.tsv
-verbprep	look at	βλέπω	prep:εἰς+acc	
+verbprep	look at	βλέπω	prep:πρός+acc	"look at the sky" -> βλέπε πρὸς τὸν οὐρανόν
 verbprep	think about	-	prep:περί+gen	
 verbprep	talk about	-	prep:περί+gen	
 verbprep	esperar a	μένω	obj	
@@ -119,3 +129,90 @@ durative	inclinar	προσκυνέω
 verb	escapar	φεύγω		
 verb	inclinar	προσκυνέω		
 verb	pasar	διέρχομαι		
+# C16 (quality loop 2): rows for the regression lines 41-114 (our own rows)
+verb	go	εἶμι	nonfinite	ἰέναι, ἴωμεν, "which way you go" -> εἶ (εἶμι serves as the Attic future of ἔρχομαι)
+verb	ir	εἶμι	nonfinite	
+verb	come	ἥκω	sub	"before she comes" -> πρὶν ἥκειν αὐτήν
+verb	venir	ἥκω	sub	
+verb	break	κατάγνυμι		
+verb	romper	κατάγνυμι		
+verb	think	οἴομαι		"I thought it was Monday" -> ᾤμην Σελήνης ἡμέραν εἶναι
+verb	pensar	οἴομαι		
+verb	believe	πιστεύω		
+verb	creer	πιστεύω		
+verb	walk	βαδίζω		
+verb	caminar	βαδίζω		
+verb	find	εὑρίσκω		
+verb	encontrar	εὑρίσκω		
+verb	take	λαμβάνω		
+verb	tomar	λαμβάνω		
+verb	light	ἅπτω		"light the candle" -> ἅπτε τὸν λύχνον
+verb	encender	ἅπτω		
+verb	close	κλείω		
+verb	cerrar	κλείω		
+verb	write	γράφω		
+verb	escribir	γράφω		
+verb	smile	μειδιάω		
+verb	sonreír	μειδιάω		
+verb	help	βοηθέω		
+verb	ayudar	βοηθέω		
+verb	plant	φυτεύω		
+verb	plantar	φυτεύω		
+verb	teach	διδάσκω		
+verb	enseñar	διδάσκω		
+verb	shake	τρέμω		intransitive "be shaking" (tremble)
+verb	temblar	τρέμω		
+verb	paint	γράφω		γράφω "paint" (χρῴζω "colour" is the alternative)
+verb	pintar	γράφω		
+phrasal	cut off	ἀποτέμνω		
+phrasal	go inside	εἰσέρχομαι		"let's go inside" -> εἰσίωμεν
+phrasal	come inside	εἰσέρχομαι		
+state	mad	μαίνομαι	verb	"everyone here is mad" -> πάντες ἐνθάδε μαίνονται
+state	cold	ῥιγέω	verb	"I'm cold" -> ῥιγῶ
+state	wrong	ἁμαρτάνω	verb	"you were wrong" -> ἥμαρτες (an event: aorist)
+state	kind	χρηστός	adj	
+state	loco	μαίνομαι	verb	
+state	equivocado	ἁμαρτάνω	verb	
+state	amable	χρηστός	adj	
+state	tener frío	ῥιγέω	verb	
+verbprep	help with	βοηθέω	prep:περί+gen	"help me with the letter" -> βοηθεῖν μοι περὶ τῆς ἐπιστολῆς
+verbprep	ayudar con	βοηθέω	prep:περί+gen	
+perfect	-	κατάγνυμι		κατέαγα "I am broken" (intransitive perfect active)
+pp	by mistake	ἁμαρτών	ptc	"we planted white roses by mistake" -> ... ἐφυτεύσαμεν ἁμαρτόντες
+pp	por error	ἁμαρτών	ptc	
+pp	in latin	ῥωμαϊστί	adv	
+pp	in greek	Ἑλληνιστί	adv	
+pp	en latín	ῥωμαϊστί	adv	
+pp	en griego	Ἑλληνιστί	adv	
+pp	at the bottom	βάθος	prep:ἐν+dat def	"at the bottom" -> ἐν τῷ βάθει (κάτω is the alternative)
+pp	to school	διδάσκαλος	prep:πρός+acc def	"to the teacher": greek.vpl has no διδασκαλεῖον (lexicon gap)
+pp	at school	διδάσκαλος	prep:παρά+dat def	
+pp	a la escuela	διδάσκαλος	prep:πρός+acc def	
+weekday	sunday	Ἥλιος	1	Ἡλίου ἡμέρα
+weekday	monday	Σελήνη	2	Σελήνης ἡμέρα
+weekday	tuesday	Ἄρης	3	Ἄρεως ἡμέρα
+weekday	wednesday	Ἑρμῆς	4	Ἑρμοῦ ἡμέρα
+weekday	thursday	Ζεύς	5	Διὸς ἡμέρα
+weekday	friday	Ἀφροδίτη	6	Ἀφροδίτης ἡμέρα
+weekday	saturday	Κρόνος	7	Κρόνου ἡμέρα
+weekday	domingo	Ἥλιος	1	
+weekday	lunes	Σελήνη	2	
+weekday	martes	Ἄρης	3	
+weekday	miércoles	Ἑρμῆς	4	
+weekday	jueves	Ζεύς	5	
+weekday	viernes	Ἀφροδίτη	6	
+weekday	sábado	Κρόνος	7	
+durative	smile	μειδιάω		"the cat could smile" -> μειδιᾶν (an ability, not one act)
+durative	help	βοηθέω		βοήθει ἡμῖν, βοηθεῖν
+durative	write	γράφω		γράφε
+durative	believe	πιστεύω		
+durative	close	κλείω		κλεῖε τὴν θυρίδα (present imperative of the gold)
+durative	light	ἅπτω		ἅπτε τὸν λύχνον
+durative	think	οἴομαι		
+durative	be angry	ὀργίζω		state in the past: ὠργίζετο
+durative	be mad	μαίνομαι		
+durative	be cold	ῥιγέω		
+durative	shake	τρέμω		
+durative	teach	διδάσκω		
+durative	know	οἶδα		
+durative	go	εἶμι		εἶμι has the present system only (ἰέναι, ἴωμεν, ἴθι)

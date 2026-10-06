@@ -75,6 +75,11 @@ vp::rules::CueInput Server::cueInput(size_t pos) const {
     x.raw = sp.kind == vp::subs::Span::Newline ? std::string("\n") : sp.raw;
     in.spans.push_back(std::move(x));
   }
+  // Orbergise (pair la-la): the aligned original-language cue and its language
+  if (langs_.source == vp::rules::Lang::La && pos < originals_.size()) {
+    in.originalText = originals_[pos];
+    in.originalLang = originalLang_ == "es" ? vp::rules::Lang::Es : vp::rules::Lang::En;
+  }
   return in;
 }
 
@@ -156,12 +161,21 @@ json Server::cmdCueGet(const json& p) {
   JobFacts job;
   const vp::CueReason* jh = hiddenReason(r, kJobKind);
   const bool orberg = orbergMode() || (jh && decodeJob(jh->data, job) && job.orberg);
-  if (orberg) {   // Orbergise mode: meaning check against the input Latin, the original-language line
-    if (!r.target.empty() && lexFor(vp::rules::Lang::La)) {
+  if (orberg) {
+    // Orbergise mode: the engine's meaning check (CueOutput.meaningPercent/meaningMissing, stored with the cue) when
+    // it computed one; after a user edit (or with the stub) the CLI's content-lemma overlap with the input Latin.
+    // `original`: the aligned original-language cue the job used, else the one of the loaded original file.
+    OrbergFacts of;
+    const vp::CueReason* oh = hiddenReason(r, kOrbergKind);
+    const bool haveFacts = oh && decodeOrberg(oh->data, of);
+    if (haveFacts && of.percent >= 0) {
+      out["meaning"] = json{{"percent", of.percent}, {"missing", of.missing}};
+    } else if (!r.target.empty() && lexFor(vp::rules::Lang::La)) {
       const Meaning m = meaningCheck(*lexFor(vp::rules::Lang::La), sources_[pos], r.target);
       out["meaning"] = json{{"percent", m.percent}, {"missing", m.missing}};
     }
-    if (pos < originals_.size()) out["original"] = originals_[pos];
+    if (haveFacts && !of.original.empty()) out["original"] = of.original;
+    else if (pos < originals_.size()) out["original"] = originals_[pos];
   }
   return out;
 }
@@ -323,13 +337,29 @@ json Server::cmdOrbergiseStart(const json& p) {
   opt.source = vp::rules::Lang::La;
   opt.target = vp::rules::Lang::La;
   opt.orbergTier = static_cast<int>(intParam(p, "tier", 1, 1, 2));
-  boolParam(p, "keepNames", true);   // the rules engine has no switch for these yet (engine/cli/README.md)
-  boolParam(p, "simplify", false);
+  opt.orbergKeepNames = boolParam(p, "keepNames", true);
+  opt.orbergSimplify = boolParam(p, "simplify", true);
+  // originalPath: a file to load (it stays loaded and is remembered by the project); "" forgets the loaded one;
+  // absent or null keeps whatever is loaded. originalLang "en" | "es"; absent = detected from the file.
   const std::string original = strParam(p, "originalPath", "");
+  const bool forget = p.is_object() && p.contains("originalPath") && p["originalPath"].is_string() && original.empty();
+  const std::string originalLang = strParam(p, "originalLang", "");
+  if (!originalLang.empty() && originalLang != "en" && originalLang != "es")
+    fail(ErrorCode::BadParams, "originalLang must be en or es", "The original-language file must be English or Spanish.");
   if (langs_.source != vp::rules::Lang::La)
     fail(ErrorCode::BadParams, "Orbergise needs a Latin project (pair la-la)", "Open a Latin file to orbergise it.");
   requirePair("la-la");
-  if (!original.empty()) loadOriginal(original);
+  if (!original.empty()) {
+    loadOriginal(original, originalLang);
+    noteChange();   // the manifest remembers the file
+  } else if (forget && !originalPath_.empty()) {
+    clearOriginal();
+    noteChange();
+  } else if (!originalLang.empty() && !originalPath_.empty() && originalLang != originalLang_) {
+    originalLang_ = originalLang;
+    project_.manifest.settingsSnapshot["orbergOriginalLang"] = originalLang_;
+    noteChange();
+  }
   bool given = false;
   std::vector<size_t> positions = indicesParam(p, &given);
   if (!given)
@@ -337,7 +367,9 @@ json Server::cmdOrbergiseStart(const json& p) {
       if (!project_.cues[i].edited && !project_.cues[i].reviewed) positions.push_back(i);
   const int64_t jobId = nextJob_++;
   pendingJob_ = [this, jobId, positions, opt]() { runJob(jobId, positions, opt, "translate", {}); };
-  return json{{"jobId", jobId}, {"total", positions.size()}, {"warnings", json::array()}};
+  return json{{"jobId", jobId}, {"total", positions.size()}, {"warnings", json::array()},
+              {"originalPath", originalPath_.empty() ? json(nullptr) : json(originalPath_)},
+              {"originalLang", originalPath_.empty() ? json(nullptr) : json(originalLang_)}};
 }
 
 void Server::runJob(int64_t jobId, std::vector<size_t> positions, vp::rules::Options opt, const char* prefix,

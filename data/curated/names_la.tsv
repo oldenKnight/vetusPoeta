@@ -75,3 +75,19 @@ Miss	domina	dominae	f	1	translate
 Sir	domine	-	m	-	translate	vocative only
 Madam	domina	-	f	-	translate	vocative only
 Majesty	Māiestās	Māiestātis	f	3	translate	"Your Majesty" -> Māiestās Tua (phrasebook)
+# Names of the public-domain tuning sample (C15): translated titles and places; several Latin words are declined as
+# noun + adjective / genitive ("Leō Timidus", "Urbs Smaragdōrum"). "of" names are matched with or without "the".
+Oz	Oz	-	m	0	keep	indeclinable
+Kansas	Kansia	Kansiae	f	1	translate	country: in + acc / abl
+Dorothy	Dorothēa	Dorothēae	f	1	translate	
+Scarecrow	Terriculum	Terriculī	n	2	translate	
+Tin Woodman	Lignātor Stanneus	-	m	-	translate	
+Cowardly Lion	Leō Timidus	-	m	-	translate	
+Wicked Witch	Saga Mala	-	f	-	translate	
+Emerald City	Urbs Smaragdōrum	-	f	-	translate	
+City of Emeralds	Urbs Smaragdōrum	-	f	-	translate	
+Great Wizard	Magnus Magus	-	m	-	translate	
+Witch of the North	Saga Septentriōnis	-	f	-	translate	
+Golden Cap	Pilleus Aureus	-	m	-	translate	
+Power of Evil	Potestās Malī	-	f	-	translate	
+King of Beasts	Rēx Bēstiārum	-	m	-	translate	

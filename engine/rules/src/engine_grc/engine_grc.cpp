@@ -153,6 +153,27 @@ struct GreekPath::Impl {
   std::unique_ptr<frame::FrameBuilder> fbEn, fbEs;
   const std::vector<rules::GlossaryEntry>* glossary = nullptr;
   transfer::Memory memBefore;
+  uint8_t royalGender = 0;   // C16: gender of the last king / queen named in the file (address "your majesty")
+
+  // C16: the addressee of a title of address: a glossary entry for the title ("Majesty", "Your Majesty") with a
+  // gender, else the last royal noun of the file, else 0 (unknown).
+  uint8_t addresseeGender(const std::string& pattern) const {
+    if (glossary)
+      for (const rules::GlossaryEntry& e : *glossary) {
+        const std::string k = text::lower(e.name);
+        if ((k == text::lower(pattern) || pattern.find(k) != std::string::npos) && !e.gender.empty())
+          return e.gender == "f" ? feat::F : feat::M;
+      }
+    return royalGender;
+  }
+  void noteRoyal(const std::vector<transfer::Choice>& choices) {
+    for (const transfer::Choice& c : choices) {
+      if (c.lemma == kNone) continue;
+      const std::string k(lx.lemma(c.lemma).key);
+      if (k == "βασίλεια" || k == "δέσποινα" || k == "ἄνασσα") royalGender = feat::F;
+      else if (k == "βασιλεύσ" || k == "δεσπότησ" || k == "ἄναξ") royalGender = feat::M;
+    }
+  }
 
   Impl(const lex::Lexicon& l, curated::CuratedData c, GreekData g, GreekTables t, PathConfig k)
       : lx(l), cd(std::move(c)), gd(std::move(g)), gt(std::move(t)), cfg(k) {
@@ -254,9 +275,23 @@ struct GreekPath::Impl {
         if (sl.kind == frame::SlotKind::Wh || sl.kind == frame::SlotKind::VP) {
           const std::vector<frame::SemFrame>& fr = sl.kind == frame::SlotKind::Wh ? sl.wh : sl.vp;
           if (fr.empty()) continue;
-          xfer->clause(fr[0], s, st, mem, co);
+          // C16: a {WH} slot is an indirect question (dependent: "which way you go" -> ποίαν ὁδὸν εἶ)
+          xfer->clause(fr[0], s, st, mem, co, sl.kind == frame::SlotKind::Wh);
           if (cs == "subj") co.clause.pred.mood = feat::Subjunctive;
           if (sl.kind == frame::SlotKind::VP) co.clause.hasSubject = false;
+          if (cs == "inf") {   // C16: {1:inf}: the verb phrase as an infinitive ("ἆρα οἶσθα παίζειν;")
+            GrcClause body = co.clause;
+            body.type = ClauseType::Decl;
+            body.hasSubject = false;
+            body.connectors.clear();
+            GrcClause wrap;
+            wrap.type = ClauseType::Frag;
+            GrcSub sub;
+            sub.rel = SubRel::AccInf;
+            sub.clause.push_back(std::move(body));
+            wrap.subs.push_back(std::move(sub));
+            co.clause = std::move(wrap);
+          }
           realiseClause(co.clause, opt, piece, pr, flags);
         } else if (sl.kind == frame::SlotKind::Adj) {
           transfer::Choice ch;
@@ -305,7 +340,13 @@ struct GreekPath::Impl {
       }
       if (w.size() > 2 && w.front() == '(' && w.back() == ')') w = w.substr(1, w.size() - 2);
       const size_t slash = w.find('/');
-      if (slash != std::string::npos) {
+      if (slash != std::string::npos && m.note.find("addressee") != std::string::npos) {
+        // C16: "your majesty" -> ὦ βασιλεῦ / ὦ βασίλεια by the addressee: the glossary, else the last king or queen
+        // named in the file, else masculine with Check (rules_grc2_notes.md, quality loop 2)
+        uint8_t ag = addresseeGender(m.pattern);
+        if (!ag) { ag = feat::M; addFlag(flags, "addressee-guess"); }
+        w = ag == feat::F ? w.substr(slash + 1) : w.substr(0, slash);
+      } else if (slash != std::string::npos) {
         w = g == 'f' ? w.substr(slash + 1) : w.substr(0, slash);
         addFlag(flags, "speaker-gender");
       }
@@ -720,6 +761,7 @@ struct GreekPath::Impl {
     };
     std::vector<CueAcc> acc(texts.size());
     transfer::Memory mem;
+    royalGender = 0;
     transfer::Settings st;
     st.lang = lang;
     st.fidelity = std::max(1, std::min(3, opt.fidelity));
@@ -755,6 +797,7 @@ struct GreekPath::Impl {
         addFlag(so.flags, "nonverbal");
       } else {
         speech(ss.text, fb, opt, mem, st, so, true);
+        noteRoyal(so.choices);
         if (ss.kind == frame::CueKind::Song) {
           so.song = true;
           addFlag(so.flags, "song");

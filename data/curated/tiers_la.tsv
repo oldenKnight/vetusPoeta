@@ -23,10 +23,10 @@ specto	spectō	verb	1	derived
 audio	audiō	verb	1	derived	
 ago	agō	verb	1	derived	
 capio	capiō	verb	1	derived	
-accipio	accipiō	verb	1	derived	
+accipio	accipiō	verb	1	derived	get, receive, accept
 pono	pōnō	verb	1	derived	
 porto	portō	verb	1	derived	
-fero	ferō	verb	1	derived	
+fero	ferō	verb	1	derived	bring, bear
 sedeo	sedeō	verb	1	derived	
 sto	stō	verb	1	derived	
 iaceo	iaceō	verb	1	derived	
@@ -77,7 +77,7 @@ ludo	lūdō	verb	1	derived
 laboro	labōrō	verb	1	derived	
 pugno	pugnō	verb	1	derived	
 verbero	verberō	verb	1	derived	
-pulso	pulsō	verb	1	derived	
+pulso	pulsō	verb	1	derived	knock, strike, ring (a bell)
 tango	tangō	verb	1	derived	
 teneo	teneō	verb	1	derived	
 relinquo	relinquō	verb	1	derived	
@@ -92,7 +92,7 @@ exeo	exeō	verb	1	derived
 intro	intrō	verb	1	derived	
 adsum	adsum	verb	1	derived	
 absum	absum	verb	1	derived	
-pervenio	perveniō	verb	1	derived	
+pervenio	perveniō	verb	1	derived	arrive, reach, get to
 incipio	incipiō	verb	1	derived	
 desino	dēsinō	verb	1	derived	
 finio	fīniō	verb	1	derived	
@@ -127,7 +127,7 @@ puella	puella	noun	1	derived
 puer	puer	noun	1	derived	boy, child
 vir	vir	noun	1	derived	
 femina	fēmina	noun	1	derived	
-homo	homō	noun	1	derived	
+homo	homō	noun	1	derived	human being, person, people
 pater	pater	noun	1	derived	
 mater	māter	noun	1	derived	
 filius	fīlius	noun	1	derived	
@@ -225,7 +225,7 @@ cor	cor	noun	1	derived
 corpus	corpus	noun	1	derived	
 sanguis	sanguis	noun	1	derived	
 capillus	capillus	noun	1	derived	
-vestis	vestis	noun	1	derived	
+vestis	vestis	noun	1	derived	clothes, garment, dress, frock
 tunica	tunica	noun	1	derived	
 calceus	calceus	noun	1	derived	
 pecunia	pecūnia	noun	1	derived	
@@ -292,7 +292,7 @@ omnis	omnis	adj	1	derived
 totus	tōtus	adj	1	derived	
 nullus	nūllus	adj	1	derived	
 solus	sōlus	adj	1	derived	
-alius	alius	adj	1	derived	
+alius	alius	adj	1	derived	other, another
 alter	alter	adj	1	derived	
 ceteri	cēterī	adj	1	derived	
 primus	prīmus	adj	1	derived	
@@ -306,7 +306,7 @@ fessus	fessus	adj	1	derived
 aeger	aeger	adj	1	derived	
 sanus	sānus	adj	1	derived	
 fortis	fortis	adj	1	derived	
-timidus	timidus	adj	1	derived	
+timidus	timidus	adj	1	derived	cowardly, timid, fearful
 stultus	stultus	adj	1	derived	
 prudens	prūdēns	adj	1	derived	
 sapiens	sapiēns	adj	1	derived	
@@ -534,3 +534,46 @@ quotus	quotus	adj	1	derived	which (in number): quota hōra est
 pensum	pēnsum	noun	2	derived	homework, task
 latine	Latīnē	adv	1	derived	in Latin
 graece	Graecē	adv	1	derived	in Greek
+# C15 (quality loop 2): beginner words of the burned tuning sample; the note is the teacher's English gloss list.
+portus	portus	noun	1	teacher	harbour, harbor, port
+palea	palea	noun	2	teacher	straw, chaff
+noceo	noceō	verb	1	teacher	hurt, harm, injure
+socius	socius	noun	2	teacher	comrade, companion, ally, partner
+amita	amita	noun	2	teacher	aunt
+avunculus	avunculus	noun	2	teacher	uncle
+cupio	cupiō	verb	1	teacher	desire, long for, be eager
+constituo	cōnstituō	verb	2	teacher	decide, resolve, set up
+potestas	potestās	noun	2	teacher	power, authority
+follis	follis	noun	2	teacher	bellows, bag, balloon
+osculor	ōsculor	verb	2	teacher	kiss
+fateor	fateor	verb	2	teacher	admit, confess
+saga	saga	noun	2	teacher	witch
+magus	magus	noun	2	teacher	wizard, magician, sorcerer
+regia	rēgia	noun	2	teacher	palace, royal palace
+sericum	sēricum	noun	2	teacher	silk
+curiositas	cūriōsitās	noun	2	teacher	curiosity
+tintinnabulum	tintinnābulum	noun	2	teacher	bell
+omnino	omnīnō	adv	2	teacher	entirely, altogether, at all
+ciconia	cicōnia	noun	2	teacher	stork
+pungo	pungō	verb	2	teacher	sting, prick
+arceo	arceō	verb	2	teacher	keep away, keep off, ward off
+pergo	pergō	verb	2	teacher	go on, keep on, continue
+descendo	dēscendō	verb	2	teacher	go down, come down, get down
+arcesso	arcessō	verb	2	teacher	send for, summon
+caedo	caedō	verb	2	teacher	cut down, chop, fell
+aedifico	aedificō	verb	2	teacher	build
+lignator	lignātor	noun	2	teacher	woodcutter, woodman
+terriculum	terriculum	noun	2	teacher	scarecrow, bugbear
+stannum	stannum	noun	2	teacher	tin
+stanneus	stanneus	adj	2	teacher	made of tin
+fax	fax	noun	2	teacher	torch
+praeterea	praetereā	adv	2	teacher	besides, moreover
+libet	libet	verb	2	teacher	it pleases
+periculum	perīculum	noun	1	teacher	danger, peril, risk
+quidam	quīdam	pron	1	teacher	a certain, some (people)
+quisquam	quisquam	pron	2	teacher	anyone (after a negative)
+maior	maior	adj	1	teacher	
+apis	apis	noun	2	teacher	bee
+mane	māne	adv	1	teacher	in the morning, early
+vesperi	vesperī	adv	2	teacher	in the evening
+posthac	posthāc	adv	2	teacher	hereafter, from now on

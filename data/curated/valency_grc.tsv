@@ -86,7 +86,7 @@
 πέμπω	acc	τὸν δοῦλον πέμπει	
 πίνω	acc;gen	οἶνον πίνει	partitive genitive "some of"
 πίπτω	intr	ὁ λίθος πίπτει	
-πιστεύω	dat	τῷ φίλῳ πιστεύει	
+πιστεύω	dat;acc	τῷ φίλῳ πιστεύει; ἓξ ἀδύνατα πιστεύει	the person in the dative, a thing believed in the accusative (C16)
 ποιέω	acc;acc+acc	τί ποιεῖς;	
 πορεύω	mid:intr;prep:εἰς+acc	εἰς τὴν πόλιν πορεύεται	
 πράττω	acc	τί πράττεις;	
@@ -103,3 +103,5 @@
 φοβέω	acc;mid:acc	μὴ φοβοῦ	middle "fear" + accusative
 χαίρω	intr;dat	τῇ ᾠδῇ χαίρει	
 χράω	mid:dat	τῷ ξίφει χρῆται	χράομαι "use" + dative
+οἴομαι	acc+inf;inf	ᾤμην Σελήνης ἡμέραν εἶναι	"I thought it was Monday" (C16)
+χρή	impers:acc+inf	ποῖ χρή με ἰέναι;	"should" (C16)

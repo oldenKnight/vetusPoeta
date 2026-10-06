@@ -54,15 +54,16 @@ const char* adverb(const std::string& l, bool motion) {
       {"today", "hodiē"},      {"tomorrow", "crās"},       {"yesterday", "herī"},      {"tonight", "hodiē"},
       {"sometimes", "aliquandō"}, {"again", "iterum"},     {"also", "quoque"},        {"already", "iam"},
       {"still", "adhūc"},      {"soon", "mox"},            {"outside", "forīs"},      {"well", "bene"},
-      {"much", "multum"},      {"little", "paulum"},       {"first", "prīmum"},       {"then", "deinde"},
+      {"much", "multum"},      {"little", "paulum"},       {"first", "prīmum"},       {"then", "tum"},
       {"only", "modo"},        {"very", "valdē"},          {"too", "nimis"},          {"so", "tam"},
       {"often", "saepe"},      {"perhaps", "fortasse"},    {"maybe", "fortasse"},     {"really", "vērō"},
       {"away", "procul"},      {"back", "retrō"},          {"quickly", "celeriter"},  {"slowly", "lentē"},
-      {"together", "simul"},   {"almost", "paene"},        {"enough", "satis"},       {"immediately", "statim"},
+      {"together", "ūnā"},     {"almost", "paene"},        {"enough", "satis"},       {"immediately", "statim"},
       {"later", "posteā"},     {"once", "semel"},          {"gladly", "libenter"},    {"badly", "male"},
       {"everywhere", "ubīque"}, {"nowhere", "nusquam"},    {"far", "procul"},         {"near", "prope"},
       {"yes", "ita"},          {"no", "nōn"},              {"certainly", "certē"},    {"quite", "satis"},
-      {"rather", "potius"},    {"even", "etiam"},          {"ever", "umquam"},        {"long", "diū"},
+      {"rather", "potius"},    {"even", "etiam"},     {"as", "tam"},     {"hereafter", "posthāc"},
+      {"besides", "praetereā"}, {"however", "tamen"},  {"exactly", "plānē"},          {"ever", "umquam"},        {"long", "diū"},
       {"loudly", "magnā vōce"}, {"truly", "vērē"},         {"together", "ūnā"},       {"up", "sursum"},
       {"down", "deorsum"},     {"forward", "porrō"},       {"why", "cūr"},            {"how", "quōmodo"},
       {"where", "ubi"},        {"when", "quandō"},        {"at last", "tandem"},     {"suddenly", "subitō"},
@@ -162,8 +163,10 @@ const char* connector(const std::string& w, bool afterFirst) {
   if (w == "then") return afterFirst ? "deinde" : "igitur";
   static const std::pair<const char*, const char*> kC[] = {
       {"and", "et"},       {"but", "sed"},        {"or", "aut"},          {"so", "itaque"},   {"because", "quia"},
-      {"if", "sī"},        {"nor", "neque"},      {"also", "quoque"},     {"yet", "tamen"},   {"therefore", "igitur"},
-      {"however", "autem"}, {"when", "cum"},      {"although", "quamquam"}, {"while", "dum"},  {"unless", "nisi"}};
+      {"if", "sī"},        {"nor", "neque"},      {"also", "quoque"},     {"yet", "tamen"},   {"therefore", "itaque"},
+      {"however", "tamen"}, {"when", "cum"},      {"although", "quamquam"}, {"while", "dum"},  {"unless", "nisi"},
+      {"for", "nam"},      {"besides", "praetereā"}, {"moreover", "praetereā"}, {"still", "tamen"}, {"thus", "ita"},
+      {"hence", "itaque"}};
   return lookup(kC, w);
 }
 

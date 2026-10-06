@@ -10,8 +10,8 @@ welcome	χαῖρε	1	greet	plural χαίρετε
 goodbye	χαῖρε	1	greet	plural χαίρετε; ἔρρωσο (fare well) is the alternative
 bye	χαῖρε	1	greet	
 farewell	ἔρρωσο	1	greet	plural ἔρρωσθε
-see you (soon|later)	αὖθις ὄψομαί σε	1	greet	
-see you tomorrow	αὔριον ὄψομαί σε	1	greet	
+see you (soon|later)	αὖθίς σε ὄψομαι	1	greet	
+see you tomorrow	αὔριόν σε ὄψομαι	1	greet	the enclitic σε in second position (C16)
 thank you	χάριν σοι οἶδα	1	polite	
 thanks	χάριν οἶδα	1	polite	
 thank you very much	πολλὴν χάριν σοι οἶδα	1	polite	
@@ -45,7 +45,7 @@ my dear	ὦ φίλε	1	voc	feminine ὦ φίλη by the speaker glossary
 how are you	πῶς ἔχεις	1	q	
 i am fine	καλῶς ἔχω	1	answer	
 what is your name	τί ὄνομά σοι	1	q	
-my name is {NAME}	ὄνομά μοί ἐστι {1}	1	intro	
+my name is {NAME}	{1} ὄνομά μοι	1	intro	"Ἀλίκη ὄνομά μοι" (the name first, the copula left out)
 what time is it	πηνίκα ἐστίν	1	q	Attic "at what hour"
 really	ἀληθῶς	1	answer	
 nonsense	φλυαρεῖς	1	excl	"you are talking nonsense"
@@ -55,3 +55,32 @@ never mind	ἔα	1	excl
 i am late	ὀψὲ ἥκω	1	answer	"I have come late"
 play cards	χάρταις παίζειν	2	vp	verb phrase: the last word is the verb, inflected as the clause needs
 off with {NP}	ἀποτέμετε {1:acc}	2	excl	"cut off ...!" (plural command)
+# C16 (quality loop 2): set phrases of the regression lines 41-114 (our own rows)
+good afternoon	χαῖρε	1	greet	plural χαίρετε
+good night	καλὴν νύκτα	1	greet	
+sleep well	εὖ κάθευδε	1	imp	plural εὖ καθεύδετε
+you're welcome	οὐδέν ἐστιν	1	polite	"it is nothing"; ἡδέως "gladly" is the alternative
+here you are	ἰδού	1	give	
+here it is	ἰδού	1	give	
+here she|he is|comes	ἰδοὺ ἥκει	1	give	"Here she is!" of someone arriving
+too late	ὀψὲ ἤδη	1	answer	ὀψὲ λίαν is the alternative
+a little	ὀλίγον	1	answer	as a reply ("a little girl" is not matched: the phrase must stand alone)
+once upon a time	ποτέ	1	narr	before a clause: particle ποτέ ("Once upon a time there was ..." -> ἦν ποτε ...)
+long ago	πάλαι	1	adv	
+you must be	ἀνάγκη	1	answer	"it must be so" (an elliptical "must")
+i don't much care where	οὐ πολὺ μέλει μοι ποῖ	1	answer	
+i don't care	οὐ μέλει μοι	1	answer	
+that depends on {WH}	τοῦτο ἐξαρτᾶται ἐκ τοῦ {1}	1	state	{WH}: indirect question ("where you want to go" -> ποῖ βούλει ἰέναι)
+it depends on {WH}	τοῦτο ἐξαρτᾶται ἐκ τοῦ {1}	1	state	
+it doesn't matter {WH}	οὐδὲν διαφέρει {1}	1	state	"it doesn't matter which way you go" -> οὐδὲν διαφέρει ποίαν ὁδὸν εἶ
+it does not matter {WH}	οὐδὲν διαφέρει {1}	1	state	
+it doesn't matter	οὐδὲν διαφέρει	1	answer	
+do you know how to {VP}	ἆρα οἶσθα {1:inf}	1	q	{1:inf}: the verb phrase as an infinitive; ἆρ' ἐπίστασαι + infinitive is the alternative
+pass me {NP}	δός μοι {1:acc}	1	imp	
+hand me {NP}	δός μοι {1:acc}	1	imp	
+your majesty	ὦ βασιλεῦ/βασίλεια	2	address	addressee gender: the last king or queen named (or the glossary), else masculine and Check
+your highness	ὦ βασιλεῦ/βασίλεια	2	address	addressee gender as "your majesty"
+every morning	ἑκάστης ἡμέρας ἕωθεν	1	adv	genitive of time; καθ' ἑκάστην ἡμέραν ἕωθεν is the alternative
+every day	ἑκάστης ἡμέρας	1	adv	
+it is raining	ὕει	1	state	
+it's going to rain	ὕσει	1	state	

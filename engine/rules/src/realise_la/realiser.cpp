@@ -11,7 +11,7 @@ using namespace vp::feat;
 
 namespace {
 
-enum Slot : int { kVOC, kCONN, kS, kIO, kO, kOBL, kADV, kNEG, kV, kPRED, kINF, kWH, kFRONT, kEND, kSlotCount };
+enum Slot : int { kVOC, kCONN, kS, kIO, kO, kOBL, kADV, kNEG, kV, kPRED, kINF, kWH, kFRONT, kEND, kTADV, kSlotCount };
 
 int slotOf(const std::string& n) {
   if (n == "VOC") return kVOC;
@@ -30,7 +30,7 @@ int slotOf(const std::string& n) {
 }
 
 // Canonical order used to insert slots a template does not name.
-const int kCanon[] = {kFRONT, kWH, kS, kIO, kO, kOBL, kADV, kPRED, kINF, kNEG, kV, kEND};
+const int kCanon[] = {kFRONT, kWH, kS, kTADV, kIO, kO, kOBL, kADV, kPRED, kINF, kNEG, kV, kEND};
 int canonIndex(int s) {
   for (int i = 0; i < (int)(sizeof kCanon / sizeof kCanon[0]); ++i)
     if (kCanon[i] == s) return i;
@@ -171,9 +171,10 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
     if (n.interrogative != kNone) out.push_back(modifierWord(n.interrogative, 0, "order.wh"));
     if (n.numeral != kNone) out.push_back(modifierWord(n.numeral, 0, "order.num"));
     for (const LaAdj& ad : n.adjectives) {
-      if (!(order_.adjectiveBefore(ad.lemma) || exclFirst)) continue;
+      if (!(order_.adjectiveBefore(ad.lemma) || exclFirst || ad.before)) continue;
       for (uint32_t adv : ad.adverbs) { Word w; literal(adv, "?", w, "order.adv"); out.push_back(std::move(w)); }
       out.push_back(modifierWord(ad.lemma, ad.degree, exclFirst ? "order.excl" : "order.adj"));
+      if (ad.capitalise) Punctuation::capitaliseFirst(out.back().form);
     }
     if (n.possessive != kNone && n.possContrast) out.push_back(modifierWord(n.possessive, 0, "order.poss"));
     // head
@@ -204,9 +205,10 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
     }
     // post-head: adjectives, possessive, genitive, relative clause
     for (const LaAdj& ad : n.adjectives) {
-      if (order_.adjectiveBefore(ad.lemma) || exclFirst) continue;
+      if (order_.adjectiveBefore(ad.lemma) || exclFirst || ad.before) continue;
       for (uint32_t adv : ad.adverbs) { Word w; literal(adv, "?", w, "order.adv"); out.push_back(std::move(w)); }
       out.push_back(modifierWord(ad.lemma, ad.degree, "order.adj"));
+      if (ad.capitalise) Punctuation::capitaliseFirst(out.back().form);
     }
     if (n.possessive != kNone && !n.possContrast) out.push_back(modifierWord(n.possessive, 0, "order.poss"));
     for (const LaNP& g : n.genitive) np(g, Gen, nullptr, o, out);
@@ -221,6 +223,8 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
       append(out, rw);
     }
   }
+  if (n.nameWords)   // C15: a translated name: every word is the name (checker: names, no tier finding)
+    for (size_t i = start0; i < out.size(); ++i) { out[i].name = true; out[i].rule = "name.policy"; }
   for (size_t i = 0; i < n.coord.size(); ++i) {
     std::vector<Word> cw;
     np(n.coord[i], case_, owner, o, cw);
@@ -416,7 +420,7 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
       }
     }
     const bool wh = ob.np.interrogative != kNone;
-    std::vector<Word>& dst = wh ? s[kWH] : ob.front ? s[kFRONT] : s[kOBL];
+    std::vector<Word>& dst = wh ? s[kWH] : ob.front ? s[kFRONT] : ob.after ? s[kEND] : s[kOBL];
     if (ob.np.emphasis && !wh) focus = ob.front ? kFRONT : kOBL;
     append(dst, w);
   }
@@ -426,6 +430,7 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
     literal(ad.lemma, "?", w, "order.adv");
     if (ad.pos == AdvPos::Front || (ad.pos == AdvPos::Auto && order_.timeAdverb(ad.lemma))) s[kFRONT].push_back(std::move(w));
     else if (ad.pos == AdvPos::End) s[kEND].push_back(std::move(w));
+    else if (order_.timeAdverb(ad.lemma)) s[kTADV].push_back(std::move(w));   // C15 order.adv: after the subject
     else s[kADV].push_back(std::move(w));
   }
   // Predicate (copula)
@@ -530,14 +535,16 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
     }
     orderRule = "order.excl";
   } else if (c.type == ClauseType::Frag) {
-    for (int sl : {kFRONT, kWH, kS, kPRED, kIO, kO, kOBL, kADV, kNEG, kV, kINF, kEND}) append(content, s[sl]);
+    for (int sl : {kFRONT, kWH, kS, kTADV, kPRED, kIO, kO, kOBL, kADV, kNEG, kV, kINF, kEND}) append(content, s[sl]);
     orderRule = "order.decl";
   } else if (c.type == ClauseType::Imp) {
     // order.imp: verb first when the clause is short. "words" counts the complements (the verb itself and the
     // vocative excluded): "Dā mihi colōrem rubrum" is short, "Rosās in hortō nōlī carpere" is long.
     size_t words = 0;
-    for (int sl : {kFRONT, kIO, kO, kOBL, kADV, kPRED}) words += s[sl].size();
-    const bool shortImp = words <= 3 && s[kFRONT].empty();   // "Prīmum nōmen tuum scrībe": a fronted adverb keeps V last
+    for (int sl : {kFRONT, kIO, kO, kOBL, kADV, kPRED, kTADV}) words += s[sl].size();
+    // "Prīmum nōmen tuum scrībe": a fronted adverb keeps V last; so does a time adverb ("Crās ad mē venī", C15)
+    append(s[kFRONT], s[kTADV]);
+    const bool shortImp = words <= 3 && s[kFRONT].empty();
     if (prohib) {
       orderRule = "order.prohib";
       if (words <= 1) seq = {kFRONT, kV, kIO, kO, kOBL, kADV, kINF};
@@ -559,7 +566,7 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
   }
   if (content.empty()) {
     // slots the template does not name go before the first template slot that follows them canonically
-    for (int sl : {kWH, kFRONT, kS, kIO, kO, kOBL, kADV, kPRED, kINF, kNEG, kV}) {
+    for (int sl : {kWH, kFRONT, kS, kTADV, kIO, kO, kOBL, kADV, kPRED, kINF, kNEG, kV}) {
       if (s[sl].empty() || std::find(seq.begin(), seq.end(), sl) != seq.end()) continue;
       auto pos = seq.end();
       for (auto it = seq.begin(); it != seq.end(); ++it)
@@ -669,6 +676,7 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
     sctx.main = false;
     sctx.accInf = sub.rel == SubRel::AccInf;
     if (sub.rel == SubRel::Purpose) { sctx.forceMood = Subjunctive; sctx.suppressNon = neg; }
+    if (sub.rel == SubRel::Result) sctx.forceMood = Subjunctive;   // C15: tam ... ut + subjunctive
     std::vector<Word> body;
     clause(sc, o, body, sctx);
     append(sw, body);

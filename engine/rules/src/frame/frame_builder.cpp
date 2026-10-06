@@ -137,7 +137,8 @@ bool relationOf(SrcLang lang, const std::string& m, Relation& rel, std::string& 
 // Connectors at the start of a clause -> canonical English.
 std::string canonConnector(SrcLang lang, const std::string& w) {
   if (lang == SrcLang::En) {
-    if (in(w, {"and", "but", "or", "so", "then", "yet", "nor", "also", "therefore", "however"})) return w;
+    if (in(w, {"and", "but", "or", "so", "then", "yet", "nor", "also", "therefore", "however", "for", "besides",
+               "still", "thus", "hence", "moreover"})) return w;
     return "";
   }
   if (in(w, {"y", "e"})) return "and";
@@ -188,6 +189,144 @@ int numberValue(const std::string& w) {
     if (v > 100000) break;
   }
   return digits ? v : 0;
+}
+
+// C15: discourse words that open a sentence before a comma ("Oh, ...", "Why, ...", "But, comrades, ..."): their own
+// segment, parsed apart from the clause that follows.
+bool leadWord(const std::string& w) {
+  return in(w, {"oh", "ah", "why", "well", "but", "and", "so", "now", "however", "besides", "yes", "no", "alas",
+                "come", "nay", "indeed", "still", "then", "therefore", "meanwhile", "anyway", "hush", "look", "see"});
+}
+
+// C15: parentheticals that stand between commas ("..., you know,", "..., as I said;", "..., however;").
+const char* const kParentheticals[][4] = {
+    {"you", "know", nullptr, nullptr}, {"you", "see", nullptr, nullptr},   {"i", "suppose", nullptr, nullptr},
+    {"i", "think", nullptr, nullptr},  {"i", "believe", nullptr, nullptr}, {"as", "i", "said", nullptr},
+    {"as", "you", "know", nullptr},    {"however", nullptr, nullptr, nullptr}, {"of", "course", nullptr, nullptr},
+    {"i", "am", "sure", nullptr},      {"i", "hope", nullptr, nullptr},    {"though", nullptr, nullptr, nullptr},
+    {"too", nullptr, nullptr, nullptr}, {"perhaps", nullptr, nullptr, nullptr}, {"please", nullptr, nullptr, nullptr}};
+
+bool segmentBreak(const Token& t) {
+  return t.text == "," || t.text == ";" || t.text == ":" || t.text == "\xE2\x80\x94" || t.text == "\xE2\x80\x93" ||
+         t.text == "-" || t.text == "--";
+}
+bool hardBreak(const Token& t) {
+  return t.text == ";" || t.text == ":" || t.text == "\xE2\x80\x94" || t.text == "\xE2\x80\x93" || t.text == "--";
+}
+
+// C15: a vocative-like span: [my|your|our|dear]? ADJ* NOUN|PROPN+ (no article, no verb), at most four words.
+bool vocativeSpan(const std::vector<Token>& tk, int a, int b) {
+  if (b < a || b - a > 3) return false;
+  bool noun = false;
+  for (int i = a; i <= b; ++i) {
+    const Token& t = tk[(size_t)i];
+    if (t.upos == "NOUN" || t.upos == "PROPN") { noun = true; continue; }
+    if (t.upos == "ADJ" && i < b) continue;
+    if (i == a && in(t.lower, {"my", "your", "our", "dear", "o"})) continue;
+    if (t.upos == "ADJ" && i == b && i > a && in(tk[(size_t)a].lower, {"my", "your", "our"})) { noun = true; continue; }   // "my dear"
+    return false;
+  }
+  return noun;
+}
+
+// C15: the tagger's VERB / ADJ for a word the English lexicon never reads that way ("comrades" VERB, "farmer" ADJ):
+// the lexicon's noun (or adjective) reading. True when a tag changed.
+bool lexiconVeto(std::vector<Token>& tk, const lex::Lexicon& lx) {
+  bool changed = false;
+  for (Token& t : tk) {
+    if (t.upos != "VERB" && t.upos != "ADJ") continue;
+    if (t.lower.empty() || t.text.empty()) continue;
+    std::vector<lex::Analysis> an;
+    lx.lookup(text::en_key(t.lower), an);
+    if (an.empty()) continue;
+    bool verb = false, noun = false, adj = false, plural = false;
+    for (const lex::Analysis& a : an) {
+      const uint8_t pos = lx.lemma(a.lemma).pos;
+      verb = verb || pos == feat::Verb;
+      adj = adj || pos == feat::Adj || pos == feat::Participle;
+      if (pos == feat::Noun) { noun = true; plural = plural || feat::unpack(lx.feature(a.feat)).number == feat::Pl; }
+    }
+    if (t.upos == "VERB" && !verb && (noun || adj)) {
+      t.upos = noun ? "NOUN" : "ADJ";
+      t.feats = noun ? nlp::morph::fromString(plural ? "Number=Plur" : "Number=Sing") : 0;
+      changed = true;
+    } else if (t.upos == "ADJ" && !adj && !verb && noun) {
+      t.upos = "NOUN";
+      t.feats = nlp::morph::fromString(plural ? "Number=Plur" : "Number=Sing");
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+// C15: a punctuation token as the root ("But I cannot!", "but if you will come ...,"): the verb (else the last auxiliary)
+// becomes the root and takes the punctuation's dependents. Works per tree (segments have their own roots).
+void punctRoot(std::vector<Token>& tk) {
+  const int n = (int)tk.size();
+  for (int r = 0; r < n; ++r) {
+    if (tk[(size_t)r].head != 0 || (tk[(size_t)r].upos != "PUNCT" && tk[(size_t)r].upos != "SYM")) continue;
+    // the tokens of this tree
+    std::vector<int> tree;
+    for (int i = 0; i < n; ++i) {
+      int x = i, steps = 0;
+      while (x >= 0 && x != r && tk[(size_t)x].head > 0 && steps++ <= n) x = tk[(size_t)x].head - 1;
+      if (x == r) tree.push_back(i);
+    }
+    int v = -1;
+    for (int i : tree)
+      if (i != r && tk[(size_t)i].upos == "VERB" && tk[(size_t)i].head == r + 1) v = i;
+    if (v < 0)
+      for (int i : tree)
+        if (i != r && tk[(size_t)i].upos == "VERB") { v = i; break; }
+    if (v < 0)
+      for (int i : tree)
+        if (i != r && tk[(size_t)i].upos == "AUX") v = i;
+    if (v < 0) continue;
+    for (int i : tree)
+      if (i != v && tk[(size_t)i].head == r + 1) tk[(size_t)i].head = v + 1;
+    // an auxiliary that becomes the root takes the subject / negation hung on the old head
+    tk[(size_t)v].head = 0;
+    tk[(size_t)v].deprel = "root";
+    tk[(size_t)r].head = v + 1;
+    tk[(size_t)r].deprel = "punct";
+    if (tk[(size_t)v].upos == "AUX")
+      for (int i : tree)
+        if (i != v && (tk[(size_t)i].deprel == "nsubj" || (tk[(size_t)i].deprel == "advmod" && tk[(size_t)i].lower == "not")) &&
+            tk[(size_t)i].head > 0 && tk[(size_t)tk[(size_t)i].head - 1].upos == "AUX")
+          tk[(size_t)i].head = v + 1;
+  }
+}
+
+// C15: after a retag the parser may still hang the verb under a noun ("The farmer carries water." -> carries/amod
+// of water). A simple clause made only of nominal words around one verb is rebuilt by hand: the verb is the root,
+// the last noun before it the subject, the last noun after it the object, determiners / adjectives / numerals
+// attach to the next noun, adverbs and punctuation to the verb. Returns false (tree unchanged) for anything else.
+bool flatClause(std::vector<Token>& tk, int v) {
+  const int n = (int)tk.size();
+  if (v < 0 || v >= n || tk[(size_t)v].deprel == "root") return false;
+  for (int i = 0; i < n; ++i) {
+    if (i == v) continue;
+    if (!in(tk[(size_t)i].upos, {"DET", "ADJ", "NOUN", "PROPN", "PRON", "NUM", "PUNCT", "ADV"})) return false;
+  }
+  auto nominal = [&](int i) { return in(tk[(size_t)i].upos, {"NOUN", "PROPN", "PRON"}); };
+  int subj = -1, obj = -1;
+  for (int i = 0; i < v; ++i)
+    if (nominal(i)) subj = i;
+  for (int i = v + 1; i < n; ++i)
+    if (nominal(i)) obj = i;
+  if (subj < 0) return false;
+  for (int i = 0; i < n; ++i) {
+    Token& t = tk[(size_t)i];
+    if (i == v) { t.head = 0; t.deprel = "root"; continue; }
+    if (i == subj) { t.head = v + 1; t.deprel = "nsubj"; continue; }
+    if (i == obj) { t.head = v + 1; t.deprel = "obj"; continue; }
+    if (t.upos == "PUNCT" || t.upos == "ADV") { t.head = v + 1; t.deprel = t.upos == "PUNCT" ? "punct" : "advmod"; continue; }
+    const int noun = i < v ? subj : obj;
+    if (noun < 0 || (i < v && i > subj) || (i > v && i > obj)) { t.head = v + 1; t.deprel = "dep"; continue; }
+    t.head = noun + 1;
+    t.deprel = t.upos == "DET" ? "det" : t.upos == "NUM" ? "nummod" : nominal(i) ? "compound" : "amod";
+  }
+  return true;
 }
 
 }  // namespace
@@ -506,6 +645,13 @@ std::string FrameBuilder::lemmaOf(const Token& t) const {
   lex_->lookup(key, an);
   if (an.empty() && lang_ == SrcLang::Es) lex_->lookup(text::es_bare(t.lower), an);
   if (an.empty()) return rule;
+  // C15: the rule lemmatiser may cut a word to a non-word ("sting" -> "st"); the lexicon knows the form itself
+  bool ruleKnown = rule == t.lower;
+  if (!ruleKnown && lang_ == SrcLang::En) {
+    std::vector<lex::Analysis> ra;
+    lex_->lookup(text::en_key(rule), ra);
+    ruleKnown = !ra.empty();
+  }
   auto posOk = [&](uint8_t pos) {
     if (t.upos == "NOUN") return pos == feat::Noun;
     if (t.upos == "VERB" || t.upos == "AUX") return pos == feat::Verb;
@@ -561,6 +707,7 @@ std::string FrameBuilder::lemmaOf(const Token& t) const {
     bestAgree = std::max(bestAgree, agree(a));
   }
   std::string same, other, ruleHit;
+  std::vector<uint32_t> sameFeats, otherFeats;   // C15: the form's features under its own lemma and under the other
   for (const lex::Analysis& a : an) {
     const lex::Lemma l = lex_->lemma(a.lemma);
     if (l.id == lex::kNoLemma || !posOk(l.pos)) continue;
@@ -568,13 +715,19 @@ std::string FrameBuilder::lemmaOf(const Token& t) const {
     std::string h = text::lower(l.head);
     if (h.find(' ') != std::string::npos) continue;
     const std::string hk = lang_ == SrcLang::En ? text::en_key(h) : text::es_key(h);
-    if (hk == key) { if (same.empty()) same = h; }
-    else if (other.empty()) other = h;
+    if (hk == key) { if (same.empty()) same = h; if (h == same) sameFeats.push_back(a.feat); }
+    else { if (other.empty()) other = h; if (h == other) otherFeats.push_back(a.feat); }
     if (h == rule && ruleHit.empty()) ruleHit = h;
   }
+  // C15: "have come": "come" is the participle of come itself and of the rare "cum" alike: the form's own lemma
+  bool sameInflects = false;
+  for (uint32_t f : sameFeats)
+    sameInflects = sameInflects || std::find(otherFeats.begin(), otherFeats.end(), f) != otherFeats.end();
   if (es && t.upos == "NOUN" && !same.empty() && num != nlp::morph::NumPlur) return same;   // "hermana", "niña", "reina" keep their own lemma
   if (inflected) {
     if (!ruleHit.empty() && ruleHit != t.lower) return ruleHit;
+    // C15: a form that is its own lemma and its own rule lemma ("have come") is not a rare homograph ("cum")
+    if (!same.empty() && sameInflects && !es) return same;
     if (!other.empty()) return other;
     if (!same.empty()) return same;
   } else {
@@ -582,6 +735,7 @@ std::string FrameBuilder::lemmaOf(const Token& t) const {
     if (!ruleHit.empty()) return ruleHit;
     if (!other.empty() && lang_ == SrcLang::Es) return other;
   }
+  if (!ruleKnown) return t.lower;
   return rule;
 }
 
@@ -676,7 +830,7 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
         np.pronLemma = w == "somebody" ? "someone" : w == "everybody" ? "everyone" : w == "anybody" ? "anyone"
                      : w == "whom" ? "who" : w;
         np.pron.person = 3;
-        np.pron.number = in(w, {"these", "those", "ones", "all", "both", "others", "many", "few"}) ? 2 : 1;
+        np.pron.number = in(w, {"these", "those", "ones", "all", "both", "others", "many", "few", "some"}) ? 2 : 1;
         if (in(w, {"everyone", "all"})) np.pron.number = 2;
         np.number = np.pron.number;
         np.negative = in(w, {"nobody", "nothing", "none"});
@@ -919,7 +1073,7 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
       continue;
     }
     if (d == "flat" || (d == "compound" && kt.upos == "PROPN")) {   // multi-word names
-      if (np.isName) np.head += " " + kt.text;
+      if (np.isName) np.head = k < h ? kt.text + " " + np.head : np.head + " " + kt.text;   // source order (C15)
       np.tokens.push_back(k);
       continue;
     }
@@ -1016,6 +1170,12 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
       for (SemNP& g : np.coord)
         if (g.numeral.empty() && g.determiner == "a") { g.numeral = "1"; g.numeralValue = 1; g.determiner.clear(); }
   }
+  // C15: "no one" = nobody, "any one" = anyone
+  if (np.isPronoun && np.pronLemma == "one" && (np.determiner == "no" || np.determiner == "any")) {
+    np.pronLemma = np.determiner == "no" ? "nobody" : "anyone";
+    np.negative = np.determiner == "no";
+    np.determiner.clear();
+  }
   std::sort(np.tokens.begin(), np.tokens.end());
   for (int x : np.tokens) c.take(x);
   np.tokens.erase(std::unique(np.tokens.begin(), np.tokens.end()), np.tokens.end());
@@ -1031,6 +1191,9 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
   int first = sub.empty() ? h : sub.front();
   for (int x : sub)   // "¡Entonces juega!": the first word, not the inverted mark
     if (!isPunctTok(c.t(x))) { first = x; break; }
+  int firstContent = first;   // C15: the first word after a coordinating conjunction ("and then you will know")
+  for (int x : sub)
+    if (!isPunctTok(c.t(x)) && !(c.dep(x) == "cc" && x < h)) { firstContent = x; break; }
 
   const bool topLevel = c.par[(size_t)h] < 0 || c.consumed[(size_t)c.par[(size_t)h]];
   // A noun root whose clause the parser hung on it as an acl: re-root.
@@ -1125,7 +1288,16 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     f.pred.token = h;
     if (hu == "AUX") {
       // "This one does." / "This one can." / "You must be": an auxiliary standing for the verb
-      if (in(hl, {"do", "does", "did", "hacer"})) f.pred.ellipsis = true;
+      if (in(hl, {"do", "does", "did", "hacer"})) {
+        // "what shall we do?" / "I'll do anything": "do" with an object is the verb itself (faciō), not an ellipsis
+        bool object = false;
+        for (int k : c.kids[(size_t)h])
+          if (c.ok(k) && (c.dep(k) == "obj" || (c.t(k).upos == "PRON" && k < h && in(c.t(k).lower, {"what", "anything",
+                                                                                                    "everything", "nothing", "something", "this", "that", "it"}) && c.dep(k) != "nsubj")))
+            object = true;
+        if (object) f.pred.lemma = "do";
+        else f.pred.ellipsis = true;
+      }
       if (in(hl, {"can", "could", "poder"})) { f.pred.lemma = "can"; f.pred.pastModal = hl == "could"; }
       if (in(hl, {"must", "should"})) { f.pred.lemma = "be"; f.pred.modality = Modality::Must; }
       if (hl == "be" || hl == "ser" || hl == "estar") f.pred.lemma = "be";
@@ -1217,6 +1389,7 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     if (en) {
       if (al == "will" || al == "'ll" || al == "wo") f.pred.tense = Tense::Future;
       else if (al == "shall") { f.pred.tense = Tense::Future; f.pred.deliberative = true; }
+
       else if (al == "would" || al == "'d") f.pred.mood = SrcMood::Conditional;
       else if (al == "can") f.pred.modality = Modality::Can;
       else if (al == "could") { f.pred.modality = Modality::Can; f.pred.pastModal = true; }
@@ -1225,14 +1398,15 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       else if (al == "should" || al == "ought") f.pred.modality = Modality::Should;
       else if (alem == "do") {
         if (fget(c.t(a), nlp::morph::TenseShift) == nlp::morph::TensePast) f.pred.tense = Tense::Past;
-        if (fget(c.t(a), nlp::morph::MoodShift) == nlp::morph::MoodImp) f.type = Kind::Imp;
+        if (fget(c.t(a), nlp::morph::MoodShift) == nlp::morph::MoodImp && !c.question) f.type = Kind::Imp;   // not "don't you know?" (C15)
       } else if (alem == "have") {
         haveAux = true;
         f.pred.aspect = Aspect::Perfect;
         if (fget(c.t(a), nlp::morph::TenseShift) == nlp::morph::TensePast || al == "had") f.pred.tense = Tense::Past;
       } else if (alem == "be") {
         beAux = true;
-        if (fget(c.t(a), nlp::morph::TenseShift) == nlp::morph::TensePast || al == "was" || al == "were")
+        // "has been kissed" is a present perfect: "been" (a participle tagged past) does not make the clause past
+        if ((fget(c.t(a), nlp::morph::TenseShift) == nlp::morph::TensePast && al != "been") || al == "was" || al == "were")
           f.pred.tense = Tense::Past;
       } else if (al == "to") {
         c.drop(a, Drop::Marker);
@@ -1270,6 +1444,10 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
   }
   if (verbal && !ht.text.empty()) {
     const uint32_t vf = fget(ht, nlp::morph::VerbFormShift), tt = fget(ht, nlp::morph::TenseShift);
+    if (en && beAux && ht.lower == "gone") {   // C15: "Oz is gone" -> Oz abiit (go away, perfect)
+      f.pred.aspect = Aspect::Perfect;
+      if (f.pred.particle.empty()) f.pred.particle = "away";
+    } else
     if (beAux && vf == nlp::morph::VfPart && (tt == nlp::morph::TensePast || !en)) f.pred.voice = Voice::Passive;
     else if (beAux && (vf == nlp::morph::VfGer || (vf == nlp::morph::VfPart && tt != nlp::morph::TensePast)))
       f.pred.aspect = Aspect::Progressive;
@@ -1309,7 +1487,10 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
   if (verbal && xcomp >= 0 && (c.t(xcomp).upos == "VERB" || c.t(xcomp).upos == "AUX")) {
     const std::string xl = c.lem(xcomp);
     bool take = true;
-    if (en && hl == "go" && f.pred.aspect == Aspect::Progressive) {   // "going to rain"
+    bool goParticle = false;   // C15: "I am now going away to make a visit": motion + purpose, not the future
+    for (int k : c.kids[(size_t)h])
+      if (c.ok(k) && particleWord(c.t(k).lower) && k > h && k < xcomp) goParticle = true;
+    if (en && hl == "go" && f.pred.aspect == Aspect::Progressive && !goParticle) {   // "going to rain"
       f.pred.tense = Tense::Future;
       f.pred.aspect = Aspect::Simple;
       f.pred.lemma = xl;
@@ -1355,8 +1536,28 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       f.pred.lemma = xl;
       f.pred.token = xcomp;
       c.drop(h, Drop::Aux);
+    } else if (en && in(hl, {"like", "love"}) &&
+               (f.pred.mood == SrcMood::Conditional || f.pred.modality == Modality::Should)) {
+      // C15 modal.like: "I should like to cry" / "I would like to go" -> velim + infinitive
+      f.pred.modality = Modality::Want;
+      f.pred.mood = SrcMood::Subjunctive;
+      f.pred.tense = Tense::Present;
+      f.pred.lemma = xl;
+      f.pred.token = xcomp;
+      c.drop(h, Drop::Aux);
+    } else if (en && hl == "like" && obj < 0) {
+      // C15: "I always like to help" -> semper libenter adiuvō (the complement is the verb, "gladly")
+      f.pred.lemma = xl;
+      f.pred.token = xcomp;
+      SemAdverb g;
+      g.lemma = "gladly";
+      g.token = h;
+      f.adverbs.push_back(g);
+      c.drop(h, Drop::Aux);
     } else if (in(hl, {"try", "begin", "start", "know", "like", "love", "learn", "forget", "hope", "decide", "seem",
-                       "dare", "prefer", "continue", "stop", "saber", "intentar", "empezar", "comenzar"})) {
+                       "dare", "prefer", "continue", "stop", "saber", "intentar", "empezar", "comenzar"}) ||
+               (en && obj < 0 && in(hl, {"help", "refuse", "promise", "fail", "manage", "hate", "fear", "cease",
+                                         "intend", "plan", "attempt", "deserve", "mean"}))) {   // C15: "help to keep away"
       f.pred.complementVerb = xl;
       f.pred.complementToken = xcomp;
     } else {
@@ -1450,14 +1651,40 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       SemAdj a;
       a.lemma = hu == "ADJ" ? hl : c.t(h).lower;
       a.token = h;
+      // C15: degree from the form ("greater", "braver", "best") and from "more" / "most"
+      if (en && hu == "ADJ") {
+        const std::string& kl = c.t(h).lower;
+        if (kl != a.lemma) {
+          if (kl.size() > 2 && kl.compare(kl.size() - 2, 2, "er") == 0) a.degree = feat::Comparative;
+          if (kl.size() > 3 && kl.compare(kl.size() - 3, 3, "est") == 0) a.degree = feat::Superlative;
+        }
+        if (kl == "better" || kl == "worse") a.degree = feat::Comparative;
+        if (kl == "best" || kl == "worst") a.degree = feat::Superlative;
+      }
+      for (int k : c.kids[(size_t)h])
+        if (c.ok(k) && c.dep(k) == "advmod" && en && in(c.t(k).lower, {"more", "most"})) {
+          a.degree = c.t(k).lower == "more" ? feat::Comparative : feat::Superlative;
+          c.drop(k, Drop::Marker);
+          c.take(k);
+        }
       for (int k : c.kids[(size_t)h])
         if (c.ok(k) && c.dep(k) == "advmod" && in(c.t(k).lower, {"very", "too", "so", "quite", "rather", "really",
-                                                                  "extremely", "muy", "demasiado", "tan", "bastante"})) {
+                                                                  "extremely", "muy", "demasiado", "tan", "bastante",
+                                                                  "as"})) {
           a.adverbs.push_back(c.t(k).lower);
           a.advTokens.push_back(k);
           c.take(k);
         }
       f.predAdj.push_back(a);
+      if (en && c.t(h).lower == "gone" && f.predAdj.size() == 1) {   // C15: "Oz is gone" -> Oz abiit
+        f.predAdj.clear();
+        f.copula = false;
+        f.pred.lemma = "go";
+        f.pred.token = h;
+        f.pred.particle = "away";
+        f.pred.aspect = Aspect::Perfect;
+        c.drop(cop, Drop::Aux);
+      }
       for (int k : c.kids[(size_t)h])
         if (c.ok(k) && c.dep(k) == "conj" && (c.t(k).upos == "ADJ")) {
           SemAdj b;
@@ -1560,8 +1787,15 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       a.token = h;
       if (hu == "ADP" && hl == "off") {}   // handled by the phrasebook ("off with ...")
       f.adverbs.push_back(a);
+    } else if (hu == "INTJ" && !canonConnector(lang_, c.t(h).lower).empty()) {   // "Besides," tagged INTJ (C15)
+      f.connectors.push_back(canonConnector(lang_, c.t(h).lower));
+      c.drop(h, Drop::Marker);
     } else if (hu == "INTJ") {
       f.interjections.push_back(c.t(h).lower);
+    } else if (hu == "CCONJ" || hu == "SCONJ") {   // C15: "But, comrades, ...": the connector alone
+      const std::string cn = canonConnector(lang_, c.t(h).lower);
+      if (!cn.empty()) { f.connectors.push_back(cn); c.drop(h, Drop::Marker); }
+      else if (c.t(h).lower == "for") { f.connectors.push_back("for"); c.drop(h, Drop::Marker); }
     }
   }
   if (f.hasPred && cop < 0 && verbal && f.pred.lemma == "be" && !f.existential && !f.copula) {
@@ -1574,7 +1808,7 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     SemAdverb a;
     a.lemma = c.lem(k);
     a.token = k;
-    a.front = k == first && k < h;
+    a.front = (k == first || k == firstContent) && k < h;
     f.adverbs.push_back(a);
     (void)kl;
   };
@@ -1709,7 +1943,8 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
         continue;
       }
       // "then" / "so" at the start of the clause: connector
-      if (k == first && in(kl, {"then", "so", "entonces", "luego", "also"})) {
+      if ((k == first || k == firstContent) && in(kl, {"then", "so", "entonces", "luego", "also", "therefore", "however",
+                                                       "besides", "still"})) {
         c.drop(k, Drop::Marker);   // accounted for by the connector table
         f.connectors.push_back(kl == "entonces" || kl == "luego" ? "then" : kl);
         continue;
@@ -1760,11 +1995,17 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       SemSub s;
       s.relation = Relation::Coord;
       for (int g : c.kids[(size_t)k])
-        if (c.ok(g) && c.dep(g) == "cc") { s.marker = canonConnector(lang_, c.t(g).lower); c.drop(g, Drop::Marker); }
+        if (c.ok(g) && c.dep(g) == "cc" && s.marker.empty()) {
+          s.marker = canonConnector(lang_, c.t(g).lower);
+          c.drop(g, Drop::Marker);
+          c.take(g);   // C15: the conjunction is the coordination's, not a connector of the second clause ("et et")
+        }
       if (s.marker.empty()) s.marker = "and";
       SemFrame cf;
       buildClause(c, k, cf);
       if (f.type == Kind::Imp && cf.type == Kind::Decl && !cf.hasSubject) cf.type = Kind::Imp;
+      // C15: the second verb of a question shares the question ("Why don't you run and jump?" -> ... et salīs?)
+      if (cf.type == Kind::Yn && !cf.hasSubject) cf.type = Kind::Decl;
       s.frame.push_back(cf);
       f.subordinate.push_back(s);
       continue;
@@ -1792,10 +2033,28 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
         else if (d == "parataxis") { s.relation = Relation::Coord; marker = ""; }
         else { s.relation = Relation::Time; marker = "when"; }
       }
+      // C15: verb + object + (to) infinitive. Verbs of ordering / teaching / allowing / wanting take the object and
+      // the infinitive ("I ordered them to build this City" -> Eōs iussī hanc Urbem aedificāre); verbs of helping /
+      // asking / urging take ut + subjunctive with the object as its subject ("help me find my way" -> mē adiuvāre ut
+      // viam inveniam)
+      if (en && (d == "xcomp" || d == "ccomp" || d == "advcl") && (marker == "to" || d == "xcomp") &&
+          c.t(k).upos == "VERB" && (obj >= 0 || f.hasObject)) {
+        if (in(hl, {"order", "command", "teach", "allow", "permit", "want", "wish", "force", "compel", "forbid",
+                    "let", "make", "bid", "like", "expect", "need"})) {
+          s.relation = Relation::Complement;
+          marker = "inf";
+        } else if (in(hl, {"help", "ask", "beg", "persuade", "urge", "tell", "warn", "advise", "encourage", "invite",
+                           "remind"})) {
+          s.relation = Relation::Purpose;
+          marker = "to-obj";
+        }
+      }
       s.marker = marker;
       s.before = k < h;
       SemFrame sf;
       buildClause(c, k, sf);
+      // C15: a dependent clause is never a yes/no question of its own ("help me find my way?" -> ut viam inveniam)
+      if (sf.type == Kind::Yn) sf.type = Kind::Decl;
       s.frame.push_back(sf);
       f.subordinate.push_back(s);
       continue;
@@ -1843,7 +2102,7 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
   // floating "all" with a pronoun subject ("You're all very rude"): the subject is plural, quantified
   for (size_t i = 0; i < f.adverbs.size(); ++i)
     if (f.adverbs[i].lemma == "all" && f.hasSubject && f.subject.isPronoun && f.subject.pron.person < 3 &&
-        f.subject.pronLemma != "all") {
+        f.subject.pronLemma != "all" && f.subject.pron.number != 1) {
       f.subject.pron.number = 2;
       f.subject.number = 2;
       f.subject.determiner = "all";
@@ -2089,9 +2348,15 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
   // Spanish deliberative question (C13): "¿Qué voy a hacer?" / "¿Qué haré?" -> quid faciam?
   if (!en && f.type == Kind::Wh && f.pred.tense == Tense::Future && f.pred.modality == Modality::None)
     f.pred.deliberative = true;
-  if (f.type == Kind::Wh && f.pred.deliberative && f.hasSubject && f.subject.isPronoun && f.subject.pron.person == 1)
+  // deliberative subjunctive (C15): "what shall I do?" -> quid faciam, "Shall we go there?" -> Eāmusne illūc?;
+  // "what shall we do now?" asks about the future -> quid faciēmus
+  const bool p1 = f.hasSubject && f.subject.isPronoun && f.subject.pron.person == 1;
+  if (f.pred.deliberative && p1 &&
+      ((f.type == Kind::Wh && (f.subject.pron.number != 2 || f.pred.modality == Modality::Should)) ||
+       (f.type == Kind::Yn && en)))
     f.pred.deliberative = true;
   else f.pred.deliberative = false;
+
   // the interrogative NP of a wh question that is an object/oblique keeps its NP (realiser moves it first)
   (void)first;
 }
@@ -2205,11 +2470,36 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
     return in(w, {"then", "now", "so", "well", "oh", "and", "but", "entonces", "pues", "y", "pero"});
   };
   if (book_.size() > 0) {
+    const std::vector<curated::PhraseEntry>& book = lang_ == SrcLang::En ? cd_.phrasebook() : cd_.phrasebookEs();
     for (int i = 0; i < n;) {
       if (isPunctTok(s.tokens[(size_t)i])) { ++i; continue; }
+      // C15: register "lead": one word opening the sentence before a comma ("Why, ..." -> Quid? ...)
+      bool sentenceStart = true;
+      for (int k = 0; k < i; ++k) sentenceStart = sentenceStart && isPunctTok(s.tokens[(size_t)k]);
+      const bool leadPos = sentenceStart && i + 2 < n && s.tokens[(size_t)i + 1].text == ",";
+      if (leadPos) {
+        int le = -1;
+        for (size_t q = 0; q < book.size() && le < 0; ++q)
+          if (book[q].reg == "lead" && text::lower(book[q].pattern) == s.tokens[(size_t)i].lower) le = (int)q;
+        if (le >= 0) {
+          PhraseMatch m;
+          m.entry = le;
+          m.first = m.last = i;
+          m.pattern = book[(size_t)le].pattern;
+          m.latin = book[(size_t)le].latin;
+          m.reg = book[(size_t)le].reg;
+          m.note = book[(size_t)le].note;
+          m.tier = book[(size_t)le].tier;
+          c.consumed[(size_t)i] = 1;
+          phrases.push_back(std::move(m));
+          ++i;
+          continue;
+        }
+      }
       PhraseMatch m;
       if (!book_.match(s.tokens, i, m)) { ++i; continue; }
-      const curated::PhraseEntry& e = (lang_ == SrcLang::En ? cd_.phrasebook() : cd_.phrasebookEs())[(size_t)m.entry];
+      const curated::PhraseEntry& e = book[(size_t)m.entry];
+      if (e.reg == "lead") { ++i; continue; }
       bool leftOk = m.first == 0 || isPunctTok(s.tokens[(size_t)m.first - 1]) ||
                     s.tokens[(size_t)m.first - 1].upos == "CCONJ";
       if (!leftOk) {
@@ -2238,6 +2528,8 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
       const bool prefixOk = e.reg == "adv" || e.reg == "narr" ||
                             ((topDep == "advmod" || topDep == "discourse") &&
                              (e.reg == "answer" || e.reg == "excl" || e.reg == "polite"));
+      // C15: register "tail": an adverbial phrase that closes a clause ("in my day", "as soon as you can")
+      if (e.reg == "tail" && rightOk) leftOk = true;
       if (leftOk && (rightOk || prefixOk)) {
         m.pattern = e.pattern;
         m.latin = e.latin;
@@ -2307,6 +2599,26 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
       }
     }
     s.units.push_back(std::move(u));
+  }
+  // C15: a lead connector set off by a comma ("However, I will ...", "Besides, you have ...") opens the next clause
+  // (not before a vocative: "But, comrades, ..." keeps "Sed," apart)
+  for (size_t ui = 0; ui + 1 < s.units.size(); ++ui) {
+    Unit& u = s.units[ui];
+    Unit& nx = s.units[ui + 1];
+    if (u.type != Unit::Clause || nx.type != Unit::Clause || nx.vocative || u.frame.type != Kind::Frag ||
+        u.frame.hasSubject || !u.frame.predAdj.empty() || !u.frame.interjections.empty())
+      continue;
+    std::string w;
+    if (u.frame.connectors.size() == 1 && u.frame.adverbs.empty()) w = u.frame.connectors[0];
+    else if (u.frame.adverbs.size() == 1 && u.frame.connectors.empty()) w = u.frame.adverbs[0].lemma;
+    if (!in(w, {"however", "besides", "therefore", "still", "yet", "thus", "moreover", "then", "so", "and", "but",
+                "for"}))
+      continue;
+    nx.frame.connectors.insert(nx.frame.connectors.begin(), w);
+    for (int k = u.first; k <= u.last; ++k) c.drop(k, Drop::Marker);
+    nx.first = u.first;
+    s.units.erase(s.units.begin() + (long)ui);
+    --ui;
   }
   // transparent connectors before a phrase ("Then go away."): attach to the phrase
   for (size_t ui = 0; ui + 1 < s.units.size(); ++ui) {
@@ -2416,6 +2728,80 @@ bool FrameBuilder::troubled(const SemSentence& s) {
   return false;
 }
 
+// C15: segments parsed on their own. A sentence-initial discourse word before a comma ("Oh,", "Why,", "But,"), a
+// vocative between commas ("comrades", "my dear", "your Majesty"), a parenthetical between commas ("you know",
+// "as I said", "however") and every clause after ";" / ":" / a dash is parsed apart: each becomes a unit of its own
+// (the frame builder's groups follow the roots), so a stray word no longer bends the parse of the clause.
+bool FrameBuilder::segmentParse(std::vector<Token>& tk) const {
+  const int n = (int)tk.size();
+  if (n < 3 || !nlp_) return false;
+  std::vector<int> cuts;   // segment starts (after the separator)
+  auto addCut = [&](int at) {
+    if (at > 0 && at < n && std::find(cuts.begin(), cuts.end(), at) == cuts.end()) cuts.push_back(at);
+  };
+  for (int i = 0; i + 1 < n; ++i)
+    if (hardBreak(tk[(size_t)i])) addCut(i + 1);
+  // starts of comma-delimited spans
+  std::vector<int> starts = {0};
+  for (int i = 0; i + 1 < n; ++i)
+    if (segmentBreak(tk[(size_t)i])) starts.push_back(i + 1);
+  for (size_t si = 0; si < starts.size(); ++si) {
+    const int a = starts[si];
+    int b = a;   // last token of the span (before its separator / the end)
+    while (b + 1 < n && !segmentBreak(tk[(size_t)b + 1]) && !(tk[(size_t)b + 1].upos == "PUNCT" && b + 2 == n)) ++b;
+    const int sep = b + 1;   // separator or final punctuation or n
+    const bool sepIsBreak = sep < n && segmentBreak(tk[(size_t)sep]);
+    const bool atEnd = sep >= n || (sep + 1 == n && tk[(size_t)sep].upos == "PUNCT" && !sepIsBreak);
+    if (!sepIsBreak && !atEnd) continue;
+    bool cut = false;
+    if (a == 0 && b == 0 && sepIsBreak && leadWord(tk[0].lower)) cut = true;            // "Oh, ..."
+    // "But, comrades, ...": a one-word "verb" after a lead word that the lexicon also reads as a noun is the addressee
+    if (a == 2 && b == 2 && sepIsBreak && leadWord(tk[0].lower) && tk[2].upos == "VERB" && lex_) {
+      std::vector<lex::Analysis> an;
+      lex_->lookup(text::en_key(tk[2].lower), an);
+      for (const lex::Analysis& x : an)
+        if (lex_->lemma(x.lemma).pos == feat::Noun) {
+          tk[2].upos = "NOUN";
+          tk[2].feats = nlp::morph::fromString(feat::unpack(lex_->feature(x.feat)).number == feat::Pl ? "Number=Plur" : "Number=Sing");
+          break;
+        }
+    }
+    if (!cut && (sepIsBreak || a > 0) && !(a == 0 && atEnd) && vocativeSpan(tk, a, b)) {
+      // a vocative needs something else in the sentence and no article; time nouns are adverbs, not addressees
+      bool time = false;
+      for (int i = a; i <= b; ++i) time = time || timeNoun(tk[(size_t)i].lower);
+      cut = !time;
+    }
+    if (!cut && (a > 0 || sepIsBreak))
+      for (const auto& p : kParentheticals) {
+        int k = 0;
+        while (k < 4 && p[k]) ++k;
+        if (b - a + 1 != k) continue;
+        bool same = true;
+        for (int j = 0; j < k; ++j) same = same && tk[(size_t)a + (size_t)j].lower == p[j];
+        if (same) { cut = true; break; }
+      }
+    if (cut) { addCut(a); if (sep + 1 < n && sepIsBreak) addCut(sep + 1); }
+  }
+  if (cuts.empty()) return false;
+  std::sort(cuts.begin(), cuts.end());
+  cuts.push_back(n);
+  int a = 0;
+  for (int cutAt : cuts) {
+    if (cutAt <= a) continue;
+    std::vector<Token> seg(tk.begin() + a, tk.begin() + cutAt);
+    for (Token& t : seg) { t.head = -1; t.deprel.clear(); }
+    nlp_->parser().parse(seg);
+    for (int i = 0; i < (int)seg.size(); ++i) {
+      Token& t = tk[(size_t)(a + i)];
+      t.head = seg[(size_t)i].head > 0 ? seg[(size_t)i].head + a : 0;
+      t.deprel = seg[(size_t)i].deprel;
+    }
+    a = cutAt;
+  }
+  return true;
+}
+
 std::vector<size_t> FrameBuilder::splitPoints(std::string_view t) {
   std::vector<size_t> out;
   for (size_t i = 0; i + 1 < t.size(); ++i) {
@@ -2461,6 +2847,27 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
     };
     int fix = -1;
     uint32_t feats = 0;
+    // C15: an "adjective" the lexicon knows only as a noun ("The farmer carries water.": farmer tagged as the
+    // comparative of "farm") is a noun; then the -s word after it can be the verb
+    std::vector<int> nounFix;
+    if (!verb)
+      for (int i = 0; i + 1 < n; ++i) {
+        if (tk[(size_t)i].upos != "ADJ") continue;
+        std::vector<lex::Analysis> an;
+        lex_->lookup(text::en_key(tk[(size_t)i].lower), an);
+        bool noun = false, adj = false;
+        for (const lex::Analysis& a : an) {
+          const uint8_t pos = lex_->lemma(a.lemma).pos;
+          noun = noun || pos == feat::Noun;
+          adj = adj || pos == feat::Adj || pos == feat::Participle;
+        }
+        if (noun && !adj) nounFix.push_back(i);
+      }
+    auto nounLike = [&](int i) {
+      const std::string& pu = tk[(size_t)i].upos;
+      return pu == "NOUN" || pu == "PROPN" || pu == "PRON" ||
+             std::find(nounFix.begin(), nounFix.end(), i) != nounFix.end();
+    };
     if (!verb) {
       // "He does not like fish": the word after do + not; "I don't much care": one degree adverb in between
       for (int i = 2; i < n && fix < 0; ++i) {
@@ -2484,9 +2891,8 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
       } else {
         for (int i = 1; i + 1 < n && fix < 0; ++i) {
           const std::string& w = tk[(size_t)i].lower;
-          const std::string& pu = tk[(size_t)i - 1].upos;
           if ((tk[(size_t)i].upos == "NOUN" || tk[(size_t)i].upos == "ADJ") && w.size() > 3 && w.back() == 's' &&
-              (pu == "NOUN" || pu == "PROPN" || pu == "PRON") && verbReading(tk[(size_t)i])) {
+              nounLike(i - 1) && verbReading(tk[(size_t)i])) {
             fix = i;
             feats = nlp::morph::fromString("Number=Sing|Person=3|Tense=Pres|VerbForm=Fin|Mood=Ind");
           }
@@ -2494,10 +2900,13 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
       }
     }
     if (fix >= 0) {
+      for (int i : nounFix)
+        if (i < fix) { tk[(size_t)i].upos = "NOUN"; tk[(size_t)i].feats = nlp::morph::fromString("Number=Sing"); }
       tk[(size_t)fix].upos = "VERB";
       tk[(size_t)fix].feats = feats;
       nlp_->parser().parse(tk);
       out.repairs.emplace_back("retag");
+      flatClause(tk, fix);
     }
   }
   // Spanish (C13): tags and features from spanish.vpl (second-person verbs read as nouns: "¿A dónde vas?", "¿Quién
@@ -2506,6 +2915,25 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
     nlp_->parser().parse(tk);
     out.repairs.emplace_back("retag");
   }
+  bool reparse = nlp_ && lex_ && lang_ == SrcLang::En && lexiconVeto(tk, *lex_);
+  // C15: "for" before a subject pronoun and its verb is the conjunction "for" (= nam): "for you will help ...",
+  // ", for she does not know ..."
+  if (nlp_ && lang_ == SrcLang::En)
+    for (int i = 0; i + 2 < n; ++i) {
+      if (tk[(size_t)i].lower != "for" || tk[(size_t)i].upos == "CCONJ") continue;
+      if (!in(tk[(size_t)i + 1].lower, {"i", "you", "he", "she", "we", "they", "it", "there"})) continue;
+      bool verbNext = false;
+      for (int j = i + 2; j < n && j <= i + 3; ++j)
+        verbNext = verbNext || tk[(size_t)j].upos == "AUX" || tk[(size_t)j].upos == "VERB";
+      if (tk[(size_t)i + 1].lower == "you" && !(tk[(size_t)i + 2].upos == "AUX" || tk[(size_t)i + 2].upos == "VERB")) verbNext = false;
+      if (!verbNext) continue;
+      tk[(size_t)i].upos = "CCONJ";
+      tk[(size_t)i].feats = 0;
+      reparse = true;
+    }
+  if (reparse) nlp_->parser().parse(tk);
+  if (nlp_ && lang_ == SrcLang::En) segmentParse(tk);
+  if (nlp_) punctRoot(tk);
   if (nlp_) repairTree(out);
   // "Bow!": a one-word exclamation tagged as an interjection that the lexicon knows as a verb -> imperative
   if (nlp_ && lex_ && lang_ == SrcLang::En) {

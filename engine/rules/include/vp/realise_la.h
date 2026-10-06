@@ -30,7 +30,11 @@ enum class SubRel : uint8_t { Cause, Time, Condition, Purpose, Concession, Resul
 struct LaClause;
 
 struct LaPronoun { uint8_t person = 0, number = feat::Sg, gender = 0; bool reflexive = false; };
-struct LaAdj { uint32_t lemma = kNone; uint8_t degree = 0; std::vector<uint32_t> adverbs; /* "nimis parva" */ };
+struct LaAdj {
+  uint32_t lemma = kNone; uint8_t degree = 0; std::vector<uint32_t> adverbs; /* "nimis parva" */
+  bool before = false;            // C15: before the noun whatever order.adj says ("Magnus Magus", names_la.tsv)
+  bool capitalise = false;        // C15: part of a translated name ("Leō Timidus")
+};
 
 struct LaNP {
   uint32_t head = kNone;          // noun / pronoun / substantive adjective lemma (kNone for names and pronoun specs)
@@ -57,9 +61,13 @@ struct LaNP {
   bool coordBoth = false;         // ... also before the first conjunct: "neque canēs neque fēlēs" (C13)
   std::string literal;            // unknown source word, kept verbatim (marked unknown)
   std::string fixed;              // ready Latin words from the phrasebook ("chartīs"): written as they are (C2b)
+  bool nameWords = false;         // C15: a translated name of names_la.tsv ("Urbs Smaragdōrum"): every word is a name
 };
 
-struct LaOblique { uint32_t prep = kNone; uint8_t case_ = 0; LaNP np; bool front = false; };
+struct LaOblique {
+  uint32_t prep = kNone; uint8_t case_ = 0; LaNP np; bool front = false;
+  bool after = false;             // C15: after the verb ("Potentior est quam nōs omnēs": the quam phrase of a comparison)
+};
 struct LaAdverb { uint32_t lemma = kNone; AdvPos pos = AdvPos::Auto; };
 
 struct LaPredicate {

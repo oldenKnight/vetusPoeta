@@ -81,16 +81,32 @@ struct TokInfo {
   bool name = false, word = false, number = false, punct = false;
   std::string text;         // as written
   std::string encl;
+  uint32_t verbLemma = lex::kNoLemma;   // participles: the verb they belong to (secūtus -> sequor), else kNoLemma
+  bool deponent = false;    // verbLemma (or the verb itself) is deponent
 };
 void tokInfos(const lex::Lexicon& la, const Sentence& s, std::vector<TokInfo>& out);
 
+// The verb of a participle lemma: the lexicon lists the participle's headword as a "verb ... participle" analysis of
+// the verb itself (lēctus <- legō perfect participle passive; secūtus <- sequor). Same vowel quantities first, then
+// the verb's tier and frequency. kNoLemma when `p` is not a participle lemma or no verb is found. `buf` is scratch.
+uint32_t verbOfParticipleLemma(const lex::Lexicon& la, uint32_t p, std::vector<lex::Analysis>& buf);
+
 // ---- Latin frame builder (readable.cpp) ------------------------------------------------------------------------------
+// Perfect participle + a form of sum read as one verb (amātus erat, ingressus est): both tokens stay in the interlinear,
+// the note names the periphrasis.
+struct Periphrasis {
+  int participle = -1, aux = -1;           // token indices
+  bool deponent = false;                   // active meaning (ingressus est = entered)
+  int auxTense = 0;                        // vp::feat tense of the sum form (Present -> perfect, Imperfect -> pluperfect)
+};
+
 struct Built {
   std::vector<frame::SemFrame> frames;     // main clauses in order (coordinated main clauses: several)
   std::vector<std::string> joiners;        // between frames[i-1] and frames[i]: Latin key of the connector or ","
   std::vector<std::string> flags;          // "abl-abs", "no-verb", ...
   std::vector<std::string> roles;          // per token: "subject", "object", ...
   double fill = 1.0;                       // share of word tokens the frame accounts for
+  std::vector<Periphrasis> periphrases;
 };
 void buildFrames(const lex::Lexicon& la, const Tables& tab, const Sentence& s, const std::vector<TokInfo>& ti,
                  Built& out);

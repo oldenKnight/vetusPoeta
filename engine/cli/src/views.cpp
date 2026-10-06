@@ -8,6 +8,7 @@
 #include "vp/text.h"
 #if defined(VP_HAVE_RULES)
 #include "vp/morph.h"
+#include "vp/transfer_grc.h"
 #endif
 
 namespace vpcli {
@@ -310,6 +311,7 @@ std::string stripAddedEmoji(const std::string& target, const std::string& source
   return any ? collapseSpaces(out) : out;
 }
 
+#if !defined(VP_HAVE_RULES)
 namespace {
 bool isGreekVowel(char32_t c) {
   switch (c) {
@@ -346,8 +348,12 @@ void dropMonosyllableAccent(std::u32string& w) {
   w.erase(std::remove(w.begin(), w.end(), static_cast<char32_t>(0x0301)), w.end());
 }
 }  // namespace
+#endif
 
 std::string greekMonotonic(const std::string& text) {
+#if defined(VP_HAVE_RULES)
+  return vp::grc::toMonotonic(text);   // C12's table (the one the Greek engine path is tested against)
+#else
   const std::string d = vp::text::nfd(text);
   std::u32string mapped;
   mapped.reserve(d.size());
@@ -383,6 +389,7 @@ std::string greekMonotonic(const std::string& text) {
   }
   flush();
   return vp::text::nfc(vp::text::toUtf8(out));
+#endif
 }
 
 vp::rules::Check markupCheck(const std::string& target, int maxLine, int maxLines) {
@@ -584,12 +591,18 @@ void applyOutput(const vp::rules::CueOutput& out, vp::CueRecord& r) {
     if (x.kind.empty() || x.kind[0] != '_') r.reasons.push_back(vp::CueReason{x.tokenIndex, x.kind, x.text, x.data});
   if (!out.tokens.empty()) setHidden(r, kTokensKind, encodeTokens(out.tokens));
   setStoredFlags(r, out.flags);
+  OrbergFacts of;
+  of.percent = out.meaningPercent;
+  of.missing = out.meaningMissing;
+  of.original = out.original;
+  setHidden(r, kOrbergKind, encodeOrberg(of));
 }
 
 // ---------------------------------------------------------------------------------------------- stored engine data
 const char* const kTokensKind = "_tokens";
 const char* const kFlagsKind = "_flags";
 const char* const kJobKind = "_job";
+const char* const kOrbergKind = "_orberg";
 
 bool isHiddenReason(const vp::CueReason& r) { return !r.kind.empty() && r.kind[0] == '_'; }
 
@@ -757,6 +770,99 @@ bool decodeJob(const std::string& data, JobFacts& out) {
       if (p.is_array() && p.size() == 2 && p[0].is_string() && p[1].is_number_integer())
         out.onlineVerdicts.emplace_back(p[0].get<std::string>(), p[1].get<int>());
   return true;
+}
+
+std::string encodeOrberg(const OrbergFacts& f) {
+  if (f.percent < 0 && f.original.empty()) return std::string();
+  json o{{"p", f.percent < 0 ? -1 : std::min(100, f.percent)}};
+  if (!f.missing.empty()) o["m"] = f.missing;
+  if (!f.original.empty()) o["o"] = f.original;
+  return o.dump(-1, ' ', false, json::error_handler_t::replace);
+}
+
+bool decodeOrberg(const std::string& data, OrbergFacts& out) {
+  out = OrbergFacts();
+  const json o = json::parse(data, nullptr, false);
+  if (!o.is_object()) return false;
+  if (o.contains("p") && o["p"].is_number_integer()) out.percent = std::max(-1, std::min(100, o["p"].get<int>()));
+  if (o.contains("m") && o["m"].is_array())
+    for (const json& m : o["m"])
+      if (m.is_string()) out.missing.push_back(m.get<std::string>());
+  if (o.contains("o") && o["o"].is_string()) out.original = o["o"].get<std::string>();
+  return true;
+}
+
+// ---------------------------------------------------------------------------------------------- Orbergise original
+std::vector<std::string> alignOriginal(const std::vector<TimedText>& cues, const std::vector<TimedText>& original) {
+  std::vector<std::string> out(cues.size());
+  bool timed = !cues.empty() && !original.empty();
+  for (const TimedText& t : cues) timed = timed && t.timed;
+  for (const TimedText& t : original) timed = timed && t.timed;
+  if (cues.size() == original.size() || !timed) {   // 1. by cue index
+    for (size_t i = 0; i < out.size() && i < original.size(); ++i) out[i] = original[i].text;
+    return out;
+  }
+  // 2. by time overlap (both lists are in file order; a cue scan over all originals keeps this simple and exact)
+  for (size_t i = 0; i < cues.size(); ++i) {
+    const int64_t s = cues[i].start, e = cues[i].end;
+    int64_t bestOv = 0;
+    size_t best = original.size();
+    for (size_t j = 0; j < original.size(); ++j) {
+      const int64_t ov = std::min(e, original[j].end) - std::max(s, original[j].start);
+      if (ov <= 0) continue;
+      const int64_t shorter = std::min(e - s, original[j].end - original[j].start);
+      if (ov * 2 >= shorter) {
+        if (!out[i].empty()) out[i] += ' ';
+        out[i] += original[j].text;
+      }
+      if (ov > bestOv) {
+        bestOv = ov;
+        best = j;
+      }
+    }
+    if (out[i].empty() && best < original.size()) out[i] = original[best].text;
+  }
+  return out;
+}
+
+std::string detectOriginalLang(const std::vector<std::string>& texts) {
+  static const char* const kEs[] = {"el",  "la",  "los", "las",  "que",  "de",   "del",  "y",    "es",   "un",
+                                    "una", "por", "con", "para", "pero", "muy",  "su",   "sus",  "lo",   "le",
+                                    "se",  "al",  "mi",  "tu",   "yo",   "este", "esta", "como", "cuando", "donde"};
+  static const char* const kEn[] = {"the", "and",  "is",   "of",  "to",   "you",  "it",   "that", "he",   "she",
+                                    "we",  "they", "are",  "was", "with", "for",  "this", "my",   "your", "have",
+                                    "has", "not",  "what", "i",   "in",   "on",   "at",   "be",   "will", "do"};
+  int es = 0, en = 0;
+  for (const std::string& t : texts) {
+    std::string w;
+    auto word = [&]() {
+      if (w.empty()) return;
+      for (const char* x : kEs) es += w == x ? 1 : 0;
+      for (const char* x : kEn) en += w == x ? 1 : 0;
+      w.clear();
+    };
+    for (size_t i = 0; i < t.size();) {
+      const char32_t c = vp::text::decodeUtf8(t, i);
+      switch (c) {
+        case 0xBF: case 0xA1: case 0xF1: case 0xD1:   // ¿ ¡ ñ Ñ
+          es += 3;
+          break;
+        case 0xE1: case 0xE9: case 0xED: case 0xF3: case 0xFA: case 0xC1: case 0xC9: case 0xCD: case 0xD3: case 0xDA:
+          es += 1;   // á é í ó ú
+          break;
+        default:
+          break;
+      }
+      if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c >= 0xC0) {
+        if (c < 0x80) w.push_back(static_cast<char>(c >= 'A' && c <= 'Z' ? c + 32 : c));
+        else w += "#";   // a non-ASCII letter: no function word above contains one
+      } else {
+        word();
+      }
+    }
+    word();
+  }
+  return es > en ? "es" : "en";
 }
 
 // ---------------------------------------------------------------------------------------------- reasons for the UI
@@ -934,8 +1040,9 @@ json reasonsView(const vp::CueRecord& r, const std::vector<vp::rules::TokenView>
       out.push_back(reasonJson(x));
     }
   }
-  // Orbergise: words that replaced the input's words, when the engine did not say so itself.
-  if (job.orberg && !hasChange) {
+  // Orbergise: words that replaced the input's words, when the engine did not say so itself (the stub; the rules
+  // engine reports its changes as reasons of kind "orbergise" {was, now, why} and its meaning facts in "_orberg").
+  if (job.orberg && !hasChange && !hiddenReason(r, kOrbergKind)) {
     for (const WordChange& c : wordChanges(ctx.source, tokens)) {
       const vp::rules::TokenView* t = tok(c.tokenIndex);
       json d{{"was", c.was}, {"now", c.now}, {"why", "vocabulary"}, {"chosen", true}};

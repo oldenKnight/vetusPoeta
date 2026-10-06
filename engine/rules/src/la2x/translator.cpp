@@ -128,6 +128,7 @@ struct Translator::Impl final : public detail::LexicalSource {
   detail::Discourse disc;
   mutable std::unordered_map<uint32_t, uint32_t> partVerb;   // participle lemma -> verb lemma (capped)
   mutable std::vector<lex::Candidate> candBuf;
+  mutable std::vector<lex::Analysis> anaBuf;
   mutable std::vector<lex::Sense> senseBuf;
   std::vector<std::string> personWordsEn;   // English words of "person" rows (gloss fallback)
 
@@ -137,7 +138,13 @@ struct Translator::Impl final : public detail::LexicalSource {
   uint32_t verbOfParticiple(uint32_t p) const {
     auto it = partVerb.find(p);
     if (it != partVerb.end()) return it->second;
-    uint32_t found = lex::kNoLemma;
+    // the lexicon's own link first (the participle's headword as a participle analysis of its verb)
+    uint32_t found = detail::verbOfParticipleLemma(lx, p, anaBuf);
+    if (found != lex::kNoLemma) {
+      if (partVerb.size() > 4096) partVerb.clear();
+      partVerb.emplace(p, found);
+      return found;
+    }
     const lex::Lemma pl = lx.lemma(p);
     const std::string K(pl.key);
     std::string kw = firstItem(pl.glossEn);

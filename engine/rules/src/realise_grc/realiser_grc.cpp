@@ -41,6 +41,17 @@ uint8_t simpleGender(uint8_t g) {
 
 bool inKeys(const std::vector<std::string>& v, std::string_view k) { return std::find(v.begin(), v.end(), k) != v.end(); }
 
+// C16: an impersonal modal with accusative + infinitive by valency_grc.tsv (χρή; δεῖ has its own closed id)
+bool impersAccInf(const lex::Lexicon& lx, const GreekData& gd, uint32_t verb) {
+  if (verb == kNone) return false;
+  const lex::Lemma l = lx.lemma(verb);
+  if (l.id == kNone) return false;
+  if (const Valency* v = gd.valency(l.key))
+    for (const Frame& f : v->frames)
+      if (f.kind == FrameKind::ImpersAccInf) return true;
+  return false;
+}
+
 }  // namespace
 
 GreekRealiser::GreekRealiser(const lex::Lexicon& lx, const curated::CuratedData& cd, const GreekData& gd)
@@ -196,6 +207,8 @@ void GreekRealiser::form(uint32_t lemma, const Features& f, GWord& w, const char
     return;
   }
   if (l.flags & lex::Indeclinable) { literal(lemma, "?", w, rule); return; }
+  // C16: cardinals from five up are indeclinable (ἕξ, ἑπτά ...) even when the lexicon lacks the flag
+  if (l.pos == Num && !(l.flags & lex::HasTable)) { literal(lemma, "?", w, rule); return; }
   w.form = "[" + display(l.head) + "]";
   w.missing = true;
 }
@@ -362,9 +375,16 @@ void GreekRealiser::np(const GrcNP& n, uint8_t case_, bool afterPrep, bool predi
     for (const GrcAdj& ad : n.adjectives) {
       if (beforeNoun(ad.lemma)) pre.push_back(&ad);
       else if (definite && n.adjectives.size() == 1) pre.push_back(&ad);
+      else if (!definite && n.adjFirst) pre.push_back(&ad);
       else post.push_back(&ad);
     }
     for (const GrcAdj* ad : pre) adjWord(*ad, a, "order.adj", out);
+    if (n.genFirst)   // "Ἄρεως ἡμέρα": the genitive before the noun, without its article
+      for (const GrcNP& g : n.genitive) {
+        GrcNP x = g;
+        x.definite = false;
+        np(x, Gen, false, false, o, out);
+      }
     // head
     if (n.isName) {
       GWord w;
@@ -397,7 +417,8 @@ void GreekRealiser::np(const GrcNP& n, uint8_t case_, bool afterPrep, bool predi
       w.rule = "order.poss";
       out.push_back(std::move(w));
     }
-    for (const GrcNP& g : n.genitive) np(g, Gen, false, false, o, out);
+    if (!n.genFirst)
+      for (const GrcNP& g : n.genitive) np(g, Gen, false, false, o, out);
     for (const GrcClause& rc : n.relative) {
       Ctx rctx;
       rctx.main = false;
@@ -456,7 +477,7 @@ void GreekRealiser::verbGroup(const GrcClause& c, const Agree& subj, std::vector
   uint8_t tense = p.tense;
   if (mood == Subjunctive) tense = aspect(tense) == Perfect ? (uint8_t)Present : aspect(tense);
   if (p.modal != kNone) {
-    const bool impersonal = p.modal == k_.dei || p.modal == k_.exesti;
+    const bool impersonal = p.modal == k_.dei || p.modal == k_.exesti || impersAccInf(lx_, gd_, p.modal);
     const uint8_t mt = p.modalTense ? p.modalTense : tense;
     if (impersonal) push(fin, p.modal, verbForm(P3, Sg, mt, mood, Active), "order.inf");
     else push(fin, p.modal, verbForm(person, number, mt, mood, Active), "order.inf");
@@ -496,7 +517,7 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
   if (c.pred.person) verbAgree.person = c.pred.person;
   if (c.pred.number) verbAgree.number = c.pred.number;
 
-  const bool impersDei = c.pred.modal != kNone && c.pred.modal == k_.dei;
+  const bool impersDei = c.pred.modal != kNone && (c.pred.modal == k_.dei || impersAccInf(lx_, gd_, c.pred.modal));
   const bool impersExesti = c.pred.modal != kNone && c.pred.modal == k_.exesti;
   const uint8_t subjCase = (ctx.infinitival || impersDei) ? (uint8_t)Acc : impersExesti ? (uint8_t)Dat : (uint8_t)Nom;
 
@@ -551,12 +572,22 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
     }
     np(ob.np, oc, ob.prep != kNone, false, o, w);
     const bool wh = ob.np.interrogative != kNone || (ob.np.head != kNone && ob.np.head == k_.tis);
-    append(wh ? s[kWH] : ob.front ? s[kFRONT] : s[kOBL], w);
+    append(wh ? s[kWH] : ob.front ? s[kFRONT] : ob.end ? s[kEND] : s[kOBL], w);
   }
   // adverbs
+  bool frontGiven = false;
   for (const GrcAdverb& ad : c.adverbs) {
     GWord w;
-    literal(ad.lemma, "?", w, "order.adv");
+    const lex::Lemma al = lx_.lemma(ad.lemma);
+    if (al.id != kNone && (al.pos == Adj || al.pos == Num)) {   // C16: the adverb of an adjective (πρῶτον, ἡδέως)
+      Features af;
+      af.pos = Adv;
+      form(ad.lemma, af, w, "order.adv");
+      if (w.missing) literal(ad.lemma, "?", w, "order.adv");
+    } else {
+      literal(ad.lemma, "?", w, "order.adv");
+    }
+    frontGiven = frontGiven || ad.pos == AdvPos::Front;
     if (ad.pos == AdvPos::Front || (ad.pos == AdvPos::Auto && timeAdverb(ad.lemma))) s[kFRONT].push_back(std::move(w));
     else if (ad.pos == AdvPos::End) s[kEND].push_back(std::move(w));
     else s[kADV].push_back(std::move(w));
@@ -566,8 +597,10 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
   const bool isCopula = c.pred.lemma != kNone && c.pred.modal == kNone && (!c.predicative.empty() || !c.predAdj.empty());
   const bool exist = c.existential && !isCopula;   // order.exist: V S (location first); orthotone ἔστι for εἰμί
   const uint8_t predCase = ctx.infinitival ? (uint8_t)Acc : (uint8_t)Nom;
+  bool whPred = false;
   for (const GrcNP& pn : c.predicative) {
     std::vector<GWord> w;
+    whPred = whPred || pn.interrogative != kNone;
     np(pn, predCase, false, true, o, w);
     append(pn.interrogative != kNone ? s[kWH] : s[kPRED], w);
   }
@@ -676,22 +709,40 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
     orderRule = "order.excl";
   } else if (c.type == ClauseType::Frag) {
     for (int sl : {kFRONT, kWH, kS, kPRED, kIO, kO, kOBL, kADV, kNEG, kV, kINF, kPRED2, kEND}) append(content, s[sl]);
+  } else if (c.type == ClauseType::Imp && ctx.main && frontGiven) {
+    // C16 (order.imp): a fronted sequence adverb puts the imperative last ("πρῶτον τὸ ὄνομά σου γράφε")
+    orderRule = prohib ? "order.prohib" : "order.imp";
+    seq = {kFRONT, kIO, kO, kOBL, kADV, kNEG, kV, kINF, kPRED, kPRED2, kEND};
   } else if (c.type == ClauseType::Imp && ctx.main) {
     orderRule = prohib ? "order.prohib" : "order.imp";
     seq = {kFRONT, kNEG, kV};
     addTemplate(tmpl("order.imp", {"VOC", "V", "IO", "O", "OBL", "ADV"}));
     for (int sl : {kINF, kPRED, kPRED2, kEND}) seq.push_back(sl);
+  } else if (c.type == ClauseType::Wh && isCopula && whPred) {
+    // C16 (order.wh.cop): an interrogative predicate takes the copula right after it ("τίς ἡμέρα ἐστὶ σήμερον;")
+    orderRule = "order.wh";
+    seq = {kWH, kNEG, kV, kFRONT, kS, kPRED, kADV, kPRED2, kEND};
   } else {
     const char* id = exist ? "order.exist" : isCopula ? "order.copula" : impersDei ? "order.dei"
                      : impersExesti ? "order.exesti" : c.pred.modal != kNone ? "order.inf" : "order.decl";
     orderRule = id;
     seq.push_back(kWH);
     seq.push_back(kFRONT);
-    if (exist) addTemplate(tmpl(id, {"CONN", "OBL", "V", "S"}));
+    if (exist || c.verbFirst) addTemplate(tmpl("order.exist", {"CONN", "OBL", "V", "S"}));
     else if (isCopula) addTemplate(tmpl(id, {"VOC", "CONN", "S", "PRED", "NEG", "V"}));
     else if (impersDei) addTemplate(tmpl(id, {"CONN", "NEG", "V", "S", "O", "OBL", "INF"}));
     else if (impersExesti) addTemplate(tmpl(id, {"CONN", "NEG", "V", "IO", "O", "OBL", "INF"}));
-    else if (c.pred.modal != kNone) addTemplate(tmpl(id, {"VOC", "CONN", "S", "NEG", "V", "IO", "O", "OBL", "ADV", "INF"}));
+    else if (c.pred.modal != kNone && c.type == ClauseType::Yn && c.ara && c.bias == YnBias::Neutral) {
+      // C16 (order.yn.inf): ἆρα + the modal first, the infinitive after the subject and the dative pronoun
+      // ("ἆρα δύνανται αἱ γαλαῖ μειδιᾶν;", "ἆρα δύνασαί μοι βοηθεῖν περὶ τῆς ἐπιστολῆς;")
+      orderRule = "order.yn";
+      // an enclitic pronoun object (μοι, σε) goes with the modal, before the infinitive
+      if (s[kO].size() == 1 && s[kO][0].enclitic) {
+        s[kIO].insert(s[kIO].begin(), std::move(s[kO][0]));
+        s[kO].clear();
+      }
+      addTemplate(tmpl("order.yn.inf", {"VOC", "CONN", "NEG", "V", "S", "IO", "INF", "O", "OBL", "ADV"}));
+    } else if (c.pred.modal != kNone) addTemplate(tmpl(id, {"VOC", "CONN", "S", "NEG", "V", "IO", "O", "OBL", "ADV", "INF"}));
     else if (c.type == ClauseType::Yn && c.ara && c.bias == YnBias::Neutral) {   // decision 4: ἆρα + verb first
       orderRule = "order.yn";
       addTemplate(tmpl("order.yn", {"VOC", "CONN", "NEG", "V", "S", "IO", "O", "OBL", "ADV"}));
@@ -723,9 +774,29 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
     if (c.bias == YnBias::ExpectNo) { GWord m; literal(k_.me, "μή", m, "order.yn.me"); lead.push_back(std::move(m)); }
     content.insert(content.begin(), lead.begin(), lead.end());
   }
-  // second-position particles: after the first word of the clause
+  // C16: the modal particle ἄν after the negation (moved to the front: "οὐκ ἂν ἐνθάδε ἦσθα") or the first word
+  if (c.an && !content.empty()) {
+    GWord an;
+    literal(findLemma(lx_, "ἄν", Particle) != kNone ? findLemma(lx_, "ἄν", Particle) : findLemma(lx_, "ἄν"), "ἄν", an,
+            "mood.an");
+    std::vector<GWord> neg, rest;
+    for (GWord& w : content)
+      ((w.lemma == k_.ou && k_.ou != kNone) || (w.lemma == k_.me && k_.me != kNone) ? neg : rest).push_back(std::move(w));
+    content.clear();
+    if (!neg.empty()) {
+      append(content, neg);
+      content.push_back(std::move(an));
+      append(content, rest);
+    } else {
+      append(content, rest);
+      content.insert(content.begin() + 1, std::move(an));
+    }
+  }
+  // second-position particles: after the first word of the clause (after "διὰ τί" as a whole: "διὰ τί οὖν")
   if (!conn2.empty()) {
-    const size_t at = content.empty() ? 0 : 1;
+    size_t at = content.empty() ? 0 : 1;
+    if (content.size() >= 2 && content[1].lemma == k_.tis && k_.tis != kNone && lx_.lemma(content[0].lemma).pos == Prep)
+      at = 2;
     for (size_t i = 0; i < conn2.size(); ++i) content.insert(content.begin() + (long)(at + i), std::move(conn2[i]));
   }
   std::vector<GWord> clauseWords;
@@ -770,6 +841,18 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
     }
     Ctx sctx;
     sctx.main = false;
+    if (sub.otherwise) {   // C16: "εἰ δὲ μή," + the clause (an "or else" before a counterfactual)
+      for (const char* h : {"εἰ", "δέ", "μή"}) {
+        GWord w;
+        const uint32_t id = std::string(h) == "εἰ" ? k_.ei : std::string(h) == "μή" ? k_.me
+                                                                       : findLemma(lx_, h, Particle);
+        literal(id, h, w, "order.sub.otherwise");
+        if (std::string(h) == "δέ") w.enclitic = false;
+        sw.push_back(std::move(w));
+      }
+      sw.back().punctAfter = ",";
+      conj = kNone;
+    }
     if (conj != kNone) {
       GWord w;
       literal(conj, "?", w, sub.before ? "order.sub.pre" : sub.rel == SubRel::Purpose ? "order.sub.purp"

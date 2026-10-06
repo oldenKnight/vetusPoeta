@@ -59,7 +59,9 @@ std::vector<std::string> displayLines(const std::string& target, const vp::subs:
 // Removes emoji that the engine added: pictographic code points (music notes excluded) that do not occur in the
 // source, with their variation selectors, joiners and skin tones; spaces left behind are collapsed.
 std::string stripAddedEmoji(const std::string& target, const std::string& source);
-// Polytonic -> monotonic Greek (breathings, iota subscript and koronis dropped; grave and circumflex -> acute).
+// Polytonic -> monotonic Greek for export greek:"monotonic". With the rules engine linked (VP_HAVE_RULES) this is
+// vp::grc::toMonotonic (C12: one tonos per word, breathings / iota subscript / length marks dropped, diaeresis kept,
+// monosyllables unaccented except ή and the interrogatives); without it a local approximation of the same rules.
 std::string greekMonotonic(const std::string& text);
 // A5 (markup/line layout) on a target as the engine produced it.
 vp::rules::Check markupCheck(const std::string& target, int maxLine, int maxLines);
@@ -112,6 +114,33 @@ struct JobFacts {
 };
 std::string encodeJob(const JobFacts& j);
 bool decodeJob(const std::string& data, JobFacts& out);
+// Orbergise facts the engine returned for the cue (CueOutput.meaningPercent / meaningMissing / original), hidden kind
+// "_orberg"; applyOutput stores them, an edit keeps `original` and drops the meaning (cue.get then measures it).
+extern const char* const kOrbergKind;
+struct OrbergFacts {
+  int percent = -1;                   // -1: not computed by the engine
+  std::vector<std::string> missing;
+  std::string original;
+};
+std::string encodeOrberg(const OrbergFacts& f);   // "" when there is nothing to keep (percent < 0, no original)
+bool decodeOrberg(const std::string& data, OrbergFacts& out);
+
+// ---- Orbergise: the original-language file ----
+// One cue's text and timing (timed = false for a text document or an unparsable timing).
+struct TimedText {
+  std::string text;
+  int64_t start = 0, end = 0;
+  bool timed = false;
+};
+// The original's text for each of `cues` (DESIGN 10.7 "aligned by cue index, then by time overlap"):
+//  1. same number of cues, or either side untimed (a .txt): by cue index (position);
+//  2. otherwise by time: every original cue that overlaps the cue for at least half of the shorter of the two, in
+//     order, joined with a space; a cue that no original cue covers that well gets the original cue with the
+//     largest positive overlap; a cue with no overlap at all gets "" (the engine then rewrites from the Latin).
+std::vector<std::string> alignOriginal(const std::vector<TimedText>& cues, const std::vector<TimedText>& original);
+// Language of an original-language file when orbergise.start gives none: "es" when Spanish markers (¿ ¡ ñ, accented
+// vowels, common Spanish function words) outweigh common English function words, else "en".
+std::string detectOriginalLang(const std::vector<std::string>& texts);
 
 // ---- ReasonView in the shapes the UI reads (DESIGN 9.2 "Consumed by the UI") ----
 // The rules engine's reasons are turned into: sense {source, sense, senseEs, context[]}; one candidate reason per

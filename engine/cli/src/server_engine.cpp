@@ -80,7 +80,8 @@ const std::vector<PairState>& Server::pairStates() {
     st.pair = p;
     PairLangs pl;
     parsePair(p, pl);
-    const bool intoLatinFromSource = pl.target == vp::rules::Lang::La &&
+    // EN/ES -> Latin or Greek: the source analysis (english/spanish .tag.vpt + .dep.vpt) and the curated tables
+    const bool intoLatinFromSource = (pl.target == vp::rules::Lang::La || pl.target == vp::rules::Lang::Grc) &&
                                      (pl.source == vp::rules::Lang::En || pl.source == vp::rules::Lang::Es);
     if (!realEngine_) {
       st.available = true;
@@ -102,26 +103,34 @@ const std::vector<PairState>& Server::pairStates() {
                            std::string("The ") + (en ? "English" : "Spanish") + " language analysis files (" + base +
                                ".tag.vpt, " + base + ".dep.vpt) are missing from the data folder (data/nlp). "
                                "Reinstall the app."};
+      } else if (pl.target == vp::rules::Lang::Grc) {
+        st.available = probePair(pl, st.why);   // the Greek tables of the engine (C12) are checked by the probe
       } else {
         st.available = true;
       }
     } else {
-      // Pairs the rules engine may or may not implement yet: ask it with one empty cue (cheap: unimplemented pairs
-      // are refused before any work).
-      vp::rules::CueInput c;
-      vp::rules::Options o;
-      o.source = pl.source;
-      o.target = pl.target;
-      o.orbergise = pl.source == pl.target;
-      vp::rules::Context ctx;
-      vp::Result<std::vector<vp::rules::CueOutput>> r =
-          engine_->translate({c}, o, ctx, std::function<void(size_t)>(), std::function<bool()>());
-      if (r) st.available = true;
-      else st.why = r.error();
+      st.available = probePair(pl, st.why);
     }
     pairs_.push_back(std::move(st));
   }
   return pairs_;
+}
+
+// Pairs the rules engine may or may not serve with the data at hand: ask it with one empty cue (cheap: unimplemented
+// pairs and missing tables are refused before any work).
+bool Server::probePair(const PairLangs& pl, vp::Error& why) {
+  vp::rules::CueInput c;
+  vp::rules::Options o;
+  o.source = pl.source;
+  o.target = pl.target;
+  o.orbergise = pl.source == pl.target;
+  vp::rules::Context ctx;
+  vp::Result<std::vector<vp::rules::CueOutput>> r =
+      engine_->translate({c}, o, ctx, std::function<void(size_t)>(), std::function<bool()>());
+  if (r) return true;
+  why = r.error();
+  if (why.hint.empty()) why.hint = "This language pair is not available with the installed data.";
+  return false;
 }
 
 void Server::requirePair(const std::string& pair) {
@@ -245,6 +254,15 @@ void Server::retarget(size_t pos, const std::string& text) {
   r.reasons = remapReasons(r.reasons, before, now);
   setHidden(r, kTokensKind, now.empty() ? std::string() : encodeTokens(now));
   setStoredFlags(r, flags);
+  // Orbergise facts: the original line stays; the engine's meaning check described the old text (a check of the
+  // edited text replaces it when it computes one, else cue.get measures the edit itself)
+  if (const vp::CueReason* oh = hiddenReason(r, kOrbergKind)) {
+    OrbergFacts of;
+    decodeOrberg(oh->data, of);
+    of.percent = chk && chk->meaningPercent >= 0 ? chk->meaningPercent : -1;
+    of.missing = chk && chk->meaningPercent >= 0 ? chk->meaningMissing : std::vector<std::string>();
+    setHidden(r, kOrbergKind, encodeOrberg(of));
+  }
 }
 
 void Server::storeOutput(size_t pos, const vp::rules::CueOutput& out) {
@@ -270,35 +288,53 @@ std::vector<size_t> Server::indicesParam(const json& p, bool* given) const {
 }
 
 // ---- Orbergise: the original-language file ----
-void Server::loadOriginal(const std::string& path) {
+// Aligned to the project's cues by alignOriginal (views.h: by cue index when the counts agree or a side is untimed,
+// else by time overlap); the language is `lang` ("en" | "es") or detected (detectOriginalLang). The path and the
+// language are kept in the manifest's settings snapshot (orbergOriginalPath / orbergOriginalLang) so reopening the
+// project restores them.
+void Server::loadOriginal(const std::string& path, const std::string& lang) {
+  if (!lang.empty() && lang != "en" && lang != "es")
+    fail(ErrorCode::BadParams, "originalLang must be en or es", "The original-language file must be English or Spanish.");
   vp::subs::Format f;
   if (!formatFromPath(path, f))
     fail(ErrorCode::UnsupportedFormat, "unknown file type: " + path, "Only .srt, .vtt, .ass, .ssa and .txt files can be opened.");
+  if (!fs::isRegularFile(path))
+    fail(ErrorCode::NotFound, "no file at " + path, "The original-language file was not found. Choose it again.");
   const std::string bytes = unwrap(fs::readFile(path, 64ull << 20));
   std::vector<uint8_t> b(bytes.begin(), bytes.end());
   const vp::subs::Document d = unwrap(vp::subs::parse(b, f));
-  std::vector<std::string> out(project_.cues.size());
-  if (d.cues.size() == doc_.cues.size() || d.format == vp::subs::Format::Txt || format_ == vp::subs::Format::Txt) {
-    for (size_t i = 0; i < out.size() && i < d.cues.size(); ++i) out[i] = d.cues[i].plainText();
-  } else {
-    // different cue counts: the original cue(s) overlapping each cue in time
-    std::vector<std::pair<int64_t, int64_t>> ot(d.cues.size());
-    for (size_t j = 0; j < d.cues.size(); ++j) vp::subs::parseTiming(d.cues[j].timingRaw, d.format, ot[j].first, ot[j].second);
-    for (size_t i = 0; i < out.size(); ++i) {
-      int64_t s = 0, e = 0;
-      if (!vp::subs::parseTiming(doc_.cues[i].timingRaw, format_, s, e)) continue;
-      for (size_t j = 0; j < d.cues.size(); ++j) {
-        const int64_t ov = std::min(e, ot[j].second) - std::max(s, ot[j].first);
-        if (ov > 0 && ov * 2 >= std::min(e - s, ot[j].second - ot[j].first)) {
-          if (!out[i].empty()) out[i] += ' ';
-          out[i] += d.cues[j].plainText();
-        }
-      }
+  auto timed = [](const vp::subs::Document& doc, std::vector<std::string>* texts) {
+    std::vector<TimedText> out(doc.cues.size());
+    for (size_t i = 0; i < doc.cues.size(); ++i) {
+      out[i].text = doc.cues[i].plainText();
+      out[i].timed = doc.format != vp::subs::Format::Txt &&
+                     vp::subs::parseTiming(doc.cues[i].timingRaw, doc.format, out[i].start, out[i].end) &&
+                     out[i].end > out[i].start;
+      if (texts) texts->push_back(out[i].text);
     }
-  }
-  originals_ = std::move(out);
+    return out;
+  };
+  std::vector<std::string> texts;
+  const std::vector<TimedText> orig = timed(d, &texts);
+  std::vector<std::string> aligned = alignOriginal(timed(doc_, nullptr), orig);
+  aligned.resize(project_.cues.size());
+  originals_ = std::move(aligned);
   originalPath_ = path;
+  originalLang_ = lang.empty() ? detectOriginalLang(texts) : lang;
   project_.manifest.settingsSnapshot["orbergOriginalPath"] = path;
+  project_.manifest.settingsSnapshot["orbergOriginalLang"] = originalLang_;
+  if (lang.empty()) logMsg(LogLevel::Info, "original " + path + ": language detected as " + originalLang_);
+}
+
+void Server::clearOriginal() {
+  originals_.clear();
+  originals_.shrink_to_fit();
+  originalPath_.clear();
+  originalLang_ = "en";
+  if (project_.manifest.settingsSnapshot.is_object()) {
+    project_.manifest.settingsSnapshot.erase("orbergOriginalPath");
+    project_.manifest.settingsSnapshot.erase("orbergOriginalLang");
+  }
 }
 
 }  // namespace vpcli

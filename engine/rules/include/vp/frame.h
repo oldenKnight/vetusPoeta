@@ -255,6 +255,7 @@ class FrameBuilder {
   void buildNP(Ctx& c, int head, SemNP& np) const;
   void fillSlot(Ctx& c, PhraseSlot& slot) const;
   void repairTree(SemSentence& s) const;
+  bool segmentParse(std::vector<nlp::Token>& tk) const;   // C15: discourse words, vocatives, parentheticals apart
 
   SrcLang lang_;
   const nlp::Pipeline* nlp_;

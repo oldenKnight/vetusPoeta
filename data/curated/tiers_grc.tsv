@@ -79,7 +79,7 @@
 φοβέω	φοβέω	verb	1	derived	frighten
 δοκέω	δοκέω	verb	1	derived	
 ἥκω	ἥκω	verb	1	derived	have come, be here
-εὑρίσκω	εὑρίσκω	verb	1	derived	
+εὑρίσκω	εὑρίσκω	verb	1	derived	find
 μέλλω	μέλλω	verb	1	derived	
 ἐπίσταμαι	ἐπίσταμαι	verb	1	derived	
 καθεύδω	καθεύδω	verb	1	derived	
@@ -106,11 +106,11 @@
 δεσπότης	δεσπότης	noun	1	derived	
 γεωργός	γεωργός	noun	1	derived	
 ἀγρός	ἀγρός	noun	1	derived	
-οἰκία	οἰκία	noun	1	derived	
+οἰκία	οἰκία	noun	1	derived	house, home
 κῆπος	κῆπος	noun	1	derived	garden
 θύρα	θύρα	noun	1	derived	door
 ὁδός	ὁδός	noun	1	derived	
-ἡμέρα	ἡμέρα	noun	1	derived	
+ἡμέρα	ἡμέρα	noun	1	derived	day, date
 νύξ	νύξ	noun	1	derived	
 ὥρα	ὥρα	noun	1	derived	
 ἵππος	ἵππος	noun	1	derived	
@@ -135,7 +135,7 @@
 βασιλεύς	βασιλεύς	noun	1	derived	
 βασίλεια	βασίλεια	noun	1	derived	queen
 ὄνομα	ὄνομα	noun	1	derived	
-ἔργον	ἔργον	noun	1	derived	
+ἔργον	ἔργον	noun	1	derived	work, deed, task, homework
 χρόνος	χρόνος	noun	1	derived	
 χώρα	χώρα	noun	1	derived	
 νῆσος	νῆσος	noun	1	derived	
@@ -241,3 +241,69 @@
 ἐπανέρχομαι	ἐπανέρχομαι	verb	2	derived	come back, return
 διέρχομαι	διέρχομαι	verb	2	derived	go through, get through
 δήπου	δήπου	particle	2	derived	of course, surely
+# C16 (quality loop 2): beginner words of the regression lines 41-114 (notes = English glosses)
+διδάσκαλοσ	διδάσκαλος	noun	1	derived	teacher, schoolmaster
+μῦθοσ	μῦθος	noun	1	derived	story, tale, fable
+ἐπιστολή	ἐπιστολή	noun	1	derived	letter, epistle, message
+ἱμάτιον	ἱμάτιον	noun	1	derived	coat, cloak, mantle
+λύχνοσ	λύχνος	noun	2	derived	lamp, candle
+θυρίσ	θυρίς	noun	2	derived	window
+ὡρολόγιον	ὡρολόγιον	noun	2	derived	clock
+χρῶμα	χρῶμα	noun	2	derived	colour, color, paint
+ἄριστον	ἄριστον	noun	2	derived	breakfast
+σκότοσ	σκότος	noun	2	derived	darkness, dark
+σκοτεινόσ	σκοτεινός	adj	2	derived	dark
+βάθοσ	βάθος	noun	2	derived	depth, bottom
+κάτω	κάτω	adv	1	derived	down, below
+τρέμω	τρέμω	verb	2	derived	tremble, shake
+χρηστόσ	χρηστός	adj	1	derived	kind, useful, honest
+ὕω	ὕω	verb	2	derived	rain
+ῥιγέω	ῥιγέω	verb	2	derived	be cold, shiver
+μαίνομαι	μαίνομαι	verb	2	derived	be mad, rage
+ὀργίζω	ὀργίζω	verb	2	derived	anger, be angry
+ἁμαρτάνω	ἁμαρτάνω	verb	1	derived	miss, err, be wrong, make a mistake
+ῥόδον	ῥόδον	noun	2	derived	rose
+ἐρυθρόσ	ἐρυθρός	adj	1	derived	red
+ὄπισθεν	ὄπισθεν	adv	2	derived	behind
+ἐγγύσ	ἐγγύς	adv	1	derived	near, close
+ἐνίοτε	ἐνίοτε	adv	2	derived	sometimes
+οὐδαμῶσ	οὐδαμῶς	adv	1	derived	not at all, in no way
+πόσοσ	πόσος	adj	1	derived	how much, how many
+μειδιάω	μειδιάω	verb	2	derived	smile
+κλείω	κλείω	verb	2	derived	close, shut
+ἅπτω	ἅπτω	verb	2	derived	light, kindle, fasten
+πιστεύω	πιστεύω	verb	1	derived	believe, trust
+οἴομαι	οἴομαι	verb	1	derived	think, suppose
+ἀδύνατοσ	ἀδύνατος	adj	1	derived	impossible, unable
+ὀλίγοσ	ὀλίγος	adj	1	derived	few
+κατάγνυμι	κατάγνυμι	verb	2	derived	break, shatter
+βόθροσ	βόθρος	noun	2	derived	hole, pit
+βαθύσ	βαθύς	adj	1	derived	deep
+ἕωθεν	ἕωθεν	adv	2	derived	at dawn, early in the morning
+ἕκαστοσ	ἕκαστος	det	1	derived	each, every
+πρῶτοσ	πρῶτος	adj	1	derived	first
+ἀνάγκη	ἀνάγκη	noun	1	derived	necessity
+χρή	χρή	verb	1	derived	
+διαφέρω	διαφέρω	verb	2	derived	differ, matter
+μέλω	μέλω	verb	2	derived	be a care
+ἰδού	ἰδού	adv	1	derived	look, here you are
+φυτεύω	φυτεύω	verb	2	derived	plant
+ποτέ	ποτέ	adv	1	derived	once, ever
+ὀργίλοσ	ὀργίλος	adj	2	derived	angry, irritable
+ἡδύσ	ἡδύς	adj	1	derived	sweet, pleasant
+ῥωμαϊστί	ῥωμαϊστί	adv	2	derived	in Latin
+ἑλληνιστί	Ἑλληνιστί	adv	2	derived	in Greek
+δεύτεροσ	δεύτερος	num	1	derived	second
+τρίτοσ	τρίτος	adj	1	derived	third
+ἕκτοσ	ἕκτος	adj	1	derived	sixth
+σελήνη	Σελήνη	name	2	derived	
+ἄρησ	Ἄρης	name	2	derived	
+ἑρμῆσ	Ἑρμῆς	name	2	derived	
+ζεύσ	Ζεύς	name	1	derived	
+ἀφροδίτη	Ἀφροδίτη	name	2	derived	
+κρόνοσ	Κρόνος	name	2	derived	
+ἥλιοσ	Ἥλιος	name	2	derived	
+# C16 (quality loop 2): beginner words of the regression lines 41-114 (notes = English glosses)
+εἰσέρχομαι	εἰσέρχομαι	verb	2	derived	go in, come in, enter
+ἐξαρτάω	ἐξαρτάω	verb	2	derived	depend
+ἁμαρτών	ἁμαρτών	adj	2	derived	

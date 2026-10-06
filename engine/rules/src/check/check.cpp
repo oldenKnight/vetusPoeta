@@ -761,6 +761,10 @@ struct LatinChecker::Impl {
         const uint8_t t = cd.effectiveTier(r.key, r.lpos, r.tier);
         best = std::min(best, t);
       }
+      if (best == 9 && hinted != lex::kNoLemma) {   // C15: the realiser generated the form from the hinted lemma
+        const lex::Lemma hl = lx.lemma(hinted);       // ("ōsculāta" from ōsculor; the reading is a participle lemma)
+        if (hl.id != lex::kNoLemma) best = cd.effectiveTier(hl.key, hl.pos, hl.tier);
+      }
       if (best == 9) {   // hinted lemma not among the readings: the best tier of any reading
         for (const Reading& r : rd[i]) best = std::min<uint8_t>(best, cd.effectiveTier(r.key, r.lpos, r.tier));
       }

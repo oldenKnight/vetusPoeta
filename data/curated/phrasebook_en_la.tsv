@@ -174,7 +174,7 @@ happy birthday	fēlīx diēs nātālis	1	greet
 merry christmas	fēlīx diēs nātālis Chrīstī	2	greet	
 your majesty	Māiestās Tua	2	address	vocative phrase
 your highness	Celsitūdō Tua	2	address	
-my dear	mī cāre/mea cāra	1	address	
+my dear	mī/mea cāre/cāra	1	address	
 my friend	mī amīce/mea amīca	1	address	
 my lord	domine	1	address	
 my lady	domina	1	address	
@@ -202,3 +202,21 @@ that depends	id pendet	1	answer
 it depends	id pendet	1	answer	
 it doesn't matter {WH}	nihil interest {1:subj}	1	state	"it doesn't matter which way you go" -> nihil interest quā viā eās
 it does not matter {WH}	nihil interest {1:subj}	1	state	
+# C15 (quality loop 2). Registers: paren = a parenthetical between commas, kept where the source has it; conn = a
+# connector between commas, moved to the front of the clause before it ("..., however;" -> Tamen ...); lead = a word
+# that opens the sentence before a comma ("Why, ..." -> Quid? ...); tail = an adverbial phrase that ends a clause.
+you know	ut scīs	1	paren	"My head is stuffed with straw, you know," -> ..., ut scīs,
+as you know	ut scīs	1	paren	
+as i said	ut dīxī	1	paren	
+i am sure	certē	1	adv	"I am sure I do not want ..." -> Certē ... nōlō
+however	tamen	1	conn	
+why	quid?	1	lead	"Why, don't you know?" -> Quid? Nescīs?
+exactly so	ita plānē	1	answer	
+just so	ita plānē	1	answer	
+there is no place like home	nūllus locus est sīcut domus	1	idiom	
+as soon as you can	quam prīmum	1	tail	
+as soon as possible	quam prīmum	1	tail	
+in reality	rē vērā	1	adv	
+in my day	in diēbus meīs	1	tail	
+i feel like {NP}	{1:nom} mihi videor	1	stmt	"I feel like a new man." -> Novus homō mihi videor.
+in trouble	in perīculō	1	tail	"anyone in trouble"

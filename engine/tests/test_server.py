@@ -6,7 +6,10 @@ on the fixture lexicon, so they are the same on every machine.
 Real engine (C8, skipped with a message when data/work/latin.vpl or data/work/nlp/english.*.vpt are absent): a
 session on tests/samples/sample.en.srt with the rules engine (Latin for all 12 cues, reasons in the UI shapes of
 DESIGN 9.2, word.inspect, words.list, export byte for byte, names.set, corrections, speaker gender), the pair
-report when the NLP models are missing, the online check through the scripted transport (VP_ONLINE_MOCK=1, no
+report when the NLP models are missing, Orbergise (C8b: tests/samples/sample.la.srt without and with
+sample.en.srt / sample.es.srt as the original, language detection, a mismatched original aligned by time, the
+original path restored on reopen), en-grc / grc-en on the Greek sample, export greek:"monotonic", the pair report
+without greek.vpl, the online check through the scripted transport (VP_ONLINE_MOCK=1, no
 network), and a local-model run (skipped without a model file or without the local model in the build).
 Python 3 stdlib only.
 
@@ -682,7 +685,7 @@ def part_real(exe, work, _lex):
         eng.req("project.new", {"kind": "text", "pair": "la-en", "text": "Puella rosam videt."})
         e = eng.err("translate.start", {})
         check(e["code"] != "lexicon_missing" and e["hint"], "unavailable pair la-en: %s (%s)" % (e["code"], e["hint"]))
-    # Orbergise: a Latin project; refused with a hint while the rules engine has no Latin -> Latin rewrite
+    # Orbergise: a Latin project (part_orberg_greek covers it in depth); refused with a hint when la-la is not offered
     la_sample = samples.get("la")
     eng.req("project.new", {"kind": "subs", "pair": "la-la", "sourcePath": la_sample})
     if "la-la" in hello["pairs"]:
@@ -709,6 +712,190 @@ def part_real(exe, work, _lex):
     e = eng.err("translate.start", {})
     check(e["code"] == "not_found" and "english" in e["hint"], "no NLP: translate.start refused with the hint, not lexicon_missing")
     check(eng.shutdown() == 0 and log_clean(eng.log_path), "no-NLP engine: clean shutdown")
+
+
+NINE_PAIRS = ["en-la", "es-la", "la-en", "la-es", "en-grc", "es-grc", "grc-en", "grc-es", "la-la"]
+POLYTONIC_MARKS = ("̓", "̔", "͂", "ͅ", "̀")   # breathings, circumflex, iota subscript, grave
+
+
+def has_polytonic(text):
+    import unicodedata
+    d = unicodedata.normalize("NFD", text)
+    return any(m in d for m in POLYTONIC_MARKS)
+
+
+def is_greek(text):
+    return any(0x0370 <= ord(c) <= 0x03FF or 0x1F00 <= ord(c) <= 0x1FFF for c in text)
+
+
+def run_job(eng, cmd, params, timeout=300):
+    r = eng.req(cmd, params, timeout=60)
+    done = eng.wait_event("translate.done", lambda e: e["jobId"] == r["jobId"], timeout=timeout)
+    return r, done
+
+
+def part_orberg_greek(exe, work, _lex):
+    """C8b: orbergise.start wiring (original file aligned + language detected, Options switches, meaning/original
+    from CueOutput, orbergise reasons), the Greek pairs, export greek:"monotonic", engine.hello pairs."""
+    print("real engine: Orbergise (la-la) with and without the original, Greek pairs, monotonic export")
+    missing = real_data_missing()
+    if missing:
+        print("  SKIP: missing " + ", ".join(missing))
+        return
+    data = os.path.join(work, "data")
+    eng = Engine(exe, data, WORK, os.path.join(work, "orberg.log"), stub=False)
+    hello = eng.req("engine.hello", timeout=120)
+    greek_data = os.path.isfile(os.path.join(WORK, "greek.vpl"))
+    nlp_es = os.path.isfile(os.path.join(WORK, "nlp", "spanish.tag.vpt"))
+    want = [p for p in NINE_PAIRS if greek_data or "grc" not in p]
+    want = [p for p in want if nlp_es or not p.startswith("es-")]
+    check(all(p in hello["pairs"] for p in want), "hello: pairs %s (want %s)" % (hello["pairs"], want))
+    check(sorted(hello["pairs"] + [u["pair"] for u in hello["pairsUnavailable"]]) == sorted(NINE_PAIRS),
+          "hello: every pair is either available or listed with its reason")
+    la_sample = os.path.join(SAMPLES, "sample.la.srt")
+    en_sample = os.path.join(SAMPLES, "sample.en.srt")
+    es_sample = os.path.join(SAMPLES, "sample.es.srt")
+
+    # ---- Orbergise without the original ----
+    eng.req("project.new", {"kind": "subs", "pair": "la-la", "sourcePath": la_sample})
+    r, done = run_job(eng, "orbergise.start", {"tier": 1})
+    check(done["stats"]["done"] == 12 and not eng.events_of("translate.error", r["jobId"]) and r["originalPath"] is None,
+          "orbergise without original: 12 cues")
+    ds = [eng.req("cue.get", {"index": i}) for i in range(12)]
+    check(all(d["cue"]["confidence"] in ("ok", "check", "fix") and d["cue"]["target"] for d in ds),
+          "orbergise: every cue has a target and a confidence (%s)" % [d["cue"]["confidence"] for d in ds])
+    check(all(isinstance(d.get("meaning", {}).get("percent"), int) and 0 <= d["meaning"]["percent"] <= 100 and
+              isinstance(d["meaning"]["missing"], list) for d in ds), "orbergise: meaning {percent, missing} on every cue")
+    check(all("original" not in d for d in ds), "orbergise without original: no 'original'")
+    check(all(-1 <= x["tokenIndex"] < len(d["tokens"]) for d in ds for x in d["reasons"]), "orbergise: reasons point into tokens")
+    # a higher-register cue of our own: the ablative absolute becomes a postquam clause -> an orbergise change
+    eng.req("project.new", {"kind": "text", "pair": "la-la", "text": "Urbe captā, mīlitēs praedam dīvīsērunt."})
+    run_job(eng, "orbergise.start", {"tier": 1, "simplify": True})
+    d = eng.req("cue.get", {"index": 0})
+    ch = [x for x in d["reasons"] if x["kind"] == "orbergise" and isinstance(x["data"], dict) and "was" in x["data"]]
+    check(ch and all({"was", "now", "why"} <= set(x["data"]) for x in ch) and "ostquam" in d["cue"]["target"],
+          "orbergise: changes {was, now, why} passed through (%s -> %r)" % ([x["data"]["was"] for x in ch], d["cue"]["target"]))
+    run_job(eng, "orbergise.start", {"tier": 1, "simplify": False})
+    d2 = eng.req("cue.get", {"index": 0})
+    check("ostquam" not in d2["cue"]["target"], "orbergise simplify:false keeps the structure (%r)" % d2["cue"]["target"])
+
+    # ---- with the original (English, detected), Spanish detected, original given explicitly ----
+    eng.req("project.new", {"kind": "subs", "pair": "la-la", "sourcePath": la_sample})
+    r, done = run_job(eng, "orbergise.start", {"tier": 2, "keepNames": True, "originalPath": en_sample})
+    check(r["originalPath"] == en_sample and r["originalLang"] == "en" and done["stats"]["done"] == 12,
+          "orbergise with sample.en.srt: language detected as %s" % r["originalLang"])
+    ds = [eng.req("cue.get", {"index": i}) for i in range(12)]
+    check(ds[0].get("original") == "The girl sees the rose." and all(d.get("original") for d in ds),
+          "orbergise: original aligned by index (%r)" % ds[0].get("original"))
+    check(all("meaning" in d for d in ds), "orbergise with original: meaning on every cue")
+    check(any(d["cue"]["target"] for d in ds), "orbergise with original: targets")
+    r = eng.req("orbergise.start", {"tier": 1, "originalPath": es_sample, "indices": [0]})
+    eng.wait_event("translate.done", lambda e: e["jobId"] == r["jobId"], timeout=300)
+    check(r["originalLang"] == "es" and eng.req("cue.get", {"index": 0}).get("original", "").startswith("La niña"),
+          "orbergise with sample.es.srt: language detected as %s" % r["originalLang"])
+    e = eng.err("orbergise.start", {"tier": 1, "originalPath": en_sample, "originalLang": "fr"})
+    check(e["code"] == "bad_params" and e["hint"], "originalLang fr refused with a hint")
+    r = eng.req("orbergise.start", {"tier": 1, "originalPath": en_sample, "originalLang": "en", "indices": [0, 1]})
+    eng.wait_event("translate.done", lambda e: e["jobId"] == r["jobId"], timeout=300)
+    check(r["originalLang"] == "en", "originalLang given: en")
+
+    # a mismatched original: 5 cues with other timings (aligned by time overlap), no crash
+    mism = os.path.join(work, "mismatch.en.srt")
+    blocks = srt_blocks(open(en_sample, "rb").read())
+    with open(mism, "wb") as f:
+        for k in range(5):
+            a, b = 1 + 6 * k, 6 + 6 * k
+            f.write(b"%d\n00:00:%02d,000 --> 00:00:%02d,500\n" % (k + 1, a, b) + b"\n".join(blocks[2 * k][2:]) + b"\n\n")
+    r, done = run_job(eng, "orbergise.start", {"tier": 1, "originalPath": mism})
+    ds = [eng.req("cue.get", {"index": i}) for i in range(12)]
+    check(done["stats"]["done"] == 12 and not eng.events_of("translate.error", r["jobId"]),
+          "mismatched original (5 cues for 12): job done")
+    check(ds[0].get("original") == "The girl sees the rose." and ds[11].get("original") == "" and
+          all(d["cue"]["target"] for d in ds), "mismatched original: aligned by time (%r ... %r)" %
+          (ds[0].get("original"), ds[11].get("original")))
+    # edit a cue: the original stays, the meaning is measured on the edit
+    ed = eng.req("cue.set", {"index": 0, "text": "Puella rosam spectat."})
+    d = eng.req("cue.get", {"index": 0})
+    check(ed["cue"]["state"] == "edited" and d.get("original") == "The girl sees the rose." and "meaning" in d,
+          "edit in Orbergise mode: original kept, meaning %s" % d.get("meaning"))
+
+    # ---- the project remembers originalPath: save, close, reopen ----
+    r = eng.req("orbergise.start", {"tier": 1, "originalPath": en_sample, "indices": [1]})
+    eng.wait_event("translate.done", lambda e: e["jobId"] == r["jobId"], timeout=300)
+    ppath = os.path.join(work, "orberg.vpoeta")
+    eng.req("project.saveAs", {"path": ppath})
+    eng.req("project.close", {})
+    op = eng.req("project.open", {"path": ppath})
+    check(op["project"]["orberg"]["originalPath"] == en_sample and op["project"]["orberg"]["originalLang"] == "en",
+          "reopen: originalPath restored (%s)" % op["project"]["orberg"])
+    o5 = eng.req("cue.get", {"index": 5}).get("original")
+    check(o5 == "The boys are playing in the garden.", "reopen: cue.get original from the restored file (%r)" % o5)
+    r = eng.req("orbergise.start", {"tier": 1, "originalPath": "", "indices": [2]})
+    eng.wait_event("translate.done", lambda e: e["jobId"] == r["jobId"], timeout=300)
+    check(r["originalPath"] is None and "original" not in eng.req("cue.get", {"index": 2}),
+          "originalPath \"\" forgets the original")
+    eng.req("project.close", {"discard": True})
+
+    # ---- Greek pairs ----
+    if greek_data and "en-grc" in hello["pairs"]:
+        eng.req("project.new", {"kind": "subs", "pair": "en-grc", "sourcePath": en_sample})
+        r, done = run_job(eng, "translate.start", {"indices": [0, 1, 2]})
+        ds = [eng.req("cue.get", {"index": i}) for i in range(3)]
+        tg = [d["cue"]["target"] for d in ds]
+        check(done["stats"]["done"] == 3 and all(is_greek(t) for t in tg) and any(has_polytonic(t) for t in tg),
+              "en-grc: polytonic Greek for 3 cues %s" % tg)
+        check(all(d["tokens"] and all(-1 <= x["tokenIndex"] < len(d["tokens"]) for x in d["reasons"]) for d in ds),
+              "en-grc: tokens and reasons")
+        pv = eng.req("export.preview", {"indices": [0, 1, 2], "greek": "monotonic"})["cues"]
+        pl = eng.req("export.preview", {"indices": [0, 1, 2]})["cues"]
+        check(all(not has_polytonic(" ".join(c["lines"])) and is_greek(" ".join(c["lines"])) for c in pv) and
+              any(has_polytonic(" ".join(c["lines"])) for c in pl), "export.preview: monotonic %s, polytonic by default" %
+              [c["lines"] for c in pv])
+        out_m = os.path.join(work, "out.mono.srt")
+        out_p = os.path.join(work, "out.poly.srt")
+        eng.req("export.write", {"path": out_m, "format": "srt", "greek": "monotonic"})
+        eng.req("export.write", {"path": out_p, "format": "srt"})
+        src = srt_blocks(open(en_sample, "rb").read())
+        mono = srt_blocks(open(out_m, "rb").read())
+        poly = srt_blocks(open(out_p, "rb").read())
+        text_m = b"\n".join(b"\n".join(x[2:]) for x in mono[:3]).decode("utf-8")
+        check(len(mono) == len(src) == 12 and all(a[:2] == b[:2] for a, b in zip(src, mono)),
+              "monotonic export: numbering and timing bytes untouched")
+        check(not has_polytonic(text_m) and is_greek(text_m) and not any(0x1F00 <= ord(c) <= 0x1FFF for c in text_m),
+              "monotonic export: no breathings/circumflexes left (%r)" % text_m)
+        check(any(has_polytonic(b"\n".join(x[2:]).decode("utf-8")) for x in poly[:3]), "polytonic export unchanged by default")
+        check(mono[3:] == poly[3:], "monotonic touches Greek only (untranslated English cues identical)")
+        eng.req("project.close", {"discard": True})
+    if greek_data and "grc-en" in hello["pairs"]:
+        eng.req("project.new", {"kind": "subs", "pair": "grc-en", "sourcePath": os.path.join(SAMPLES, "sample.grc.srt")})
+        r, done = run_job(eng, "translate.start", {"indices": [0, 1, 2]})
+        tg = [eng.req("cue.get", {"index": i})["cue"]["target"] for i in range(3)]
+        check(done["stats"]["done"] == 3 and all(t and not is_greek(t) and re.search(r"[A-Za-z]{3}", t) for t in tg),
+              "grc-en: English for 3 cues %s" % tg)
+        pv = eng.req("export.preview", {"indices": [0], "greek": "monotonic"})["cues"][0]["lines"]
+        check(" ".join(pv).replace("\n", " ").split() == tg[0].replace("\n", " ").split(), "grc-en: monotonic option ignored for an English target")
+        eng.req("project.close", {"discard": True})
+    check(eng.shutdown() == 0 and not eng.bad_lines, "Orbergise/Greek engine: clean shutdown")
+    check(log_clean(eng.log_path), "no sanitizer report in the Orbergise/Greek log")
+
+    # ---- no Greek lexicon: the Greek pairs are unavailable with a reason, the others stay ----
+    print("real engine: lexicon folder without greek.vpl")
+    lexdir = os.path.join(work, "lex-nogreek")
+    os.makedirs(lexdir)
+    for name in ("latin.vpl", "english.vpl", "spanish.vpl", "nlp"):
+        if os.path.exists(os.path.join(WORK, name)):
+            os.symlink(os.path.join(WORK, name), os.path.join(lexdir, name))
+    eng = Engine(exe, os.path.join(work, "data-nogreek"), lexdir, os.path.join(work, "nogreek.log"), stub=False)
+    hello = eng.req("engine.hello", timeout=120)
+    un = {u["pair"]: u for u in hello["pairsUnavailable"]}
+    grc = [p for p in NINE_PAIRS if "grc" in p]
+    check(all(un.get(p, {}).get("code") == "lexicon_missing" and "greek.vpl" in un[p]["message"] and un[p]["hint"]
+              for p in grc), "no greek.vpl: %s unavailable (lexicon_missing, hint)" % grc)
+    check("en-la" in hello["pairs"] and "la-la" in hello["pairs"], "no greek.vpl: Latin pairs still available")
+    eng.req("project.new", {"kind": "subs", "pair": "en-grc", "sourcePath": en_sample})
+    e = eng.err("translate.start", {})
+    check(e["code"] == "lexicon_missing" and "Greek" in e["hint"], "no greek.vpl: translate.start refused with the hint")
+    check(eng.shutdown() == 0 and log_clean(eng.log_path), "no-Greek engine: clean shutdown")
 
 
 def part_online_mock(exe, work, _lex):
@@ -797,7 +984,7 @@ def main():
     stub_only = "--stub-only" in sys.argv[3:] or os.environ.get("VP_TEST_STUB_ONLY") == "1"
     parts = [part_session, part_framing, part_long_job, part_crash]
     if not stub_only:
-        parts += [part_real, part_online_mock, part_model]
+        parts += [part_real, part_orberg_greek, part_online_mock, part_model]
     t0 = time.time()
     for part in parts:
         t = time.time()

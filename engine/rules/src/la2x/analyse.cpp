@@ -8,6 +8,7 @@
 #include <cmath>
 #include <unordered_map>
 
+#include "internal.h"
 #include "vp/features.h"
 #include "vp/la2x.h"
 #include "vp/morph.h"
@@ -99,6 +100,9 @@ struct RI {
   bool personNoun = false;  // a noun denoting a person
   uint8_t tier = 0;         // the lemma's tier
   bool motion = false;      // a verb of motion (accusative of place = "to")
+  bool perfPart = false;    // perfect participle (amātus, secūtus, ingressus <- ingredior): + sum = one verb
+  bool adjToo = false;      // the same token also reads as an adjective lemma (laetus, īrātus): a predicate, not a verb
+  bool placeAcc = false;    // domum / rūs: accusative of place to, an adverb in effect
 };
 
 struct Hyp {
@@ -115,6 +119,7 @@ struct Analyser::Impl {
   std::vector<NameForm> nameForms;   // names_la.tsv, every declined form, sorted by key
   mutable std::unordered_map<uint32_t, uint32_t> valCache;   // lemma -> packed valency bits (capped)
   mutable std::vector<lex::Sense> senseBuf;
+  mutable std::vector<lex::Analysis> anaBuf;
   std::vector<std::string> personNouns;   // sorted latin keys
 
   Impl(const lex::Lexicon& l, const curated::CuratedData& c) : lx(l), cd(c) {
@@ -403,7 +408,23 @@ struct Analyser::Impl {
   }
 
   // ---- priors --------------------------------------------------------------------------------------------------------
-  double prior(const Token& t, const Reading& r, const std::vector<Reading>& all) const {
+  // Tier of a reading's lemma; a participle lemma counts at its verb's tier (lēctus -> legō, tier 1).
+  uint8_t readingTier(const Reading& r) const {
+    if (r.lemma == lex::kNoLemma) return 0;
+    const lex::Lemma l = lx.lemma(r.lemma);
+    if (l.pos == Participle) {
+      const uint32_t v = detail::verbOfParticipleLemma(lx, r.lemma, anaBuf);
+      if (v != lex::kNoLemma) {
+        const lex::Lemma vl = lx.lemma(v);
+        return cd.effectiveTier(vl.key, vl.pos, vl.tier);
+      }
+    }
+    return cd.effectiveTier(l.key, l.pos, l.tier);
+  }
+
+  // pastCtx: another word of the sentence is a past-only finite verb or a past adverb (heri, ōlim): a form spelled
+  // like both the present and the perfect of one lemma (legit, venit) is read as the perfect.
+  double prior(const Token& t, const Reading& r, const std::vector<Reading>& all, bool pastCtx = false) const {
     const Features f = unpack(r.packed);
     double p = 0;
     bool coreCommon = false, properAdj = false;
@@ -426,16 +447,53 @@ struct Analyser::Impl {
       if (r.aflags & lex::FromTable) p += 0.1;
       if ((f.pos == Verb || f.pos == Participle) && f.voice == Passive && !(l.flags & lex::Deponent)) p -= 0.25;
       if (f.pos == Participle || (f.pos == Verb && f.mood == ParticipleMood)) p -= 0.4;
-      // the same form read as the perfect and as the present of one lemma (venit / vēnit): present first
+      // the same form read as the perfect and as the present of one lemma (venit / vēnit): present first, unless the
+      // sentence is set in the past (another past-only verb, heri, ōlim)
       if (f.pos == Verb && f.tense == Perfect && !t.text.empty() && !hasLengthMark(t.text)) {
         for (const Reading& o : all) {
           const Features g = unpack(o.packed);
           if (o.lemma == r.lemma && g.pos == Verb && g.tense == Present && g.mood == f.mood) {
             // syncopated perfects spelled like the present (amāt) are rarer still
-            p -= (r.display.size() > 3 && r.display.compare(r.display.size() - 3, 3, "\xC4\x81t") == 0) ? 1.2 : 0.5;
+            const bool syncopated = r.display.size() > 3 && r.display.compare(r.display.size() - 3, 3, "\xC4\x81t") == 0;
+            p -= syncopated ? 1.2 : pastCtx ? 0.0 : 0.5;
             break;
           }
         }
+      }
+      if (pastCtx && f.pos == Verb && f.tense == Present && f.mood == Indicative && !t.text.empty() &&
+          !hasLengthMark(t.text)) {
+        for (const Reading& o : all) {
+          const Features g = unpack(o.packed);
+          const bool syncopated = o.display.size() > 3 && o.display.compare(o.display.size() - 3, 3, "\xC4\x81t") == 0;
+          if (o.lemma == r.lemma && g.pos == Verb && g.tense == Perfect && g.mood == f.mood && g.person == f.person &&
+              g.number == f.number && !syncopated) {
+            p -= 0.4;
+            break;
+          }
+        }
+      }
+      // a form found only on a form page of this lemma while another lemma's own table has it (volat: volō "fly",
+      // not volō "want"; edit: edō "eat", not ēdō)
+      if (!(r.aflags & lex::FromTable)) {
+        for (const Reading& o : all)
+          if (o.lemma != r.lemma && o.lemma != lex::kNoLemma && (o.aflags & lex::FromTable) && o.packed == r.packed) {
+            p -= 0.8;
+            break;
+          }
+      }
+      // homographs under several lemmas: the core lemma first (tier 1 before tier 2 before tier 3)
+      if (!r.name) {
+        const uint8_t mine = readingTier(r);
+        uint8_t bestOther = 9;
+        for (const Reading& o : all)
+          if (o.lemma != r.lemma && o.lemma != lex::kNoLemma && !o.name) bestOther = std::min(bestOther, readingTier(o));
+        if (bestOther <= 2 && mine >= 3) p -= 0.5;
+        else if (bestOther == 1 && mine == 2) p -= 0.2;
+      }
+      // est / sunt / erat ... are sum (never edō "eat" or a noun)
+      if (l.key != "sum") {
+        const std::string k = text::latin_key(t.text);
+        if (k == "est" || k == "estis" || k == "es" || k == "sunt" || k == "erat" || k == "erant") p -= 2.0;
       }
     } else if (r.name) {
       p += 0.6;

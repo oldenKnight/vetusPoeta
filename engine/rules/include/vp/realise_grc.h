@@ -121,9 +121,15 @@ struct GrcNP {
   bool emphasis = false;          // keeps a pronoun subject; emphatic pronoun forms
   std::vector<GrcNP> coord;       // further conjuncts: "X καὶ Y"
   std::string literal;            // unknown source word kept verbatim (marked unknown)
+  // C16 (additive): attributive adjectives of an indefinite NP before the noun ("εἰς βαθὺν βόθρον", the EN/ES
+  // transfer's default; the realiser's own default stays after the noun: "ἀνὴρ ἀγαθός"); the genitive attribute
+  // before the noun without its article ("Ἄρεως ἡμέρα").
+  bool adjFirst = false;
+  bool genFirst = false;
 };
 
-struct GrcOblique { uint32_t prep = kNone; uint8_t case_ = 0; GrcNP np; bool front = false; };
+struct GrcOblique { uint32_t prep = kNone; uint8_t case_ = 0; GrcNP np; bool front = false;
+                    bool end = false;   /* C16: after the verb ("ἐφυτεύσαμεν ἁμαρτόντες") */ };
 struct GrcAdverb { uint32_t lemma = kNone; AdvPos pos = AdvPos::Auto; };
 
 struct GrcPredicate {
@@ -143,6 +149,7 @@ struct GrcSub {
   SubRel rel = SubRel::Cause;
   uint32_t conj = kNone;           // explicit conjunction (default by relation: ὅτι, ἐπεί, εἰ, ἵνα, ὥστε, καί)
   bool before = false;
+  bool otherwise = false;          // C16: "or (else)" before a counterfactual: "εἰ δὲ μή, οὐκ ἂν ἐνθάδε ἦσθα"
   std::vector<GrcClause> clause;   // exactly one
 };
 
@@ -172,6 +179,10 @@ struct GrcClause {
   Role relRole = Role::None;              // relative clause: role of ὅς
   uint32_t relPrep = kNone;
   std::string punct;                      // source punctuation; empty = "." / ";" / "!" by type
+  // C16 (additive)
+  bool an = false;                        // modal particle ἄν (counterfactual "would"): after the negation or the
+                                          // first word ("οὐκ ἂν ἐνθάδε ἦσθα")
+  bool verbFirst = false;                 // V S order without the existential accent ("πρὶν ἥκειν αὐτήν")
 };
 
 struct GrcSentence {

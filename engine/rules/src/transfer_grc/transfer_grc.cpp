@@ -2,6 +2,7 @@
 // Greek closed classes, article policy, particles, tense / aspect mapping and the lexical rules of lexical_en_grc.tsv.
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 
 #include "transfer/tables.h"
@@ -82,6 +83,7 @@ const char* adverbTable(const std::string& a, bool motion) {
       {"near", "ἐγγύς", nullptr},     {"sometimes", "ἐνίοτε", nullptr}, {"often", "πολλάκις", nullptr},
       {"immediately", "εὐθύς", nullptr}, {"even", "καί", nullptr},    {"how", "ὡς", nullptr},
       {"thus", "οὕτως", nullptr},     {"together", "ὁμοῦ", nullptr},  {"loudly", "μέγα", nullptr},
+      {"gladly", "ἡδέως", nullptr},   {"next", "ἔπειτα", nullptr},    {"below", "κάτω", nullptr},
   };
   for (const R& r : kRows)
     if (a == r.en) return motion && r.motion ? r.motion : r.rest;
@@ -91,6 +93,66 @@ const char* adverbTable(const std::string& a, bool motion) {
 bool dropAdverb(const std::string& a) {
   return in(a, {"just", "back", "away", "off", "up", "down", "out", "in", "over", "around", "not", "n't", "about",
                 "through", "please", "on", "along", "by"});
+}
+
+// C16: sense head-word weighting (as the Latin transfer, C15). Where does `word` stand in the English sense gloss?
+// 2 = head of the first gloss item ("house, dwelling" for house), 1 = head of a later item ("dwelling place,
+// settlement, house"), -1 = only inside an item as a modifier, 0 = not in the gloss. The head of a noun / adjective
+// item is its last word before a preposition or relative word; of a verb item, its first word after "to".
+bool sameEnglish(const std::string& a, const std::string& b) {
+  if (a == b) return true;
+  auto stem = [](std::string x) {
+    if (x.size() > 4 && x.compare(x.size() - 3, 3, "ies") == 0) return x.substr(0, x.size() - 3) + "y";
+    if (x.size() > 3 && x.compare(x.size() - 2, 2, "es") == 0 && (x[x.size() - 3] == 's' || x[x.size() - 3] == 'x'))
+      return x.substr(0, x.size() - 2);
+    if (x.size() > 3 && x.back() == 's' && x[x.size() - 2] != 's') x.pop_back();
+    return x;
+  };
+  return stem(a) == stem(b);
+}
+int glossHead(const std::string& gloss0, const std::string& word, uint8_t pos) {
+  const std::string gloss = text::lower(gloss0);
+  std::string g;
+  int depth = 0;
+  for (char ch : gloss) {
+    if (ch == '(' || ch == '[') { ++depth; continue; }
+    if (ch == ')' || ch == ']') { if (depth) --depth; continue; }
+    if (!depth) g += ch;
+  }
+  bool seen = false;
+  int item = 0;
+  size_t a = 0;
+  while (a <= g.size()) {
+    size_t b = g.find_first_of(",;:", a);
+    if (b == std::string::npos) b = g.size();
+    const std::string it = g.substr(a, b - a);
+    a = b + 1;
+    std::vector<std::string> ws;
+    std::string cur;
+    for (char ch : it) {
+      if ((ch >= 'a' && ch <= 'z') || ch == '-' || ch == '\'') cur += ch;
+      else if (!cur.empty()) { ws.push_back(cur); cur.clear(); }
+    }
+    if (!cur.empty()) ws.push_back(cur);
+    while (!ws.empty() && in(ws[0], {"to", "a", "an", "the", "one's", "be", "become"})) ws.erase(ws.begin());
+    if (ws.empty()) { if (b >= g.size()) break; continue; }
+    ++item;
+    for (const std::string& w : ws) seen = seen || sameEnglish(w, word);
+    std::string head;
+    if (pos == Verb) head = ws[0];
+    else {
+      size_t end = ws.size();
+      for (size_t i = 1; i < ws.size(); ++i)
+        if (in(ws[i], {"of", "for", "in", "on", "with", "by", "to", "from", "at", "that", "which", "who", "used",
+                       "paid", "made", "as", "into", "between", "having"})) { end = i; break; }
+      head = ws[end - 1];
+      if (end < ws.size() && (ws[end] == "or" || ws[end] == "and") && end + 1 < ws.size() && sameEnglish(ws[end + 1], word))
+        head = ws[end + 1];
+    }
+    if (sameEnglish(head, word)) return item == 1 ? 2 : 1;
+    if (b >= g.size()) break;
+  }
+  return seen && pos != Verb ? -1 : 0;
 }
 
 const char* cardinal(int v) {
@@ -129,6 +191,8 @@ struct GreekTransfer::Ctx {
   std::string objPrep;                  // verbprep frame obj: the PP with this preposition is the object
   std::string prepOverride, prepOverrideGreek;
   uint8_t prepOverrideCase = 0;
+  int depth = 0;                        // C16: > 0 inside a subordinate clause or an indirect question
+  uint8_t startGender = 0;              // C16: the last noun's gender before this clause ("red ones" after "roses")
   Ctx(const SemSentence& ss, const transfer::Settings& t, transfer::Memory& m, GrcClauseOut& o)
       : s(ss), st(t), mem(m), out(o) {}
   void cover(int tok) { if (tok >= 0) out.covered.push_back(tok); }
@@ -174,6 +238,17 @@ std::string GreekTransfer::english(const std::string& src, const transfer::Setti
     if (!g.empty()) return g;
   }
   return std::string();
+}
+
+uint32_t GreekTransfer::adjAdverb(const char* form) const {
+  morph::Token t;
+  analyse(lx_, form, t);
+  for (const lex::Analysis& a : t.analyses) {
+    const lex::Lemma l = lx_.lemma(a.lemma);
+    if (l.id == kNone || (l.pos != Adj && l.pos != Num)) continue;
+    if (unpack(lx_.feature(a.feat)).pos == Adv) return a.lemma;
+  }
+  return kNone;
 }
 
 uint32_t GreekTransfer::lexRowLemma(const LexRow* r, uint8_t pos) const {
@@ -289,6 +364,12 @@ uint32_t GreekTransfer::select(const std::string& sourceLemma, uint8_t pos, cons
     lx_.senses(k.lemma, senses);
     if (k.sense < senses.size()) {
       const lex::Sense& se = senses[k.sense];
+      // C16: head-word weighting: the source word as the head of the gloss outweighs the word as a modifier
+      if (!es) {
+        const int hw = glossHead(std::string(se.glossEn), text::lower(sourceLemma), pos == Name ? (uint8_t)Noun : pos);
+        if (hw == 2) { s += 0.05; why += ", gloss head"; }
+        else if (hw == -1 && !isTaught(l)) { s -= 0.3; why += ", gloss modifier only"; }
+      }
       double ov = 0;
       for (const std::string& kw : words(std::string(se.keywords))) {
         if (kw == sourceLemma) kwHit = true;
@@ -326,7 +407,7 @@ uint32_t GreekTransfer::select(const std::string& sourceLemma, uint8_t pos, cons
     const uint8_t tier = tierOf(l);
     double s = 0.5 + taughtBonus + tierTerm(tier, why);
     common(l, s, why);
-    if (substantive) { s -= 0.05; why += ", adjective as noun"; }
+    if (substantive) { s -= 0.4; why += ", adjective as noun"; }   // C16: a taught noun ("the dark" -> σκότος) wins
     sc.push_back(Scored{id, 0, s, why, tier, true, 0.5});
   }
   if (!pivotVia.empty())
@@ -374,6 +455,7 @@ uint32_t GreekTransfer::adverb(const std::string& lemma0, int token, Ctx& c, boo
   if (const char* g = adverbTable(lemma, motion)) {
     uint32_t id = greek(g, Adv);
     if (id == kNone) id = greek(g, Particle);
+    if (id == kNone) id = adjAdverb(g);   // C16: πρῶτον, ἡδέως are adverb cells of πρῶτος, ἡδύς
     if (id != kNone) {
       c.table(id, lemma0, token);
       c.cover(token);
@@ -471,6 +553,8 @@ void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
       const std::string det = anaphor ? n.determiner : p;
       gender = N;
       if (anaphor && c.mem.lastGender) gender = c.mem.lastGender;
+      // C16: "The queen wanted red ones": the noun before this clause (ῥόδα), not the clause's own subject
+      if (anaphor && c.startGender) gender = c.startGender;
       number = n.number == 2 || p == "these" || p == "those" ? Pl : Sg;
       if (anaphor && !n.adjectives.empty() && det.empty()) {   // "red ones": the adjective is the head
         Choice ch;
@@ -481,7 +565,7 @@ void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
         o.head = id;
         o.number = number;
         o.gender = gender ? gender : (uint8_t)M;
-        o.definite = true;
+        o.definite = n.definite;   // C16: "red ones" -> ἐρυθρά, "the red ones" -> τὰ ἐρυθρά
         return;
       }
       id = (det == "that" || det == "those") ? greek("ἐκεῖνος") : greek("οὗτος", Det);
@@ -500,6 +584,36 @@ void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
   // ---- names ----
   if (n.isName) {
     const std::string low = text::lower(n.head);
+    // C16: weekday names (lexical_en_grc.tsv kind weekday): the god's name in the genitive + ἡμέρα ("Ἄρεως ἡμέρα"),
+    // or the ordinal counted from Sunday ("τρίτη ἡμέρα") for the alternative
+    if (const LexRow* wd = gt_.find("weekday", low)) {
+      const uint32_t day = greek("ἡμέρα", Noun);
+      const uint32_t god = greek(wd->greek.c_str(), Name) != kNone ? greek(wd->greek.c_str(), Name)
+                                                                   : greek(wd->greek.c_str());
+      const char* ord = ordinal(std::atoi(wd->frame.c_str()));
+      const uint32_t ordId = ord ? (greek(ord, Adj) != kNone ? greek(ord, Adj) : greek(ord)) : kNone;
+      if (day != kNone && (weekdayOrdinal_ ? ordId != kNone : god != kNone)) {
+        o.head = day;
+        o.definite = false;
+        if (weekdayOrdinal_) {
+          GrcAdj a;
+          a.lemma = ordId;
+          o.adjectives.push_back(a);
+        } else {
+          GrcNP g;
+          g.head = god;
+          g.isName = true;
+          g.number = Sg;
+          o.genitive.push_back(g);
+          o.genFirst = true;
+        }
+        c.table(day, n.head, n.token, weekdayOrdinal_ ? "weekday: ordinal" : "weekday: " + wd->greek);
+        if (std::find(c.out.flags.begin(), c.out.flags.end(), "weekday") == c.out.flags.end())
+          c.out.flags.push_back("weekday");
+        c.mem.lastGender = F;
+        return;
+      }
+    }
     const bool inTable = gd_.nameByEnglish(n.head) != nullptr;
     bool glossary = false;
     if (c.st.context)
@@ -559,6 +673,8 @@ void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
     return;
   }
   // ---- common nouns ----
+  bool substAdj = false;
+  o.adjFirst = true;   // C16: attributive adjectives before an indefinite noun (εἰς βαθὺν βόθρον)
   {
     const std::string low = text::lower(n.head);
     Choice ch;
@@ -567,6 +683,14 @@ void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
     const LexRow* realia = gt_.find("realia", low);
     if (!realia) { const std::string en = english(n.head, c.st); if (!en.empty()) realia = gt_.find("realia", en); }
     if (low == "hour" && n.ordinal) { id = greek("ὥρα", Noun); c.table(id, n.head, n.token); }
+    else if ((low == "thing" || low == "cosa") && !n.adjectives.empty() && !n.adjectives[0].lemma.empty()) {
+      // C16: "six impossible things" -> ἓξ ἀδύνατα: the adjective as a neuter noun
+      ch.token = n.adjectives[0].token;
+      id = select(n.adjectives[0].lemma, Adj, c.context, false, false, c.st, ch);
+      c.out.choices.push_back(ch);
+      c.cover(n.adjectives[0].token);
+      if (id != kNone) { substAdj = true; o.gender = N; }
+    }
     else if (realia && (id = lexRowLemma(realia, Noun)) != kNone) {
       ch.source = n.head;
       ch.lemma = id;
@@ -645,6 +769,7 @@ void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
   if (o.dem != Demonstrative::None) o.definite = true;
   if (n.interrogative) {
     if (n.wh == "how many" || n.wh == "how much") o.interrogative = greek("πόσος", Adj);
+    else if (n.wh == "what" || n.wh == "qué") o.interrogative = greek("τίς", Pron);   // C16: "τίς ἡμέρα"
     else o.interrogative = greek("ποῖος", Adj);
     if (o.interrogative == kNone) o.interrogative = greek("τίς", Pron);
     o.definite = false;
@@ -669,6 +794,7 @@ void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
   }
   // adjectives
   for (const frame::SemAdj& a : n.adjectives) {
+    if (substAdj && &a == &n.adjectives[0]) continue;   // the head already
     Choice ch;
     ch.token = a.token;
     GrcAdj ga;
@@ -746,6 +872,71 @@ void GreekTransfer::obliqueInto(const frame::SemOblique& ob, Ctx& c, GrcClause& 
   c.cover(ob.token);
   const std::string head = text::lower(n.head);
   const bool time = transfer::tables::timeNoun(head);
+  // C16: fixed prepositional phrases (lexical_en_grc.tsv kind pp): "in Latin" -> Ῥωμαϊστί, "at the bottom" -> ἐν τῷ
+  // βάθει, "to school" -> πρὸς τὸν διδάσκαλον, "by mistake" -> ἁμαρτών agreeing with the subject, after the verb
+  {
+    const LexRow* r = nullptr;
+    const std::string det = text::lower(n.determiner);
+    if (n.adjectives.empty() && n.possessor.empty() && n.numeral.empty()) {
+      if (!det.empty()) r = gt_.find("pp", (prep.empty() ? "" : prep + " ") + det + " " + head);
+      if (!r) r = gt_.find("pp", (prep.empty() ? "" : prep + " ") + head);
+    }
+    if (r) {
+      const std::string& fr = r->frame;
+      bool done = false;
+      if (fr == "adv") {
+        uint32_t id = greek(r->greek.c_str(), Adv);
+        if (id == kNone) id = adjAdverb(r->greek.c_str());
+        if (id != kNone) {
+          cl.adverbs.push_back(GrcAdverb{id, ob.front ? AdvPos::Front : AdvPos::Auto});
+          c.table(id, prep + " " + n.head, n.token, "fixed phrase (lexical_en_grc.tsv)");
+          done = true;
+        }
+      } else if (fr.compare(0, 5, "prep:") == 0) {
+        std::string spec = fr.substr(5);
+        const bool def = spec.size() > 4 && spec.compare(spec.size() - 4, 4, " def") == 0;
+        if (def) spec.resize(spec.size() - 4);
+        const size_t plus = spec.find('+');
+        GrcOblique o;
+        o.prep = greek(spec.substr(0, plus).c_str(), Prep);
+        o.case_ = plus == std::string::npos ? (uint8_t)Acc : curated::parseCase(spec.substr(plus + 1));
+        o.np.head = greek(r->greek.c_str(), Noun);
+        o.np.definite = def;
+        o.np.case_ = o.case_;
+        o.front = ob.front;
+        if (o.prep != kNone && o.np.head != kNone) {
+          c.table(o.prep, prep, ob.token);
+          c.table(o.np.head, n.head, n.token, "fixed phrase (lexical_en_grc.tsv)");
+          c.mem.lastGender = simpleGender(lx_.lemma(o.np.head).gender);
+          cl.obliques.push_back(o);
+          done = true;
+        }
+      } else if (fr == "ptc") {
+        uint32_t id = greek(r->greek.c_str(), Participle);
+        if (id == kNone) id = greek(r->greek.c_str());
+        if (id != kNone && c.frame) {
+          const SemFrame& sf = *c.frame;
+          const bool plural = sf.hasSubject && (sf.subject.isPronoun ? sf.subject.pron.number == 2 : sf.subject.number == 2);
+          GrcOblique o;
+          o.case_ = Nom;
+          o.np.head = id;
+          o.np.case_ = Nom;
+          o.np.number = plural ? Pl : Sg;
+          // a plural group is masculine unless a feminine noun names it; a singular speaker / subject keeps its gender
+          o.np.gender = plural && (!sf.hasSubject || sf.subject.isPronoun) ? (uint8_t)M : c.subjGender ? c.subjGender : (uint8_t)M;
+          o.end = true;
+          c.table(id, prep + " " + n.head, n.token, "fixed phrase: participle (lexical_en_grc.tsv)");
+          cl.obliques.push_back(o);
+          done = true;
+        }
+      }
+      if (done) {
+        c.cover(n.tokens);
+        c.cover(n.token);
+        return;
+      }
+    }
+  }
   auto add = [&](const char* gprep, uint8_t cs) {
     GrcOblique o;
     if (gprep) {
@@ -978,8 +1169,12 @@ void GreekTransfer::predicateInto(const SemFrame& f, Ctx& c, GrcClause& cl) cons
                              f.predAdj.empty() && f.predicative.empty() && sp.complementVerb.empty() &&
                              c.mem.lastVerb != kNone && f.type == Kind::Decl)) {
     verb = c.mem.lastVerb != kNone ? c.mem.lastVerb : greek("ποιέω", Verb);
-    c.table(verb, sp.lemma, sp.token, "verb of the previous clause");
-    if (lemma == "can") p.modal = greek("δύναμαι", Verb);
+    if (lemma == "can" || lemma == "poder") {   // C16: "This one can." -> αὕτη δύναται (the modal alone)
+      verb = greek("δύναμαι", Verb);
+      c.table(verb, sp.lemma, sp.token, "elliptical \"can\"");
+    } else {
+      c.table(verb, sp.lemma, sp.token, "verb of the previous clause");
+    }
   } else {
     verb = choose(lemma, sp.token, hasObj, personObj);
     if (!sp.particle.empty() && !seParticle) {
@@ -998,7 +1193,10 @@ void GreekTransfer::predicateInto(const SemFrame& f, Ctx& c, GrcClause& cl) cons
   }
   switch (sp.modality) {
     case Modality::Can: p.modal = greek("δύναμαι", Verb); break;
-    case Modality::Must: case Modality::Should: p.modal = greek("δεῖ", Verb); break;
+    case Modality::Must: p.modal = greek("δεῖ", Verb); break;
+    case Modality::Should:   // C16: "Which way should I go?" -> ποῖ χρή με ἰέναι;
+      p.modal = greek("χρή", Verb) != kNone ? greek("χρή", Verb) : greek("δεῖ", Verb);
+      break;
     case Modality::Want: p.modal = greek("βούλομαι", Verb); break;
     case Modality::May: p.modal = greek("ἔξεστι", Verb); break;
     case Modality::Let: p.mood = Subjunctive; p.person = 1; p.number = Pl; break;
@@ -1009,13 +1207,16 @@ void GreekTransfer::predicateInto(const SemFrame& f, Ctx& c, GrcClause& cl) cons
   // perfect only for a resulting state (passive present without an agent: "the clock is broken")
   const uint32_t main = p.modal != kNone ? p.modal : p.lemma;
   const std::string mk = main != kNone ? std::string(lx_.lemma(main).key) : std::string();
-  const bool state = mk == "εἰμί" || mk == "ἔχω" || mk == "οἶδα" || mk == "οἰκέω" || mk == "βούλομαι" ||
-                     mk == "δύναμαι" || mk == "ἐθέλω" || mk == "νομίζω" || mk == "δοκέω" || mk == "κεῖμαι" ||
-                     sp.habitual;
+  bool state = mk == "εἰμί" || mk == "ἔχω" || mk == "οἶδα" || mk == "οἰκέω" || mk == "βούλομαι" ||
+               mk == "δύναμαι" || mk == "ἐθέλω" || mk == "νομίζω" || mk == "δοκέω" || mk == "κεῖμαι" ||
+               mk == "οἴομαι" || sp.habitual;
+  // C16: "be" + state adjective in the past: imperfect for a lasting state (ὠργίζετο), aorist for an event (ἥμαρτες)
+  if (c.forcedVerb != kNone && main == c.forcedVerb) state = durative(std::string(), c.forcedVerb, c.st);
   uint8_t tense = Present;
   if (sp.tense == frame::Tense::Future) tense = Future;
   else if (past) {
-    if (sp.aspect == frame::Aspect::Progressive || sp.habitual || state || sp.pastModal) tense = Imperfect;
+    if (sp.aspect == frame::Aspect::Perfect && !sp.pastModal && p.modal == kNone) tense = Pluperfect;   // C16
+    else if (sp.aspect == frame::Aspect::Progressive || sp.habitual || state || sp.pastModal) tense = Imperfect;
     else tense = Aorist;
   } else if (sp.aspect == frame::Aspect::Perfect) {
     tense = Aorist;
@@ -1026,10 +1227,45 @@ void GreekTransfer::predicateInto(const SemFrame& f, Ctx& c, GrcClause& cl) cons
     p.voice = Passive;
     bool agent = false;
     for (const frame::SemOblique& o : f.obliques) agent = agent || o.prep == "by";
-    if (tense == Present && !agent) tense = Perfect;
+    if (tense == Present && !agent) {
+      tense = Perfect;
+      // C16 (lexical_en_grc.tsv kind perfect): the perfect active has the passive sense ("is broken" -> κατέαγεν)
+      if (main != kNone)
+        for (const LexRow& r : gt_.rows())
+          if (r.kind == "perfect" && text::greek_key(r.greek) == mk) { p.voice = 0; break; }
+    }
   }
   if (sp.deliberative) { tense = Aorist; p.mood = Subjunctive; }   // "τί ποιήσω;"
-  if (sp.mood == frame::SrcMood::Conditional) tense = past ? Imperfect : Present;   // no optative (style 1.2)
+  // "would": no optative (style 1.2); C16: a counterfactual main clause takes ἄν + imperfect (present time) or aorist
+  // (past time: "would have"): "οὐκ ἂν ἐνθάδε ἦσθα"
+  if (sp.mood == frame::SrcMood::Conditional) {
+    if (c.depth == 0 && sp.modality != Modality::Let) {
+      cl.an = true;
+      tense = past || sp.aspect == frame::Aspect::Perfect ? (uint8_t)Aorist : (uint8_t)Imperfect;
+      if (state && tense == Aorist) tense = Imperfect;
+    } else {
+      tense = past ? Imperfect : Present;
+    }
+  }
+  // C16: verb rows of frame "nonfinite" (an infinitive, a subjunctive, a future or a dependent clause: "go" -> εἶμι,
+  // ἰέναι / ἴωμεν / εἶ) and "sub" (a dependent clause only: "before she comes" -> πρὶν ἥκειν)
+  if (c.forcedVerb == kNone && !ph && !(vpr && vpr->greek != "-") && sp.fixedLatin.empty() && p.lemma != kNone) {
+    const bool nonfinite = p.modal != kNone || p.mood == Subjunctive || tense == Future || c.depth > 0;
+    const std::string src = text::lower(sp.complementVerb.empty() ? sp.lemma : sp.complementVerb);
+    const std::string srcEn = english(src, c.st);
+    const LexRow* r = nullptr;
+    for (const std::string& k : {src, srcEn}) {
+      if (k.empty() || r) continue;
+      if (c.depth > 0) r = row("verb", k, "sub");
+      if (!r && nonfinite) r = row("verb", k, "nonfinite");
+    }
+    const uint32_t id = lexRowLemma(r, Verb);
+    if (id != kNone) {
+      p.lemma = id;
+      c.table(id, src, sp.complementVerb.empty() ? sp.token : sp.complementToken, "lexical_en_grc.tsv: " + r->frame);
+      if (r->frame == "nonfinite" && (tense == Future || tense == Aorist)) tense = Present;   // εἶμι: present system
+    }
+  }
   p.tense = tense;
   if (p.modal != kNone) {
     p.infTense = durative(sp.complementVerb.empty() ? sp.lemma : sp.complementVerb, p.lemma, c.st) ? (uint8_t)Present
@@ -1051,6 +1287,8 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
   const uint8_t keepPerson = c.subjPerson, keepNumber = c.subjNumber, keepGender = c.subjGender;
   const std::string keepObjPrep = c.objPrep, keepPO = c.prepOverride, keepPOG = c.prepOverrideGreek;
   const uint8_t keepPOC = c.prepOverrideCase;
+  const uint8_t keepStart = c.startGender;
+  c.startGender = c.mem.lastGender;
   c.objPrep.clear();
   c.prepOverride.clear();
   c.prepOverrideGreek.clear();
@@ -1088,6 +1326,7 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
     c.subjectRole = true;
     npInto(f.subject, c, cl.subject);
     c.subjectRole = false;
+    if (f.existential) cl.subject.adjFirst = false;   // C16: new information: "ἦν ποτε κόρη μικρά"
     if (f.subject.pron.emphatic) cl.subject.emphasis = true;
     if (f.subject.determiner == "all" && f.subject.isPronoun) {
       cl.pred.person = f.subject.pron.person ? f.subject.pron.person : 3;
@@ -1156,6 +1395,18 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
       !(f.type == Kind::Wh && f.wh.role == frame::Role::Object && f.object.isPronoun && f.object.interrogative)) {
     cl.hasObject = true;
     npInto(f.object, c, cl.object);
+    // C16: a verb whose valency_grc.tsv frames are "dat;acc" (πιστεύω): the person in the dative, a thing in the
+    // accusative ("ἓξ ἀδύνατα πιστεύω")
+    if (cl.pred.lemma != kNone && cl.pred.modal == kNone && !transfer::animate(f.object) && !f.object.isPronoun)
+      if (const Valency* v = gd_.valency(lx_.lemma(cl.pred.lemma).key)) {
+        bool dat = false, acc = false;
+        for (const Frame& fr : v->frames) {
+          if (fr.middle) continue;
+          dat = dat || (fr.kind == FrameKind::Dat && !acc);
+          acc = acc || fr.kind == FrameKind::Acc;
+        }
+        if (dat && acc) cl.object.case_ = Acc;
+      }
   }
   if (f.hasIndirect) {
     cl.hasIndirect = true;
@@ -1207,6 +1458,16 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
       cl.predGender = N;
       if (itSubj) { cl.subject.pron.gender = N; cl.subject.gender = N; }
     }
+  }
+  // C16: an elliptical "it is" (nothing predicated) is the existential, orthotone ἔστι ("πιστεύεις ὅτι ἔστιν")
+  {
+    const std::string pl = text::lower(f.pred.lemma);
+    const bool be = pl == "be" || pl == "ser" || pl == "estar";
+    const bool itSubj = !f.hasSubject || (f.subject.isPronoun && (f.subject.pronLemma == "it" || f.subject.pronLemma == "that" ||
+                                                                   f.subject.pronLemma == "ello" || f.subject.pronLemma == "eso"));
+    if (be && f.hasPred && f.type == Kind::Decl && !state && itSubj && cl.predicative.empty() && cl.predAdj.empty() &&
+        cl.obliques.empty() && cl.adverbs.empty() && !cl.hasObject && cl.pred.modal == kNone && f.subordinate.empty())
+      cl.existential = true;
   }
   // fragment adjectives ("Very strange!")
   if (!f.hasPred && !f.predAdj.empty()) {
@@ -1272,7 +1533,18 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
     }
     const uint32_t id = adverb(a.lemma, a.token, c, c.motion);
     if (id == kNone) continue;
-    cl.adverbs.push_back(GrcAdverb{id, a.front ? AdvPos::Front : AdvPos::Auto});
+    // C16: "first ... then": πρῶτον ... ἔπειτα, both at the front
+    const bool seq = a.lemma == "first" || a.lemma == "primero";
+    if (seq) c.mem.sawFirst = true;
+    // C16: an adverb right after a subject NP modifies it ("Everyone here is mad" -> πάντες ἐνθάδε μαίνονται)
+    int subjLast = f.hasSubject ? f.subject.token : -1;
+    if (f.hasSubject)
+      for (int t : f.subject.tokens) subjLast = std::max(subjLast, t);
+    const bool postSubj = !seq && !a.front && f.hasSubject && subjLast >= 0 && a.token == subjLast + 1 &&
+                          f.type == Kind::Decl && (!f.subject.isPronoun || f.subject.determiner == "all" ||
+                                                   f.subject.pronLemma == "everyone" || f.subject.pronLemma == "everybody" ||
+                                                   f.subject.pronLemma == "all");
+    cl.adverbs.push_back(GrcAdverb{id, a.front || seq ? AdvPos::Front : postSubj ? AdvPos::BeforeVerb : AdvPos::Auto});
   }
   for (const std::string& d : f.discourse)
     if (d == "please" || d == "por favor") {
@@ -1289,6 +1561,14 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
     if (k == "and" || k == "y") g = "καί";
     else if (k == "but" || k == "pero") g = f.negative ? "ἀλλά" : "δέ";
     else if (k == "or" || k == "o") g = "ἤ";
+    else if ((k == "then" || k == "next" || k == "luego" || k == "después") && c.mem.prevFirst && f.type == Kind::Imp) {
+      const uint32_t ep = greek("ἔπειτα", Adv);   // C16: "First write your name. Then write the date."
+      if (ep != kNone) {
+        cl.adverbs.insert(cl.adverbs.begin(), GrcAdverb{ep, AdvPos::Front});
+        c.table(ep, k0, -1, "connector after \"first\"");
+        continue;
+      }
+    }
     else if (k == "so" || k == "then" || k == "therefore" || k == "entonces" || k == "pues") g = "οὖν";
     else if (k == "because" || k == "porque") g = "ὅτι";
     else if (k == "now") g = "νῦν";
@@ -1332,7 +1612,10 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
       c.cover(f.wh.token);
     } else if ((w == "who" || w == "what") &&
                !((f.wh.role == frame::Role::Subject && f.hasSubject && !f.subject.isPronoun) ||
-                 (f.wh.role == frame::Role::Object && f.hasObject && !f.object.isPronoun))) {
+                 (f.wh.role == frame::Role::Object && f.hasObject && !f.object.isPronoun) ||
+                 // C16: "What day is it today?": the interrogative is the predicate NP's determiner (τίς ἡμέρα)
+                 (f.wh.role == frame::Role::Predicate && !f.predicative.empty() && !f.predicative[0].isPronoun &&
+                  f.predicative[0].interrogative))) {
       cl.wh.lemma = greek("τίς", Pron);
       cl.wh.gender = w == "what" ? N : M;
       cl.wh.role = f.wh.role == frame::Role::Subject ? Role::Subject
@@ -1360,7 +1643,10 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
     GrcSub gs;
     gs.before = sb.before;
     GrcClause sc;
+    const int dep = sb.relation == Relation::Coord ? 0 : 1;   // a coordinated clause is not dependent
+    c.depth += dep;
     clauseInto(sf, c, sc);
+    c.depth -= dep;
     c.frame = &f;
     const std::string mk = text::lower(sb.marker);
     auto conj = [&](const char* h) { uint32_t id = greek(h, Conj); return id != kNone ? id : greek(h); };
@@ -1371,7 +1657,21 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
         break;
       case Relation::Time:
         gs.rel = SubRel::Time;
-        if (mk == "before") gs.conj = conj("πρίν");
+        if (mk == "before" || mk == "antes") {
+          gs.conj = conj("πρίν");
+          // C16 (order.prin): after an affirmative main clause πρίν + infinitive, its own subject in the accusative
+          // after the verb ("τρέχωμεν πρὶν ἥκειν αὐτήν"); the same subject as the main clause is left out
+          if (!f.negative && sc.type == ClauseType::Decl && sc.pred.lemma != kNone) {
+            gs.rel = SubRel::AccInf;
+            sc.verbFirst = true;
+            if (sc.hasSubject && sc.subject.isPronoun) {
+              const bool same = cl.hasSubject && cl.subject.isPronoun && cl.subject.pron.person == sc.subject.pron.person &&
+                                cl.subject.pron.number == sc.subject.pron.number;
+              if (same) sc.hasSubject = false;
+              else sc.subject.emphasis = true;
+            }
+          }
+        }
         else if (mk == "while" || mk == "until") gs.conj = conj("ἕως");
         else if (mk == "when" && sf.pred.tense != frame::Tense::Past) gs.conj = conj("ὅτε");
         break;
@@ -1380,7 +1680,9 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
         // future / general conditions: ἐάν + subjunctive; others εἰ + indicative
         if (sf.pred.tense == frame::Tense::Future || f.type == Kind::Imp || f.pred.tense == frame::Tense::Future) {
           sc.pred.mood = Subjunctive;
-          if (sc.pred.tense == Future) sc.pred.tense = durative(sf.pred.lemma, sc.pred.lemma, c.st) ? Present : Aorist;
+          // C16: ἐάν + aorist subjunctive for a single event ("ἐὰν λευκὰ ῥόδα ἴδῃ"), present for a lasting one
+          if (sc.pred.tense == Future || sc.pred.tense == Present)
+            sc.pred.tense = durative(sf.pred.lemma, sc.pred.lemma, c.st) ? Present : Aorist;
         }
         if (mk == "unless") sc.polarity = sc.polarity == Polarity::Neg ? Polarity::Pos : Polarity::Neg;
         break;
@@ -1390,13 +1692,23 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
         break;
       case Relation::Result: gs.rel = SubRel::Result; break;
       case Relation::Concession: gs.rel = SubRel::Coord; gs.conj = conj("ἀλλά"); break;
-      case Relation::Complement:
-        if (sf.type == Kind::Wh) gs.rel = SubRel::IndirectQ;
+      case Relation::Complement: {
+        if (sf.type == Kind::Wh) { gs.rel = SubRel::IndirectQ; break; }
+        // C16: verbs of thinking (valency_grc.tsv acc+inf: οἴομαι, νομίζω) take accusative + infinitive
+        // ("ᾤμην Σελήνης ἡμέραν εἶναι"); others ὅτι + indicative ("πιστεύεις ὅτι ἔστιν")
+        bool accInf = false;
+        const uint32_t mv = cl.pred.modal != kNone ? cl.pred.modal : cl.pred.lemma;
+        if (mv != kNone)
+          if (const Valency* v = gd_.valency(lx_.lemma(mv).key))
+            accInf = !v->frames.empty() && v->frames[0].kind == FrameKind::AccInf;
+        if (accInf) gs.rel = SubRel::AccInf;
         else { gs.rel = SubRel::Cause; gs.conj = conj("ὅτι"); }
         break;
+      }
       case Relation::Coord: {
         gs.rel = SubRel::Coord;
         gs.conj = conj(mk == "but" || mk == "pero" ? "ἀλλά" : mk == "or" || mk == "o" ? "ἤ" : "καί");
+        if ((mk == "or" || mk == "o") && sc.an) gs.otherwise = true;   // C16: εἰ δὲ μή, + counterfactual
         // the coordinating word is the conjunction already: not a connector of the clause too ("ἢ ἢ")
         sc.connectors.erase(std::remove(sc.connectors.begin(), sc.connectors.end(), gs.conj), sc.connectors.end());
         if (f.type == Kind::Imp && sc.type == ClauseType::Decl && !sc.hasSubject) {
@@ -1423,13 +1735,58 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
   c.prepOverride = keepPO;
   c.prepOverrideGreek = keepPOG;
   c.prepOverrideCase = keepPOC;
+  c.startGender = keepStart;
 }
 
 void GreekTransfer::clause(const SemFrame& f, const SemSentence& s, const transfer::Settings& st,
-                           transfer::Memory& mem, GrcClauseOut& out) const {
+                           transfer::Memory& mem, GrcClauseOut& out, bool subordinate) const {
   out.clear();
   Ctx c(s, st, mem, out);
+  c.depth = subordinate ? 1 : 0;
   clauseInto(f, c, out.clause);
+  // C16: a clause that starts with "if" and has no main clause ("Only if you believe it is.") is the condition
+  // alone; "only if" = "not unless": εἰ μή ("εἰ μὴ πιστεύεις ὅτι ἔστιν")
+  bool ifConn = false;
+  for (const std::string& k : f.connectors) ifConn = ifConn || text::lower(k) == "if" || text::lower(k) == "si";
+  if (ifConn && f.type == Kind::Decl && f.hasPred) {
+    GrcClause inner = out.clause;
+    bool only = false;
+    for (const frame::SemAdverb& a : f.adverbs) only = only || a.lemma == "only" || a.lemma == "solo" || a.lemma == "sólo";
+    if (only) {
+      const uint32_t monon = adverbTable("only", false) ? greek(adverbTable("only", false), Adv) : kNone;
+      inner.adverbs.erase(std::remove_if(inner.adverbs.begin(), inner.adverbs.end(),
+                                         [&](const GrcAdverb& a) { return a.lemma == monon; }),
+                          inner.adverbs.end());
+      inner.polarity = inner.polarity == Polarity::Neg ? Polarity::Pos : Polarity::Neg;
+    }
+    GrcClause outer;
+    outer.type = ClauseType::Frag;
+    outer.punct = inner.punct;
+    GrcSub gs;
+    gs.rel = SubRel::Condition;
+    gs.conj = greek("εἰ", Conj) != kNone ? greek("εἰ", Conj) : greek("εἰ");
+    gs.clause.push_back(std::move(inner));
+    outer.subs.push_back(std::move(gs));
+    out.clause = std::move(outer);
+    c.table(out.clause.subs[0].conj, "if", -1, only ? "\"only if\": εἰ μή (not unless)" : "condition without a main clause");
+  }
+  // C16: "..., or you wouldn't be here": "or (else)" before a counterfactual is εἰ δὲ μή, + the clause with ἄν
+  bool orConn = false;
+  for (const std::string& k : f.connectors) orConn = orConn || text::lower(k) == "or" || text::lower(k) == "o";
+  if (orConn && out.clause.an) {
+    GrcClause inner = out.clause;
+    const uint32_t e = greek("ἤ", Conj) != kNone ? greek("ἤ", Conj) : greek("ἤ");
+    inner.connectors.erase(std::remove(inner.connectors.begin(), inner.connectors.end(), e), inner.connectors.end());
+    GrcClause outer;
+    outer.type = ClauseType::Frag;
+    outer.punct = inner.punct;
+    GrcSub gs;
+    gs.rel = SubRel::Coord;
+    gs.otherwise = true;
+    gs.clause.push_back(std::move(inner));
+    outer.subs.push_back(std::move(gs));
+    out.clause = std::move(outer);
+  }
   if (mem.addresseeGuess) out.flags.push_back("addressee-guess");
   std::sort(out.covered.begin(), out.covered.end());
   out.covered.erase(std::unique(out.covered.begin(), out.covered.end()), out.covered.end());

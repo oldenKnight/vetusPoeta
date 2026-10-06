@@ -169,6 +169,37 @@ void chunks(const std::string& s, std::vector<std::pair<size_t, size_t>>& out, b
   }
 }
 
+// The text ends with clause-level punctuation: , ; : or a dash (— – -).
+bool clauseEnd(std::string_view s) {
+  size_t n = s.size();
+  while (n > 0 && isSpace(s[n - 1])) --n;
+  if (n == 0) return false;
+  const char c = s[n - 1];
+  if (c == ',' || c == ';' || c == ':' || c == '-') return true;
+  return n >= 3 && (s.compare(n - 3, 3, "\xE2\x80\x94") == 0 || s.compare(n - 3, 3, "\xE2\x80\x93") == 0);
+}
+
+// The cue starts a clause of its own: a capital letter (after quotes) or a clause-initial conjunction.
+bool startsClause(std::string_view s) {
+  size_t a = 0;
+  while (a < s.size() && (s[a] == '"' || s[a] == '\'' || s[a] == '-' || isSpace(s[a]))) ++a;
+  if (a < s.size() && s.compare(a, 3, "\xE2\x80\x9C") == 0) a += 3;
+  if (a >= s.size()) return false;
+  if (s[a] >= 'A' && s[a] <= 'Z') return true;
+  if ((unsigned char)s[a] == 0xC2 && a + 1 < s.size() && ((unsigned char)s[a + 1] == 0xBF || (unsigned char)s[a + 1] == 0xA1))
+    return true;   // ¿ ¡
+  if ((unsigned char)s[a] == 0xC3 && a + 1 < s.size() && (unsigned char)s[a + 1] >= 0x80 && (unsigned char)s[a + 1] <= 0x9E)
+    return true;   // capital accented letter
+  size_t b = a;
+  while (b < s.size() && s[b] >= 'a' && s[b] <= 'z') ++b;
+  const std::string_view w = s.substr(a, b - a);
+  for (const char* c : {"and", "but", "or", "nor", "for", "so", "yet", "if", "when", "because", "then", "while",
+                        "unless", "although", "though", "until", "till", "after", "before", "since", "as", "y", "pero",
+                        "o", "ni", "porque", "si", "cuando", "aunque", "pues", "entonces"})
+    if (w == c) return true;
+  return false;
+}
+
 }  // namespace
 
 bool endsSentence(std::string_view text) {
@@ -251,6 +282,12 @@ std::vector<SourceSentence> mapSentences(const std::vector<std::string>& cueText
         open = -1;
         const bool last = k + 1 == ch.size();
         if (last && !endsSentence(piece)) open = (long)out.size() - 1;
+        // C15: a cue that ends at a clause boundary ("," ";" ":" or a dash) does not continue into a next cue that
+        // starts a clause of its own (a capital letter, or a conjunction / subordinator): each cue is rendered as the
+        // clause it is, which keeps the cue mapping exact ("..., my aunt and uncle," | "Can you help me ...?")
+        if (last && open >= 0 && pi + 1 == pieces.size() && ci + 1 < cueTexts.size() && clauseEnd(piece) &&
+            startsClause(trim(cueTexts[ci + 1])))
+          open = -1;
         // an ellipsis at the end of a cue continues only when the next cue starts with "..." or lower case
         if (last && open < 0 && pi + 1 == pieces.size() && ci + 1 < cueTexts.size()) {
           const std::string& pc = piece;

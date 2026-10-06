@@ -503,11 +503,17 @@ void Server::installProject(vp::Project&& p, const std::string& path, const std:
   autosaver_ = vp::Autosaver(autosaveDebounceMs_, std::max<int64_t>(60000, autosaveDebounceMs_));
   originals_.clear();
   originalPath_.clear();
-  const json& snap = project_.manifest.settingsSnapshot;
+  originalLang_ = "en";
+  // Orbergise: the original-language file of the last orbergise.start (manifest settings snapshot)
+  const json snap = project_.manifest.settingsSnapshot;
   if (snap.is_object() && snap.contains("orbergOriginalPath") && snap["orbergOriginalPath"].is_string()) {
     const std::string orig = snap["orbergOriginalPath"].get<std::string>();
+    std::string lang = snap.contains("orbergOriginalLang") && snap["orbergOriginalLang"].is_string()
+                           ? snap["orbergOriginalLang"].get<std::string>() : std::string();
+    if (lang != "en" && lang != "es") lang.clear();
     try {
-      if (fs::isRegularFile(orig)) loadOriginal(orig);
+      if (fs::isRegularFile(orig)) loadOriginal(orig, lang);
+      else warnings.push_back("the original-language file is missing: " + orig);
     } catch (const CmdError& e) {
       warnings.push_back("the original-language file could not be read: " + e.error.message);
     }
@@ -540,6 +546,7 @@ void Server::closeProject(bool discardAutosave) {
   originals_.clear();
   originals_.shrink_to_fit();
   originalPath_.clear();
+  originalLang_ = "en";
   autosaver_ = vp::Autosaver(autosaveDebounceMs_, std::max<int64_t>(60000, autosaveDebounceMs_));
 }
 
@@ -575,6 +582,8 @@ json Server::projectJson() const {
               {"stats", statsJson()},
               {"subs", {{"format", formatName(format_)}, {"encoding", doc_.encoding}, {"bom", doc_.bom},
                         {"newline", doc_.newline == "\r\n" ? "crlf" : "lf"}, {"warnings", warns}}},
+              {"orberg", {{"originalPath", originalPath_.empty() ? json(nullptr) : json(originalPath_)},
+                          {"originalLang", originalLang_}}},
               {"dirty", autosaver_.dirty()},
               {"canUndo", !undo_.empty()},
               {"canRedo", !redo_.empty()}};

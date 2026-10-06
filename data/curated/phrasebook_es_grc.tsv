@@ -9,10 +9,10 @@ buenas tardes	χαῖρε	1	greet	plural χαίρετε
 buenas noches	χαῖρε	1	greet	plural χαίρετε
 adiós	χαῖρε	1	greet	plural χαίρετε; ἔρρωσο (fare well) is the alternative
 hasta luego	χαῖρε	1	greet	plural χαίρετε
-hasta pronto	αὖθις ὄψομαί σε	1	greet	
-hasta mañana	αὔριον ὄψομαί σε	1	greet	
-nos vemos	αὖθις ὄψομαί σε	1	greet	
-nos vemos mañana	αὔριον ὄψομαί σε	1	greet	
+hasta pronto	αὖθίς σε ὄψομαι	1	greet	
+hasta mañana	αὔριόν σε ὄψομαι	1	greet	
+nos vemos	αὖθίς σε ὄψομαι	1	greet	
+nos vemos mañana	αὔριόν σε ὄψομαι	1	greet	
 bienvenido|bienvenida|bienvenidos|bienvenidas	χαῖρε	1	greet	plural χαίρετε
 gracias	χάριν οἶδα	1	polite	
 muchas gracias	πολλὴν χάριν σοι οἶδα	1	polite	
@@ -49,8 +49,8 @@ bravo	εὖ γε	1	praise
 cómo estás	πῶς ἔχεις	1	q	
 cómo está usted	πῶς ἔχεις	1	q	
 cómo te llamas	τί ὄνομά σοι	1	q	
-me llamo {NAME}	ὄνομά μοί ἐστι {1}	1	intro	
-mi nombre es {NAME}	ὄνομά μοί ἐστι {1}	1	intro	
+me llamo {NAME}	{1} ὄνομά μοι	1	intro	
+mi nombre es {NAME}	{1} ὄνομά μοι	1	intro	
 quién sabe	τίς οἶδεν	1	q	
 qué hora es	πηνίκα ἐστίν	1	q	Attic "at what hour"
 llego tarde	ὀψὲ ἥκω	1	answer	
@@ -67,3 +67,16 @@ que le corten {NP}	ἀποτέμετε {1:acc}	2	excl	"off with ..." (plural com
 vete	ἄπελθε	1	imp	plural ἀπέλθετε
 váyase	ἄπελθε	1	imp	usted
 váyanse	ἀπέλθετε	1	imp	
+# C16 (quality loop 2): mirrors of the English rows
+aquí tienes|aquí tiene	ἰδού	1	give	
+demasiado tarde	ὀψὲ ἤδη	1	answer	
+un poco	ὀλίγον	1	answer	as a reply
+había una vez	ποτέ	1	narr	before a clause: particle ποτέ
+duerme bien	εὖ κάθευδε	1	imp	plural εὖ καθεύδετε
+su majestad	ὦ βασιλεῦ/βασίλεια	2	address	addressee gender as in the English row
+depende de {WH}	τοῦτο ἐξαρτᾶται ἐκ τοῦ {1}	1	state	
+no importa {WH}	οὐδὲν διαφέρει {1}	1	state	
+pasa me {NP}	δός μοι {1:acc}	1	imp	"Pásame ..." (the tokenizer splits the clitic)
+todas las mañanas	ἑκάστης ἡμέρας ἕωθεν	1	adv	
+cada mañana	ἑκάστης ἡμέρας ἕωθεν	1	adv	
+va a llover	ὕσει	1	state	

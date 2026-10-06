@@ -50,6 +50,100 @@ std::vector<std::string> words(const std::string& s) {
   return out;
 }
 
+// C15: the American spelling of a British word (harbour -> harbor, centre -> center, realise -> realize); empty
+// when there is none. The reverse index is keyed by the lexicon's glosses, mostly American.
+std::string americanSpelling(const std::string& w) {
+  std::string a = w;
+  auto rep = [&](const char* from, const char* to) {
+    const size_t at = a.find(from);
+    if (at != std::string::npos && at > 0) a.replace(at, std::char_traits<char>::length(from), to);
+  };
+  rep("our", "or");
+  if (a.size() > 4 && a.compare(a.size() - 2, 2, "re") == 0 && a.find_first_of("aeiou", a.size() - 4) != std::string::npos &&
+      a[a.size() - 3] != 'e' && a[a.size() - 3] != 'u')
+    a = a.substr(0, a.size() - 2) + "er";
+  rep("ise", "ize");
+  rep("yse", "yze");
+  if (w == "grey") a = "gray";
+  if (w == "plough") a = "plow";
+  return a == w ? std::string() : a;
+}
+
+// C15: loose identity of an English word with a gloss word (plural -s / -es, British spelling).
+bool sameWord(const std::string& a, const std::string& b) {
+  if (a == b) return true;
+  auto stem = [](std::string x) {
+    if (x.size() > 4 && x.compare(x.size() - 3, 3, "ies") == 0) return x.substr(0, x.size() - 3) + "y";
+    if (x.size() > 4 && x.compare(x.size() - 2, 2, "es") == 0 &&
+        (x[x.size() - 3] == 's' || x[x.size() - 3] == 'x' || x[x.size() - 3] == 'h')) return x.substr(0, x.size() - 2);
+    if (x.size() > 3 && x.back() == 's' && x[x.size() - 2] != 's') return x.substr(0, x.size() - 1);
+    return x;
+  };
+  const std::string sa = stem(a), sb = stem(b);
+  if (sa == sb) return true;
+  const std::string aa = americanSpelling(sa), ab = americanSpelling(sb);
+  return (!aa.empty() && aa == sb) || (!ab.empty() && ab == sa) || (!aa.empty() && aa == ab);
+}
+
+// C15: sense head-word weighting. Where does `word` stand in the sense gloss? 2 = head of the first gloss item
+// ("harbor, port" for harbor), 1 = head of a later item, -1 = only inside an item as a modifier ("port duty ... of
+// public harbours" for harbour), 0 = not in the gloss. The head of a noun / adjective item is its last word before a
+// preposition or relative word; of a verb item, the first word after "to".
+int glossHead(const std::string& gloss0, const std::string& word, uint8_t pos) {
+  std::string gloss = text::lower(gloss0);
+  // drop parentheses
+  std::string g;
+  int depth = 0;
+  for (char ch : gloss) {
+    if (ch == '(' || ch == '[') { ++depth; continue; }
+    if (ch == ')' || ch == ']') { if (depth) --depth; continue; }
+    if (!depth) g += ch;
+  }
+  bool seen = false;
+  int item = 0;
+  size_t a = 0;
+  while (a <= g.size()) {
+    size_t b = g.find_first_of(",;:", a);
+    if (b == std::string::npos) b = g.size();
+    std::string it = g.substr(a, b - a);
+    a = b + 1;
+    std::vector<std::string> ws;
+    {
+      std::string cur;
+      for (char ch : it) {
+        if ((ch >= 'a' && ch <= 'z') || ch == '-' || ch == '\'') cur += ch;
+        else if (!cur.empty()) { ws.push_back(cur); cur.clear(); }
+      }
+      if (!cur.empty()) ws.push_back(cur);
+    }
+    while (!ws.empty() && (ws[0] == "to" || ws[0] == "a" || ws[0] == "an" || ws[0] == "the" || ws[0] == "one's" ||
+                           ws[0] == "be" || ws[0] == "become"))
+      ws.erase(ws.begin());
+    if (ws.empty()) { if (b >= g.size()) break; continue; }
+    ++item;
+    for (const std::string& w : ws) seen = seen || sameWord(w, word);
+    std::string head;
+    if (pos == Verb) head = ws[0];
+    else {
+      static const char* const kStop[] = {"of", "for", "in", "on", "with", "by", "to", "from", "at", "that", "which",
+                                          "who", "used", "paid", "made", "as", "into", "between", "having"};
+      size_t end = ws.size();
+      for (size_t i = 1; i < ws.size(); ++i) {
+        bool stop = false;
+        for (const char* k : kStop) stop = stop || ws[i] == k;
+        if (stop) { end = i; break; }
+      }
+      head = ws[end - 1];
+      // "harbor or port": both words of a two-word "or" item are heads
+      if (end < ws.size() && (ws[end] == "or" || ws[end] == "and") && end + 1 < ws.size() && sameWord(ws[end + 1], word))
+        head = ws[end + 1];
+    }
+    if (sameWord(head, word)) return item == 1 ? 2 : 1;
+    if (b >= g.size()) break;
+  }
+  return seen && pos != Verb ? -1 : 0;   // verbs: "take care of" still names "care"
+}
+
 uint8_t simpleGender(uint8_t g) {
   switch (g) {
     case M: case F: case N: return g;
@@ -89,6 +183,7 @@ struct Transfer::Ctx {
   bool routeObject = false;             // "which way (do I go)": the way is the route (ablative), not an object
   uint8_t phrasalCase = 0;              // phrasal_en_la.tsv frame acc/dat/abl: case of the object
   bool negConsumed = false;             // an NP carries the clause's negation ("neque ... neque")
+  bool afterSi = false;                 // C15: inside a sī / nisi clause: "anything" is quid, not aliquid
   Ctx(const SemSentence& ss, const Settings& t, Memory& m, ClauseOut& o) : s(ss), st(t), mem(m), out(o) {}
   void cover(int tok) { if (tok >= 0) out.covered.push_back(tok); }
   void cover(const std::vector<int>& v) { out.covered.insert(out.covered.end(), v.begin(), v.end()); }
@@ -153,6 +248,16 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
   std::vector<lex::Candidate> raw;
   la_.reverse(keyOf(sourceLemma), raw);
   if (raw.empty() && es) la_.reverse("es:" + text::es_bare(sourceLemma), raw);
+  // C15: British spelling -> also the American key (harbour -> harbor); candidates merged, best score per lemma
+  if (!es) {
+    const std::string us = americanSpelling(text::lower(sourceLemma));
+    if (!us.empty()) {
+      std::vector<lex::Candidate> more;
+      la_.reverse(text::en_key(us), more);
+      raw.insert(raw.end(), more.begin(), more.end());
+      std::stable_sort(raw.begin(), raw.end(), [](const lex::Candidate& x, const lex::Candidate& y) { return x.score > y.score; });
+    }
+  }
   // teacher glosses: tier rows whose note lists the source lemma ("hole" -> fovea; data/curated/tiers_la.tsv)
   std::vector<const curated::TierEntry*> taught;
   if (!es) cd_.glossTiers(text::lower(sourceLemma), taught);
@@ -248,6 +353,12 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
     la_.senses(k.lemma, senses);
     if (k.sense < senses.size()) {
       const lex::Sense& se = senses[k.sense];
+      // C15: head-word weighting: the source word as the head of the gloss outweighs the word as a modifier
+      if (!es) {
+        const int hw = glossHead(std::string(se.glossEn), text::lower(sourceLemma), pos == Name ? (uint8_t)Noun : pos);
+        if (hw == 2) { s += 0.05; why += ", gloss head"; }
+        else if (hw == -1) { s -= 0.3; why += ", gloss modifier only"; }
+      }
       double ov = 0;
       for (const std::string& kw : words(std::string(se.keywords))) {
         if (kw == sourceLemma) kwHit = true;
@@ -261,6 +372,8 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
         const uint16_t tg = se.tags;
         if ((tg & 1u) && hasObject) { s += 0.1; why += ", transitive"; }
         if ((tg & 2u) && !hasObject) { s += 0.05; why += ", intransitive"; }
+        // C15: an intransitive sense cannot take the clause's object ("He can't hurt the straw": not doleō)
+        if ((tg & 2u) && !(tg & 1u) && hasObject) { s -= 0.25; why += ", intransitive with an object"; }
         if ((tg & (1u << 8)) && personObject) { s += 0.05; why += ", with-dat"; }
       }
     }
@@ -392,6 +505,177 @@ uint32_t Transfer::adverb(const std::string& lemma0, int token, Ctx& c, bool mot
   return id;
 }
 
+// ---- names of names_la.tsv made of several words (C15) ------------------------------------------------------------
+// "Leō Timidus", "Urbs Smaragdōrum", "Magnus Magus": the nominative noun is the head (declined), nominative adjectives
+// agree with it (before or after as written), genitives stay as written. False when a word does not analyse.
+bool Transfer::latinNameNP(const std::string& latin, LaNP& o) const {
+  const std::vector<std::string> ws = words(latin);
+  if (ws.empty()) return false;
+  o = LaNP{};
+  int head = -1;
+  struct Part { int kind; uint32_t lemma; std::string text; };   // 1 adjective, 2 genitive
+  std::vector<std::pair<int, Part>> parts;
+  for (size_t i = 0; i < ws.size(); ++i) {
+    morph::Token mt;
+    morph::analyseLatin(la_, ws[i], mt);
+    uint32_t noun = kNone, adj = kNone;
+    uint8_t num = Sg;
+    bool gen = false;
+    for (const lex::Analysis& a : mt.analyses) {
+      const lex::Lemma l = la_.lemma(a.lemma);
+      const Features f = unpack(la_.feature(a.feat));
+      if (l.pos == Noun && f.case_ == Nom && noun == kNone && !(l.flags & lex::ProperName)) { noun = a.lemma; num = f.number ? f.number : (uint8_t)Sg; }
+      else if ((l.pos == Adj || l.pos == Participle) && f.case_ == Nom && adj == kNone) adj = a.lemma;
+      if (f.case_ == Gen) gen = true;
+    }
+    if (head < 0 && noun != kNone) {
+      head = (int)i;
+      o.head = noun;
+      o.number = num;
+      continue;
+    }
+    if (adj != kNone && !gen) { parts.push_back({(int)i, Part{1, adj, ws[i]}}); continue; }
+    if (gen || adj != kNone) { parts.push_back({(int)i, Part{2, kNone, ws[i]}}); continue; }
+    return false;
+  }
+  if (head < 0) return false;
+  for (const auto& p : parts) {
+    if (p.second.kind == 1) {
+      LaAdj a;
+      a.lemma = p.second.lemma;
+      a.before = p.first < head;
+      a.capitalise = true;
+      o.adjectives.push_back(a);
+    } else {
+      LaNP g;
+      g.fixed = p.second.text;
+      o.genitive.push_back(g);
+    }
+  }
+  o.capitalise = true;
+  o.nameWords = true;
+  return true;
+}
+
+// The NP as a name of names_la.tsv: the written words ("Tin Woodman", "the Cowardly Lion", "the City of Emeralds",
+// "the Witch of the North") are looked up longest first; a translated multi-word name becomes a Latin NP, a single
+// name keeps the realiser's name policy (declined from the table). The parts used are covered.
+bool Transfer::nameTableInto(const SemNP& n, Ctx& c, LaNP& o) const {
+  if (n.token < 0 || (size_t)n.token >= c.s.tokens.size()) return false;
+  auto cap = [](const std::string& w) { return !w.empty() && w[0] >= 'A' && w[0] <= 'Z'; };
+  // head words in source order (multi-word names: "Tin Woodman")
+  std::vector<int> headToks;
+  for (int t : n.tokens) {
+    const nlp::Token& x = c.s.tokens[(size_t)t];
+    if ((x.upos == "PROPN" || x.upos == "NOUN") && cap(x.text) && t <= n.token) headToks.push_back(t);
+  }
+  if (headToks.empty() || headToks.back() != n.token) headToks = {n.token};
+  std::string head;
+  for (int t : headToks) head += (head.empty() ? "" : " ") + c.s.tokens[(size_t)t].text;
+  // capitalised adjectives right before the head ("Cowardly Lion", "Wicked Witch", "Great Wizard")
+  std::string adjs;
+  std::vector<size_t> adjUsed;
+  for (size_t i = 0; i < n.adjectives.size(); ++i) {
+    const int t = n.adjectives[i].token;
+    if (t < 0 || t > headToks.front() || !cap(c.s.tokens[(size_t)t].text)) continue;
+    adjs += c.s.tokens[(size_t)t].text + " ";
+    adjUsed.push_back(i);
+  }
+  // "of" genitive ("City of Emeralds", "Witch of the North")
+  std::string ofGen, ofGenThe;
+  if (!n.genitive.empty() && n.genitive[0].token > n.token) {
+    const SemNP& g = n.genitive[0];
+    std::string gw;
+    for (int t : g.tokens) {
+      const nlp::Token& x = c.s.tokens[(size_t)t];
+      if (x.upos == "DET" || x.upos == "ADP") continue;
+      gw += (gw.empty() ? "" : " ") + x.text;
+    }
+    ofGen = " of " + gw;
+    ofGenThe = " of the " + gw;
+  }
+  struct Try { std::string s; bool adj, gen; };
+  std::vector<Try> tries;
+  if (!adjs.empty() && !ofGen.empty()) { tries.push_back({adjs + head + ofGen, true, true}); tries.push_back({adjs + head + ofGenThe, true, true}); }
+  if (!ofGen.empty()) { tries.push_back({head + ofGen, false, true}); tries.push_back({head + ofGenThe, false, true}); }
+  if (!adjs.empty()) tries.push_back({adjs + head, true, false});
+  tries.push_back({head, false, false});
+  for (const Try& t : tries) {
+    const curated::NameEntry* e = cd_.nameByEnglish(t.s);
+    if (!e) continue;
+    const bool multi = e->latinNom.find(' ') != std::string::npos;
+    if (multi) {
+      if (!latinNameNP(e->latinNom, o)) continue;
+    } else {
+      // a one-word name: the realiser's name policy (names_la.tsv declension); a translated title word with a
+      // lexicon lemma ("Cicōnia") is declined from the lexicon
+      uint32_t id = e->policy == curated::NamePolicy::Translate && e->declension < 0 ? morph::findLemma(la_, e->latinNom, Noun) : kNone;
+      o = LaNP{};
+      if (id != kNone) { o.head = id; o.capitalise = true; o.nameWords = true; }
+      else { o.isName = true; o.name = t.s; }
+    }
+    if (n.number == 2 && !multi) o.number = Pl;
+    Choice ch;
+    ch.token = n.token;
+    ch.source = t.s;
+    ch.lemma = o.head;
+    ch.kind = "name";
+    ch.note = "names_la.tsv: " + e->latinNom;
+    c.out.choices.push_back(ch);
+    c.cover(n.tokens);
+    if (!t.gen)   // the "of" attribute was not part of the name: translate it as usual
+      for (const SemNP& g : n.genitive) { LaNP x; npInto(g, c, x); o.genitive.push_back(x); break; }
+    if (!t.adj)
+      for (const frame::SemAdj& a : n.adjectives) {
+        Choice ac;
+        ac.token = a.token;
+        LaAdj la;
+        la.lemma = select(a.lemma, Adj, c.context, false, false, c.st, ac);
+        c.out.choices.push_back(ac);
+        if (la.lemma != kNone) o.adjectives.push_back(la);
+        else c.out.unknownWords.push_back(a.lemma);
+      }
+    return true;
+  }
+  return false;
+}
+
+// A capitalised common noun used as a title inside the sentence ("the kind Stork", "this City", "a great Head",
+// "the Golden Cap" when the table lacks it): the noun, capitalised. Not for the first word of the sentence.
+bool Transfer::titleNoun(const SemNP& n, Ctx& c, LaNP& o) const {
+  if (c.st.lang != frame::SrcLang::En || n.token <= 0 || (size_t)n.token >= c.s.tokens.size()) return false;
+  const std::string& surf = c.s.tokens[(size_t)n.token].text;
+  if (surf.empty() || surf[0] < 'A' || surf[0] > 'Z') return false;
+  bool first = true;
+  for (int i = 0; i < n.token; ++i) {
+    const nlp::Token& x = c.s.tokens[(size_t)i];
+    if (x.upos != "PUNCT" && x.text != "\"" && x.text != "\xE2\x80\x9C") first = false;
+  }
+  if (first) return false;
+  const std::string low = text::lower(surf);
+  if (c.st.srcLex) {   // the English lexicon must know the word as a common noun
+    std::vector<lex::Analysis> an;
+    c.st.srcLex->lookup(text::en_key(low), an);
+    bool noun = false;
+    for (const lex::Analysis& a : an) noun = noun || c.st.srcLex->lemma(a.lemma).pos == Noun;
+    if (!noun) return false;
+  }
+  Choice ch;
+  ch.token = n.token;
+  std::string sg = low;
+  if (n.number == 2 && sg.size() > 3 && sg.back() == 's') sg.pop_back();
+  const uint32_t id = select(sg, Noun, c.context, false, false, c.st, ch);
+  if (id == kNone || ch.candidates.empty() || cd_.effectiveTier(la_.lemma(id).key, la_.lemma(id).pos, la_.lemma(id).tier) > 2)
+    return false;
+  SemNP m = n;
+  m.isName = false;
+  m.head = sg;
+  m.title = true;   // guard: npInto does not come back here
+  npInto(m, c, o);
+  o.capitalise = true;
+  return true;
+}
+
 // ---- noun phrases ---------------------------------------------------------------------------------------------------
 void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
   o = LaNP{};
@@ -462,6 +746,8 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
     else if (p == "everything") { id = latin("omnis", Adj); number = Pl; gender = N; }
     else if (p == "nobody" || p == "none") { id = latin("nēmō", Pron); gender = M; }
     else if (p == "nothing") { id = latin("nihil", Pron); gender = N; }
+    else if ((p == "someone" || p == "anyone") && c.afterSi) { id = latin("quis", Pron); gender = M; }   // C15: sī quis
+    else if ((p == "something" || p == "anything") && c.afterSi) { id = latin("quis", Pron); gender = N; }   // sī quid
     else if (p == "someone" || p == "anyone") { id = latin("aliquis", Pron); gender = M; }
     else if (p == "something" || p == "anything") { id = latin("aliquis", Pron); gender = N; }
     else if (p == "who") { id = latin("quis", Pron); gender = M; }
@@ -470,6 +756,7 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
     else if (p == "many") { id = latin("multus", Adj); number = Pl; gender = M; }
     else if (p == "few") { id = latin("paucus", Adj); number = Pl; gender = M; }
     else if (p == "both") { id = latin("ambō"); number = Pl; gender = M; }
+    else if (p == "some") { id = latin("quīdam", Pron); number = Pl; gender = M; }   // C15: "some say" -> quīdam dīcunt
     else if (p == "other" || p == "others" || p == "another") { id = latin("alius", Adj); number = p == "others" ? Pl : Sg; }
     else if (p == "this" || p == "that" || p == "one" || p == "ones") {
       const bool anaphor = p == "one" || p == "ones";
@@ -489,7 +776,8 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
         o.gender = gender ? gender : (uint8_t)M;
         return;
       }
-      if (det == "that") id = latin("ille", Det);
+      if (det == "that" && !anaphor) id = latin("is", Pron);   // C15: the pronoun "that" is id ("Id pendet ...")
+      else if (det == "that") id = latin("ille", Det);
       else if (det == "this") id = latin("hic", Pron);
       else id = latin("is", Pron);
     } else {
@@ -505,6 +793,15 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
     o.gender = gender;
     tableChoice(id, p);
     return;
+  }
+  // C15: names of names_la.tsv, also several words and "of" phrases; English capitalised common nouns as titles
+  if (!n.isPronoun && !n.title && c.st.lang == frame::SrcLang::En && (n.isName || (n.token > 0 && (size_t)n.token < c.s.tokens.size() &&
+                                                                     !c.s.tokens[(size_t)n.token].text.empty() &&
+                                                                     c.s.tokens[(size_t)n.token].text[0] >= 'A' &&
+                                                                     c.s.tokens[(size_t)n.token].text[0] <= 'Z'))) {
+    if (nameTableInto(n, c, o)) return;
+    if (n.isName && !cd_.nameByEnglish(n.head) && titleNoun(n, c, o)) return;
+    if (!n.isName && titleNoun(n, c, o)) return;
   }
   // names
   if (n.isName) {
@@ -614,6 +911,7 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
       o.head = id;
       const lex::Lemma l = la_.lemma(id);
       if (l.flags & lex::PluralOnly) o.number = Pl;
+      if (text::lower(n.head) == "people" && n.numeral.empty()) o.number = Pl;   // C15: people -> hominēs
       if (l.pos == Adj || l.pos == Participle) o.gender = N;   // a taught adjective as a noun: "in īmō"
       if (l.pos == Noun && !(l.flags & lex::PluralOnly) && pluralOnly(id)) o.number = Pl;   // tenebrae
       if (l.pos == Noun) {
@@ -760,7 +1058,9 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
     break;
   }
   // relative clause
-  for (const SemFrame& rf : n.relative) {
+  for (const SemFrame& rf0 : n.relative) {
+    SemFrame dep;
+    const SemFrame& rf = deponentActive(rf0, c, dep) ? dep : rf0;
     LaClause rc;
     clauseInto(rf, c, rc);
     // role of the gap: the relative pronoun's role, else object when the clause has a subject
@@ -836,6 +1136,36 @@ bool Transfer::obliqueInto(const frame::SemOblique& ob, Ctx& c, LaClause& cl) co
     c.out.choices.push_back(ch);
     return true;
   };
+  // C15: "tomorrow morning" -> crās māne, "this evening" -> hodiē vesperī, "in the morning" -> māne
+  if ((prep.empty() || prep == "in" || prep == "on") && (head == "morning" || head == "evening" || head == "night") &&
+      n.adjectives.empty() && n.possessor.empty()) {
+    const char* day = nullptr;
+    for (const SemNP& g : n.genitive) {
+      const std::string gh = text::lower(g.head);
+      day = gh == "tomorrow" ? "crās" : gh == "yesterday" ? "herī" : gh == "today" ? "hodiē" : nullptr;
+    }
+    if (!day && n.determiner == "this") day = "hodiē";
+    if (day || n.determiner.empty() || prep == "in") {
+      const char* part = head == "morning" ? "māne" : head == "evening" ? "vesperī" : "nocte";
+      for (const char* w : {day, part}) {
+        if (!w) continue;
+        realise::LaAdverb a;
+        a.lemma = latin(w, Adv);
+        if (a.lemma == kNone) a.lemma = latin(w);
+        if (a.lemma == kNone) continue;
+        a.pos = ob.front ? realise::AdvPos::Front : realise::AdvPos::BeforeVerb;
+        cl.adverbs.push_back(a);
+        Choice ch;
+        ch.token = n.token;
+        ch.source = head;
+        ch.lemma = a.lemma;
+        ch.kind = "table";
+        c.out.choices.push_back(ch);
+      }
+      c.cover(n.tokens);
+      return true;
+    }
+  }
   // time adverbs as nouns ("today", "tomorrow")
   if (prep.empty() || ((prep == "on" || prep == "at" || prep == "in") && time)) {
     if (const char* adv = tables::adverb(head, false)) {
@@ -885,6 +1215,10 @@ bool Transfer::obliqueInto(const frame::SemOblique& ob, Ctx& c, LaClause& cl) co
     npInto(n, c, cl.object);
     return true;
   }
+  if (prep == "to" || prep == "into") {   // C15: a country of names_la.tsv ("back to Kansas" -> in Kansiam)
+    const curated::NameEntry* ne = n.isName ? cd_.nameByEnglish(n.head) : nullptr;
+    if (ne && ne->note.find("country") != std::string::npos) return withPrep("in", Acc);
+  }
   if (prep == "to") {
     if (person && !c.motion) {
       if (!cl.hasIndirect) { cl.hasIndirect = true; npInto(n, c, cl.indirect); return true; }
@@ -896,6 +1230,18 @@ bool Transfer::obliqueInto(const frame::SemOblique& ob, Ctx& c, LaClause& cl) co
     if (time) return bare(Acc);
     if (person && !cl.hasIndirect) { cl.hasIndirect = true; npInto(n, c, cl.indirect); return true; }
     return withPrep("prō", Abl);
+  }
+  // C15: comparison: "more powerful than all of us" -> potentior ... quam nōs omnēs (same case as the subject),
+  // after the verb; "as tall as" -> tam ... quam
+  if (prep == "than" || (prep == "as" && c.frame && !c.frame->predAdj.empty())) {
+    LaOblique o;
+    o.prep = latin("quam", Conj);
+    o.case_ = Nom;
+    npInto(n, c, o.np);
+    o.np.case_ = Nom;
+    o.after = true;
+    cl.obliques.push_back(o);
+    return true;
   }
   if (prep == "with") return person ? withPrep("cum", Abl) : bare(Abl);
   if (prep == "at") {
@@ -1042,7 +1388,12 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     ch.kind = "table";
     ch.note = "verb of the previous clause";
     c.out.choices.push_back(ch);
-  } else if (ph && sp.complementVerb.empty() && (verb = latin(ph->latin.c_str(), Verb)) != kNone) {
+  } else if (ph && sp.complementVerb.empty() &&
+             (verb = latin([&] {   // C15: "arceō|absum": with an object the first verb, without one the second
+                       const size_t bar = ph->latin.find('|');
+                       if (bar == std::string::npos) return ph->latin;
+                       return hasObj ? ph->latin.substr(0, bar) : ph->latin.substr(bar + 1);
+                     }().c_str(), Verb)) != kNone) {
     Choice ch;
     ch.token = sp.token;
     ch.source = sp.particle.empty() ? sp.lemma : sp.lemma + " " + sp.particle;
@@ -1136,7 +1487,11 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     // "the clock is broken": resultant state; Spanish passive "se" is a process ("Se venden casas") (C13)
     if (tense == Present && !agent && sp.particle != "se") tense = Perfect;
   }
-  if (sp.deliberative) { tense = Present; p.mood = Subjunctive; }
+  if (sp.deliberative) {
+    tense = Present;
+    p.mood = Subjunctive;
+    if (sp.modality == Modality::Should && sp.complementVerb.empty() && p.lemma != kNone) p.modal = kNone;   // "Why should I?" -> cūr faciam
+  }
   if (sp.mood == frame::SrcMood::Conditional) {
     if (c.st.fidelity >= 3) tense = Present;
     else { tense = tense == Perfect || tense == Pluperfect ? Pluperfect : Imperfect; p.mood = Subjunctive; }
@@ -1144,6 +1499,10 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     p.mood = Subjunctive;
   }
   if (sp.tense == frame::Tense::Future && sp.modality == Modality::Can) tense = Future;
+  // C15: "Oz was always our friend" -> semper ... fuit (a whole past span, not a background state)
+  if (tense == Imperfect && f.copula && sp.aspect == frame::Aspect::Simple && !sp.pastModal)
+    for (const frame::SemAdverb& a : f.adverbs)
+      if (a.lemma == "always") tense = Perfect;
   p.tense = tense;
   if (p.modal != kNone) { p.infTense = Present; p.infVoice = p.voice; p.voice = Active; }
   if (p.lemma != kNone) {
@@ -1152,8 +1511,48 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
   }
 }
 
+// C15: the passive of a verb whose Latin is deponent ("a person who has been kissed by the Witch") is said
+// actively: the agent is the subject, the patient the object ("quem Saga ōsculāta est"). False: unchanged.
+bool Transfer::deponentActive(const SemFrame& in, Ctx& c, SemFrame& out) const {
+  if (!in.hasPred || in.pred.voice != frame::Voice::Passive || in.pred.modality != Modality::None ||
+      !in.pred.complementVerb.empty() || !in.hasSubject || in.hasObject)
+    return false;
+  int agent = -1;
+  for (size_t i = 0; i < in.obliques.size(); ++i)
+    if (in.obliques[i].prep == "by") agent = (int)i;
+  if (agent < 0) return false;
+  Choice probe;
+  const uint32_t v = select(in.pred.lemma, Verb, {}, true, false, c.st, probe);
+  if (v == kNone || !(la_.lemma(v).flags & lex::Deponent)) return false;
+  out = in;
+  out.pred.voice = frame::Voice::Active;
+  out.object = in.subject;
+  out.hasObject = true;
+  out.subject = in.obliques[(size_t)agent].np;
+  out.obliques.erase(out.obliques.begin() + agent);
+  return true;
+}
+
 // ---- clauses --------------------------------------------------------------------------------------------------------
-void Transfer::clauseInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
+void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
+  // C15 (neg.nemo): "I do not want to kill anybody" -> nēminem necāre volō: the negation moves into the pronoun
+  SemFrame fneg;
+  const SemFrame* fp = &f0;
+  if (f0.negative && f0.hasObject && f0.object.isPronoun &&
+      (f0.object.pronLemma == "anyone" || f0.object.pronLemma == "anything")) {
+    bool never = false;
+    for (const frame::SemAdverb& a : f0.adverbs) never = never || a.lemma == "never";
+    if (!never) {
+      fneg = f0;
+      fneg.negative = false;
+      fneg.object.pronLemma = f0.object.pronLemma == "anyone" ? "nobody" : "nothing";
+      fneg.object.negative = true;
+      fp = &fneg;
+    }
+  }
+  SemFrame fdep;
+  if (deponentActive(*fp, c, fdep)) fp = &fdep;
+  const SemFrame& f = *fp;
   const SemFrame* keepFrame = c.frame;
   const bool keepMotion = c.motion, keepNeg = c.negative;
   const uint8_t keepPerson = c.subjPerson, keepNumber = c.subjNumber, keepGender = c.subjGender;
@@ -1180,6 +1579,13 @@ void Transfer::clauseInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
   }
   if (f.negative) cl.polarity = realise::Polarity::Neg;
   if (f.expectYes) cl.bias = realise::YnBias::ExpectYes;
+  // C15: a negated yes/no question ("Can't you get down?", "Don't you know?") is a statement with a question mark:
+  // "Nōn potes dēscendere?", "Nescīs?" (the main agent's gold; nōnne is kept for tag questions)
+  if (f.type == Kind::Yn && f.negative && c.st.lang == frame::SrcLang::En) {
+    cl.type = realise::ClauseType::Decl;
+    cl.bias = realise::YnBias::Neutral;
+    cl.punct = "?";
+  }
   cl.existential = f.existential;
   cl.exclQuam = f.exclQuam;
   // the clause's content lemmas (sense-keyword overlap)
@@ -1426,6 +1832,11 @@ void Transfer::clauseInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
       if (q != kNone) cl.politeness.push_back(q);
     }
   for (const std::string& k : f.connectors) {
+    // C15: "Then you must go ..." (a statement): tum, first; "Then go away." / "Then why ...?": igitur, second
+    if (k == "then" && !c.mem.prevFirst && (f.type == Kind::Decl || f.type == Kind::Frag)) {
+      const uint32_t tum = latin("tum", Adv);
+      if (tum != kNone) { cl.connectors.push_back(tum); continue; }
+    }
     if (k == "then" && c.mem.prevFirst) {   // "First write ... Then write ...": deinde, an adverb at the front
       realise::LaAdverb a;
       a.lemma = latin("deinde", Adv);
@@ -1443,7 +1854,12 @@ void Transfer::clauseInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     const char* la = nullptr;
     realise::Role role = realise::Role::None;
     uint8_t gender = 0;
-    if (w == "where") la = c.motion ? "quō" : "ubi";
+    // C15: "Where did you get the shoes?" asks where from: unde
+    if (w == "where" && (f.pred.lemma == "get" || f.pred.lemma == "obtain" || f.pred.lemma == "receive" ||
+                         f.pred.lemma == "buy" || f.pred.lemma == "take" ||
+                         std::any_of(f.obliques.begin(), f.obliques.end(), [](const frame::SemOblique& o) { return o.prep == "from"; })))
+      la = "unde";
+    else if (w == "where") la = c.motion ? "quō" : "ubi";
     else if (w == "whither") la = "quō";
     else if (w == "why") la = "cūr";
     else if (w == "how") la = "quōmodo";
@@ -1489,7 +1905,10 @@ void Transfer::clauseInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     realise::LaSub ls;
     ls.before = sb.before;
     LaClause sc;
+    const bool keepSi = c.afterSi;
+    c.afterSi = sb.relation == Relation::Condition;
     clauseInto(sb.frame[0], c, sc);
+    c.afterSi = keepSi;
     c.frame = &f;
     switch (sb.relation) {
       case Relation::Cause: ls.rel = realise::SubRel::Cause; break;
@@ -1505,11 +1924,39 @@ void Transfer::clauseInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
         ls.rel = realise::SubRel::Condition;
         if (sb.marker == "unless") ls.conj = latin("nisi", Conj);
         break;
-      case Relation::Purpose: ls.rel = realise::SubRel::Purpose; break;
+      case Relation::Purpose:
+        ls.rel = realise::SubRel::Purpose;
+        // C15: the subject of a subject-less purpose clause: the object of help / ask / tell ("help me find" ->
+        // ut inveniam), else the main subject ("I came to see you" -> ut tē videam)
+        if (!sc.hasSubject && !sc.pred.person) {
+          const LaNP* ctl = sb.marker == "to-obj" && cl.hasObject ? &cl.object : cl.hasSubject ? &cl.subject : nullptr;
+          if (ctl && ctl->isPronoun) {
+            sc.pred.person = ctl->pron.person;
+            sc.pred.number = ctl->pron.number ? ctl->pron.number : ctl->number;
+          } else if (ctl) {
+            sc.pred.person = 3;
+            sc.pred.number = ctl->number;
+          } else if (f.type == Kind::Imp) {
+            sc.pred.person = 2;
+            sc.pred.number = cl.pred.number ? cl.pred.number : (uint8_t)Sg;
+          }
+        }
+        break;
       case Relation::Result: ls.rel = realise::SubRel::Result; break;
       case Relation::Concession: ls.rel = realise::SubRel::Concession; break;
       case Relation::Complement:
         ls.rel = sb.frame[0].type == Kind::Wh ? realise::SubRel::IndirectQ : realise::SubRel::AccInf;
+        // C15: an indirect question is in the subjunctive, tenses by the sequence of tenses ("Vidē quid fēcerīs!",
+        // "mē rogāvit quālis essēs")
+        if (ls.rel == realise::SubRel::IndirectQ && c.st.lang == frame::SrcLang::En && sc.pred.mood == Indicative) {
+          const bool mainPast = cl.pred.tense == Perfect || cl.pred.tense == Imperfect || cl.pred.tense == Pluperfect;
+          sc.pred.mood = Subjunctive;
+          if (mainPast) sc.pred.tense = sc.pred.tense == Pluperfect || sc.pred.tense == Perfect ?
+                                        (sf.pred.aspect == frame::Aspect::Perfect ? (uint8_t)Pluperfect : (uint8_t)Imperfect)
+                                        : sc.pred.tense == Future ? (uint8_t)Imperfect : (uint8_t)Imperfect;
+          else if (sc.pred.tense == Imperfect || sc.pred.tense == Pluperfect) sc.pred.tense = Perfect;
+          else if (sc.pred.tense == Future) sc.pred.tense = Present;
+        }
         if (ls.rel == realise::SubRel::AccInf && sc.hasSubject && sc.subject.isPronoun &&
             sc.subject.pron.person == c.subjPerson && c.subjPerson == 3 && f.hasSubject && f.subject.isPronoun)
           sc.subject.pron.reflexive = true;
@@ -1519,7 +1966,7 @@ void Transfer::clauseInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
             (sf.subject.pronLemma == "it" || (sf.implicitSubject && sf.subject.pron.person == 3)) &&
             !sc.predicative.empty())
           sc.hasSubject = false;
-        if (ls.rel == realise::SubRel::AccInf && !sc.hasSubject && sc.predicative.empty()) {   // implicit "it"
+        if (ls.rel == realise::SubRel::AccInf && !sc.hasSubject && sc.predicative.empty() && sb.marker != "inf") {   // implicit "it"
           sc.hasSubject = true;
           sc.subject.isPronoun = true;
           sc.subject.pron.person = 3;
@@ -1529,7 +1976,19 @@ void Transfer::clauseInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
         break;
       case Relation::Coord: {
         ls.rel = realise::SubRel::Coord;
-        const char* k = sb.marker == "but" ? "sed" : sb.marker == "or" ? "aut" : "et";
+        const char* k = sb.marker == "but" ? "sed" : sb.marker == "or" ? "aut" : sb.marker == "for" ? "nam"
+                      : sb.marker == "so" ? "itaque" : sb.marker == "yet" ? "tamen" : sb.marker == "nor" ? "neque" : "et";
+        // C15: a coordinated verb without its own subject has the first clause's person ("curris et salīs")
+        if (!sc.hasSubject && sc.type != realise::ClauseType::Imp && cl.hasSubject && !sc.pred.person) {
+          if (cl.subject.isPronoun) {
+            sc.pred.person = cl.subject.pron.person;
+            sc.pred.number = cl.subject.pron.number ? cl.subject.pron.number : cl.subject.number;
+          } else {
+            sc.pred.person = 3;
+            sc.pred.number = cl.subject.coord.empty() ? cl.subject.number : (uint8_t)Pl;
+          }
+        }
+        if (sb.marker == "nor") sc.polarity = realise::Polarity::Pos;
         ls.conj = latin(k, Conj);
         // ", or you would not ..." = otherwise: "; aliter ..." with the conditional's subjunctive
         if (sb.marker == "or" && sf.pred.mood == frame::SrcMood::Conditional) {
@@ -1553,6 +2012,23 @@ void Transfer::clauseInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
   // clause-level negative words from NPs ("no", "nobody", "nothing", "never")
   if (c.negative && !f.negative) cl.polarity = realise::Polarity::Neg;
   if (c.negConsumed) { cl.polarity = realise::Polarity::Pos; c.negConsumed = false; }
+  // C15: "not know" -> nesciō ("Nescīs?", "potestāte suā ūtī nescit") unless a negative word carries the negation
+  if (cl.polarity == realise::Polarity::Neg && cl.type != realise::ClauseType::Imp) {
+    const uint32_t scio = latin("sciō", Verb), nescio = latin("nesciō", Verb);
+    bool negWord = false;
+    auto negNP = [&](const LaNP& x) {
+      if (x.head != kNone && (x.head == latin("nēmō", Pron) || x.head == latin("nihil", Pron))) negWord = true;
+      for (const LaAdj& a : x.adjectives) if (a.lemma == latin("nūllus", Adj)) negWord = true;
+    };
+    if (cl.hasSubject) negNP(cl.subject);
+    if (cl.hasObject) negNP(cl.object);
+    for (const realise::LaAdverb& a : cl.adverbs)
+      if (a.lemma == latin("numquam", Adv) || a.lemma == latin("nusquam", Adv)) negWord = true;
+    if (!negWord && scio != kNone && nescio != kNone) {
+      if (cl.pred.modal == scio) { cl.pred.modal = nescio; cl.polarity = realise::Polarity::Pos; }
+      else if (cl.pred.modal == kNone && cl.pred.lemma == scio) { cl.pred.lemma = nescio; cl.polarity = realise::Polarity::Pos; }
+    }
+  }
   c.frame = keepFrame;
   c.motion = keepMotion;
   c.negative = keepNeg;

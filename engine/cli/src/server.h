@@ -147,7 +147,10 @@ class Server {
   void retarget(size_t pos, const std::string& text);   // user text in place of the target: check, tokens, reasons
   void storeOutput(size_t pos, const vp::rules::CueOutput& out);
   bool orbergMode() const;
-  void loadOriginal(const std::string& path);           // Orbergise: the original-language file, aligned to the cues
+  bool probePair(const PairLangs& pl, vp::Error& why);  // one empty cue through the engine
+  // Orbergise: the original-language file aligned to the cues (lang "" = detect), and forgetting it
+  void loadOriginal(const std::string& path, const std::string& lang);
+  void clearOriginal();
   std::vector<size_t> indicesParam(const json& p, bool* given) const;
 
   // commands (DESIGN §9 table)
@@ -247,6 +250,7 @@ class Server {
   std::atomic<uint64_t> mockCalls_{0};
   // Orbergise: the original-language cue texts aligned to the project's cues (cue.get .original)
   std::string originalPath_;
+  std::string originalLang_ = "en";                             // "en" | "es" (given or detected)
   std::vector<std::string> originals_;
 };
 

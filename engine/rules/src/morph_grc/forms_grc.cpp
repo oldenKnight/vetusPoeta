@@ -1,6 +1,8 @@
 // Greek lemma lookup, Attic-first generation, built-in closed-class tables, the rule paradigm for lemmas without a
 // table, and analysis with the Attic filter (vp/morph_grc.h).
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 
 #include "vp/morph_grc.h"
 #include "vp/realise_grc.h"
@@ -451,7 +453,7 @@ bool allNonAttic(const lex::Lexicon& lx, uint32_t lemma, const std::string& form
 
 // Attic forms the lexicon attests through a form-page analysis but whose table cell holds another dialect's form.
 // Used only when the lexicon has an analysis of exactly this form for the lemma with these features.
-struct Override { const char* lemmaKey; uint8_t tense, mood, person, number; const char* form; };
+struct Override { const char* lemmaKey; uint8_t tense, mood, person, number; const char* form; bool nu = false; };
 const Override kOverrides[] = {
     {"εἰμί", Imperfect, Indicative, P2, Sg, "ἦσθα"},   // the Attic table cell has ἦς
     {"πίνω", Aorist, Imperative, P2, Sg, "πῖθι"},      // the table cell has πίε
@@ -459,6 +461,20 @@ const Override kOverrides[] = {
     {"δεῖ", Imperfect, Indicative, P3, Sg, "ἔδει"},
     {"βούλομαι", Present, Indicative, P2, Sg, "βούλει"},   // Attic prose -ει (the cell has βούλῃ)
     {"οἴομαι", Present, Indicative, P2, Sg, "οἴει"},
+    // C16: classical Attic augments the readers use where the table's first (or only Attic-flagged) cell differs
+    {"εὑρίσκω", Aorist, Indicative, P1, Sg, "ηὗρον"},   // the cell has εὗρον (later Attic)
+    {"εὑρίσκω", Aorist, Indicative, P2, Sg, "ηὗρες"},
+    {"εὑρίσκω", Aorist, Indicative, P3, Sg, "ηὗρε", true},
+    {"εὑρίσκω", Aorist, Indicative, P1, Pl, "ηὕρομεν"},
+    {"εὑρίσκω", Aorist, Indicative, P2, Pl, "ηὕρετε"},
+    {"εὑρίσκω", Aorist, Indicative, P3, Pl, "ηὗρον"},
+    {"βούλομαι", Imperfect, Indicative, P1, Sg, "ἐβουλόμην"},   // the Attic-flagged cells have ἠβουλ- (later)
+    {"βούλομαι", Imperfect, Indicative, P2, Sg, "ἐβούλου"},
+    {"βούλομαι", Imperfect, Indicative, P3, Sg, "ἐβούλετο"},
+    {"βούλομαι", Imperfect, Indicative, P1, Pl, "ἐβουλόμεθα"},
+    {"βούλομαι", Imperfect, Indicative, P2, Pl, "ἐβούλεσθε"},
+    {"βούλομαι", Imperfect, Indicative, P3, Pl, "ἐβούλοντο"},
+    {"οἴομαι", Imperfect, Indicative, P1, Sg, "ᾤμην"},   // the Attic-flagged cell ᾤομην is a table error
 };
 
 bool attested(const lex::Lexicon& lx, uint32_t lemma, const char* form, const Features& want) {
@@ -498,6 +514,7 @@ bool generate(const lex::Lexicon& lx, uint32_t lemma, const Features& want0, std
         want.number == ov.number && (want.voice == 0 || want.voice == Active) && attested(lx, lemma, ov.form, want)) {
       out = ov.form;
       gi.exact = gi.attic = true;
+      gi.movableNu = ov.nu;
       Features f = want;
       f.voice = Active;
       gi.packed = pack(f);
@@ -553,6 +570,13 @@ bool generate(const lex::Lexicon& lx, uint32_t lemma, const Features& want0, std
     std::string f = cleanCell(c.second, &nu);
     if (f.empty()) continue;
     if (!(cf.extra & Attic) && allNonAttic(lx, lemma, text::nfc(c.second), cf)) s -= 10;
+    // C16: 2nd singular middle / passive in -ῃ (the readers' Attic: φοβῇ, ὀργίζῃ) over the later -ει of a tied cell
+    // (βούλει, οἴει stay: attested overrides above)
+    if (want.person == P2 && want.number == Sg && want.mood == Indicative && (cf.voice == Middle || cf.voice == Passive)) {
+      const std::string fb = text::greek_bare(f);
+      if (fb.size() >= 2 && fb.compare(fb.size() - 2, 2, "η") == 0) s += 1;   // greek_bare drops the subscript
+    }
+    if (std::getenv("VP_DBG_GEN")) fprintf(stderr, "gen %s s=%d voice=%d\n", f.c_str(), s, (int)cf.voice);
     if (s > best || (s == best && f < bestForm)) {
       best = s;
       bestForm = std::move(f);

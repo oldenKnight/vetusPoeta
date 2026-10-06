@@ -134,8 +134,8 @@ long rssAnonKb() {
   return -1;
 }
 
-std::vector<rules::CueInput> regressionCues(int repeat = 1) {
-  std::ifstream f(repo() / "tests" / "regression" / "own_dialogue.en.srt", std::ios::binary);
+std::vector<rules::CueInput> regressionCues(int repeat = 1, const char* file = "own_dialogue.en.srt") {
+  std::ifstream f(repo() / "tests" / "regression" / file, std::ios::binary);
   std::vector<uint8_t> b((std::istreambuf_iterator<char>(f)), {});
   auto d = subs::parse(b, subs::Format::Srt);
   REQUIRE(d.ok());
@@ -1173,4 +1173,183 @@ TEST_CASE("rules-en: RSS flat over 1,026 cues (the regression file 9 times)") {
 #else
   if (after10 > 0) CHECK(after1000 <= after10 + after10 / 20 + 256);   // 5 % (+256 kB allocator slack)
 #endif
+}
+
+// ================================================================================================================
+// C15 (quality loop 2): the burned public-domain sample tests/regression/oz_sample.en.srt vs the main agent's gold.
+
+TEST_CASE("rules-d: end to end on oz_sample.en.srt vs the gold Latin (report; determinism; calibration)") {
+  NEED_REAL();
+  auto e = engine();
+  std::vector<rules::CueInput> in = regressionCues(1, "oz_sample.en.srt");
+  REQUIRE(in.size() == 100);
+  rules::Options o;
+  o.fidelity = 2;
+  o.speakerGender = 'f';   // the gold file's speaker is usually Dorothy (header of the gold file)
+  rules::Context ctx;
+  auto r1 = e->translate(in, o, ctx, nullptr, nullptr);
+  REQUIRE(r1.ok());
+  auto r2 = engine()->translate(in, o, ctx, nullptr, nullptr);   // a fresh engine: byte-identical
+  REQUIRE(r2.ok());
+  REQUIRE(r1->size() == 100);
+  REQUIRE(r2->size() == 100);
+  bool same = true;
+  for (size_t i = 0; i < 100; ++i) {
+    same = same && r1.value()[i].target == r2.value()[i].target;
+    same = same && r1.value()[i].confidence == r2.value()[i].confidence;
+  }
+  CHECK(same);
+  std::ifstream g(repo() / "tests" / "regression" / "expected" / "oz_sample.la.gold.txt");
+  std::vector<std::string> gold;
+  std::string line;
+  while (std::getline(g, line))
+    if (!line.empty() && line[0] != '#') gold.push_back(line);
+  REQUIRE(gold.size() == 100);
+  int matches = 0, exact = 0, wrongOk = 0;
+  std::map<std::string, int> conf, checkWhy;
+  std::ostringstream table;
+  table << "| # | source | gold | ours | conf |\n|---|---|---|---|---|\n";
+  for (size_t i = 0; i < 100; ++i) {
+    const rules::CueOutput& c = r1.value()[i];
+    CHECK_MESSAGE(!c.target.empty(), "empty target for cue " << i + 1);
+    ++conf[confName(c.confidence)];
+    const std::string ours = flat(c.target);
+    bool match = false, exactMatch = false;
+    for (const std::string& alt : splitAlt(gold[i])) {
+      match = match || norm(alt) == norm(ours);
+      exactMatch = exactMatch || text::nfc(alt) == text::nfc(ours);
+    }
+    matches += match;
+    exact += exactMatch;
+    if (!match && c.confidence == rules::Confidence::Ok) ++wrongOk;
+    if (c.confidence != rules::Confidence::Ok) {
+      bool why = false;
+      for (const auto& f : c.flags)
+        if (f != "tags") { ++checkWhy[f]; why = true; }
+      for (const auto& k : c.checks)
+        if (!k.ok) { ++checkWhy[k.id]; why = true; }
+      if (!why) ++checkWhy["margin < 0.15"];
+    }
+    if (!match) {
+      std::string chk;
+      for (const auto& k : c.checks)
+        if (!k.ok) chk += k.id + " ";
+      for (const auto& f : c.flags)
+        if (f != "tags") chk += f + " ";
+      std::string g2 = gold[i];
+      for (size_t at; (at = g2.find(" | ")) != std::string::npos;) g2.replace(at, 3, " / ");
+      table << "| " << i + 1 << " | " << in[i].sourceText << " | " << g2 << " | " << ours << " | "
+            << confName(c.confidence) << (chk.empty() ? "" : " " + chk) << "|\n";
+    }
+  }
+  std::ostringstream rep;
+  rep << "Regression oz_sample.en.srt -> Latin, fidelity 2, speaker f\n";
+  rep << "match rate (normalised, any gold alternative): " << matches << " / 100\n";
+  rep << "exact (macrons and punctuation too): " << exact << " / 100\n";
+  rep << "confidence: ok " << conf["ok"] << ", check " << conf["check"] << ", fix " << conf["fix"] << "\n";
+  rep << "wrong among OK: " << wrongOk << "\n";
+  rep << "check/fix because:";
+  for (const auto& w : checkWhy) rep << " " << w.first << " " << w.second << ";";
+  rep << "\n\nMismatches:\n" << table.str() << "\nAll outputs:\n";
+  for (size_t i = 0; i < 100; ++i)
+    rep << i + 1 << "\t" << in[i].sourceText << "\t" << flat(r1.value()[i].target) << "\t"
+        << confName(r1.value()[i].confidence) << "\n";
+  std::ofstream(buildDir() / "regression_report_oz.txt") << rep.str();
+  MESSAGE("oz regression: " << matches << " / 100 match the gold; confidence ok " << conf["ok"] << " / check "
+                            << conf["check"] << " / fix " << conf["fix"] << "; wrong among OK " << wrongOk);
+  CHECK(wrongOk == 0);
+}
+
+// DEBUG-ONLY (C15 development): VP_DEBUG_SENT="sentence|sentence" prints frames and outputs.
+TEST_CASE("rules-d: debug print (env VP_DEBUG_SENT)") {
+  const char* e = std::getenv("VP_DEBUG_SENT");
+  if (!e || !*e) return;
+  NEED_REAL();
+  std::vector<std::string> ss;
+  std::string all = e;
+  size_t a = 0;
+  for (;;) {
+    size_t b = all.find('|', a);
+    ss.push_back(all.substr(a, b == std::string::npos ? std::string::npos : b - a));
+    if (b == std::string::npos) break;
+    a = b + 1;
+  }
+  frame::FrameBuilder fb(frame::SrcLang::En, &real().pen, &real().en, cur());
+  for (const auto& x : ss) {
+    frame::SemSentence s;
+    fb.analyse(x, s);
+    std::string toks;
+    for (const auto& t : s.tokens) toks += t.text + "/" + t.upos + "/" + t.lemma + "/" + t.deprel + ">" + std::to_string(t.head) + " ";
+    MESSAGE(x << "\n  tokens: " << toks << "\n  frame: " << frame::describe(s));
+  }
+  const auto o = run(ss);
+  for (size_t i = 0; i < o.size(); ++i) {
+    std::string fl;
+    for (const auto& f : o[i].flags) fl += f + " ";
+    for (const auto& k : o[i].checks) if (!k.ok) fl += k.id + "(" + k.detail + ") ";
+    MESSAGE(ss[i] << " => " << o[i].text << "  [" << confName(o[i].conf) << "] " << fl);
+  }
+}
+
+// DEBUG-ONLY (C15 development): VP_DEBUG_WORD="harbour:n|carry:v" prints the candidates with their sense glosses.
+TEST_CASE("rules-d: debug candidates (env VP_DEBUG_WORD)") {
+  const char* e = std::getenv("VP_DEBUG_WORD");
+  if (!e || !*e) return;
+  NEED_REAL();
+  transfer::Transfer tr(real().la, cur());
+  std::string all = e;
+  size_t a = 0;
+  for (;;) {
+    size_t b = all.find('|', a);
+    std::string w = all.substr(a, b == std::string::npos ? std::string::npos : b - a);
+    const size_t c = w.find(':');
+    const char p = c == std::string::npos ? 'n' : w[c + 1];
+    w = w.substr(0, c);
+    const uint8_t pos = p == 'v' ? feat::Verb : p == 'a' ? feat::Adj : p == 'r' ? feat::Adv : feat::Noun;
+    transfer::Settings st;
+    transfer::Choice ch;
+    tr.select(w, pos, {}, false, false, st, ch);
+    std::vector<lex::Candidate> raw;
+    real().la.reverse(text::en_key(w), raw);
+    std::string out = w + ":";
+    for (const auto& cd : ch.candidates) {
+      const lex::Lemma l = real().la.lemma(cd.lemma);
+      std::vector<lex::Sense> ss;
+      real().la.senses(cd.lemma, ss);
+      out += "\n   " + std::string(l.head) + " t" + std::to_string(l.tier) + " " + std::to_string(cd.score) + " [" + cd.why + "] gloss=" + std::string(l.glossEn);
+      if (cd.sense < ss.size()) out += " | sense=" + std::string(ss[cd.sense].glossEn) + " kw=" + std::string(ss[cd.sense].keywords);
+    }
+    out += "\n  raw:";
+    for (const auto& k : raw) out += " " + std::string(real().la.lemma(k.lemma).head) + "/" + std::to_string(k.score) + "/s" + std::to_string(k.sense);
+    MESSAGE(out);
+    if (b == std::string::npos) break;
+    a = b + 1;
+  }
+}
+
+// DEBUG-ONLY (C15 development): VP_DEBUG_LEX="comrades|farmer" prints english.vpl analyses; "la:word" latin.vpl.
+TEST_CASE("rules-d: debug lexicon (env VP_DEBUG_LEX)") {
+  const char* e = std::getenv("VP_DEBUG_LEX");
+  if (!e || !*e) return;
+  NEED_REAL();
+  std::string all = e;
+  size_t a = 0;
+  for (;;) {
+    size_t b = all.find('|', a);
+    std::string w = all.substr(a, b == std::string::npos ? std::string::npos : b - a);
+    const bool la = w.rfind("la:", 0) == 0;
+    if (la) w = w.substr(3);
+    const lex::Lexicon& lx = la ? real().la : real().en;
+    std::vector<lex::Analysis> an;
+    lx.lookup(la ? text::latin_key(w) : text::en_key(w), an);
+    std::string out = w + ":";
+    for (const auto& x : an) {
+      const lex::Lemma l = lx.lemma(x.lemma);
+      out += "\n   " + std::string(l.head) + " pos=" + std::to_string((int)l.pos) + " tier=" + std::to_string((int)l.tier) +
+             " feat=" + std::to_string(x.feat) + " gloss=" + std::string(l.glossEn).substr(0, 80);
+    }
+    MESSAGE(out);
+    if (b == std::string::npos) break;
+    a = b + 1;
+  }
 }

@@ -9,6 +9,7 @@
 #include <functional>
 
 #include "internal.h"
+#include "vp/morph.h"
 #include "vp/text.h"
 
 namespace vp::la2x::detail {
@@ -20,8 +21,32 @@ using frame::Role;
 using frame::SemFrame;
 using frame::SemNP;
 
+uint32_t verbOfParticipleLemma(const lex::Lexicon& la, uint32_t p, std::vector<lex::Analysis>& buf) {
+  if (p == lex::kNoLemma || p >= la.lemmaCount()) return lex::kNoLemma;
+  const lex::Lemma pl = la.lemma(p);
+  if (pl.pos != Participle) return lex::kNoLemma;
+  buf.clear();
+  la.lookup(pl.key, buf);
+  uint32_t best = lex::kNoLemma;
+  long bestScore = -1;
+  const std::string head = morph::displayForm(pl.head, true);
+  for (const lex::Analysis& a : buf) {
+    const Features f = unpack(la.feature(a.feat));
+    if (f.pos != Verb || f.mood != ParticipleMood) continue;
+    const lex::Lemma vl = la.lemma(a.lemma);
+    if (vl.pos != Verb) continue;
+    long sc = 0;
+    if (morph::displayForm(a.display, true) == head) sc += 1L << 20;   // vīsus: videō, not vīsō
+    sc += (long)(4 - std::min<uint8_t>(3, vl.tier ? vl.tier : 3)) << 16;
+    sc += 65535 - (vl.freqRank ? std::min<long>(65535, (long)vl.freqRank) : 65535);
+    if (sc > bestScore || (sc == bestScore && a.lemma < best)) { bestScore = sc; best = a.lemma; }
+  }
+  return best;
+}
+
 void tokInfos(const lex::Lexicon& la, const Sentence& s, std::vector<TokInfo>& out) {
   out.clear();
+  std::vector<lex::Analysis> buf;
   out.resize(s.tokens.size());
   for (size_t i = 0; i < s.tokens.size(); ++i) {
     const Token& t = s.tokens[i];
@@ -51,6 +76,11 @@ void tokInfos(const lex::Lexicon& la, const Sentence& s, std::vector<TokInfo>& o
       x.lgender = r->nameGender;
     }
     if (!x.f.gender && r->nameGender) x.f.gender = r->nameGender;
+    // participles: the verb they belong to (deponents read actively in periphrases)
+    if (x.lpos == Participle) x.verbLemma = verbOfParticipleLemma(la, r->lemma, buf);
+    else if (x.lpos == Verb && x.f.mood == ParticipleMood) x.verbLemma = r->lemma;
+    if (x.verbLemma != lex::kNoLemma) x.deponent = (la.lemma(x.verbLemma).flags & lex::Deponent) != 0;
+    else if (x.lpos == Verb) x.deponent = (x.lflags & lex::Deponent) != 0;
     // comparative lemmas (altior, melior) carry the degree
     if (x.lpos == Adj && x.f.degree == 0 && x.key.size() > 3 && x.key.compare(x.key.size() - 3, 3, "ior") == 0)
       x.f.degree = Comparative;
@@ -383,9 +413,12 @@ class Builder {
           }
         }
         if (passivePeri) {
-          f.pred.lemma = ti_[(size_t)partTok].key;
+          const TokInfo& pt = ti_[(size_t)partTok];
+          f.pred.lemma = pt.verbLemma != lex::kNoLemma ? std::string(la_.lemma(pt.verbLemma).key) : pt.key;
           f.pred.complementToken = partTok;   // the participle token carries the lexical verb
-          f.pred.voice = frame::Voice::Passive;
+          // deponent perfect (ingressus est, secūta est, locūtī sunt): one active verb
+          f.pred.voice = pt.deponent ? frame::Voice::Active : frame::Voice::Passive;
+          out_.periphrases.push_back(Periphrasis{partTok, verb, pt.deponent, (int)v.f.tense});
           f.pred.auxTokens.push_back(verb);
           used_[(size_t)partTok] = 1;
           out_.roles[(size_t)partTok] = "verb";

@@ -706,7 +706,7 @@ TEST_CASE("rules-grc: real lexicon - gold file (first 40 regression sentences fr
   NEED_GRC();
   g_lx = &realGrc().lx;
   const auto gold = goldLines();
-  REQUIRE(gold.size() == 40);
+  REQUIRE(gold.size() >= 40);   // the gold file grew to 114 lines (C16); the hand-built clauses cover the first 40
   const std::vector<Row> rows = goldRows();
   REQUIRE(rows.size() == 40);
   grc::GreekRealiser R(realGrc().lx, cur(), gdata());
