@@ -65,6 +65,23 @@
       "train_sentences": 12544,
       "train_tokens": 204578
     },
+    "summary": {
+      "dev_las": 78.82,
+      "dev_uas": 82.33,
+      "dev_upos": 94.7,
+      "note": "times measured with the four trainers running side by side on 4 cores",
+      "pruning_cost_dev_las": 0.33,
+      "pruning_cost_dev_upos": 0.09,
+      "size_budget_bytes": 12000000,
+      "target_las": 78.0,
+      "target_upos": 94.0,
+      "targets_met": true,
+      "test_las": 79.65,
+      "test_uas": 82.93,
+      "test_upos": 94.62,
+      "total_bytes": 11536358,
+      "within_budget": true
+    },
     "tagger": {
       "ancora_fraction": null,
       "bytes": 6292551,
@@ -209,6 +226,23 @@
       "train_seconds": 5584.9,
       "train_sentences": 28473,
       "train_tokens": 835366
+    },
+    "summary": {
+      "dev_las": 80.16,
+      "dev_uas": 84.7,
+      "dev_upos": 96.49,
+      "note": "times measured with the four trainers running side by side on 4 cores",
+      "pruning_cost_dev_las": 0.29,
+      "pruning_cost_dev_upos": 0.08,
+      "size_budget_bytes": 12000000,
+      "target_las": 82.0,
+      "target_upos": 95.0,
+      "targets_met": false,
+      "test_las": 79.39,
+      "test_uas": 83.96,
+      "test_upos": 96.71,
+      "total_bytes": 11536538,
+      "within_budget": true
     },
     "tagger": {
       "ancora_fraction": 1.0,
