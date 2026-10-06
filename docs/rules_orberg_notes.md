@@ -98,3 +98,11 @@ the second batch was written blind and passed unchanged. EN -> LA regression sta
 2. Passive (default) or active-with-main-subject for the ablative absolute?
 3. `futpart` past (scrīptūra erat -> scrībere volēbat) shifts "about to" towards "wanted to": acceptable, or keep it?
 4. Should A6 in the checker adopt the participle -> verb tier rule?
+
+
+## Decisions by the main agent (2026-10-06)
+1. Rewrite-first stays (the Latin's own rewrite when clean, the original's translation as fallback): the measured
+   12/22 vs 19/22 settles it. `simplify_la.tsv` keeps `prefer=rewrite`.
+2. Ablative absolute -> passive temporal clause by default (no invented agent); the active switch stays optional.
+3. Gerundive without agent -> dēbeō + passive infinitive. Accepted.
+4. Dictionary-driven swaps marked Check for the teacher. Accepted.
