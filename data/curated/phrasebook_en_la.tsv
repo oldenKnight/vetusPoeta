@@ -180,3 +180,21 @@ my friend	mī amīce/mea amīca	1	address
 my lord	domine	1	address	
 my lady	domina	1	address	
 ladies and gentlemen	dominae ac dominī	1	address	
+pass me {NP}	dā mihi {1:acc}	1	imp	
+hand me {NP}	dā mihi {1:acc}	1	imp	
+play cards	chartīs lūdere	1	vp	do you play cards -> Lūdisne chartīs?
+bow	inclīnāte vōs	1	imp	plural; singular inclīnā tē
+this is impossible	hoc fierī nōn potest	1	state	
+that is impossible	id fierī nōn potest	1	state	
+impossible	fierī nōn potest	1	state	as a one-word reply
+it doesn't matter	nihil interest	1	answer	
+it does not matter	nihil interest	1	answer	
+which way	quā viā	1	q	
+what a {ADJ} {NP}	quam {1} {2:nom}	1	excl	exclamation with adjective + noun
+take my coat	sūme pallium meum	1	imp	
+go to school	ad lūdum īre	1	vp	
+at school	in lūdō	1	pp	
+in latin	Latīnē	1	adv	
+in greek	Graecē	1	adv	
+in english	Anglicē	1	adv	
+in spanish	Hispānicē	1	adv	

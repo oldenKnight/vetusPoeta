@@ -43,7 +43,9 @@ struct Check  { std::string id; bool ok = true; std::string detail; };       // 
 struct Reason { int tokenIndex = -1; std::string kind, text, data; };         // kind per DESIGN §9.2
 struct Alternative { std::string text, reason; double score = 0; };
 
-struct CueInput  { uint32_t index = 0; std::string sourceText; int64_t startMs = 0, endMs = 0; std::string prevSource, nextSource; };
+struct SpanIn    { bool tag = false; std::string raw; };    // source cue spans: text or an opaque tag (vp::subs::Span)
+struct CueInput  { uint32_t index = 0; std::string sourceText; int64_t startMs = 0, endMs = 0; std::string prevSource, nextSource;
+                   std::vector<SpanIn> spans; /* optional: when present the cue assembly can report tag positions (A5) */ };
 struct CueOutput {
   uint32_t index = 0;
   std::string target;                       // one or more lines joined with '\n'

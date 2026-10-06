@@ -104,3 +104,12 @@ macrons option) -> pieces back on the cues -> C1 checker + A5/A7/A8/A9 -> confid
    data/curated/ (phrasal_en_la.tsv) for the teacher to edit?
 5. Gold-style questions: "Valdē parva est et valdē alba" (repeat the copula per adjective?) and "Quī diēs est hodiē"
    (wh questions: verb right after the wh phrase?) are realiser order rules (C1) if you want them.
+
+
+## Decisions by the main agent (2026-10-06) on C2's questions
+1. The CLI switches to `makeEngine(EngineConfig)` in task C8 (CLI-2), which also adapts test_server.py.
+2. `CueInput.spans` added to rules.h (text/tag spans from vp::subs); the CLI fills it in C8; the cue assembly
+   reports "tag position approximated" through A5 when a tag falls inside a re-broken text.
+3. Yes: phrasal verbs, verb+preposition and state adjectives move to data/curated (task C2b).
+4. Yes: C1 order rules for a single copula with coordinated predicates ("Valdē parva et valdē alba est" is also
+   accepted in the gold) and verb-second after a wh word with the copula ("Quī diēs est hodiē?"). (C2b.)

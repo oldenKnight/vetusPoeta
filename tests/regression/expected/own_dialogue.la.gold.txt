@@ -10,7 +10,7 @@ Manē mē, quaesō. | Exspectā mē, quaesō.
 Quis es?
 Nesciō.
 Vīdistīne fēlem meam?
-Parva est et alba. | Valdē parva est et valdē alba.
+Parva est et alba. | Valdē parva est et valdē alba. | Valdē parva et valdē alba est.
 Nōlī timēre.
 Aperī iānuam, quaesō.
 Iānua nimis parva est.
@@ -42,7 +42,7 @@ Nūlla thēa est. | Thēa nōn est.
 Sūme igitur placentam.
 Placentam nōlō.
 Quota hōra est?
-Hīc semper hōra sexta est.
+Hīc semper hōra sexta est. | Semper hīc hōra sexta est.
 Cūr semper hōra sexta est?
 Quia hōrologium frāctum est.
 Quis hōrologium frēgit?
@@ -88,7 +88,7 @@ Duōs frātrēs et ūnam sorōrem habeō.
 Pater meus agricola est.
 Māter mea puerōs docet.
 In casā parvā prope flūmen habitāmus.
-Cotīdiē māne ad lūdum ambulō. | Omnī māne ad scholam ambulō.
+Cotīdiē māne ad lūdum ambulō. | Omnī māne ad scholam ambulō. | Omnī māne ad lūdum ambulō.
 Hodiē magister īrātus erat.
 Nēmō pēnsum fēcerat.
 Crās epistulam Latīnē scrībēmus.
@@ -114,5 +114,5 @@ Cūr igitur tremis?
 Frīgeō.
 Sūme pallium meum.
 Valdē benignus es. | Valdē benigna es.
-Bene dormī. | Bonam noctem; bene dormī.
+Bene dormī. | Bonam noctem; bene dormī. | Bene dormī, dormī bene.
 Crās tē vidēbō.
