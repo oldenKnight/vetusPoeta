@@ -315,14 +315,64 @@ class GtCompareJs(unittest.TestCase):
         if not node:
             self.skipTest("node not installed")
         js = ("var g=require(%s);var items=[];for(var i=0;i<60;i++)items.push({text:'Line number '+i+'.'});"
-              "var b=g.makeBatches(items,25,4500);var big=g.makeBatches([{text:new Array(3000).join('a')},"
+              "var b=g.makeBatches(items,25,4500,7000);var big=g.makeBatches([{text:new Array(3000).join('a')},"
               "{text:new Array(3000).join('b')}],25,4500);"
               "console.log(JSON.stringify([b.length,b[0].length,b[2].length,big.length,"
-              "g.splitParts('Salve.\\n\\nVale.\\n  \\n\\nIterum.'),g.hasLetter('♪ ♪'),g.hasLetter('[music]')]))"
+              "g.splitParts('Salve.\\n\\nVale.\\n  \\n\\nIterum.'),g.hasLetter('♪ ♪'),g.hasLetter('[music]'),g.makeBatches(items,25,4500,200).every(function(b){var n=0;b.forEach(function(it){"
+              "n+=encodeURIComponent(it.text).length+6;});return n<=200&&b.length>=1;}),g.hasLetter('♪ Hi ♪'),"
+              "g.pageUrl({baseUrl:'https://x/',sl:'en',tl:'la'},'a b\\n\\nc')]))"
               % json.dumps(os.path.join(EVAL, "gt_compare.js")))
         out = subprocess.run([node, "-e", js], capture_output=True, text=True, timeout=60)
         self.assertEqual(out.returncode, 0, out.stderr)
-        self.assertEqual(json.loads(out.stdout), [3, 25, 10, 2, ["Salve.", "Vale.", "Iterum."], False, True])
+        self.assertEqual(json.loads(out.stdout), [3, 25, 10, 2, ["Salve.", "Vale.", "Iterum."], False, False, True, True,
+                                                 "https://x/?sl=en&tl=la&op=translate&text=a%20b%0A%0Ac"])
+
+
+CHROME = os.environ.get("VP_CHROMIUM", "/opt/pw-browsers/chromium-1194/chrome-linux/chrome")
+NODE_PATH = os.environ.get("NODE_PATH", "/opt/node-tools/node_modules")
+
+
+@unittest.skipUnless(shutil.which("node") and os.path.isfile(CHROME) and
+                     os.path.isdir(os.path.join(NODE_PATH, "playwright")), "node + Playwright + Chromium not installed")
+class GtCompareMock(unittest.TestCase):
+    """gt_compare.js end to end against tests/fixtures/gt_mock.html (file: URL, no network): URL submission of a
+    whole batch, per-line fallback when the part count differs, typing fallback, 25-line batch splitting."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="vp-gt-")
+        self.mock = "file://" + os.path.join(HERE, "fixtures", "gt_mock.html")
+        src = read_text(os.path.join(ROOT, "tests", "regression", "own_dialogue.en.txt")).split("\n")
+        self.lines = [l for l in src if l.strip()][:30]
+        self.inp = os.path.join(self.tmp, "in.txt")
+        with open(self.inp, "w", encoding="utf-8") as f:
+            f.write("\n".join(self.lines[:29] + ["[music]"]) + "\n")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def run_tool(self, name, mode, limit):
+        env = dict(os.environ, NODE_PATH=NODE_PATH)
+        p = subprocess.run(["node", os.path.join(EVAL, "gt_compare.js"), self.inp, "--name", name, "--out-dir",
+                            self.tmp, "--base-url", self.mock + "?mode=" + mode, "--wait-ms", "2500", "--limit",
+                            str(limit)], capture_output=True, text=True, timeout=300, env=env)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        out = read_text(os.path.join(self.tmp, name + ".gt.la.txt")).split("\n")[:-1]
+        return out, load_json(os.path.join(self.tmp, name + ".gt.meta.json"))["stats"]
+
+    def test_url_batches(self):
+        out, st = self.run_tool("url", "", 30)
+        self.assertEqual(out, ["LA: " + l for l in self.lines[:29]] + ["[music]"])   # no-letter line copied
+        self.assertEqual((st["batches"], st["requests"], st["fallbacks"], st["typed"]), (2, 2, 0, 0))
+
+    def test_count_mismatch_falls_back_per_line(self):
+        out, st = self.run_tool("merge", "merge", 5)
+        self.assertEqual(out, ["LA: " + l for l in self.lines[:5]])
+        self.assertEqual((st["fallbacks"], st["requests"]), (1, 6))
+
+    def test_typing_fallback(self):
+        out, st = self.run_tool("typed", "nourl", 5)
+        self.assertEqual(out, ["LA: " + l for l in self.lines[:5]])
+        self.assertEqual(st["typed"], 1)
 
 
 @unittest.skipUnless(find_engine(), "no vpengine build (set VP_ENGINE or build build-eval)")

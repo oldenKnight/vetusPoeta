@@ -94,22 +94,32 @@ python3 tools/eval/run_eval.py --file F --gold G --out data/work/eval/NAME/ \
     --compare-system data/work/gt/NAME.gt.la.txt --system-name "Google Translate"
 ```
 `gt_compare.js`: one Chromium context, realistic UA, batches of up to 25 lines (blank-line separated, at most
-4,500 characters), output split on blank lines with a one-line-per-request fallback when counts differ, 1.5-3 s
-jittered pauses, no parallelism. Source box by ARIA role/label ("Source text"), result by the `lang="la"`
-attribute or the polite live region; not found -> stops with `data/work/gt/NAME.failure.png`. CAPTCHA and consent
-walls stop the run; with `--headful` the owner completes them in the window (5 min wait). Lines without a letter
-are copied, not sent. Output `NAME.gt.la.txt` (one line per input line) + `NAME.gt.meta.json`.
+4,500 characters and 7,000 URL-encoded characters). Each batch is submitted by loading
+`...?sl=en&tl=la&op=translate&text=<encoded batch>`; when no result appears within `--wait-ms` (30 s) the text is
+typed into the source box (ARIA "Source text"), checked to hold the whole batch, and the result awaited again.
+Result = the `lang="la"` element of the target panel, else the polite live region; the placeholders "Translation" /
+"Translating..." are no result. Output split on blank lines; one line per request when counts differ. 1.5-3 s
+jittered pause between requests, no parallelism. No result -> stops with `data/work/gt/NAME.failure.png`. CAPTCHA
+and consent walls stop the run; with `--headful` the owner completes them in the window (5 min wait). Sound-only
+lines (`[music]`, notes) are copied, not sent. Output `NAME.gt.la.txt` (one line per input line) + `NAME.gt.meta.json`
+(requests, fallbacks, typed batches). `--base-url` points the tool at `tools/eval/tests/fixtures/gt_mock.html`
+(tests, offline, no pause).
 Scoring: each line of the other system goes through `cue.set` on a scratch project of the same file (the server
 runs `Engine::check` on it), then `cue.get` gives checks and tokens; automatic error = A1, A3 or A4 fails, unknown
 token, no output or copied source (A5 and A6 reported, not counted; plain text has no markup and no tier
 promise). Our side uses the same definition on the `--primary` cell. Paired McNemar exact tests on discordant
 pairs (automatic error; gold mismatch). `compare.html` shows per-cue A/B rows; `system_<name>.jsonl` holds the
 other system's records (input of a blind A/B review sheet).
-Dry run 2026-10-06 (5 own sentences): **blocked in this container** — Chromium could not open any HTTPS page
-through the session's proxy (`ERR_CERT_AUTHORITY_INVALID`: the browser certificate store here does not hold the
-proxy's CA). A plain fetch of the page succeeded (HTTP 200) and showed `<textarea aria-label="Source text">` and
-a source panel wrapped in `lang="en"`, which the locators expect; the result locator is unverified in a browser.
-The owner runs it on a normal machine.
+Dry runs 2026-10-06. (1) First version, live: Chromium in this container cannot open HTTPS pages through the
+session proxy (`ERR_CERT_AUTHORITY_INVALID`, the browser certificate store lacks the proxy CA); a plain fetch showed
+`<textarea aria-label="Source text">` and a `lang="en"` source panel. (2) A live run with certificate checking turned
+off (by the coordinator, not committed) loaded the page but the typed batch arrived as its last line only and nothing
+was translated; hence the URL submission above. (3) Rewritten flow, offline against the mock page: 5 lines in one
+URL batch, split correctly; per-line fallback on a merged result; typing fallback; 30 regression lines -> batches
+of 25 + 5, all split correctly (tests `GtCompareMock`). **Not re-run live**: this repo's tool does not switch off
+certificate checking, so the live check of the rewritten flow (result locator, splitting of real output) is for the
+owner on a normal machine:
+`node tools/eval/gt_compare.js data/work/gt/dry5.src.txt --name dry5 --limit 5`.
 
 ## 6. Never committed
 Google Translate output (`data/work/gt/`), compare.html, system_*.jsonl, cues_*.jsonl and review sheets of the

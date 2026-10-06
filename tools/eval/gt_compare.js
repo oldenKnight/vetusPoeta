@@ -6,12 +6,16 @@
  *   NODE_PATH=/opt/node-tools/node_modules node tools/eval/gt_compare.js data/work/gt/NAME.src.txt [--name NAME]
  *       [--headful] [--batch 25] [--max-chars 4500] [--limit N] [--sl en] [--tl la] [--out-dir data/work/gt]
  *
- * Input: one plain line per cue (run_eval.py --dump-source). Lines without a letter are copied, not sent.
- * Method: one browser context, realistic user agent, batches of up to 25 lines separated by blank lines and at most
- * --max-chars characters; the output is split on blank lines and, when the number of parts differs, the batch is
- * redone one line per request. 1.5-3 s jittered pause between requests, no parallelism. The source box and the
- * result are found by ARIA role/label and the lang attribute, not by class names; when they cannot be found the
- * tool stops with a screenshot in data/work/gt/. CAPTCHA ("unusual traffic") and consent walls stop the run with
+ * Input: one plain line per cue (run_eval.py --dump-source). Lines without a letter outside [sound]/(sound)
+ * descriptions and music notes are copied, not sent.
+ * Method: one browser context, realistic user agent, batches of up to 25 lines separated by blank lines, at most
+ * --max-chars characters and --max-url characters of URL-encoded text. Each batch is submitted by loading
+ * <base>?sl=..&tl=..&op=translate&text=<encoded batch> (typing into the source box is the fallback when no result
+ * appears); the output is split on blank lines and, when the number of parts differs, the batch is redone one line
+ * per request. 1.5-3 s jittered pause between requests, no parallelism. The result is found by the lang attribute
+ * of the target panel or the polite live region, the source box by ARIA role/label, not by class names; when no
+ * result appears the tool stops with a screenshot in data/work/gt/. --base-url points the tool at a local mock page
+ * (tests only). CAPTCHA ("unusual traffic") and consent walls stop the run with
  * a message; with --headful the owner can solve them in the window (the tool waits up to 5 minutes).
  */
 'use strict';
@@ -24,15 +28,19 @@ var CHROME = process.env.VP_CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-l
 var UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
 
 function parseArgs(argv) {
-  var a = { input: null, name: null, headful: false, batch: 25, maxChars: 4500, limit: 0, sl: 'en', tl: 'la',
-            outDir: path.join(ROOT, 'data', 'work', 'gt') };
+  var a = { input: null, name: null, headful: false, batch: 25, maxChars: 4500, maxUrl: 7000, limit: 0, sl: 'en',
+            tl: 'la', outDir: path.join(ROOT, 'data', 'work', 'gt'), baseUrl: 'https://translate.google.com/',
+            waitMs: 30000 };
   for (var i = 0; i < argv.length; i++) {
     var k = argv[i];
     if (k === '--headful') a.headful = true;
     else if (k === '--name') a.name = argv[++i];
     else if (k === '--batch') a.batch = Math.max(1, Math.min(25, parseInt(argv[++i], 10) || 25));
     else if (k === '--max-chars') a.maxChars = Math.max(200, Math.min(5000, parseInt(argv[++i], 10) || 4500));
+    else if (k === '--max-url') a.maxUrl = Math.max(500, parseInt(argv[++i], 10) || 7000);
     else if (k === '--limit') a.limit = parseInt(argv[++i], 10) || 0;
+    else if (k === '--base-url') a.baseUrl = argv[++i];
+    else if (k === '--wait-ms') a.waitMs = Math.max(1000, parseInt(argv[++i], 10) || 30000);
     else if (k === '--sl') a.sl = argv[++i];
     else if (k === '--tl') a.tl = argv[++i];
     else if (k === '--out-dir') a.outDir = path.resolve(argv[++i]);
@@ -49,21 +57,33 @@ function parseArgs(argv) {
   return a;
 }
 
-function hasLetter(s) { return /[A-Za-zÀ-ɏͰ-ϿЀ-ӿ]/.test(s); }
+// Same rule as evallib.counted(): sound descriptions ([music], (laughs)) and music notes do not count as text.
+function hasLetter(s) {
+  var rest = s.replace(/\[[^\]]*\]|\([^)]*\)|[\u2669\u266A\u266B\u266C]/g, ' ');
+  return /[A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF]/.test(rest);
+}
 
 function sleep(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
 
-function jitter() { return 1500 + Math.floor(Math.random() * 1500); }
+var LOCAL = false;   // set for a file: base URL (the tests' mock page): no politeness pause needed offline
+
+function jitter() { return LOCAL ? 0 : 1500 + Math.floor(Math.random() * 1500); }
 
 function log(msg) { process.stderr.write('[gt] ' + msg + '\n'); }
 
-function makeBatches(items, maxN, maxChars) {
-  var out = [], cur = [], chars = 0;
+// Batches of at most maxN lines, maxChars characters and maxUrl characters once URL-encoded (blank-line separators
+// counted: '\n\n' is 2 characters, '%0A%0A' 6 encoded).
+function makeBatches(items, maxN, maxChars, maxUrl) {
+  var out = [], cur = [], chars = 0, enc = 0;
+  maxUrl = maxUrl || Infinity;
   items.forEach(function (it) {
-    var add = it.text.length + 2;
-    if (cur.length && (cur.length >= maxN || chars + add > maxChars)) { out.push(cur); cur = []; chars = 0; }
+    var add = it.text.length + 2, addEnc = encodeURIComponent(it.text).length + 6;
+    if (cur.length && (cur.length >= maxN || chars + add > maxChars || enc + addEnc > maxUrl)) {
+      out.push(cur); cur = []; chars = 0; enc = 0;
+    }
     cur.push(it);
     chars += add;
+    enc += addEnc;
   });
   if (cur.length) out.push(cur);
   return out;
@@ -104,13 +124,16 @@ Session.prototype.checkWalls = function () {
     });
 };
 
+function pageUrl(args, text) {
+  var u = args.baseUrl + (args.baseUrl.indexOf('?') >= 0 ? '&' : '?') + 'sl=' + encodeURIComponent(args.sl) +
+          '&tl=' + encodeURIComponent(args.tl) + '&op=translate';
+  return text === undefined ? u : u + '&text=' + encodeURIComponent(text);
+}
+
 Session.prototype.open = function () {
-  var a = this.args, self = this;
-  var url = 'https://translate.google.com/?sl=' + encodeURIComponent(a.sl) + '&tl=' + encodeURIComponent(a.tl) +
-            '&op=translate';
-  return this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 })
-    .then(function () { return self.checkWalls(); })
-    .then(function () { return self.sourceBox(); });
+  var self = this;
+  return this.page.goto(pageUrl(this.args), { waitUntil: 'domcontentloaded', timeout: 60000 })
+    .then(function () { return self.checkWalls(); });
 };
 
 // The source box: the textarea labelled "Source text" (seen in the served page on 2026-10-06:
@@ -133,50 +156,83 @@ Session.prototype.sourceBox = function () {
 };
 
 // The result: the element marked with the target language (lang="la") that is not the source box (the served page
-// wraps the source panel in <span lang="en">, the result panel is expected to mirror it; unverified in a browser
-// here); as a fallback the polite live region the page uses to announce the translation.
+// wraps the source panel in <span lang="en">, the result panel is expected to mirror it); as a fallback the polite
+// live region the page uses to announce the translation. Placeholders ("Translation", "Translating...") are no
+// result.
 Session.prototype.readResult = function () {
   var tl = this.args.tl;
   return this.page.evaluate(function (tl) {
     function visible(el) { var r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; }
+    function placeholder(t) { return /^\s*(translation|translating\W*|traducci\u00f3n|traduciendo\W*)\s*$/i.test(t); }
     var nodes = Array.prototype.slice.call(document.querySelectorAll('[lang="' + tl + '"]'));
     var best = null;
     nodes.forEach(function (n) {
       if (n === document.documentElement || n.tagName === 'TEXTAREA' || !visible(n)) return;
       if (n.querySelector('textarea')) return;
       var t = n.innerText || '';
-      if (t.trim() && (!best || (best.contains(n) ? false : t.length > (best.innerText || '').length))) best = n;
+      if (t.trim() && !placeholder(t) && (!best || (best.contains(n) ? false : t.length > (best.innerText || '').length))) best = n;
     });
     if (best) return { how: 'lang=' + tl, text: best.innerText };
     var live = Array.prototype.slice.call(document.querySelectorAll('[aria-live="polite"]')).filter(function (n) {
-      return visible(n) && (n.innerText || '').trim();
+      return visible(n) && (n.innerText || '').trim() && !placeholder(n.innerText);
     });
     if (live.length) return { how: 'aria-live', text: live[live.length - 1].innerText };
     return null;
   }, tl);
 };
 
+// Waits until a result is present and unchanged for 1.2 s (the page streams long results); resolves with the text,
+// or null after --wait-ms. `stale` is a result that must not be taken (the previous one, typing path).
+Session.prototype.waitResult = function (stale) {
+  var self = this, t0 = Date.now();
+  function poll() {
+    return self.readResult().then(function (r) {
+      if (r && r.text.trim() && r.text !== stale) {
+        return sleep(1200).then(function () { return self.readResult(); }).then(function (r2) {
+          if (r2 && r2.text === r.text) { self.how = r.how; return r.text; }
+          return poll();
+        });
+      }
+      if (Date.now() - t0 > self.args.waitMs) return null;
+      return sleep(400).then(poll);
+    });
+  }
+  return poll();
+};
+
+// Primary path: load the page with the batch in the URL (the text arrives whole, the page translates on load).
+// Fallback: type the text into the source box of the loaded page.
 Session.prototype.translate = function (text) {
   var self = this, page = this.page;
   this.requests++;
-  var t0 = Date.now();
-  return this.box.fill('')
+  return page.goto(pageUrl(this.args, text), { waitUntil: 'domcontentloaded', timeout: 60000 })
+    .then(function () { return self.checkWalls(); })
+    .then(function () { return self.waitResult(null); })
+    .then(function (out) {
+      if (out !== null) { self.path = 'url'; return out; }
+      log('no result from the URL path after ' + self.args.waitMs + ' ms, typing into the source box');
+      return self.typeText(text);
+    });
+};
+
+Session.prototype.typeText = function (text) {
+  var self = this, page = this.page, before = null;
+  return this.readResult()
+    .then(function (r) { before = r ? r.text : null; return self.sourceBox(); })
+    .then(function (box) { return box.click().then(function () { return box.fill(''); }); })
+    .then(function () { return page.keyboard.insertText(text); })   // one input event with the whole text
     .then(function () { return sleep(300); })
-    .then(function () { return self.box.fill(text); })
-    .then(function poll() {
-      return self.readResult().then(function (r) {
-        var elapsed = Date.now() - t0;
-        if (r && r.text.trim() && r.text !== self.lastResult) {
-          // wait until the text is stable for 1.2 s (the page streams long results)
-          return sleep(1200).then(function () { return self.readResult(); }).then(function (r2) {
-            if (r2 && r2.text === r.text) { self.lastResult = r.text; self.how = r.how; return r.text; }
-            return poll();
-          });
-        }
-        if (elapsed > 30000) {
-          return self.checkWalls().then(function () { return self.shot('no translation result found after 30 s'); });
-        }
-        return sleep(400).then(poll);
+    .then(function () { return self.box.inputValue(); })
+    .then(function (v) {
+      if (v.replace(/\s+/g, ' ').trim() !== text.replace(/\s+/g, ' ').trim()) {
+        return self.shot('the source box does not hold the whole batch after typing');
+      }
+      return self.waitResult(before);
+    })
+    .then(function (out) {
+      if (out !== null) { self.path = 'typed'; return out; }
+      return self.checkWalls().then(function () {
+        return self.shot('no translation result found after ' + (2 * self.args.waitMs / 1000) + ' s (URL and typing)');
       });
     });
 };
@@ -194,6 +250,7 @@ function main() {
       throw new Error('Playwright not found: set NODE_PATH=/opt/node-tools/node_modules');
     }
   }
+  LOCAL = /^file:/.test(args.baseUrl);
   fs.mkdirSync(args.outDir, { recursive: true });
   var lines = fs.readFileSync(args.input, 'utf8').replace(/\r/g, '').split('\n');
   if (lines.length && lines[lines.length - 1] === '') lines.pop();
@@ -201,8 +258,8 @@ function main() {
   var result = lines.map(function (l) { return hasLetter(l) ? null : l; });
   var items = [];
   lines.forEach(function (l, i) { if (hasLetter(l)) items.push({ i: i, text: l.replace(/\s+/g, ' ').trim() }); });
-  var batches = makeBatches(items, args.batch, args.maxChars);
-  var stats = { lines: lines.length, sent: items.length, batches: batches.length, fallbacks: 0, requests: 0 };
+  var batches = makeBatches(items, args.batch, args.maxChars, args.maxUrl);
+  var stats = { lines: lines.length, sent: items.length, batches: batches.length, fallbacks: 0, requests: 0, typed: 0 };
   log(items.length + ' lines to translate in ' + batches.length + ' batches');
 
   var launch = { executablePath: CHROME, headless: !args.headful };
@@ -219,19 +276,26 @@ function main() {
       batches.forEach(function (batch, bi) {
         chain = chain.then(function () {
           var text = batch.map(function (it) { return it.text; }).join('\n\n');
-          return session.translate(text).then(function (out) {
+          var wait = bi === 0 ? Promise.resolve() : sleep(jitter());
+          return wait.then(function () { return session.translate(text); }).then(function (out) {
             var parts = splitParts(out);
             if (parts.length === batch.length) {
               batch.forEach(function (it, k) { result[it.i] = parts[k]; });
-              log('batch ' + (bi + 1) + '/' + batches.length + ': ' + batch.length + ' lines (' + session.how + ')');
-              return sleep(jitter());
+              log('batch ' + (bi + 1) + '/' + batches.length + ': ' + batch.length + ' lines (' + session.path +
+                  ', ' + session.how + ')');
+              if (session.path === 'typed') stats.typed++;
+              return null;
             }
             stats.fallbacks++;
             log('batch ' + (bi + 1) + ': ' + parts.length + ' parts for ' + batch.length + ' lines, one per request');
             var c = sleep(jitter());
             batch.forEach(function (it) {
               c = c.then(function () { return session.translate(it.text); })
-                .then(function (o) { result[it.i] = o.replace(/\s+/g, ' ').trim(); return sleep(jitter()); });
+                .then(function (o) {
+                  result[it.i] = o.replace(/\s+/g, ' ').trim();
+                  if (session.path === 'typed') stats.typed++;
+                  return sleep(jitter());
+                });
             });
             return c;
           });
@@ -261,4 +325,4 @@ if (require.main === module) {
   try { main(); } catch (e) { log('STOPPED: ' + e.message); process.exitCode = 2; }
 }
 
-module.exports = { makeBatches: makeBatches, splitParts: splitParts, hasLetter: hasLetter };
+module.exports = { makeBatches: makeBatches, splitParts: splitParts, hasLetter: hasLetter, pageUrl: pageUrl };
