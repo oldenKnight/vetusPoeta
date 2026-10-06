@@ -1,0 +1,26 @@
+# Orbergise with the original-language cue (task C14): our own English (and two Spanish) cues, a higher-register Latin
+# version and the beginner Latin we expect. Policy (simplify_la.tsv "rule original prefer=rewrite"): the Latin's own
+# rewrite when it is clean, else the original's translation (EN/ES -> LA at fidelity 3) when that one is clean.
+# Columns: id	lang	original	latin	expected	path (latin | original | kept)
+1	en	After he read the letter, the boy ran home.	Epistulā lēctā, puer domum cucurrit.	Postquam epistula lēcta est, puer domum cucurrit.	latin
+2	en	The boy saw a wolf in the forest.	Puer lupum in silvā cōnspexit.	Puer lupum in silvā vīdit.	latin
+3	en	The soldier killed the king.	Mīles rēgem interfēcit.	Mīles rēgem necāvit.	latin
+4	en	I have to write a letter.	Mihi epistula scrībenda est.	Epistulam scrībere dēbeō.	latin
+5	en	We must go home.	Nōbīs domum eundum est.	Domum īre dēbēmus.	latin
+6	en	The sad girl is crying.	Puella maesta lacrimat.	Puella trīstis flet.	latin
+7	en	While the father was sleeping, the boys were playing in the garden.	Patre dormiente, puerī in hortō lūdēbant.	Dum pater dormit, puerī in hortō lūdēbant.	latin
+8	en	The slaves went to the river to get water.	Servī aquam petītum ad flūmen iērunt.	Servī ad flūmen iērunt ut aquam peterent.	latin
+9	en	The boy will go to the city.	Puer ad urbem itūrus est.	Puer ad urbem ībit.	latin
+10	en	When night came, everyone slept.	Cum nox vēnisset, omnēs dormīvērunt.	Postquam nox vēnit, omnēs dormīvērunt.	latin
+11	en	Some boys are playing in the garden.	Nōn nūllī puerī in hortō lūdunt.	Aliquī puerī in hortō lūdunt.	latin
+12	en	The girl loves the rose.	Puella rosam amat.	Puella rosam amat.	kept
+13	en	The sailor saw a ship on the sea.	Nauta nāvigium in ōceanō vīdit.	Nauta nāvem in marī vīdit.	latin
+14	en	We must go.	Eundum est.	Īre dēbēmus.	original
+15	en	We must fight.	Pugnandum est.	Pugnāre dēbēmus.	original
+16	en	We must stay here.	Hīc manendum est.	Hīc manēre dēbēmus.	original
+17	en	The boy is sitting in the garden.	Puer in hortō cōnsīdit.	Puer in hortō sedet.	original
+18	en	The girl is making dinner.	Puella cēnam parat.	Puella cēnam facit.	original
+19	en	The father is speaking to the slaves.	Pater servōs alloquitur.	Pater cum servīs loquitur.	original
+20	en	You must be quiet.	Tacendum est.	Tacēre dēbēs.	original
+21	es	El niño vio un lobo en el bosque.	Puer lupum in silvā cōnspexit.	Puer lupum in silvā vīdit.	latin
+22	es	Debemos ir.	Eundum est.	Īre dēbēmus.	original

@@ -46,3 +46,10 @@ if(NOT VP_RULES_GRC2_ADDED)
     ${CMAKE_CURRENT_SOURCE_DIR}/src/engine_grc/*.cpp)
   target_sources(vp_rules PRIVATE ${VP_RULES_GRC2_SRC})
 endif()
+
+# C14 (Orbergise, pair la-la): orberg/ rewriter, meaning check, cue outputs. Guarded so the block is idempotent.
+if(NOT VP_RULES_ORBERG_ADDED)
+  set(VP_RULES_ORBERG_ADDED ON)
+  file(GLOB VP_RULES_ORBERG_SRC CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/orberg/*.cpp)
+  target_sources(vp_rules PRIVATE ${VP_RULES_ORBERG_SRC})
+endif()

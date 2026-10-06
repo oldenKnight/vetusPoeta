@@ -1,0 +1,36 @@
+# simplify_la.tsv - Orbergise structure rewrites (engine/rules/src/orberg, DESIGN.md §1.2 and §10.7). Teacher-editable.
+# Columns: kind	key	value	params	note
+#   rule	<rule id>	on|off	name=value;name=value	what the rule does (the code implements each id; the row switches it and
+#                                               sets its parameters)
+#   pair	<latin keys, space separated>	<replacement lemma head>	agree|fixed	word pairs rewritten together (double
+#        negatives, litotes, rare negations). Keys are lemma keys (latin_key of the headword) in text order.
+#        agree: the replacement takes the case/number/gender (or person/number/tense) of the last word of the pair;
+#        fixed: the replacement is written as it is.
+#   keep	<lemma key>	<pos>	-	a lemma never swapped by the lexicon's sense keywords (their keywords mislead); a
+#        periphrasis_la.tsv row still applies.
+# Vocabulary swaps (tier 2/3 word -> core word) live in periphrasis_la.tsv; this file holds structures.
+rule	ablabs.perf	on	conj=postquam;voice=passive	ablative absolute with a perfect participle -> postquam + the noun in the nominative + perfect indicative (passive for transitive verbs, so no agent is guessed; deponents active). voice=active: active perfect with the main clause's subject (Check)
+rule	ablabs.pres	on	conj=dum	ablative absolute with a present participle -> dum + the noun in the nominative + present indicative
+rule	gerundive	on	modal=dēbeō	gerundive of obligation / passive periphrastic (+ sum): a dative agent becomes the subject of dēbeō + active infinitive, the gerundive's noun its object; without an agent dēbeō + passive infinitive (the meaning stays exact); gerund without agent kept
+rule	supine	on	conj=ut	supine of purpose -> ut + subjunctive after the main verb (present after a present/future main verb, imperfect after a past one)
+rule	futpart	on	past=volō	future participle + sum -> future tense; + a past tense of sum -> volō (imperfect) + infinitive
+rule	histinf	on		historic infinitive (a sentence without a finite verb) -> imperfect indicative
+rule	cumsubj	on	plup=postquam;impf=dum	cum + pluperfect subjunctive -> postquam + perfect indicative; cum + imperfect subjunctive -> dum + present indicative
+rule	relchain	on		a relative clause inside a relative clause that ends the sentence -> a new sentence with the antecedent noun
+rule	split	on	words=12;conj=et sed nam atque	sentences longer than `words` words are split at et/sed/nam/atque between two finite clauses (et/atque dropped)
+rule	accinf	on		accusative + infinitive after verbs of saying and thinking: kept, marked with a note
+rule	original	on	prefer=rewrite	with the original-language cue: rewrite = the rewrite of the Latin itself when it is clean (no Fix, tier ceiling met, meaning >= 60 %, no construction left), else the original's translation (EN/ES -> LA at fidelity 3) when that one is clean; original = the original's translation first
+pair	non nullus	aliquis	agree	"not none" = some
+pair	nonnullus	aliquis	agree	"some"
+pair	non numquam	saepe	fixed	"not never" = sometimes; saepe is the nearest tier 1 word
+pair	nonnumquam	saepe	fixed	"sometimes"
+pair	non nihil	aliquid	fixed	"not nothing" = something
+pair	non nescio	scio	agree	litotes: "I am not unaware" = I know
+pair	non ignoro	scio	agree	litotes: "I am not ignorant" = I know
+pair	nec non	et	fixed	"and also"
+pair	neque non	et	fixed	"and also"
+pair	haud	non	fixed	haud = nōn
+keep	curo	verb	-	"take care of": the keywords (see, look) would give videō
+keep	intereo	verb	-	"perish": the keywords (go) would give eō; periphrasis row morior
+keep	obeo	verb	-	"die / meet": the keywords (go) would give eō
+keep	alloquor	verb	-	"speak to, address" + accusative: dīcō / salūtō change the meaning

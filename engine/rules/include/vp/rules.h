@@ -27,6 +27,9 @@ struct Options {
   bool orbergise = false;        // rewrite Latin input with tier ceiling
   int orbergTier = 1;
   char speakerGender = 'm';     // 'm' | 'f' | 'u' (unknown): gender of first-person predicate forms (rules_la_notes.md decision 1)
+  // C14 addition (Orbergise options of orbergise.start; see vp/orberg.h)
+  bool orbergKeepNames = true;   // names are left as they are
+  bool orbergSimplify = true;    // structure rewrites (false: vocabulary swaps only)
 };
 
 struct Features { std::string pos, case_, number, gender, person, tense, mood, voice, degree; };
@@ -45,7 +48,10 @@ struct Alternative { std::string text, reason; double score = 0; };
 
 struct SpanIn    { bool tag = false; std::string raw; };    // source cue spans: text or an opaque tag (vp::subs::Span)
 struct CueInput  { uint32_t index = 0; std::string sourceText; int64_t startMs = 0, endMs = 0; std::string prevSource, nextSource;
-                   std::vector<SpanIn> spans; /* optional: when present the cue assembly can report tag positions (A5) */ };
+                   std::vector<SpanIn> spans; /* optional: when present the cue assembly can report tag positions (A5) */
+                   // C14 addition (Orbergise, pair la-la): sourceText holds the Latin; the aligned original-language cue
+                   // (by cue index, then by time overlap; empty when no original file is loaded) and its language
+                   std::string originalText; Lang originalLang = Lang::En; };
 struct CueOutput {
   uint32_t index = 0;
   std::string target;                       // one or more lines joined with '\n'
@@ -55,6 +61,11 @@ struct CueOutput {
   std::vector<Check> checks;
   std::vector<Reason> reasons;
   std::vector<std::string> flags;           // "song", "nonverbal", "name-guessed", "cps", ...
+  // C14 addition (Orbergise): the meaning check (content-lemma overlap with the input Latin or the original's
+  // transfer) in percent, -1 when not computed; the input content lemmas not accounted for; the original-language cue
+  int meaningPercent = -1;
+  std::vector<std::string> meaningMissing;
+  std::string original;
 };
 
 struct GlossaryEntry { std::string name, policy, form, gender; int declension = 0; };

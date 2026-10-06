@@ -17,6 +17,7 @@
 #include "vp/frame.h"
 #include "engine_grc/engine_grc.h"   // C12 grc hook
 #include "vp/la2x.h"   // C11 la2x hook
+#include "vp/orberg.h"   // C14 orberg hook
 #include "vp/lex.h"
 #include "vp/morph.h"
 #include "vp/nlp.h"
@@ -154,6 +155,7 @@ class RulesEngine final : public Engine {
     std::lock_guard<std::mutex> lk(m_);
     try {
       if (grcPair(opt)) return grcTranslate(cues, opt, ctx, progress, cancelled);   // C12 grc hook
+      if (orbergPair(opt)) return orbergTranslate(cues, opt, ctx, progress, cancelled);   // C14 orberg hook
       if (la2xPair(opt)) return la2xTranslate(cues, opt, ctx, progress, cancelled);   // C11 la2x hook
       return translateImpl(cues, opt, ctx, progress, cancelled);
     } catch (const std::exception& e) {
@@ -1536,6 +1538,118 @@ class RulesEngine final : public Engine {
     return c;
   }
   // ==== C11 la2x: END ===============================================================================================
+
+  // ==== C14 orberg (Orbergise, pair la-la): BEGIN ===================================================================
+  // Owned by task C14 (engine/rules/src/orberg). Reached only through the one-line hooks marked "C14 orberg hook":
+  // the include and the dispatch of pair la-la (Options.orbergise) in translate(). The original-language path reuses
+  // this engine's EN/ES -> LA pipeline (frame builder, transfer at fidelity 3, realiser) through
+  // orberg::EngineContext::fromOriginal.
+  std::unique_ptr<orberg::Resources> orbergRes_;
+  const lex::Lexicon* orbergLex_ = nullptr;
+
+  static bool orbergPair(const Options& o) { return o.source == Lang::La && o.target == Lang::La; }
+
+  Result<std::vector<CueOutput>> orbergTranslate(const std::vector<CueInput>& cues, const Options& opt,
+                                                 const Context& ctx, const std::function<void(size_t)>& progress,
+                                                 const std::function<bool()>& cancelled) {
+    Result<void> r = ensureLatin();
+    if (!r.ok()) return Result<std::vector<CueOutput>>(r.error());
+    Error err{ErrorCode::Internal, "", ""};
+    la2x::Translator* t = la2xTranslator(&err);
+    if (!t) return Result<std::vector<CueOutput>>(err);
+    if (!orbergRes_ || orbergLex_ != la_) {
+      orbergRes_.reset();
+      const std::vector<stdfs::path> dirs = {cfg_.curatedDir, stdfs::path(cfg_.dataDir) / "curated",
+                                             stdfs::path(cfg_.dataDir) / ".." / "curated",
+                                             stdfs::path(cfg_.dataDir) / ".." / ".." / "data" / "curated"};
+      Result<std::unique_ptr<orberg::Resources>> rr = orberg::Resources::create(*la_, *cd_, dirs);
+      if (!rr.ok()) return Result<std::vector<CueOutput>>(rr.error());
+      orbergRes_ = std::move(rr.value());
+      orbergLex_ = la_;
+    }
+    orberg::EngineContext ec;
+    ec.la = la_;
+    ec.cd = cd_.get();
+    ec.la2x = t;
+    ec.checker = checker_.get();
+    ec.resources = orbergRes_.get();
+    ec.glossary = &ctx.glossary;
+    ec.cpsLimit = cfg_.cpsLimit;
+    ec.maxLine = cfg_.maxLine;
+    ec.maxLines = cfg_.maxLines;
+    ec.fromOriginal = [this, &opt, &ctx](const std::string& text, Lang lang, int ceiling,
+                                         const std::vector<uint32_t>& prefer, orberg::OriginalLatin& out) {
+      return orbergFromOriginal(text, lang, ceiling, prefer, opt, ctx, out);
+    };
+    t->resetDiscourse();
+    std::vector<CueOutput> outs = orberg::cues(cues, opt, ctx, ec, progress, cancelled);
+    glossary_ = nullptr;
+    return Result<std::vector<CueOutput>>(std::move(outs));
+  }
+
+  // The original-language cue through this engine's EN/ES -> LA pipeline at fidelity 3 (tier 1 preferred, periphrasis
+  // allowed); a candidate that is one of the input's own core lemmas (`prefer`) is forced, so words the student
+  // already reads stay.
+  bool orbergFromOriginal(const std::string& text, Lang lang, int ceiling, const std::vector<uint32_t>& prefer,
+                          const Options& opt0, const Context& ctx, orberg::OriginalLatin& out) {
+    (void)ceiling;
+    if (lang != Lang::En && lang != Lang::Es) return false;
+    const frame::SrcLang sl = lang == Lang::Es ? frame::SrcLang::Es : frame::SrcLang::En;
+    Result<const frame::FrameBuilder*> fbr = builder(sl);
+    if (!fbr.ok()) return false;
+    const frame::FrameBuilder& fb = *fbr.value();
+    Options opt = opt0;
+    opt.source = lang;
+    opt.target = Lang::La;
+    opt.fidelity = 3;
+    opt.orbergise = false;
+    opt.useModel = false;
+    opt.useOnline = false;
+    opt.emoji = false;
+    transfer::Settings st;
+    st.lang = sl;
+    st.fidelity = 3;
+    st.srcLex = sl == frame::SrcLang::Es ? es_ : en_;
+    st.speakerGender = opt.speakerGender == 'f' ? 'f' : opt.speakerGender == 'u' ? 'u' : 'm';
+    st.context = &ctx;
+    glossary_ = &ctx.glossary;
+    transfer::Memory mem;
+    std::string all;
+    for (const SourceSentence& ss : frame::mapSentences({text})) {
+      if (ss.kind != frame::CueKind::Speech) { glossary_ = nullptr; return false; }
+      const transfer::Memory m0 = mem;
+      memBefore_ = mem;
+      SentOut so;
+      speech(ss.text, fb, opt, ctx, mem, st, so, false);
+      transfer::Settings st2 = st;
+      for (const transfer::Choice& c : so.choices) {
+        if (c.kind != "sense" || c.token < 0 || std::binary_search(prefer.begin(), prefer.end(), c.lemma)) continue;
+        for (size_t k = 1; k < c.candidates.size(); ++k)
+          if (std::binary_search(prefer.begin(), prefer.end(), c.candidates[k].lemma)) {
+            st2.overrides.push_back({c.token, (int)k});
+            break;
+          }
+      }
+      if (!st2.overrides.empty()) {
+        transfer::Memory m2 = m0;
+        SentOut s2;
+        speech(ss.text, fb, opt, ctx, m2, st2, s2, false);
+        so = std::move(s2);
+        mem = m2;
+      }
+      display(so.latin, opt.macrons);
+      if (!so.unknown.empty()) out.unknown = true;
+      if (std::find(so.flags.begin(), so.flags.end(), "frame-fallback") != so.flags.end()) out.fallback = true;
+      for (const transfer::Choice& c : so.choices)
+        if (c.lemma != lex::kNoLemma && c.kind != "table") out.lemmas.push_back(c.lemma);
+      if (!all.empty()) all += ' ';
+      all += so.latin.text;
+    }
+    glossary_ = nullptr;
+    out.text = all;
+    return !all.empty();
+  }
+  // ==== C14 orberg: END =============================================================================================
 };
 
 }  // namespace

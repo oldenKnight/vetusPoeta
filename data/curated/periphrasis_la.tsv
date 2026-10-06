@@ -41,3 +41,22 @@ vereor	2	timeō
 metuo	2	timeō	
 formido	3	timeō	
 paveo	3	timeō	
+proficiscor	2	abeō	C14: "set out" -> go away
+egredior	2	exeō	C14
+ingredior	2	intrō	C14 (with in + acc: "in cubiculum intrāvit")
+advenio	2	veniō	C14
+orior	2	surgō	C14: the sun rises -> surgit
+interficio	2	necō	C14
+lacrimo	3	fleō	C14
+maestus	2	trīstis	C14
+parvulus	2	parvus	C14
+navigium	3	nāvis	C14
+oceanus	3	mare	C14
+intereo	2	morior	C14
+pereo	2	morior	C14
+obeo	2	morior	C14 (sense "die")
+clamito	2	clāmō	C14
+perficio	2	fīniō	C14
+cupio	2	volō	C14
+domicilium	3	domus	C14
+nonnullus	2	aliquis	C14 (simplify_la.tsv pair row first)
