@@ -1,0 +1,101 @@
+# Greek engine path (C12) — coverage, mismatches, gaps, questions
+
+Code: `engine/rules/{include/vp/transfer_grc.h, include/vp/grc2x.h, src/transfer_grc, src/grc2x, src/engine_grc}`, one
+delimited block "C12 grc" in `src/engine/engine.cpp` (three one-line hooks: translate, check, inspect); tests:
+`engine/tests/test_rules_grc2.cpp`; fixtures `tests/fixtures/grc2x/sentences.tsv`. Reports (written by the tests):
+`<build>/regression_report_grc.txt`, `regression_report_grc_es.txt`, `grc2x_report.txt`.
+
+## What is implemented
+* **A3 fix (C9 checker).** A form with a finite-verb reading and a noun reading and no article of its own (ἔχεις =
+  ἔχω 2 sg / ἔχις nom-acc pl) is no longer reported as a disagreeing subject: the verb reading gives a consistent
+  clause. C9 generator again 2,000 clauses / 0 faults; ἀποφεύγω aorist test now expects "ἀπέφυγεν." (cells exist);
+  the missing-form test uses a missing verb instead. A1b now checks capitalised sentence starts on the lower-case word.
+* **Decision 4 in the realiser:** ἆρα + verb first ("ἆρα εἶδες τὴν γαλῆν μου;"); order_grc.txt order.yn is a slot
+  template now; C9's table row "ἆρα φιλεῖ ἡ κόρη τὴν μητέρα;" updated.
+* **Transfer EN/ES -> Greek** (`GreekTransfer`): REVX on greek.vpl (English keyword; Spanish `es:` keyword, the
+  English pivot through spanish.vpl's gloss when it has one); scoring as §10.2 plus Greek tiers (tiers_grc.tsv wins),
+  shared_el bonus (+0.05 at fidelity 2, +0.1 at 3, D12), −0.2 for a declinable lemma without a table; teacher glosses
+  from the tiers_grc.tsv notes (33 notes added for beginner words) and from readable_grc.tsv read backwards (English
+  and Spanish columns: the Spanish teacher index); tier preference and low-tier flag as Latin. Closed classes in code:
+  article by the frame's definiteness + possessor + generic plural subject (τὰ ἄνθη, αἱ σφαῖραι), names with the
+  article (decision 6), unique definite predicates `forceArticle` (decision 9), ἐγώ/σύ dropped unless emphatic,
+  οὗτος/ἐκεῖνος, πᾶς/οὐδείς/τις, numerals 1-12/20/100/1000, ordinals 1-12, prepositions (preps_en_grc.tsv + rules for
+  to/for/with/at/in/on/into/of/by/from), particles from connectors (and καί, but ἀλλά/δέ, so/then οὖν, or ἤ,
+  because ὅτι), "of course" + clause -> δήπου (phrasebook note), elliptical "This one does." -> αὕτη δὲ τρέχει.
+  Tense: aorist for past events, imperfect for past states / progressive / habitual, perfect only for a passive
+  resulting state, future; deliberative -> aorist subjunctive; no optative (conditionals -> indicative). Imperatives:
+  aorist for a single act, present for the verbs of lexical_en_grc.tsv kind `durative` (the Greek verb decides) and
+  for prohibitions (μή + present imperative, decision 8). New table `data/curated/lexical_en_grc.tsv` (phrasal,
+  verb+preposition, state adjectives, realia, fixed verbs, durative verbs; English and Spanish rows).
+  Realia (decision 1): tea/coffee -> ποτόν with reason "no Attic word; equivalent used" and Check. "Please"
+  (decision 2): ἀντιβολῶ at fidelity 1-2, left out at 3. Emoji from emoji_grc.tsv (realiser). Capitals: sentence
+  start capitalised (decision 5, `capitaliseGreek`); the regression compares case-insensitively (the gold is lower case).
+* **Phrasebooks:** the frame builder runs on a copy of CuratedData whose phrasebooks are phrasebook_en_grc.tsv /
+  phrasebook_es_grc.tsv (new, 64 rows mirroring phrasebook_es_la.tsv). Rows added to the English one: "i am late",
+  "play cards" (register vp: the last word is the verb, the others are analysed into obliques), "off with {NP}".
+* **Cue assembly:** cue/ splitting reused; line breaks through `subs::breakLines` with `greekBreakHints()` (καί ἀλλά
+  ὅτι εἰ ἐάν ἐπεί ὅτε ἵνα ὥστε ἐν εἰς ἐκ ἐξ πρός ἀπό μετά διά περί ὑπό παρά ἐπί ἤ οὐδέ); `?` -> `;`, source
+  `;`/`:` -> `·`; movable ν across phrasebook pieces. `toMonotonic(text)` (public, transfer_grc.h) for the CLI's
+  export option greek:"monotonic": acute from any accent (one per word), breathings / iota subscript / length marks
+  dropped, diaeresis kept, monosyllables unaccented except ἤ ποῦ ποῖ πῶς πῇ τίς τί.
+* **Checks and confidence:** GreekChecker A1/A1b/A3/A4/A6 + A5/A7/A8 as Latin; A9 is reported "not run for Greek".
+  Fix: A1/A3/A4 faults, unknown words, markup; Check: A1/A1b warnings (accent differs), A5 tag position, A6, A7, A8,
+  margin < 0.15, realia, name guessed/kept, paradigm forms, missing forms, frame fallbacks, low tier, songs, nonverbal.
+  Alternatives: the second candidate of the most ambiguous word; the other speaker gender when unknown.
+* **Greek -> EN/ES (`grc2x`):** tokens incl. `;` `·` and elided words; readings from vp::grc::analyse + closed
+  tables (article / pronoun tables win; τίς vs τις by the accent) + names_grc.tsv forms + glossary; disambiguation by
+  coordinate ascent over local constraints (article agreement ±3/−2, adjective/numeral ↔ noun, preposition case,
+  one finite verb per clause, verb ↔ nominative number/person with the neuter-plural rule, ὦ + vocative, infinitive
+  after a modal); interlinear words (lemma, features in words, gloss + pivot flag, alternatives, why); a SemFrame per
+  clause (predicate position adjectives, neuter nom/acc as object when no 3rd-person subject fits, genitive
+  attributes vs genitive objects of ἀκούω etc., δεῖ/ἔξεστι persons, existential ἔστι, subordinates ὅτι/ἐπεί/εἰ/ἵνα,
+  particles -> "and/for/so/but"); English (do-support, inversion, tense reversed: aorist -> past, imperfect -> "was
+  ...ing", perfect -> present perfect) and es-MX Spanish (pretérito/imperfecto, ser/estar, clitics, personal "a",
+  pro-drop, ¿?/¡!). Glosses: new `data/curated/readable_grc.tsv` (165 rows) first, then the lexicon. English /
+  Spanish inflection reuses C11's helpers (`la2x/internal.h`: en::verb, en::plural, es::verb, es::adjective ...).
+
+## Results (fidelity 2, speaker f, real data)
+| Set | Result |
+|---|---|
+| EN -> GRC, own_dialogue.en.srt 1-40 vs own_dialogue.grc.gold.txt | **40 / 40** (normalised; exact incl. case/punct 0 / 40 because of decision 5 capitals); ok 30 / check 10 / fix 0 |
+| ES -> GRC, own_dialogue.es.srt 1-40 vs the same gold (report only) | **36 / 40**; ok 33 / check 7 / fix 0 |
+| GRC -> EN / GRC -> ES, 40 own Attic sentences | **40 / 40** and **40 / 40** |
+| Monotonic table | 23 / 23 |
+| Determinism | two engines byte-identical on the 40 cues |
+| RSS | RssAnon flat over 1,000 cues in batches of 20 (4,724 kB -> 4,724 kB) |
+| Latin regression / Spanish regression / Greek primitives | 114 / 114, 100 / 100, all C9 cases green |
+
+Caveat: the 40 gold lines were used for tuning (curated rows, teacher glosses), and the 40 own Attic sentences were
+written together with the readable rules; neither is a held-out measure.
+
+## Mismatches (ES -> GRC; EN -> GRC has none)
+| # | source | gold | ours | why |
+|---|---|---|---|---|
+| 24 | Son todos muy groseros. | πάντες πάνυ ἄγροικοί ἐστε | …εἰσιν | "son" is 3rd plural (ustedes / ellos): no 2nd person to read |
+| 27 | ¡Que le corten la cabeza! | …τὴν κεφαλὴν αὐτοῦ | …τὴν κεφαλήν | the dative "le" (possessor) is not carried into the slot |
+| 30 | Nunca he jugado. | οὐδέποτε πρότερον ἔπαισα | οὐδέποτε ἔπαισα | the Spanish has no "before" (proposed gold alternative) |
+| 37 | No hay té. | οὐκ ἔστι ποτόν | ἔστιν οὐδὲν ποτόν | correct Attic too (proposed gold alternative) |
+
+## Gaps seen on lines 41-80 (not tuned; `VP_GRC2_TRY=<file>` prints them)
+* Phrasebook gaps: "here you are", "you're welcome", "too late", "it doesn't matter {WH}", "that depends on {WH}",
+  "do you know how to {VP}", titles ("Your Majesty" stays in Latin letters, name-guessed, Check).
+* Indirect questions after "depends on" / "care where" come out word by word (Check).
+* Lexical choices from REVX without a teacher gloss are sometimes odd (pass -> κρίνω, paint -> ζωγράφος); every such
+  choice is visible as a reason with its candidates; low margins give Check.
+* "once upon a time" -> ἐπὶ χρόνου (literal); a phrasebook row ποτέ would be better.
+* GRC -> EN: participles (none in the beginner style), the optative, the dual and crasis are not read as such;
+  relative clauses are realised flat; ἄν is ignored.
+
+## Questions for the main agent
+1. A9 for Greek: run grc2x on the Greek output and compare source lemmas (as la2x does for Latin)? Implemented hook
+   only reports "not run"; the data is there (grc2x readable glosses).
+2. Gold alternatives proposed: line 30 "οὐδέποτε ἔπαισα" (for the Spanish source), line 37 "ἔστιν οὐδὲν ποτόν".
+3. Should "Of course ..." stay δήπου (beginner tier 2 added to tiers_grc.tsv) or πάνυ γε + clause?
+4. Monotonic export: monosyllables lose the accent (modern convention); confirm, or keep every accent as tonos.
+5. Spanish personal "a" before specific animals ("¿Viste al gato?", "desata a los bueyes"): keep?
+
+## API changes (recorded in STATUS)
+Additive only: `curated::CuratedData::replacePhrasebooks(en, es)` (a copy with the Greek phrasebooks for the frame
+builder). New public headers `vp/transfer_grc.h` (GreekTables, GreekTransfer, toMonotonic, capitaliseGreek,
+greekBreakHints) and `vp/grc2x.h` (Translator, splitSentences). Internal `src/engine_grc/engine_grc.h` (GreekPath).
+Wish for the CLI: call `vp::grc::toMonotonic` on Greek cue text when exporting with greek:"monotonic".

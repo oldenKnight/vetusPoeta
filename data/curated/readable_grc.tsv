@@ -1,0 +1,172 @@
+# head	pos	english	spanish	es_gender	tags
+# Greek -> English / Spanish glosses for the readable sentence and the interlinear view of grc2x (C12; teacher-editable;
+# our own rows). head: the Greek lemma (as greek.vpl writes it, without length marks); pos: noun, verb, adj, adv, pron,
+# prep, conj, particle, or "mid" for the middle voice of a verb with its own meaning; English: verbs in the base form
+# ("look for"), nouns singular; Spanish: verbs in the infinitive ("tener miedo" inflects its first word), nouns
+# singular with the gender column; tags: person, animal (Spanish personal "a" for objects), mass (no "a"), motion
+# (present progressive in English: "is coming"), plural:<form> (an irregular English plural).
+δοῦλος	noun	slave	esclavo	m	person
+λίθος	noun	stone	piedra	f	
+κόρη	noun	girl	muchacha	f	person
+μήτηρ	noun	mother	madre	f	person
+πατήρ	noun	father	padre	m	person
+παῖς	noun	boy	niño	m	person plural:boys
+παιδίον	noun	child	niño	m	person plural:children
+ἀγρός	noun	field	campo	m	
+γυνή	noun	woman	mujer	f	person plural:women
+οἰκία	noun	house	casa	f	
+γεωργός	noun	farmer	campesino	m	person
+βοῦς	noun	ox	buey	m	animal plural:oxen
+σφαῖρα	noun	ball	pelota	f	
+γαλῆ	noun	cat	gato	m	animal
+φίλος	noun	friend	amigo	m	person
+ἀνήρ	noun	man	hombre	m	person plural:men
+ἄρτος	noun	bread	pan	m	mass
+κῆπος	noun	garden	jardín	m	
+δεσπότης	noun	master	amo	m	person
+ἵππος	noun	horse	caballo	m	animal
+βιβλίον	noun	book	libro	m	
+θύρα	noun	door	puerta	f	
+πόλις	noun	city	ciudad	f	
+ἄνθρωπος	noun	man	hombre	m	person plural:men
+θεός	noun	god	dios	m	person
+ὕδωρ	noun	water	agua	f	mass
+ἀδελφός	noun	brother	hermano	m	person
+ἀδελφή	noun	sister	hermana	f	person
+λύκος	noun	wolf	lobo	m	animal plural:wolves
+διδάσκαλος	noun	teacher	maestro	m	person
+ἄνθος	noun	flower	flor	f	
+ᾠδή	noun	song	canción	f	
+βασίλεια	noun	queen	reina	f	person
+καρδία	noun	heart	corazón	m	
+κεφαλή	noun	head	cabeza	f	
+πλακοῦς	noun	cake	pastel	m	
+ποτόν	noun	drink	bebida	f	
+οἶκος	noun	house	casa	f	
+ἡμέρα	noun	day	día	m	
+νύξ	noun	night	noche	f	
+ὁδός	noun	road	camino	m	
+θάλαττα	noun	sea	mar	m	
+δένδρον	noun	tree	árbol	m	
+ὄνομα	noun	name	nombre	m	
+ἀγορά	noun	market place	plaza	f	
+αἴρω	verb	lift	levantar		
+φιλέω	verb	love	amar		
+εἰμί	verb	be	ser		
+βαίνω	verb	go	ir		motion
+ἔρχομαι	verb	come	venir		motion
+ἥκω	verb	have come	haber llegado		
+λύω	verb	untie	desatar		
+ὁράω	verb	see	ver		
+οἶδα	verb	know	saber		
+ἀκούω	verb	listen to	escuchar		
+φοβέω	mid	be afraid	tener miedo		
+φοβέω	verb	frighten	asustar		
+δίδωμι	verb	give	dar		
+τρέχω	verb	run	correr		
+παίζω	verb	play	jugar		
+καλέω	verb	call	llamar		
+ἀνοίγω	verb	open	abrir		
+καθεύδω	verb	sleep	dormir		
+τιμάω	verb	honour	honrar		
+λαλέω	verb	talk	hablar		
+λέγω	verb	say	decir		
+ἔχω	verb	have	tener		
+ζητέω	verb	look for	buscar		
+διώκω	verb	chase	perseguir		
+σπεύδω	verb	hurry	apresurarse		
+ἀπέρχομαι	verb	go away	irse		motion
+ἐπανέρχομαι	verb	come back	regresar		motion
+διέρχομαι	verb	get through	pasar		
+μένω	verb	wait	esperar		
+πίνω	verb	drink	beber		
+λαμβάνω	verb	take	tomar		
+δύναμαι	verb	can	poder		
+βούλομαι	verb	want	querer		
+ᾄδω	verb	sing	cantar		
+φεύγω	verb	flee	huir		
+προσκυνέω	verb	bow	inclinarse		
+ἀποτέμνω	verb	cut off	cortar		
+ποιέω	verb	do	hacer		
+οἰκέω	verb	live	vivir		
+χαίρω	verb	rejoice	alegrarse		
+μικρός	adj	small	pequeño		
+μέγας	adj	big	grande		
+καλός	adj	beautiful	hermoso		
+σοφός	adj	wise	sabio		
+λευκός	adj	white	blanco		
+ἀγαθός	adj	good	bueno		
+κακός	adj	bad	malo		
+θαυμαστός	adj	strange	extraño		
+ἄγροικος	adj	rude	grosero		
+πᾶς	adj	all	todo		
+πολύς	adj	much	mucho		
+δύο	num	two	dos		
+τρεῖς	num	three	tres		
+εἷς	num	one	uno		
+πόσος	adj	how many	cuánto		
+οὐδείς	adj	no	ninguno		
+νῦν	adv	now	ahora		
+ἀεί	adv	always	siempre		
+δεῦρο	adv	here	aquí		
+ἐνθάδε	adv	here	aquí		
+ἐκεῖ	adv	there	allí		
+πάνυ	adv	very	muy		
+λίαν	adv	too	demasiado		
+ὀψέ	adv	late	tarde		
+οὐδέποτε	adv	never	nunca		
+πρότερον	adv	before	antes		
+ταχέως	adv	quickly	rápido		
+ποῦ	adv	where	dónde		
+ποῖ	adv	where	adónde		
+πόθεν	adv	where from	de dónde		
+πῶς	adv	how	cómo		
+πότε	adv	when	cuándo		
+πηνίκα	adv	at what time	a qué hora		
+ἐν	prep	in	en		
+εἰς	prep	into	a		
+ἐκ	prep	out of	de		
+ἀπό	prep	from	de		
+πρός	prep	towards	hacia		
+μετά	prep	with	con		
+σύν	prep	with	con		
+περί	prep	about	sobre		
+ὑπό	prep	by	por		
+παρά	prep	beside	junto a		
+ἐπί	prep	on	sobre		
+διά	prep	through	por		
+ἄνευ	prep	without	sin		
+πρό	prep	before	ante		
+καί	conj	and	y		
+ἀλλά	conj	but	pero		
+ἤ	conj	or	o		
+ὅτι	conj	because	porque		
+ἐπεί	conj	when	cuando		
+ὅτε	conj	when	cuando		
+εἰ	conj	if	si		
+ἐάν	conj	if	si		
+ἵνα	conj	so that	para que		
+δέ	particle	and	y		
+γάρ	particle	for	pues		
+οὖν	particle	so	así que		
+μέν	particle	-	-		
+γε	particle	-	-		
+δή	particle	-	-		
+δήπου	particle	of course	claro que		
+οὐ	particle	not	no		
+μή	particle	not	no		
+ἆρα	particle	-	-		
+ὁ	article	the	el		
+ἐγώ	pron	I	yo		
+σύ	pron	you	tú		
+ἡμεῖς	pron	we	nosotros		
+ὑμεῖς	pron	you	ustedes		
+αὐτός	pron	he, she, it	él, ella, ello		
+οὗτος	pron	this	este		
+ἐκεῖνος	pron	that	aquel		
+τίς	pron	who, what	quién, qué		
+τις	pron	someone, something	alguien, algo		
+ὅς	pron	who, which	que		
+ὦ	intj	O	oh		
+οἴμοι	intj	alas	ay		
+φεῦ	intj	alas	ay		

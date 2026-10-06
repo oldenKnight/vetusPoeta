@@ -83,3 +83,13 @@ semicolon-separated item, parentheses dropped) makes that Latin lemma a candidat
 bonus (as the English notes of tiers_la.tsv); there is no part-of-speech column, the Latin head is looked up with the
 part of speech asked for (an adjective may stand for a noun: `imus īmus fondo`). Homographs share the key and differ
 by head (`sero sērō tarde`, `sero serō plantar`). Write only real glosses: "puerta (de la ciudad)" lists "puerta".
+
+Greek engine path (C12) tables, same conventions (Greek headwords without length marks; `key` = greek_key(head)):
+
+| File | Columns | Used by |
+|---|---|---|
+| `lexical_en_grc.tsv` | kind (phrasal, verbprep, state, realia, verb, durative), source (English or Spanish), greek, frame, note | engine transfer_grc (EN/ES -> Greek lexical rules, imperative / infinitive aspect) |
+| `phrasebook_es_grc.tsv` | pattern, greek, tier, register, note | engine frame pre-pass for Spanish -> Greek (syntax of phrasebook_es_la.tsv) |
+| `readable_grc.tsv` | head, pos (noun, verb, adj, adv, mid = middle voice, pron, prep, conj, particle, article, intj), english, spanish, es_gender, tags (person, animal, mass, motion, plural:<form>) | engine grc2x (Greek -> English / Spanish glosses); read backwards as the teacher's reverse index of transfer_grc |
+
+The note column of `tiers_grc.tsv` is read as English glosses (the teacher's reverse index), as for `tiers_la.tsv`.

@@ -35,3 +35,14 @@ if(NOT VP_RULES_LA2X_ADDED)
   file(GLOB VP_RULES_LA2X_SRC CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/la2x/*.cpp)
   target_sources(vp_rules PRIVATE ${VP_RULES_LA2X_SRC})
 endif()
+
+# C12 (Greek engine path): EN/ES -> Greek transfer, Greek -> EN/ES (grc2x), the Greek engine path. Guarded so the block
+# is idempotent.
+if(NOT VP_RULES_GRC2_ADDED)
+  set(VP_RULES_GRC2_ADDED ON)
+  file(GLOB VP_RULES_GRC2_SRC CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/transfer_grc/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/grc2x/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine_grc/*.cpp)
+  target_sources(vp_rules PRIVATE ${VP_RULES_GRC2_SRC})
+endif()

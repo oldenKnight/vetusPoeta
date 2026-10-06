@@ -9,7 +9,7 @@ RULE order.exist      : predicate.lemma = εἰμί & no PRED | existential / lo
 RULE order.inf        : modal (δύναμαι, βούλομαι, ἐθέλω, μέλλω, ἐπίσταμαι) + INF => [VOC,] [CONN] S [NEG] V IO O OBL ADV INF ; "οὐ δύναμαι διελθεῖν", "τὰ ἄνθη οὐ δύναται λαλεῖν": the modal before the infinitive, the infinitive's objects between them
 RULE order.dei        : impersonal δεῖ + acc + INF            => [CONN] [NEG] V S O OBL INF ; "δεῖ ἡμᾶς ἀπιέναι": the subject of the infinitive in the accusative
 RULE order.exesti     : impersonal ἔξεστι + dat + INF         => [CONN] [NEG] V IO O OBL INF ; "ἔξεστί σοι ἀπιέναι": the person in the dative
-RULE order.yn         : clause.type = yn                      => optional ἆρα first, then decl order ("ἆρα ἡ κόρη τὴν μητέρα φιλεῖ;"); the Greek question mark ";"
+RULE order.yn         : clause.type = yn                      => [VOC,] [CONN] [NEG] V S IO O OBL ADV ; decision 4: ἆρα first, then the verb ("ἆρα εἶδες τὴν γαλῆν μου;", "ἆρα φιλεῖ ἡ κόρη τὴν μητέρα;"); the object first only for contrastive focus; copula, existential and modal clauses keep their own order; the Greek question mark ";"
 RULE order.yn.ou      : clause.type = yn & expects yes        => οὐ first, then decl order ("οὐ φιλεῖς τὴν μητέρα;")
 RULE order.yn.me      : clause.type = yn & expects no         => ἆρα μή first, then decl order ("ἆρα μὴ ὀργίζῃ;")
 RULE order.wh         : clause.type = wh                      => WH first (τίς, τί, ποῦ, ποῖ, πόθεν, πότε, πῶς, πόσος, ποῖος, πηνίκα, διὰ τί), then decl order without the WH slot; an interrogative adjective takes its noun along ("πόσους ἀδελφοὺς ἔχεις;")

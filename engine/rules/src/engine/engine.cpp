@@ -15,6 +15,7 @@
 #include "vp/curated.h"
 #include "vp/engine_config.h"
 #include "vp/frame.h"
+#include "engine_grc/engine_grc.h"   // C12 grc hook
 #include "vp/la2x.h"   // C11 la2x hook
 #include "vp/lex.h"
 #include "vp/morph.h"
@@ -152,6 +153,7 @@ class RulesEngine final : public Engine {
                                            const std::function<bool()>& cancelled) override {
     std::lock_guard<std::mutex> lk(m_);
     try {
+      if (grcPair(opt)) return grcTranslate(cues, opt, ctx, progress, cancelled);   // C12 grc hook
       if (la2xPair(opt)) return la2xTranslate(cues, opt, ctx, progress, cancelled);   // C11 la2x hook
       return translateImpl(cues, opt, ctx, progress, cancelled);
     } catch (const std::exception& e) {
@@ -166,6 +168,7 @@ class RulesEngine final : public Engine {
   Result<CueOutput> check(const CueInput& cue, const std::string& target, const Options& opt, const Context& ctx) override {
     std::lock_guard<std::mutex> lk(m_);
     try {
+      if (grcPair(opt)) return grcCheck(cue, target, opt, ctx);   // C12 grc hook
       Result<void> r = ensureLatin();
       if (!r.ok()) return Result<CueOutput>(r.error());
       return Result<CueOutput>(checkImpl(cue, target, opt, ctx));
@@ -177,6 +180,7 @@ class RulesEngine final : public Engine {
   Result<InspectResult> inspect(const std::string& word, Lang lang, const Options& opt) override {
     std::lock_guard<std::mutex> lk(m_);
     try {
+      if (grcInspects(lang, opt)) return grcInspect(word, lang, opt);   // C12 grc hook
       return la2xInspect(inspectImpl(word, lang, opt), lang, opt);   // C11 la2x hook
     } catch (const std::exception& e) {
       return Result<InspectResult>(ErrorCode::Internal, std::string("rules inspect: ") + e.what(),
@@ -1373,6 +1377,81 @@ class RulesEngine final : public Engine {
   std::unique_ptr<frame::FrameBuilder> fbEn_, fbEs_;
   const std::vector<GlossaryEntry>* glossary_ = nullptr;
   transfer::Memory memBefore_;
+
+  // ==== C12 grc (Greek engine path: en-grc, es-grc, grc-en, grc-es): BEGIN ==========================================
+  // Owned by task C12 (engine/rules/src/{transfer_grc,grc2x,engine_grc}). Reached only through the one-line hooks
+  // marked "C12 grc hook": the four Greek pairs in translate(), check() of a Greek cue (target or source Greek), and
+  // inspect() of Greek words and of English / Spanish words when the target is Greek.
+  std::unique_ptr<grc::GreekPath> grc2_;
+  const lex::Lexicon* grc2Lex_ = nullptr;
+
+  static bool grcPair(const Options& o) { return grc::GreekPath::toGreek(o) || grc::GreekPath::fromGreek(o); }
+  static bool grcInspects(Lang lang, const Options& o) {
+    return lang == Lang::Grc || ((lang == Lang::En || lang == Lang::Es) && o.target == Lang::Grc);
+  }
+  grc::GreekPath* grcPath(Error* err) {
+    if (!grc_) {
+      if (err) *err = Error{ErrorCode::LexiconMissing, "no Greek lexicon", "The Greek dictionary (greek.vpl) is not installed."};
+      return nullptr;
+    }
+    Result<void> c = ensureCurated();
+    if (!c.ok()) {
+      if (err) *err = c.error();
+      return nullptr;
+    }
+    if (!grc2_ || grc2Lex_ != grc_) {
+      grc2_.reset();
+      const std::vector<stdfs::path> dirs = {cfg_.curatedDir, stdfs::path(cfg_.dataDir) / "curated",
+                                             stdfs::path(cfg_.dataDir) / ".." / "curated",
+                                             stdfs::path(cfg_.dataDir) / ".." / ".." / "data" / "curated"};
+      Result<std::unique_ptr<grc::GreekPath>> r =
+          grc::GreekPath::create(*grc_, *cd_, dirs, grc::PathConfig{cfg_.cpsLimit, cfg_.maxLine, cfg_.maxLines});
+      if (!r.ok()) {
+        if (err) *err = r.error();
+        return nullptr;
+      }
+      grc2_ = std::move(r.value());
+      grc2Lex_ = grc_;
+    }
+    return grc2_.get();
+  }
+  Result<std::vector<CueOutput>> grcTranslate(const std::vector<CueInput>& cues, const Options& opt, const Context& ctx,
+                                              const std::function<void(size_t)>& progress,
+                                              const std::function<bool()>& cancelled) {
+    Error err{ErrorCode::Internal, "", ""};
+    grc::GreekPath* p = grcPath(&err);
+    if (!p) return Result<std::vector<CueOutput>>(err);
+    if (grc::GreekPath::toGreek(opt)) {   // the source models open lazily; a missing model is reported by the path
+      const frame::SrcLang lang = opt.source == Lang::Es ? frame::SrcLang::Es : frame::SrcLang::En;
+      Result<const frame::FrameBuilder*> b = builder(lang);
+      if (!b.ok()) return Result<std::vector<CueOutput>>(b.error());
+    }
+    p->setSources(nlpEn_.get(), en_, nlpEs_.get(), es_);
+    return p->translate(cues, opt, ctx, progress, cancelled);
+  }
+  Result<CueOutput> grcCheck(const CueInput& cue, const std::string& target, const Options& opt, const Context& ctx) {
+    Error err{ErrorCode::Internal, "", ""};
+    grc::GreekPath* p = grcPath(&err);
+    if (!p) return Result<CueOutput>(err);
+    if (grc::GreekPath::fromGreek(opt)) {   // the edited text is English / Spanish: only markup and reading speed
+      CueOutput o;
+      o.index = cue.index;
+      o.target = target;
+      o.confidence = Confidence::Check;
+      o.score = 0.7;
+      o.checks.push_back(Check{"A1", true, "not Greek text"});
+      return Result<CueOutput>(std::move(o));
+    }
+    return Result<CueOutput>(p->check(cue, target, opt, ctx));
+  }
+  Result<InspectResult> grcInspect(const std::string& word, Lang lang, const Options& opt) {
+    Error err{ErrorCode::Internal, "", ""};
+    grc::GreekPath* p = grcPath(&err);
+    if (!p) return Result<InspectResult>(err);
+    p->setSources(nlpEn_.get(), en_, nlpEs_.get(), es_);
+    return p->inspect(word, lang, opt);
+  }
+  // ==== C12 grc: END ================================================================================================
 
   // ==== C11 la2x (Latin -> English / Spanish; A9 round trip): BEGIN =================================================
   // Owned by task C11 (engine/rules/src/la2x). The rest of the engine reaches it only through the one-line hooks

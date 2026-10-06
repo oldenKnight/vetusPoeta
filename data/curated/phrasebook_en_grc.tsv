@@ -21,7 +21,7 @@ i am sorry	σύγγνωθί μοι	1	polite
 sorry	σύγγνωθί μοι	1	polite	
 yes	ναί	1	answer	
 no	οὔ	1	answer	
-of course	πάνυ γε	1	answer	
+of course	πάνυ γε	1	answer	before a clause: particle δήπου ("Of course we can talk" -> δυνάμεθα δήπου λαλεῖν)
 certainly	πάνυ μὲν οὖν	1	answer	
 not at all	οὐδαμῶς	1	answer	
 well done	εὖ γε	1	excl	
@@ -52,3 +52,6 @@ nonsense	φλυαρεῖς	1	excl	"you are talking nonsense"
 i don't know	οὐκ οἶδα	1	answer	
 who knows	τίς οἶδεν	1	q	
 never mind	ἔα	1	excl	
+i am late	ὀψὲ ἥκω	1	answer	"I have come late"
+play cards	χάρταις παίζειν	2	vp	verb phrase: the last word is the verb, inflected as the clause needs
+off with {NP}	ἀποτέμετε {1:acc}	2	excl	"cut off ...!" (plural command)

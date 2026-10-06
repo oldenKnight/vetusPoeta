@@ -7,13 +7,13 @@
 ἄνθρωποσ	ἄνθρωπος	noun	1	derived	
 πόλισ	πόλις	noun	1	derived	
 καλόσ	καλός	adj	1	derived	
-μέγασ	μέγας	adj	1	derived	
+μέγασ	μέγας	adj	1	derived	big, large, great
 καί	καί	conj	1	derived	
 οὐ	οὐ	particle	1	derived	
 θεόσ	θεός	noun	1	derived	
 λόγοσ	λόγος	noun	1	derived	
 ποιέω	ποιέω	verb	1	derived	
-ὁράω	ὁράω	verb	1	derived	
+ὁράω	ὁράω	verb	1	derived	see
 γυνή	γυνή	noun	1	derived	
 ἀνήρ	ἀνήρ	noun	1	derived	
 οἶκοσ	οἶκος	noun	1	derived	
@@ -24,7 +24,7 @@
 
 # Athenaze-style core added by the Greek realiser task (C9): words of the realisation tests and the beginner
 # texts; tier 2 for words a beginner meets later. Our own selection (not a copied list).
-βαίνω	βαίνω	verb	1	derived	
+βαίνω	βαίνω	verb	1	derived	go, walk
 βαδίζω	βαδίζω	verb	1	derived	
 ἐλαύνω	ἐλαύνω	verb	1	derived	
 λύω	λύω	verb	1	derived	
@@ -33,7 +33,7 @@
 αἴρω	αἴρω	verb	1	derived	
 καθίζω	καθίζω	verb	1	derived	
 σπεύδω	σπεύδω	verb	1	derived	
-τρέχω	τρέχω	verb	1	derived	
+τρέχω	τρέχω	verb	1	derived	run
 ἀκούω	ἀκούω	verb	1	derived	
 βλέπω	βλέπω	verb	1	derived	
 θαυμάζω	θαυμάζω	verb	1	derived	
@@ -48,37 +48,37 @@
 κελεύω	κελεύω	verb	1	derived	
 πείθω	πείθω	verb	1	derived	
 πέμπω	πέμπω	verb	1	derived	
-πίνω	πίνω	verb	1	derived	
+πίνω	πίνω	verb	1	derived	drink
 ἐσθίω	ἐσθίω	verb	1	derived	
 γράφω	γράφω	verb	1	derived	
 μανθάνω	μανθάνω	verb	1	derived	
 διδάσκω	διδάσκω	verb	1	derived	
-δίδωμι	δίδωμι	verb	1	derived	
+δίδωμι	δίδωμι	verb	1	derived	give
 τίθημι	τίθημι	verb	1	derived	
 ἵστημι	ἵστημι	verb	1	derived	
-λαμβάνω	λαμβάνω	verb	1	derived	
+λαμβάνω	λαμβάνω	verb	1	derived	take
 βάλλω	βάλλω	verb	1	derived	
-μένω	μένω	verb	1	derived	
-φεύγω	φεύγω	verb	1	derived	
+μένω	μένω	verb	1	derived	wait, stay, remain
+φεύγω	φεύγω	verb	1	derived	flee, run away, escape
 πίπτω	πίπτω	verb	1	derived	
 ἀπέρχομαι	ἀπέρχομαι	verb	1	derived	
 ἀφικνέομαι	ἀφικνέομαι	verb	1	derived	
-βούλομαι	βούλομαι	verb	1	derived	
+βούλομαι	βούλομαι	verb	1	derived	want, wish
 δύναμαι	δύναμαι	verb	1	derived	
 ἐθέλω	ἐθέλω	verb	1	derived	
 δεῖ	δεῖ	verb	1	derived	
 ἔξεστι	ἔξεστι	verb	1	derived	
-οἶδα	οἶδα	verb	1	derived	
+οἶδα	οἶδα	verb	1	derived	know
 γιγνώσκω	γιγνώσκω	verb	1	derived	
 νομίζω	νομίζω	verb	1	derived	
 φημί	φημί	verb	1	derived	
-λαλέω	λαλέω	verb	1	derived	
-παίζω	παίζω	verb	1	derived	
-ᾄδω	ᾄδω	verb	1	derived	
-ἀνοίγω	ἀνοίγω	verb	1	derived	
-φοβέω	φοβέω	verb	1	derived	
+λαλέω	λαλέω	verb	1	derived	talk, chat
+παίζω	παίζω	verb	1	derived	play
+ᾄδω	ᾄδω	verb	1	derived	sing
+ἀνοίγω	ἀνοίγω	verb	1	derived	open
+φοβέω	φοβέω	verb	1	derived	frighten
 δοκέω	δοκέω	verb	1	derived	
-ἥκω	ἥκω	verb	1	derived	
+ἥκω	ἥκω	verb	1	derived	have come, be here
 εὑρίσκω	εὑρίσκω	verb	1	derived	
 μέλλω	μέλλω	verb	1	derived	
 ἐπίσταμαι	ἐπίσταμαι	verb	1	derived	
@@ -92,7 +92,7 @@
 μάχομαι	μάχομαι	verb	1	derived	
 γίγνομαι	γίγνομαι	verb	1	derived	
 εἶμι	εἶμι	verb	1	derived	
-ἔρχομαι	ἔρχομαι	verb	1	derived	
+ἔρχομαι	ἔρχομαι	verb	1	derived	come, go
 ἀγοράζω	ἀγοράζω	verb	1	derived	
 παῖς	παῖς	noun	1	derived	
 πατήρ	πατήρ	noun	1	derived	
@@ -107,8 +107,8 @@
 γεωργός	γεωργός	noun	1	derived	
 ἀγρός	ἀγρός	noun	1	derived	
 οἰκία	οἰκία	noun	1	derived	
-κῆπος	κῆπος	noun	1	derived	
-θύρα	θύρα	noun	1	derived	
+κῆπος	κῆπος	noun	1	derived	garden
+θύρα	θύρα	noun	1	derived	door
 ὁδός	ὁδός	noun	1	derived	
 ἡμέρα	ἡμέρα	noun	1	derived	
 νύξ	νύξ	noun	1	derived	
@@ -120,34 +120,34 @@
 δένδρον	δένδρον	noun	1	derived	
 ἄρτος	ἄρτος	noun	1	derived	
 οἶνος	οἶνος	noun	1	derived	
-σφαῖρα	σφαῖρα	noun	1	derived	
+σφαῖρα	σφαῖρα	noun	1	derived	ball
 βιβλίον	βιβλίον	noun	1	derived	
 ναῦς	ναῦς	noun	1	derived	
 θάλαττα	θάλαττα	noun	1	derived	
 ἥλιος	ἥλιος	noun	1	derived	
-γαλῆ	γαλῆ	noun	1	derived	
-ἄνθος	ἄνθος	noun	1	derived	
-ᾠδή	ᾠδή	noun	1	derived	
-κεφαλή	κεφαλή	noun	1	derived	
+γαλῆ	γαλῆ	noun	1	derived	cat
+ἄνθος	ἄνθος	noun	1	derived	flower
+ᾠδή	ᾠδή	noun	1	derived	song
+κεφαλή	κεφαλή	noun	1	derived	head
 χείρ	χείρ	noun	1	derived	
 πούς	πούς	noun	1	derived	
 φίλος	φίλος	noun	1	derived	
 βασιλεύς	βασιλεύς	noun	1	derived	
-βασίλεια	βασίλεια	noun	1	derived	
+βασίλεια	βασίλεια	noun	1	derived	queen
 ὄνομα	ὄνομα	noun	1	derived	
 ἔργον	ἔργον	noun	1	derived	
 χρόνος	χρόνος	noun	1	derived	
 χώρα	χώρα	noun	1	derived	
 νῆσος	νῆσος	noun	1	derived	
 τέκνον	τέκνον	noun	1	derived	
-μικρός	μικρός	adj	1	derived	
+μικρός	μικρός	adj	1	derived	small, little
 κακός	κακός	adj	1	derived	
 πολύς	πολύς	adj	1	derived	
 ὀλίγος	ὀλίγος	adj	1	derived	
 νέος	νέος	adj	1	derived	
 γεραιός	γεραιός	adj	1	derived	
 σοφός	σοφός	adj	1	derived	
-λευκός	λευκός	adj	1	derived	
+λευκός	λευκός	adj	1	derived	white
 μέλας	μέλας	adj	1	derived	
 ῥᾴδιος	ῥᾴδιος	adj	1	derived	
 χαλεπός	χαλεπός	adj	1	derived	
@@ -229,9 +229,15 @@
 οἴμοι	οἴμοι	intj	1	derived	
 ὦ	ὦ	intj	1	derived	
 φεῦ	φεῦ	intj	1	derived	
-προσκυνέω	προσκυνέω	verb	2	derived	
-ἀποτέμνω	ἀποτέμνω	verb	2	derived	
+προσκυνέω	προσκυνέω	verb	2	derived	bow, bow down
+ἀποτέμνω	ἀποτέμνω	verb	2	derived	cut off
 ἀντιβολέω	ἀντιβολέω	verb	2	derived	
-ἄγροικος	ἄγροικος	adj	2	derived	
-θαυμαστός	θαυμαστός	adj	2	derived	
-πλακοῦς	πλακοῦς	noun	2	derived	
+ἄγροικος	ἄγροικος	adj	2	derived	rude, rustic
+θαυμαστός	θαυμαστός	adj	2	derived	strange, wonderful, marvellous
+πλακοῦς	πλακοῦς	noun	2	derived	cake
+χάρτησ	χάρτης	noun	2	derived	sheet of papyrus, card
+καρδία	καρδία	noun	1	derived	heart
+ποτόν	ποτόν	noun	2	derived	drink
+ἐπανέρχομαι	ἐπανέρχομαι	verb	2	derived	come back, return
+διέρχομαι	διέρχομαι	verb	2	derived	go through, get through
+δήπου	δήπου	particle	2	derived	of course, surely

@@ -603,7 +603,7 @@ std::vector<Row> moreRows() {
   std::vector<Row> t;
   auto add = [&](const CB& b, const char* e) { t.push_back(Row{{b.c}, e}); };
   add(CB().v("εἰμί").s(d("παῖς")).obl("ἐν", d("ἀγρός")), "ὁ παῖς ἐν τῷ ἀγρῷ ἐστιν.");
-  add(CB(ClauseType::Yn).ara().v("φιλέω").s(d("κόρη")).o(d("μήτηρ")), "ἆρα ἡ κόρη τὴν μητέρα φιλεῖ;");
+  add(CB(ClauseType::Yn).ara().v("φιλέω").s(d("κόρη")).o(d("μήτηρ")), "ἆρα φιλεῖ ἡ κόρη τὴν μητέρα;");   // decision 4: verb first
   add(CB().v("οἶδα").s(sb("οὐδείς", Sg, M)), "οὐδεὶς οἶδεν.");
   add(CB().v("οἰκέω", Imperfect).s(d("γαλῆ")).obl("ἐν", d("κῆπος"), true).exist(), "ἐν τῷ κήπῳ ᾤκει ἡ γαλῆ.");
   add(CB(ClauseType::Wh).v("ἔχω").pers(2).o(interrog(n("ἀδελφός", Pl), "πόσος")), "πόσους ἀδελφοὺς ἔχεις;");
@@ -865,9 +865,16 @@ TEST_CASE("rules-grc: real lexicon - token views, reasons, emoji, flags, names, 
   o.elision = true;
   CHECK(R.realise(c, o).text == text::nfc("ἀλλ’ ἐπὶ τοῦ ἵππου μένω."));
   o.elision = false;
-  // a missing cell is reported, never invented
+  // ἀποφεύγω has its aorist cells since the lexicon follow-up (B4b): no missing form any more
   s = R.realise(CB().v("ἀποφεύγω", Aorist).pers(3).c, o);
-  CHECK(std::find(s.flags.begin(), s.flags.end(), "missing-form") != s.flags.end());
+  CHECK(s.text == text::nfc("ἀπέφυγεν."));
+  CHECK(std::find(s.flags.begin(), s.flags.end(), "missing-form") == s.flags.end());
+  // a missing verb is reported, never invented
+  {
+    GrcClause mc = CB().modal("δύναμαι").pers(1).c;
+    s = R.realise(mc, o);
+    CHECK(std::find(s.flags.begin(), s.flags.end(), "missing-form") != s.flags.end());
+  }
 }
 
 namespace {

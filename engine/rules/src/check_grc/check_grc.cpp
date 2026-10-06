@@ -419,7 +419,8 @@ struct GreekChecker::Impl {
     const size_t n = rep.tokens.size();
     std::vector<grc::SandhiWord> ws(n);
     for (size_t i = 0; i < n; ++i) {
-      std::string w = grc::ultimaToAcute(T(i));
+      // C12: sentence starts are capitalised (decision 5): the accent rules are checked on the lower-case word
+      std::string w = grc::ultimaToAcute(text::lower(T(i)));
       const grc::AccentInfo a = grc::accentOf(w);
       if (a.accents >= 2) {   // the acute a following enclitic added: back to the lexical form
         std::u32string u = text::toUtf32(text::nfd(w));
@@ -439,9 +440,10 @@ struct GreekChecker::Impl {
     for (size_t i = 0; i < n; ++i) {
       const GrcCheckedToken& t = rep.tokens[i];
       if (t.name || !grc::isGreekWord(t.text)) continue;
-      const bool elided = !grc::restoreElided(t.text).empty();
-      const grc::AccentInfo a = grc::accentOf(t.text);
-      const bool clitic = grc::isProclitic(t.text) || grc::isEncliticForm(t.text) || ws[i].enclitic || ws[i].proclitic;
+      const std::string lw = text::lower(t.text);
+      const bool elided = !grc::restoreElided(lw).empty();
+      const grc::AccentInfo a = grc::accentOf(lw);
+      const bool clitic = grc::isProclitic(lw) || grc::isEncliticForm(lw) || ws[i].enclitic || ws[i].proclitic;
       if (!elided && !clitic && a.accents == 0) {
         issue("A1b", (int)i, "'" + t.text + "' has no accent", true);
         continue;
@@ -449,7 +451,7 @@ struct GreekChecker::Impl {
       if (a.accents > 2) { issue("A1b", (int)i, "'" + t.text + "' has more than two accents", true); continue; }
       if (elided) continue;
       // movable ν is the realiser's choice: compare without it
-      std::string want = ws[i].form, have = text::nfc(t.text);
+      std::string want = ws[i].form, have = text::nfc(lw);
       auto noNu = [](std::string s) {
         const std::string b = text::greek_bare(s);
         if (b.size() >= 2 && b.compare(b.size() - 2, 2, "ν") == 0) {
@@ -713,6 +715,10 @@ struct GreekChecker::Impl {
                 agrees = true;
               }
             }
+          // C12: a form with a finite-verb reading and a noun reading (ἔχεις = 2 sg of ἔχω or nom/acc pl of ἔχις)
+          // and no article of its own: the verb reading gives a consistent clause ("ὁ παῖς ὃν ἔχεις τρέχει"), so it
+          // is not reported as a disagreeing subject
+          if (!agrees && any(j, isFinite) && !(j > b && any(j - 1, isArticle) && sameGroup(j - 1, j))) agrees = true;
           anyAgree = anyAgree || agrees;
           if (!agrees && allAgree) { allAgree = false; bad = j; }
           if (coord) break;

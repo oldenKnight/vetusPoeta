@@ -1,0 +1,121 @@
+# kind	source	greek	frame	note
+# Lexical rules of the EN/ES -> Greek transfer (C12; teacher-editable; our own rows). Columns:
+#   kind: phrasal (English verb + particle -> one Greek verb), verbprep (verb + preposition: frame "obj" = the PP's noun
+#         becomes the object, "prep:<greek>+<case>" = the verb fixes the Greek preposition), state ("be" + adjective
+#         with a person subject: frame "verb" = the Greek verb replaces be + adjective, "mid" = its middle voice, "adj" =
+#         this Greek adjective is the predicate), realia (no Attic word: the nearest hypernym, confidence Check,
+#         rules_grc_notes.md decision 1), verb (a fixed choice for a frequent English verb; frame "past" = only in
+#         the past tense), durative (imperatives and infinitives of this verb take the present stem: continuing or
+#         general action, decision 8; every other verb takes the aorist for a single act).
+#   source: English (or Spanish) lemma(s), lower case. greek: the Greek lemma as in greek.vpl (headword without length
+#   marks). Spanish sources mirror the English rows (the Spanish frame builder keeps Spanish content lemmas).
+phrasal	come back	ἐπανέρχομαι		
+phrasal	go back	ἐπανέρχομαι		
+phrasal	get back	ἐπανέρχομαι		
+phrasal	get through	διέρχομαι		
+phrasal	go through	διέρχομαι		
+phrasal	go away	ἀπέρχομαι		
+phrasal	run away	φεύγω		
+phrasal	come in	εἰσέρχομαι		
+phrasal	go in	εἰσέρχομαι		
+phrasal	come out	ἐξέρχομαι		
+phrasal	go out	ἐξέρχομαι		
+phrasal	get out	ἐξέρχομαι		
+phrasal	sit down	καθίζω		
+phrasal	get up	ἀνίσταμαι		
+phrasal	stand up	ἀνίσταμαι		
+phrasal	fall down	πίπτω		
+phrasal	pick up	αἴρω		
+phrasal	give back	ἀποδίδωμι		
+phrasal	look for	ζητέω		
+verbprep	wait for	μένω	obj	"wait for me" -> μένε με
+verbprep	look for	ζητέω	obj	
+verbprep	ask for	αἰτέω	obj	
+verbprep	listen to	ἀκούω	obj	person in the genitive by valency_grc.tsv
+verbprep	look at	βλέπω	prep:εἰς+acc	
+verbprep	think about	-	prep:περί+gen	
+verbprep	talk about	-	prep:περί+gen	
+verbprep	esperar a	μένω	obj	
+verbprep	buscar a	ζητέω	obj	
+state	afraid	φοβέω	mid	"I am afraid" -> φοβοῦμαι; "don't be afraid" -> μὴ φοβοῦ
+state	scared	φοβέω	mid	
+state	angry	ὀργίζω	mid	
+state	hungry	πεινάω	verb	
+state	thirsty	διψάω	verb	
+state	glad	χαίρω	verb	
+state	happy	χαίρω	verb	
+state	tired	κάμνω	verb	
+state	tener miedo	φοβέω	mid	Spanish: "no tengas miedo" -> μὴ φοβοῦ
+state	miedo	φοβέω	mid	
+state	enojado	ὀργίζω	mid	
+state	cansado	κάμνω	verb	
+realia	tea	ποτόν		no Attic word for tea: "drink" (decision 1)
+realia	coffee	ποτόν		no Attic word for coffee: "drink"
+realia	té	ποτόν		Spanish: tea
+realia	café	ποτόν		Spanish: coffee
+realia	potato	λάχανον		no Attic word for potato: "vegetable"
+realia	chocolate	πέμμα		no Attic word for chocolate: "sweet"
+verb	go	βαίνω	present	"Where are you going?" -> ποῖ βαίνεις;
+verb	go	ἀπέρχομαι	past	"Where did everybody go?" -> ποῖ πάντες ἀπῆλθον;
+verb	come	ἔρχομαι		
+verb	know	οἶδα		
+verb	want	βούλομαι		
+verb	have	ἔχω		
+verb	do	ποιέω		
+verb	make	ποιέω		
+verb	say	λέγω		
+verb	tell	λέγω		
+verb	see	ὁράω		
+verb	ir	βαίνω	present	
+verb	ir	ἀπέρχομαι	past	
+verb	irse	ἀπέρχομαι		
+verb	venir	ἔρχομαι		
+verb	saber	οἶδα		
+verb	querer	βούλομαι		
+verb	tener	ἔχω		
+verb	hacer	ποιέω		
+verb	decir	λέγω		
+verb	ver	ὁράω		
+durative	wait	μένω		
+durative	stay	μένω		
+durative	remain	μένω		
+durative	listen	ἀκούω		
+durative	hear	ἀκούω		
+durative	bow	προσκυνέω		
+durative	talk	λαλέω		
+durative	speak	λέγω		
+durative	be	εἰμί		
+durative	have	ἔχω		
+durative	keep	ἔχω		
+durative	hold	ἔχω		
+durative	live	οἰκέω		
+durative	sleep	καθεύδω		
+durative	play	παίζω		
+durative	look	βλέπω		
+durative	watch	βλέπω		
+durative	work	πονέω		
+durative	love	φιλέω		
+durative	fear	φοβέω		
+durative	rejoice	χαίρω		
+durative	walk	βαδίζω		
+durative	run	τρέχω		
+durative	esperar	μένω		
+durative	quedar	μένω		
+durative	escuchar	ἀκούω		
+durative	hablar	λαλέω		
+durative	ser	εἰμί		
+durative	estar	εἰμί		
+durative	tener	ἔχω		
+durative	vivir	οἰκέω		
+durative	dormir	καθεύδω		
+durative	jugar	παίζω		
+durative	mirar	βλέπω		
+durative	trabajar	πονέω		
+durative	amar	φιλέω		
+durative	temer	φοβέω		
+durative	caminar	βαδίζω		
+durative	correr	τρέχω		
+durative	inclinar	προσκυνέω		
+verb	escapar	φεύγω		
+verb	inclinar	προσκυνέω		
+verb	pasar	διέρχομαι		

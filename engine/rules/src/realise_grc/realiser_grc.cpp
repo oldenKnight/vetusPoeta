@@ -692,7 +692,10 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
     else if (impersDei) addTemplate(tmpl(id, {"CONN", "NEG", "V", "S", "O", "OBL", "INF"}));
     else if (impersExesti) addTemplate(tmpl(id, {"CONN", "NEG", "V", "IO", "O", "OBL", "INF"}));
     else if (c.pred.modal != kNone) addTemplate(tmpl(id, {"VOC", "CONN", "S", "NEG", "V", "IO", "O", "OBL", "ADV", "INF"}));
-    else addTemplate(tmpl(id, {"VOC", "CONN", "S", "IO", "O", "OBL", "ADV", "NEG", "V"}));
+    else if (c.type == ClauseType::Yn && c.ara && c.bias == YnBias::Neutral) {   // decision 4: ἆρα + verb first
+      orderRule = "order.yn";
+      addTemplate(tmpl("order.yn", {"VOC", "CONN", "NEG", "V", "S", "IO", "O", "OBL", "ADV"}));
+    } else addTemplate(tmpl(id, {"VOC", "CONN", "S", "IO", "O", "OBL", "ADV", "NEG", "V"}));
   }
   if (content.empty()) {
     for (int sl : {kWH, kFRONT, kS, kIO, kO, kOBL, kADV, kPRED, kINF, kNEG, kV, kPRED2}) {

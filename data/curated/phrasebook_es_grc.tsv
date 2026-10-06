@@ -1,0 +1,69 @@
+# pattern	greek	tier	register	note
+# Spanish phrasebook for Attic Greek (C12; teacher-editable; our own rows). Same columns and syntax as
+# phrasebook_es_la.tsv (whose rows it mirrors): lower-case words matched against each token's lower form or lemma,
+# slots {NP} {NAME} {VP} {ADJ} {NUM} {WH}, optional tokens in (...), alternatives a|b; ¿ ¡ are punctuation.
+# Plural addressees: the engine replaces χαῖρε / ἔρρωσο with the plural of the note column.
+hola	χαῖρε	1	greet	plural χαίρετε
+buenos días	χαῖρε	1	greet	plural χαίρετε
+buenas tardes	χαῖρε	1	greet	plural χαίρετε
+buenas noches	χαῖρε	1	greet	plural χαίρετε
+adiós	χαῖρε	1	greet	plural χαίρετε; ἔρρωσο (fare well) is the alternative
+hasta luego	χαῖρε	1	greet	plural χαίρετε
+hasta pronto	αὖθις ὄψομαί σε	1	greet	
+hasta mañana	αὔριον ὄψομαί σε	1	greet	
+nos vemos	αὖθις ὄψομαί σε	1	greet	
+nos vemos mañana	αὔριον ὄψομαί σε	1	greet	
+bienvenido|bienvenida|bienvenidos|bienvenidas	χαῖρε	1	greet	plural χαίρετε
+gracias	χάριν οἶδα	1	polite	
+muchas gracias	πολλὴν χάριν σοι οἶδα	1	polite	
+mil gracias	πολλὴν χάριν σοι οἶδα	1	polite	
+de nada	οὐδὲν δεινόν	1	polite	"nothing terrible"
+por favor	ἀντιβολῶ	2	polite	"I beg you" (Aristophanic); omitted in flexible mode when the command is clear
+perdón	σύγγνωθί μοι	1	polite	
+perdona|perdóname|disculpa|disculpe	σύγγνωθί μοι	1	polite	
+con permiso	σύγγνωθί μοι	1	polite	
+lo siento	σύγγνωθί μοι	1	polite	
+sí	ναί	1	reply	
+no	οὔ	1	reply	
+claro	πάνυ γε	1	answer	
+claro que	πάνυ γε	1	adv	before a clause: particle δήπου ("Claro que podemos hablar." -> δυνάμεθα δήπου λαλεῖν)
+claro que sí	πάνυ γε	1	answer	
+claro que no	οὐδαμῶς	1	answer	
+por supuesto	πάνυ μὲν οὖν	1	answer	
+de acuerdo	καλῶς λέγεις	1	answer	
+está bien	καλῶς ἔχει	1	answer	
+bueno	εἶεν	1	answer	as a reply
+órale	ἄγε	1	excl	plural ἄγετε
+ándale	ἄγε	1	imp	plural ἄγετε
+para nada	οὐδαμῶς	1	answer	
+de ninguna manera	οὐδαμῶς	1	answer	
+quizás|quizá	ἴσως	1	answer	
+no sé	οὐκ οἶδα	1	answer	
+ya sé	οἶδα	1	answer	
+no importa	οὐδὲν διαφέρει	1	answer	
+basta	ἅλις	1	answer	
+tienes razón	ὀρθῶς λέγεις	1	answer	
+muy bien	εὖ γε	1	answer	
+bien hecho	εὖ γε	1	praise	
+bravo	εὖ γε	1	praise	
+cómo estás	πῶς ἔχεις	1	q	
+cómo está usted	πῶς ἔχεις	1	q	
+cómo te llamas	τί ὄνομά σοι	1	q	
+me llamo {NAME}	ὄνομά μοί ἐστι {1}	1	intro	
+mi nombre es {NAME}	ὄνομά μοί ἐστι {1}	1	intro	
+quién sabe	τίς οἶδεν	1	q	
+qué hora es	πηνίκα ἐστίν	1	q	Attic "at what hour"
+llego tarde	ὀψὲ ἥκω	1	answer	
+ay	οἴμοι	1	excl	"Ay, ay, ..." -> οἴμοι, οἴμοι, ...
+ay de mí	οἴμοι	1	excl	
+dios mío	ὦ Ζεῦ	1	excl	
+ayuda	βοήθει	1	excl	plural βοηθεῖτε
+ayúdame	βοήθει μοι	1	excl	plural βοηθεῖτέ μοι
+silencio	σίγα	1	imp	plural σιγᾶτε
+escucha	ἄκουε	1	imp	plural ἀκούετε
+vamos	ἴωμεν	1	imp	
+jugar a las cartas	χάρταις παίζειν	2	vp	verb phrase: the last word is the verb
+que le corten {NP}	ἀποτέμετε {1:acc}	2	excl	"off with ..." (plural command)
+vete	ἄπελθε	1	imp	plural ἀπέλθετε
+váyase	ἄπελθε	1	imp	usted
+váyanse	ἀπέλθετε	1	imp	

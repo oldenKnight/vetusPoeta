@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "vp/result.h"
@@ -125,6 +126,12 @@ class CuratedData {
   // states_es_la.tsv / phrasal_es_la.tsv / verbprep_es_la.tsv are merged into states() / phrasals() / verbPreps()
   // (their source words are Spanish lemmas, so they never collide with the English rows).
   const std::vector<PhraseEntry>& phrasebookEs() const { return phrasebookEs_; }      // phrasebook_es_la.tsv
+  // C12 addition: a copy of the tables whose phrasebooks are another target language's (phrasebook_en_grc.tsv,
+  // phrasebook_es_grc.tsv), so that the frame builder's pre-pass matches the Greek rows.
+  void replacePhrasebooks(std::vector<PhraseEntry> en, std::vector<PhraseEntry> es) {
+    phrasebook_ = std::move(en);
+    phrasebookEs_ = std::move(es);
+  }
   const std::vector<PairEntry>& contractionsEs() const { return contractionsEs_; }    // contractions_es.tsv
   const std::vector<CliticEntry>& clitics() const { return clitics_; }                // clitics_es.tsv
   const CliticEntry* clitic(std::string_view form) const;
