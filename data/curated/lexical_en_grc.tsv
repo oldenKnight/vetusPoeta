@@ -15,7 +15,9 @@
 #         name in the genitive + ἡμέρα, "Ἄρεως ἡμέρα"; frame = the day's ordinal counted from Sunday for the
 #         alternative "τρίτη ἡμέρα"), light (C18: a light verb or verb + object idiom, source = verb lemma + object
 #         noun lemma: the noun is the verb's meaning and is not translated, "make a mistake" -> ἁμαρτάνω; frame "mid" =
-#         the middle voice, "obj:<prep>" = the noun of that prepositional phrase is the Greek verb's object).
+#         the middle voice, "obj:<prep>" = the noun of that prepositional phrase is the Greek verb's object), subject
+#         (C18: the verb chosen by its subject, source = subject noun + verb lemma: "sun rise" -> ἀνατέλλω); phrasal rows
+#         may have frame "mid" / "pass" (the middle / passive voice: "wake up" -> ἠγέρθην).
 #   verb rows, frame (C16): "nonfinite" = used instead of the main row when the verb is an infinitive, a subjunctive,
 #         a future, or inside a subordinate clause / indirect question ("go" -> εἶμι: ἰέναι, ἴωμεν, εἶ); "sub" = used
 #         inside a subordinate clause only ("before she comes" -> πρὶν ἥκειν).
@@ -249,6 +251,16 @@ light	decir mentira	ψεύδω	mid
 light	hacer pregunta	ἐρωτάω		
 light	dar respuesta	ἀποκρίνω	mid	
 light	hacer promesa	ὑπισχνέομαι		
+state	late	ὑστερέω	verb	C18: "we will be late" -> ὑστερήσομεν (a person subject)
 state	late	ὀψέ	adv	C18: "it is late" -> ὀψέ ἐστιν (frame adv: the Greek adverb with an impersonal copula)
 state	early	πρωΐ	adv	"it is early" -> πρωΐ ἐστιν
 verbprep	bark at	ὑλακτέω	prep:πρός+acc	C18: "the dog barked at the moon" -> πρὸς τὴν σελήνην ὑλάκτει
+realia	pizza	πλακοῦς		C18: no Attic word for pizza: "flat cake" (decision 1)
+realia	pizza	πλακοῦς		Spanish: pizza (the same word)
+phrasal	wake up	ἐγείρω	pass	C18: "the children woke up" -> ἠγέρθησαν (the passive aorist is "woke up")
+phrasal	get up	ἀνίστημι	mid	"get up!" -> ἀνάστηθι
+subject	sun rise	ἀνατέλλω		C18: "when the sun rose" -> ἀνέτειλεν
+subject	moon rise	ἀνατέλλω		
+subject	sol salir	ἀνατέλλω		"salió el sol"
+durative	be tired	κάμνω		state in the past: ἔκαμνεν
+durative	be hungry	πεινάω		state in the past: ἐπείνα

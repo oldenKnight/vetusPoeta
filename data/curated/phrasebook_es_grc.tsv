@@ -63,7 +63,7 @@ silencio	σίγα	1	imp	plural σιγᾶτε
 escucha	ἄκουε	1	imp	plural ἀκούετε
 vamos	ἴωμεν	1	imp	
 jugar a las cartas	χάρταις παίζειν	2	vp	verb phrase: the last word is the verb
-que le corten {NP}	ἀποτέμετε {1:acc}	2	excl	"off with ..." (plural command)
+que le corten {NP}	ἀποτέμετε {1:acc} αὐτοῦ	2	excl	"off with ..." (plural command); C18: "le" is the possessor (possessive dative)
 vete	ἄπελθε	1	imp	plural ἀπέλθετε
 váyase	ἄπελθε	1	imp	usted
 váyanse	ἀπέλθετε	1	imp	
@@ -80,3 +80,5 @@ pasa me {NP}	δός μοι {1:acc}	1	imp	"Pásame ..." (the tokenizer splits the
 todas las mañanas	ἑκάστης ἡμέρας ἕωθεν	1	adv	
 cada mañana	ἑκάστης ἡμέρας ἕωθεν	1	adv	
 va a llover	ὕσει	1	state	
+# C18 (quality loop 3)
+que les corten {NP}	ἀποτέμετε {1:acc} αὐτῶν	2	excl	"les" is the possessor (possessive dative)

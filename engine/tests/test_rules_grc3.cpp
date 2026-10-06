@@ -148,7 +148,7 @@ int runCases(rules::Engine& e, const std::vector<Case3>& cases, bool es, const c
     CHECK_MESSAGE(r.value()[0].confidence != rules::Confidence::Fix, what << ": " << k.src << " is Fix");
     ok += hit;
   }
-  MESSAGE(what << ": " << ok << " / " << cases.size());
+  MESSAGE(std::string(what) << ": " << ok << " / " << cases.size());
   return ok;
 }
 
@@ -219,4 +219,209 @@ TEST_CASE("rules-grc3: try sentences (VP_GRC3_TRY=<file>, VP_GRC3_ES=1 for Spani
         if (!k.ok || k.detail.rfind("warning", 0) == 0) std::cout << "    " << k.id << (k.ok ? " ok " : " FAIL ") << k.detail << "\n";
     }
   }
+}
+
+// C18: every rule of the loop on our own sentences (at least two each; none is a regression or sample line).
+TEST_CASE("rules-grc3: C18 constructions (light verbs, purpose / result, participles, vocatives, particles)") {
+  NEED_REAL3();
+  auto e = engine3();
+  const std::vector<Case3> en = {
+      // light verbs and verb + object idioms (lexical_en_grc.tsv kind light)
+      {"I made a mistake.", "ἥμαρτον."},
+      {"You made a mistake.", "ἥμαρτες."},
+      {"Did you make a mistake?", "ἆρα ἥμαρτες;"},
+      {"Everyone makes mistakes.", "πάντες ἁμαρτάνουσιν."},
+      {"Let's take a walk.", "περιπατῶμεν."},
+      {"The farmer took a walk in the garden.", "ὁ γεωργὸς ἐν τῷ κήπῳ περιεπάτησεν."},
+      {"Let's have a rest.", "ἀναπαυώμεθα."},
+      {"The horses had a rest.", "οἱ ἵπποι ἀνεπαύσαντο."},
+      {"The boy gave a shout.", "ὁ παῖς ἐβόησεν."},
+      {"Give a shout!", "βόησον!"},
+      {"The doctor made a visit to the king.", "ὁ ἰατρὸς τὸν βασιλέα ἐπεσκέψατο."},
+      {"Don't tell lies.", "μὴ ψεύδου."},
+      {"The girl asked a question.", "ἡ κόρη ἠρώτησεν."},
+      // purpose: the main clause's person, the modal of a purpose clause dropped, bare infinitive by valency
+      {"I came here to see you.", "δεῦρο ἦλθον ἵνα σε ἴδω."},
+      {"We went to the market to buy bread.", "εἰς τὴν ἀγορὰν ἀπήλθομεν ἵνα ἄρτον ἀγοράσωμεν."},
+      {"Open the door so that the cat can come in.", "ἄνοιξον τὴν θύραν ἵνα ἡ γαλῆ εἰσέλθῃ."},
+      {"Give me water to drink.", "δός μοι ὕδωρ πιεῖν."},
+      // result: ὥστε + indicative (actual), + infinitive (possible); οὕτω before a consonant
+      {"The water was so cold that we ran home.", "τὸ ὕδωρ οὕτω ψυχρὸν ἦν ὥστε οἴκαδε ἐδράμομεν."},
+      {"The boy ran so fast that he fell.", "ὁ παῖς οὕτω ταχέως ἔδραμεν ὥστε ἔπεσεν."},
+      // circumstantial participles agreeing with the subject
+      {"Seeing the wolf, the shepherd ran away.", "ὁ ποιμὴν τὸν λύκον ὁρῶν ἔφυγεν."},
+      {"Singing a song, the girl walked to the river.", "ἡ κόρη ᾠδὴν ᾄδουσα εἰς τὸν ποταμὸν ἐβάδισεν."},
+      {"When the girl saw the cat, she laughed.", "ἡ κόρη τὴν γαλῆν ἰδοῦσα ἐγέλασεν."},
+      {"When I saw the queen, I bowed.", "τὴν βασίλειαν ἰδοῦσα προσεκύνησα."},
+      {"After we ate dinner, we slept.", "δεῖπνον φαγόντες ἐκαθεύδομεν."},
+      {"While he was walking, he sang.", "βαδίζων ᾖσεν."},
+      // another subject: the finite clause stays (ἥκω in the past: imperfect)
+      {"When the teacher came, the children sat down.", "ἐπεὶ ὁ διδάσκαλος ἧκεν, οἱ παῖδες ἐκάθισαν."},
+      // vocatives without the possessive, γάρ second, impersonal "it is late"
+      {"Come here, my child.", "ἐλθὲ δεῦρο, ὦ παῖ."},
+      {"Mother, look at the bird!", "ὦ μῆτερ, βλέπε πρὸς τὸν ὄρνιν!"},
+      {"Let's go home, for it is late.", "οἴκαδε ἴωμεν, ὀψὲ γάρ ἐστιν."},
+      {"It is late.", "ὀψέ ἐστιν."},
+      {"It is early.", "πρωΐ ἐστιν."},
+      // a verb without aorist cells: the narrative imperfect; derived English forms (C17) on the Greek path
+      {"The dog barked at the moon.", "ὁ κύων πρὸς τὴν σελήνην ὑλάκτει."},
+      {"The girl swam in the river.", "ἡ κόρη ἐν τῷ ποταμῷ ἔνευσεν."},
+      {"The boy ran to the sea-shore.", "ὁ παῖς εἰς τὸν αἰγιαλὸν ἔδραμεν."},
+      {"The children were singing happily.", "οἱ παῖδες ἡδέως ᾖδον."},
+      // rules added after the first blind run, each with two own sentences (none of them a blind sentence):
+      // an -ing phrase the parser read as an imperative coordinated with the clause
+      {"Jumping over the wall, the cat ran away.", "ἡ γαλῆ ὑπὲρ τοῦ τείχους πηδῶσα ἔφυγεν."},
+      {"Laughing loudly, the children ran home.", "οἱ παῖδες μέγα γελῶντες οἴκαδε ἔδραμον."},
+      // "oh" + a noun before a question: the addressee; "where is X" with X as the subject and its article
+      {"Oh small dog, where is your master?", "ὦ μικρὲ κύον, ποῦ ἐστιν ὁ δεσπότης σου;"},
+      {"O little child, where is your mother?", "ὦ μικρὲ παῖ, ποῦ ἐστιν ἡ μήτηρ σου;"},
+      // the verb chosen by its subject (kind subject), "wake up" in the passive (phrasal frame pass)
+      {"When the sun rose, the birds sang.", "ἐπεὶ ὁ ἥλιος ἀνέτειλεν, οἱ ὄρνιθες ᾖσαν."},
+      {"The moon rose over the hill.", "ἡ σελήνη ὑπὲρ τοῦ ὄρους ἀνέτειλεν."},
+      {"The children woke up early.", "οἱ παῖδες πρωῒ ἠγέρθησαν."},
+      {"The king woke up.", "ὁ βασιλεὺς ἠγέρθη."},
+      // "all" + a singular time noun: the accusative of duration
+      {"The baby slept all night.", "τὸ βρέφος πᾶσαν τὴν νύκτα ἐκάθευδεν."},
+      {"We waited all day.", "πᾶσαν τὴν ἡμέραν ἐμείναμεν."},
+      // "old man" / "old woman" as one noun
+      {"The old woman is wise.", "ἡ γραῦς σοφή ἐστιν."},
+      {"An old man lives in the house.", "γέρων ἐν τῇ οἰκίᾳ οἰκεῖ."},
+      // a statement after a command without a conjunction: γάρ; "or" after a command / must: εἰ δὲ μή
+      {"Run, the wolf is coming!", "τρέχε, ὁ γὰρ λύκος ἔρχεται!"},
+      {"Come quickly, the king is waiting!", "ἐλθὲ ταχέως, ὁ γὰρ βασιλεὺς μένει!"},
+      {"You must eat, or you will be hungry.", "δεῖ σε φαγεῖν, εἰ δὲ μή, πεινήσεις."},
+      {"Hurry up, or we will be late.", "σπεῦσον, εἰ δὲ μή, ὑστερήσομεν."},
+      // "it" for the animal of the main clause takes the state verb; the degree word stays with it; durative states
+      {"The cat is crying because it is hungry.", "ἡ γαλῆ κλαίει ὅτι πεινῇ."},
+      {"The horse was so tired that it slept.", "ὁ ἵππος οὕτως ἔκαμνεν ὥστε ἐκάθευδεν."},
+      {"The farmer's horse was so hungry that it ate the roses.", "ὁ ἵππος τοῦ γεωργοῦ οὕτως ἐπείνη ὥστε τὰ ῥόδα ἔφαγεν."},
+      // teacher glosses added (cry -> κλαίω, yard -> αὐλή)
+      {"Why is the baby crying?", "διὰ τί τὸ βρέφος κλαίει;"},
+      {"The children played in the yard.", "οἱ παῖδες ἐν τῇ αὐλῇ ἔπαισαν."},
+  };
+  const int okEn = runCases(*e, en, false, "C18 constructions EN");
+  CHECK(okEn == (int)en.size());
+  if (real3().esOk) {
+    const std::vector<Case3> es = {
+        {"Cometí un error.", "ἥμαρτον."},
+        {"Demos un paseo.", "περιπατῶμεν."},
+        {"Tomemos un descanso.", "ἀναπαυώμεθα."},
+        {"El niño dio un grito.", "ὁ παῖς ἐβόησεν."},
+        {"El médico hizo una visita al rey.", "ὁ ἰατρὸς τὸν βασιλέα ἐπεσκέψατο."},
+        // possessive dative with a body part
+        {"El perro le mordió la mano.", "ὁ κύων τὴν χεῖρα αὐτοῦ ἔδακεν."},
+        {"La madre le besó la cara.", "ἡ μήτηρ τὸ πρόσωπον αὐτοῦ ἐφίλησεν."},
+        {"¡Que le corten la mano!", "ἀποτέμετε τὴν χεῖρα αὐτοῦ!"},
+        // common gender by the Spanish noun; a gerund phrase as a participle
+        {"La niña es pequeña.", "ἡ παῖς μικρά ἐστιν."},
+        {"Veo a la niña.", "τὴν παῖδα ὁρῶ."},
+        {"Viendo al lobo, el pastor huyó.", "ὁ ποιμὴν τὸν λύκον ὁρῶν ἔφυγεν."},
+        {"Cuando la niña vio al gato, se rió.", "ἡ παῖς τὴν γαλῆν ἰδοῦσα ἐγέλασεν."},
+    };
+    const int okEs = runCases(*e, es, true, "C18 constructions ES");
+    CHECK(okEs == (int)es.size());
+  }
+  // realia (decision 1): the hypernym, flag realia, never OK; the A9 round trip is reported
+  for (const char* src : {"The tea is hot.", "We ate pizza."}) {
+    rules::CueInput x;
+    x.sourceText = src;
+    auto r = e->translate({x}, opts3(false), rules::Context{}, nullptr, nullptr);
+    REQUIRE(r.ok());
+    const auto& o = r.value()[0];
+    CHECK(std::find(o.flags.begin(), o.flags.end(), "realia") != o.flags.end());
+    CHECK(o.confidence == rules::Confidence::Check);
+    bool a9 = false;
+    for (const auto& k : o.checks) a9 = a9 || (k.id == "A9" && k.detail.find("overlap") != std::string::npos);
+    CHECK(a9);
+  }
+  // a light verb handled by its row is not a guess (no light-verb flag); an unhandled one stays Check
+  {
+    rules::CueInput x;
+    x.sourceText = "I made a mistake.";
+    auto r = e->translate({x}, opts3(false), rules::Context{}, nullptr, nullptr);
+    REQUIRE(r.ok());
+    CHECK(std::find(r.value()[0].flags.begin(), r.value()[0].flags.end(), "light-verb") == r.value()[0].flags.end());
+    x.sourceText = "The children made a noise.";
+    auto r2 = e->translate({x}, opts3(false), rules::Context{}, nullptr, nullptr);
+    REQUIRE(r2.ok());
+    CHECK(r2.value()[0].confidence == rules::Confidence::Check);
+  }
+}
+
+TEST_CASE("rules-grc3: participle forms, προσ- augment, οὕτω / οὕτως") {
+  NEED_REAL3();
+  const lex::Lexicon& lx = real3().grc;
+  auto P = [&](const char* verb, uint8_t tense, uint8_t number, uint8_t gender) {
+    std::string out;
+    const uint32_t id = grc::findLemma(lx, verb, feat::Verb);
+    REQUIRE(id != lex::kNoLemma);
+    if (!grc::participle(lx, id, tense, 0, feat::Nom, number, gender, out)) return std::string("-");
+    return out;
+  };
+  using namespace vp::feat;
+  CHECK(P("τρέχω", Present, Sg, M) == text::nfc("τρέχων"));
+  CHECK(P("τρέχω", Present, Pl, M) == text::nfc("τρέχοντες"));
+  CHECK(P("τρέχω", Present, Pl, F) == text::nfc("τρέχουσαι"));
+  CHECK(P("τρέχω", Present, Pl, N) == text::nfc("τρέχοντα"));
+  CHECK(P("ὁράω", Aorist, Sg, F) == text::nfc("ἰδοῦσα"));
+  CHECK(P("ὁράω", Aorist, Pl, M) == text::nfc("ἰδόντες"));
+  CHECK(P("ποιέω", Present, Pl, M) == text::nfc("ποιοῦντες"));
+  CHECK(P("λύω", Aorist, Pl, M) == text::nfc("λύσαντες"));
+  std::string out;
+  CHECK_FALSE(grc::participle(lx, grc::findLemma(lx, "τρέχω", Verb), Present, 0, Gen, Sg, M, out));
+  // προσκυνέω: the table's ἐπροσκύνησα is written προσεκύνησα, and the analysis reads it back
+  const uint32_t pk = grc::findLemma(lx, "προσκυνέω", Verb);
+  REQUIRE(pk != lex::kNoLemma);
+  REQUIRE(grc::generate(lx, pk, grc::verbForm(P1, Sg, Aorist), out));
+  CHECK(out == text::nfc("προσεκύνησα"));
+  morph::Token t;
+  grc::analyse(lx, text::nfc("προσεκύνησεν"), t);
+  bool found = false;
+  for (const auto& a : t.analyses) found = found || a.lemma == pk;
+  CHECK(found);
+  CHECK(grc::accentuate(text::nfc("οὕτως ψυχρόν")) == text::nfc("οὕτω ψυχρόν"));
+  CHECK(grc::accentuate(text::nfc("οὕτω ἔχει")) == text::nfc("οὕτως ἔχει"));
+}
+
+// C18 (b): noun sense consistency inside a batch (transfer::Memory::nounSense, Greek side): the earlier Greek word is
+// kept when it is one of the candidates; a remembered word that is no candidate is ignored.
+TEST_CASE("rules-grc3: noun sense consistency in a batch") {
+  NEED_REAL3();
+  static curated::CuratedData cg = [] {
+    auto r = curated::CuratedData::load(repo3() / "data" / "curated");
+    REQUIRE(r.ok());
+    return std::move(r.value());
+  }();
+  auto gd = grc::GreekData::load(repo3() / "data" / "curated");
+  auto gt = grc::GreekTables::load(repo3() / "data" / "curated");
+  REQUIRE(gd.ok());
+  REQUIRE(gt.ok());
+  grc::GreekTransfer xf(real3().grc, cg, gd.value(), gt.value());
+  transfer::Settings st;
+  frame::SemSentence s;
+  frame::SemNP n;
+  n.head = "boat";
+  n.token = 0;
+  transfer::Choice ch;
+  const uint32_t first = xf.select("boat", feat::Noun, {}, false, false, st, ch);
+  REQUIRE(first != lex::kNoLemma);
+  REQUIRE(ch.candidates.size() > 1);
+  const uint32_t other = ch.candidates[1].lemma;
+  transfer::Memory mem;
+  grc::GrcClauseOut out;
+  CHECK(xf.np(n, s, st, mem, out).head == first);           // nothing remembered: the best candidate
+  mem.nounSense.clear();
+  mem.nounSense.emplace_back("boat", other);
+  CHECK(xf.np(n, s, st, mem, out).head == other);           // the earlier choice wins
+  mem.nounSense.clear();
+  mem.nounSense.emplace_back("boat", grc::findLemma(real3().grc, "λίθος", feat::Noun));
+  CHECK(xf.np(n, s, st, mem, out).head == first);           // not a candidate: ignored, and replaced
+  REQUIRE(mem.nounSense.size() == 1);
+  CHECK(mem.nounSense[0].second == first);
+  n.head = "ship";
+  for (int i = 0; i < 40; ++i) {   // the memory is bounded (32 entries)
+    n.head = "ship" + std::to_string(i % 2 ? 0 : 1);
+    xf.np(n, s, st, mem, out);
+  }
+  CHECK(mem.nounSense.size() <= 32);
 }

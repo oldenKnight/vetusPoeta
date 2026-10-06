@@ -372,6 +372,15 @@ struct GreekPath::Impl {
         const bool nuWord = b == "εστι" || b == "εισι" || b == "πασι";
         const bool gap = out.tokens[i].end < (int)out.text.size() && out.text[(size_t)out.tokens[i].end] == ' ';
         if (nuWord && gap && startsWithVowel(out.tokens[i + 1].text)) { tx.back() += "ν"; changed = true; }
+        // C18: the grave rule across the pieces ("{1:acc} αὐτοῦ" -> "τὴν κεφαλὴν αὐτοῦ"): an acute on the ultima before
+        // another word without punctuation becomes grave, not before an enclitic, never on τίς / τί
+        const AccentInfo ai = accentOf(tx.back());
+        const std::string k = text::greek_bare(tx.back());
+        if (gap && ai.type == Accent::Acute && ai.position == 0 && ai.accents == 1 && k != "τισ" && k != "τι" &&
+            isGreekWord(out.tokens[i + 1].text) && !isEncliticForm(out.tokens[i + 1].text)) {
+          tx.back() = ultimaToGrave(tx.back());
+          changed = true;
+        }
       }
       if (changed) rewriteTokens(out, tx);
     }
@@ -580,6 +589,18 @@ struct GreekPath::Impl {
       for (const std::string& r : s.repairs) what += (what.empty() ? "" : ", ") + r;
       addFlag(flags, "frame-fallback");
       so.reasons.push_back(Reason{-1, "form", "sentence analysis fallback (" + what + "): check the structure", ""});
+    }
+    // C18: constructions the frame builder rendered by a rule of thumb (frame.h SemSentence::doubts, as the Latin path):
+    // never OK; a light verb or a noun + infinitive that a curated Greek row handled (lexical_en_grc.tsv kind light,
+    // valency purp:inf) is not a guess any more
+    for (const std::string& d : s.doubts) {
+      bool handled = false;
+      for (const transfer::Choice& c : so.choices)
+        handled = handled || (d == "light-verb" && c.note.find("light verb") != std::string::npos) ||
+                  (d == "noun-infinitive" && c.note.find("purp:inf") != std::string::npos);
+      if (handled) continue;
+      addFlag(flags, d);
+      so.reasons.push_back(Reason{-1, "form", "construction rendered by a rule of thumb (" + d + "): check it", ""});
     }
     std::string fp = s.finalPunct;
     if (fp.empty() && frame::endsSentence(text)) fp = ".";
@@ -998,7 +1019,8 @@ struct GreekPath::Impl {
       bool chk = warn || !checkOk(o, "A1b") || !checkOk(o, "A5") || !checkOk(o, "A6") || !checkOk(o, "A7") ||
                  !checkOk(o, "A8") || !checkOk(o, "A9") || a.minMargin < 0.15 || a.song || a.nonverbal;
       for (const char* f : {"name-guessed", "from-rule", "addressee-guess", "missing-form", "merged", "frame-fallback",
-                            "realia", "name-kept"})
+                            "realia", "name-kept", "contact-relative", "noun-infinitive", "purpose-guess", "light-verb",
+                            "phrase-order", "participle-phrase", "ellipsis"})
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       for (const transfer::Choice& c : a.choices)
         if (c.lowTier) {
