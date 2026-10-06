@@ -1,0 +1,105 @@
+# key	frame	example	note
+# Greek verb valency (Attic) for the realiser's case assignment and the checker's A4 (DESIGN §10.2 mirrored).
+# key = the lemma headword as in greek.vpl (greek_key applied by the loader). Frames as valency_la.tsv plus:
+#   acc+acc double accusative; gen / dat objects; prep:<greek>+<case>; impers:acc+inf (δεῖ), impers:dat+inf (ἔξεστι);
+#   mid:<frame> = the frame of the middle voice (πείθομαι + dat, ἅπτομαι + gen); several frames by preference, ";".
+ἄγω	acc	τὸν βοῦν ἄγει	
+αἱρέω	acc	τὴν πόλιν αἱρεῖ	
+αἴρω	acc	τὸν λίθον αἴρει	
+ἀκούω	acc;gen	τὴν ᾠδὴν ἀκούει; τοῦ πατρὸς ἀκούει	person in the genitive, thing in the accusative
+ἀγοράζω	acc	ἄρτον ἀγοράζει	
+ἀνοίγω	acc	τὴν θύραν ἀνοίγει	
+ἀπέρχομαι	intr;prep:ἐκ+gen;prep:ἀπό+gen	ἐκ τῆς οἰκίας ἀπέρχεται	
+ἀποθνῄσκω	intr	ὁ γέρων ἀποθνῄσκει	
+ἀποκρίνω	mid:dat	τῷ πατρὶ ἀποκρίνεται	
+ἀποκτείνω	acc	τὸν λύκον ἀποκτείνει	
+ἀποτέμνω	acc	τὴν κεφαλὴν ἀποτέμνει	
+ἀποφεύγω	intr;acc	ἀπέφυγεν	
+ἅπτω	acc;mid:gen	τοῦ ἵππου ἅπτεται	middle "touch" + genitive
+ἄρχω	gen	τῆς πόλεως ἄρχει	ruling + genitive
+ἀφικνέομαι	intr;prep:εἰς+acc	εἰς τὴν πόλιν ἀφικνεῖται	
+ᾄδω	acc	ᾠδὴν ᾄδει	
+βαδίζω	intr;prep:εἰς+acc;prep:πρός+acc	εἰς τὸν ἀγρὸν βαδίζει	
+βαίνω	intr;prep:εἰς+acc;prep:πρός+acc	πρὸς τὴν πόλιν βαίνει	
+βάλλω	acc	τὸν λίθον βάλλει	
+βασιλεύω	gen	τῆς χώρας βασιλεύει	ruling + genitive
+βλέπω	acc;prep:πρός+acc	πρὸς τὸν οὐρανὸν βλέπει	
+βοάω	intr	ὁ παῖς βοᾷ	
+βοηθέω	dat	τῷ φίλῳ βοηθεῖ	
+βούλομαι	inf;acc	ἀπιέναι βούλεται	
+γίγνομαι	copula	σοφὸς γίγνεται	
+γιγνώσκω	acc	τὴν ὁδὸν γιγνώσκει	
+γράφω	acc	ἐπιστολὴν γράφει	
+δεῖ	impers:acc+inf	δεῖ ἡμᾶς ἀπιέναι	
+δείκνυμι	dat+acc	τῷ παιδὶ τὴν ὁδὸν δείκνυσιν	
+δέχομαι	acc	τὴν ἐπιστολὴν δέχεται	
+διδάσκω	acc+acc;acc	τοὺς παῖδας τὴν μουσικὴν διδάσκει	double accusative
+δίδωμι	dat+acc	τῷ παιδὶ τὴν σφαῖραν δίδωσιν	
+διέρχομαι	intr;acc	διέρχεται	
+διώκω	acc	τὸν λύκον διώκει	
+δοκέω	impers:dat+inf;inf	δοκεῖ μοι ἀπιέναι	
+δύναμαι	inf	λαλεῖν οὐ δύναται	
+ἐθέλω	inf	ἀκούειν ἐθέλει	
+εἰμί	copula	ὁ παῖς μικρός ἐστιν	
+εἶμι	intr;prep:εἰς+acc	εἰς τὴν ἀγορὰν εἶσιν	
+ἐλαύνω	acc	τοὺς βοῦς ἐλαύνει	
+ἔξεστι	impers:dat+inf	ἔξεστί σοι ἀπιέναι	
+ἐπιθυμέω	gen	τοῦ οἴνου ἐπιθυμεῖ	desire + genitive
+ἐπιλανθάνομαι	gen	τοῦ ὀνόματος ἐπιλανθάνεται	forgetting + genitive
+ἐπίσταμαι	acc;inf	ᾠδὴν ἐπίσταται	
+ἕπομαι	dat	τῷ πατρὶ ἕπεται	
+ἔρχομαι	intr;prep:εἰς+acc;prep:πρός+acc	πρὸς τὴν οἰκίαν ἔρχεται	
+ἐρωτάω	acc+acc;acc	τὸν πατέρα τὴν ὁδὸν ἐρωτᾷ	double accusative
+ἐσθίω	acc;gen	ἄρτον ἐσθίει	partitive genitive "some of"
+εὑρίσκω	acc	τὴν σφαῖραν εὑρίσκει	
+ἔχω	acc	δύο ἀδελφοὺς ἔχει	
+ζητέω	acc	τὴν γαλῆν ζητεῖ	
+ἡγέομαι	dat;gen	τοῖς στρατιώταις ἡγεῖται	lead + dat; rule + gen
+ἥκω	intr;prep:εἰς+acc	ὀψὲ ἥκει	
+θαυμάζω	acc	τὸν κῆπον θαυμάζει	
+θεάομαι	acc	τὴν πομπὴν θεᾶται	
+καθεύδω	intr	ὁ παῖς καθεύδει	
+καθίζω	intr;prep:ἐπί+gen	ἐπὶ τοῦ λίθου καθίζει	
+καλέω	acc	τὸν δοῦλον καλεῖ	
+κελεύω	acc+inf;acc	τὸν δοῦλον σπεύδειν κελεύει	
+κλέπτω	acc	τὸν οἶνον κλέπτει	
+κρατέω	gen	τῆς θαλάττης κρατεῖ	ruling + genitive
+λαλέω	intr;dat	τῷ φίλῳ λαλεῖ	
+λαμβάνω	acc	τὴν σφαῖραν λαμβάνει	
+λέγω	acc;dat+acc	τῷ πατρὶ τὸν λόγον λέγει	
+λείπω	acc	τὴν οἰκίαν λείπει	
+λούω	acc	τὸν παῖδα λούει	middle = wash oneself
+λύω	acc	τοὺς βοῦς λύει	
+μανθάνω	acc	τὴν μουσικὴν μανθάνει	
+μάχομαι	dat	τοῖς πολεμίοις μάχεται	
+μέλλω	inf	ἀπιέναι μέλλει	
+μένω	intr;acc	μένε με	acc = wait for
+μιμνήσκω	mid:gen	τοῦ πατρὸς μέμνηται	remembering + genitive
+μισέω	acc	τὸν λύκον μισεῖ	
+νομίζω	acc+inf;acc	νομίζει τὸν παῖδα σοφὸν εἶναι	
+οἶδα	acc	οὐκ οἶδα	
+οἰκέω	intr;prep:ἐν+dat	ἐν τῇ πόλει οἰκεῖ	
+ὁράω	acc	τὴν γαλῆν ὁρᾷ	
+ὀργίζω	mid:dat	τῷ δούλῳ ὀργίζεται	
+παίζω	intr;dat	σφαίρᾳ παίζει	dative of instrument
+πείθω	acc;mid:dat	τὸν πατέρα πείθει; τῷ πατρὶ πείθεται	middle "obey" + dative
+πέμπω	acc	τὸν δοῦλον πέμπει	
+πίνω	acc;gen	οἶνον πίνει	partitive genitive "some of"
+πίπτω	intr	ὁ λίθος πίπτει	
+πιστεύω	dat	τῷ φίλῳ πιστεύει	
+ποιέω	acc;acc+acc	τί ποιεῖς;	
+πορεύω	mid:intr;prep:εἰς+acc	εἰς τὴν πόλιν πορεύεται	
+πράττω	acc	τί πράττεις;	
+προσκυνέω	intr;acc	προσκυνεῖτε	
+σπεύδω	intr	ὁ δοῦλος σπεύδει	
+σῴζω	acc	τὸν παῖδα σῴζει	
+τιμάω	acc	τοὺς θεοὺς τιμᾷ	
+τρέχω	intr;prep:εἰς+acc	εἰς τὸν ἀγρὸν τρέχει	
+ὑπακούω	dat	τῷ δεσπότῃ ὑπακούει	
+φέρω	acc;dat+acc	τὸν οἶνον φέρει	
+φεύγω	intr;acc	ὁ λύκος φεύγει	
+φημί	acc+inf	φησὶ τὸν παῖδα σοφὸν εἶναι	
+φιλέω	acc	ἡ κόρη τὴν μητέρα φιλεῖ	
+φοβέω	acc;mid:acc	μὴ φοβοῦ	middle "fear" + accusative
+χαίρω	intr;dat	τῇ ᾠδῇ χαίρει	
+χράω	mid:dat	τῷ ξίφει χρῆται	χράομαι "use" + dative

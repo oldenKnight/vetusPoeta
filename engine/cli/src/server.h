@@ -20,6 +20,7 @@
 #include "serve_io.h"
 #include "views.h"
 #include "vp/lex.h"
+#include "vp/llm.h"
 #include "vp/project.h"
 #include "vp/result.h"
 #include "vp/rules.h"
@@ -154,12 +155,18 @@ class Server {
   json cmdModelStatus(const json&);
   json cmdModelLocate(const json&);
   json cmdModelTest(const json&);
+  json cmdModelUnload(const json&);
   json cmdOnlineTest(const json&);
   json cmdHistoryUndo(const json&);
   json cmdHistoryRedo(const json&);
   json cmdEvalRun(const json&);
   json historyJson(const std::vector<size_t>& changed) const;
   ExportOptions exportOptions(const json& params) const;
+  // engine ii (server_export.cpp): model file discovery, status and the config used for every load
+  std::string modelPath() const;
+  vp::llm::Config modelConfig() const;
+  json modelStatusJson(bool hash);
+  bool modelUsable(std::string& why);
 
   Output& out_;
   ServeOptions opt_;
@@ -192,6 +199,7 @@ class Server {
   size_t historyRecords_ = 0;
   int nextCorrection_ = 1;
   double cpsLimit_ = 17;    // settings cps.adult, refreshed when settings change
+  vp::llm::Model model_;    // engine ii: loaded only inside a job or model.test, unloaded after it / 60 s idle
 };
 
 }  // namespace vpcli

@@ -1,0 +1,54 @@
+# pattern	greek	tier	register	note
+# Seed of fixed English expressions -> Attic Greek (same syntax as phrasebook_en_la.tsv; our own sentences).
+# Plural addressees: the engine replaces χαῖρε / ἔρρωσο with χαίρετε / ἔρρωσθε (note column).
+hello	χαῖρε	1	greet	plural χαίρετε
+hi	χαῖρε	1	greet	plural χαίρετε
+good morning	χαῖρε	1	greet	plural χαίρετε
+good day	χαῖρε	1	greet	plural χαίρετε
+good evening	χαῖρε	1	greet	plural χαίρετε
+welcome	χαῖρε	1	greet	plural χαίρετε
+goodbye	χαῖρε	1	greet	plural χαίρετε; ἔρρωσο (fare well) is the alternative
+bye	χαῖρε	1	greet	
+farewell	ἔρρωσο	1	greet	plural ἔρρωσθε
+see you (soon|later)	αὖθις ὄψομαί σε	1	greet	
+see you tomorrow	αὔριον ὄψομαί σε	1	greet	
+thank you	χάριν σοι οἶδα	1	polite	
+thanks	χάριν οἶδα	1	polite	
+thank you very much	πολλὴν χάριν σοι οἶδα	1	polite	
+please	ἀντιβολῶ	2	polite	"I beg you" (Aristophanic); omitted in flexible mode when the command is clear
+excuse me	σύγγνωθί μοι	1	polite	
+i am sorry	σύγγνωθί μοι	1	polite	
+sorry	σύγγνωθί μοι	1	polite	
+yes	ναί	1	answer	
+no	οὔ	1	answer	
+of course	πάνυ γε	1	answer	
+certainly	πάνυ μὲν οὖν	1	answer	
+not at all	οὐδαμῶς	1	answer	
+well done	εὖ γε	1	excl	
+oh dear	οἴμοι	1	excl	
+oh no	οἴμοι	1	excl	
+alas	φεῦ	1	excl	
+by zeus	νὴ τὸν Δία	1	excl	
+by the gods	πρὸς θεῶν	1	excl	
+come on	ἄγε	1	excl	plural ἄγετε
+look	ἰδού	1	excl	
+quick	ταχέως	1	excl	
+quickly	ταχέως	1	excl	
+help	βοήθει	1	excl	plural βοηθεῖτε
+help me	βοήθει μοι	1	excl	plural βοηθεῖτέ μοι
+be quiet	σίγα	1	imp	plural σιγᾶτε
+listen	ἄκουε	1	imp	plural ἀκούετε
+sit down	κάθιζε	1	imp	plural καθίζετε
+let's go	ἴωμεν	1	imp	
+my friend	ὦ φίλε	1	voc	
+my dear	ὦ φίλε	1	voc	feminine ὦ φίλη by the speaker glossary
+how are you	πῶς ἔχεις	1	q	
+i am fine	καλῶς ἔχω	1	answer	
+what is your name	τί ὄνομά σοι	1	q	
+my name is {NAME}	ὄνομά μοί ἐστι {1}	1	intro	
+what time is it	πηνίκα ἐστίν	1	q	Attic "at what hour"
+really	ἀληθῶς	1	answer	
+nonsense	φλυαρεῖς	1	excl	"you are talking nonsense"
+i don't know	οὐκ οἶδα	1	answer	
+who knows	τίς οἶδεν	1	q	
+never mind	ἔα	1	excl	

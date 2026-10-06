@@ -1,0 +1,118 @@
+{
+ "gate": "Latin minimal pairs, PREPLAN 2.2",
+ "rule": "pass iff accuracy >= 0.75 and Wilson 95% lower bound > 0.70 (summed log-probability)",
+ "pairsRequested": 1000,
+ "pairs": 1000,
+ "seed": 1,
+ "threads": 4,
+ "promptVersion": 1,
+ "summedLogProb": {
+  "correct": 749,
+  "interval": {
+   "p": 0.749,
+   "lo": 0.7212,
+   "hi": 0.7749
+  }
+ },
+ "meanLogProbPerToken": {
+  "correct": 581,
+  "interval": {
+   "p": 0.581,
+   "lo": 0.5502,
+   "hi": 0.6112
+  }
+ },
+ "ties": 0,
+ "sameTokenCount": {
+  "pairs": 624,
+  "correct": 460,
+  "interval": {
+   "p": 0.7372,
+   "lo": 0.7013,
+   "hi": 0.7702
+  }
+ },
+ "byTemplate": {
+  "N-A-est": {
+   "pairs": 214,
+   "correct": 168,
+   "interval": {
+    "p": 0.785,
+    "lo": 0.7252,
+    "hi": 0.8348
+   }
+  },
+  "Npl-Vpl": {
+   "pairs": 142,
+   "correct": 89,
+   "interval": {
+    "p": 0.6268,
+    "lo": 0.5449,
+    "hi": 0.702
+   }
+  },
+  "S-O-V": {
+   "pairs": 289,
+   "correct": 242,
+   "interval": {
+    "p": 0.8374,
+    "lo": 0.7904,
+    "hi": 0.8754
+   }
+  },
+  "in-N-V": {
+   "pairs": 355,
+   "correct": 250,
+   "interval": {
+    "p": 0.7042,
+    "lo": 0.6548,
+    "hi": 0.7493
+   }
+  }
+ },
+ "byCorruption": {
+  "case": {
+   "pairs": 600,
+   "correct": 445,
+   "interval": {
+    "p": 0.7417,
+    "lo": 0.7052,
+    "hi": 0.7751
+   }
+  },
+  "gender": {
+   "pairs": 51,
+   "correct": 35,
+   "interval": {
+    "p": 0.6863,
+    "lo": 0.5497,
+    "hi": 0.7967
+   }
+  },
+  "number": {
+   "pairs": 78,
+   "correct": 55,
+   "interval": {
+    "p": 0.7051,
+    "lo": 0.5962,
+    "hi": 0.7948
+   }
+  },
+  "person": {
+   "pairs": 271,
+   "correct": 214,
+   "interval": {
+    "p": 0.7897,
+    "lo": 0.7373,
+    "hi": 0.834
+   }
+  }
+ },
+ "meanTokens": {
+  "good": 7.03,
+  "bad": 7.29
+ },
+ "msPerPair": 262.4,
+ "loadMs": 336,
+ "passed": false
+}

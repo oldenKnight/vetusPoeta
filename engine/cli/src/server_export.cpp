@@ -1,8 +1,11 @@
 // Export, word/lemma lookups, model and online status.
 #include <algorithm>
+#include <cmath>
+#include <filesystem>
 
 #include "server.h"
 #include "vp/fs.h"
+#include "vp/online.h"
 #include "vp/text.h"
 
 namespace vpcli {
@@ -118,30 +121,185 @@ json Server::cmdLemmaGet(const json& p) {
 }
 
 // ---------------------------------------------------------------------------------------------- model, online
-json Server::cmdModelStatus(const json&) {
-  const json s = settings_.get();
-  return json{{"available", false}, {"path", s.value("modelPath", "")}, {"sizeBytes", 0}, {"sha256ok", false},
-              {"loaded", false}, {"cpuOk", false}, {"lastLoadMs", 0}, {"reason", "not_built"}};
+// Engine ii (engine/llm). The model file is settings.modelPath, else $VP_MODEL_GGUF, else the first *.gguf (by
+// name) in <exe dir>/models or <data>/models. Nothing is ever downloaded here. The model is loaded only inside a
+// translate job (lazily, on the engine's first question) or model.test, unloaded after it and after 60 s idle.
+namespace {
+std::string firstGguf(const std::string& dir) {
+  std::string best;
+  try {
+    if (dir.empty() || !fs::isDirectory(dir)) return best;
+    std::error_code ec;
+    for (std::filesystem::directory_iterator it(fs::u8path(dir), ec), end; !ec && it != end; it.increment(ec)) {
+      const std::string name = fs::toU8(it->path().filename());
+      if (name.size() > 5 && name.compare(name.size() - 5, 5, ".gguf") == 0 && fs::isRegularFile(fs::join(dir, name)) &&
+          (best.empty() || name < best))
+        best = name;
+    }
+  } catch (...) {
+    return std::string();
+  }
+  return best.empty() ? best : fs::join(dir, best);
+}
+
+const char* modelReason(vp::ErrorCode c) {
+  switch (c) {
+    case ErrorCode::ModelMissing: return "no_file";
+    case ErrorCode::ModelUnsupportedCpu: return "cpu";
+    default: return "bad_file";
+  }
+}
+}  // namespace
+
+std::string Server::modelPath() const {
+  const std::string configured = settings_.get().value("modelPath", "");
+  if (!configured.empty()) return configured;
+  const std::string env = envU8("VP_MODEL_GGUF");
+  if (!env.empty()) return env;
+  std::string p = exeDir().empty() ? std::string() : firstGguf(fs::join(exeDir(), "models"));
+  if (p.empty()) p = firstGguf(fs::join(opt_.dataDir, "models"));
+  return p;
+}
+
+vp::llm::Config Server::modelConfig() const {
+  vp::llm::Config c;
+  c.path = modelPath();
+  c.threads = settings_.get().value("eco", false) ? 2 : vp::llm::kMaxThreads;
+  return c;
+}
+
+// `hash`: verify the SHA-256 (about 1-2 s for the first call per file, cached after). engine.hello passes false
+// and reports a file of the right size as available until a hash says otherwise.
+json Server::modelStatusJson(bool hash) {
+  const std::string path = modelPath();
+  json j{{"available", false}, {"path", path}, {"sizeBytes", 0}, {"sha256ok", false}, {"loaded", model_.loaded()},
+         {"cpuOk", vp::llm::cpuSupported()}, {"lastLoadMs", model_.status().lastLoadMs},
+         {"rerankEnabled", vp::llm::rerankEnabled()}};
+  if (!vp::llm::built()) {
+    j["reason"] = "not_built";
+    return j;
+  }
+  if (path.empty()) {
+    j["reason"] = "no_file";
+    return j;
+  }
+  vp::Result<vp::llm::Status> st = model_.inspect(path, hash);
+  if (!st) {
+    j["reason"] = modelReason(st.error().code);
+    return j;
+  }
+  const vp::llm::Status& s = st.value();
+  j["sizeBytes"] = s.sizeBytes;
+  j["sha256ok"] = s.sha256ok;
+  const bool sizeOk = s.sizeBytes == vp::llm::kModelSizeBytes;
+  j["available"] = hash ? s.available : (s.sha256ok || sizeOk);
+  if (!j["available"].get<bool>()) j["reason"] = "sha_mismatch";
+  else if (!s.cpuOk) j["reason"] = "cpu";
+  return j;
+}
+
+bool Server::modelUsable(std::string& why) {
+  if (!vp::llm::built()) {
+    why = "model_missing";
+    return false;
+  }
+  if (!vp::llm::cpuSupported()) {
+    why = "model_unsupported_cpu";
+    return false;
+  }
+  const json st = modelStatusJson(true);
+  if (!st.value("available", false)) {
+    why = st.value("reason", "") == "no_file" ? "model_missing" : "model_load_failed";
+    return false;
+  }
+  return true;
+}
+
+json Server::cmdModelStatus(const json&) { return modelStatusJson(true); }
+
+json Server::cmdModelUnload(const json&) {
+  model_.unload();
+  return modelStatusJson(false);
 }
 
 json Server::cmdModelLocate(const json& p) {
   const std::string path = strParam(p, "path", "", true);
   if (!fs::isRegularFile(path)) fail(ErrorCode::NotFound, "no file at " + path, "The model file was not found.");
-  fail(ErrorCode::ModelMissing, "the local model engine is not part of this build",
-       "The local model is not available in this version yet.");
+  if (!vp::llm::built())
+    fail(ErrorCode::ModelMissing, "the local model engine is not part of this build",
+         "The local model is not available in this version.");
+  vp::Result<vp::llm::FileCheck> fc = vp::llm::checkModelFile(path, true);
+  if (!fc) throw CmdError{fc.error()};
+  unwrap(settings_.set(json{{"modelPath", path}}));
+  refreshSettingsCache();
+  if (model_.loaded()) model_.unload();
+  return modelStatusJson(true);
 }
 
 json Server::cmdModelTest(const json&) {
-  fail(ErrorCode::ModelMissing, "the local model engine is not part of this build",
-       "The local model is not available in this version yet.");
+  if (!vp::llm::built())
+    fail(ErrorCode::ModelMissing, "the local model engine is not part of this build",
+         "The local model is not available in this version.");
+  if (!vp::llm::cpuSupported())
+    fail(ErrorCode::ModelUnsupportedCpu, "CPU lacks AVX2/FMA/F16C/BMI2",
+         "This computer's processor lacks the AVX2 instructions the local model needs.");
+  const json st = modelStatusJson(true);
+  if (!st.value("available", false)) {
+    if (st.value("reason", "") == "no_file")
+      fail(ErrorCode::ModelMissing, "no model file", "The local model is not installed. Choose its file in Settings.");
+    fail(ErrorCode::ModelLoadFailed, "model file check failed: " + st.value("reason", std::string()),
+         "The local model file is not the expected one. Reinstall the local model.");
+  }
+  struct UnloadAfter {
+    vp::llm::Model& m;
+    ~UnloadAfter() { m.unload(); }
+  } guard{model_};
+  const int64_t t0 = monoMs();
+  unwrap(model_.load(modelConfig()));
+  const int64_t t1 = monoMs();
+  const std::vector<std::string> options = {"puella", "puer", "aqua"};
+  std::vector<float> scores;
+  const int chosen = unwrap(model_.choose("Which word means 'girl'?", options, &scores));
+  const int64_t t2 = monoMs();
+  json sj = json::array();
+  for (float f : scores) sj.push_back(std::round(static_cast<double>(f) * 1000.0) / 1000.0);
+  model_.unload();
+  json out = modelStatusJson(false);
+  out["test"] = json{{"chosen", chosen}, {"chosenText", options[static_cast<size_t>(chosen)]}, {"correct", chosen == 0},
+                     {"scores", sj}, {"loadMs", t1 - t0}, {"chooseMs", t2 - t1}, {"ms", t2 - t0}};
+  return out;
 }
 
+// Engine iii (engine/online). Runs on the worker thread: the client may sleep for its 1 request/s throttle or a
+// short Retry-After while the reader thread keeps answering engine.ping. The transport is created only when the
+// settings allow it (engines.online && online.wiktionary); otherwise nothing network-related is even constructed.
 json Server::cmdOnlineTest(const json&) {
-  const json s = settings_.get();
-  const bool enabled = s.contains("engines") && s["engines"].is_object() && s["engines"].value("online", false);
-  if (!enabled)
+  if (!vp::online::onlineAllowed(settings_))
     fail(ErrorCode::OnlineDisabled, "online check is turned off", "Turn on the online check in Settings first.");
-  fail(ErrorCode::OnlineFailed, "this build has no online client", "The online check is not available in this version yet.");
+  const char* const kNoNet = "Could not reach wiktionary.org. Check the internet connection and try again.";
+  vp::Result<std::unique_ptr<vp::online::Transport>> transport = vp::online::makeSystemTransport(settings_);
+  if (!transport) fail(transport.error().code, transport.error().message, transport.error().hint.empty() ? kNoNet : transport.error().hint);
+  vp::online::Config cfg;
+  cfg.cacheDir = fs::join(opt_.dataDir, "online-cache");
+  cfg.maxRetryAfterSec = 5;   // a test answers quickly: a longer Retry-After reports "rate limited"
+  vp::Result<std::unique_ptr<vp::online::Wiktionary>> client =
+      vp::online::Wiktionary::create(*transport.value(), settings_, cfg);
+  if (!client) fail(client.error().code, client.error().message, client.error().hint);
+  const int64_t t0 = monoMs();
+  const vp::Result<vp::online::Evidence> ev = client.value()->probe();   // "aqua", cache not read
+  const int64_t ms = monoMs() - t0;
+  if (!ev) fail(ev.error().code, ev.error().message, ev.error().hint);
+  using Ev = vp::online::Evidence;
+  if (ev->verdict == Ev::Error) {
+    if (ev->summary == "online disabled")
+      fail(ErrorCode::OnlineDisabled, "online check is turned off", "Turn on the online check in Settings first.");
+    fail(ErrorCode::OnlineFailed, ev->summary, kNoNet);
+  }
+  const bool ok = ev->verdict == Ev::Agrees || ev->verdict == Ev::Disagrees;
+  const std::string message = ok ? "wiktionary.org answered in " + std::to_string(ms) + " ms"
+                                 : "wiktionary.org: " + ev->summary;
+  return json{{"ok", ok}, {"latencyMs", ms}, {"message", message}, {"verdict", vp::online::verdictName(ev->verdict)},
+              {"summary", ev->summary}, {"url", ev->url}};
 }
 
 }  // namespace vpcli

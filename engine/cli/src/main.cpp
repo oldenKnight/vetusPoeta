@@ -21,6 +21,7 @@ void usage() {
                "  vpengine serve [--data <dir>] [--lexicons <dir>]   JSON lines on stdin/stdout (DESIGN section 9)\n"
                "  vpengine inspect <file.vpl> <word>                 analyses and paradigm cells of a word\n"
                "  vpengine check <file.srt|.vtt|.ass|.txt> [--cps N] format, encoding, cues, warnings, fast cues\n"
+               "  vpengine llm-gate <latin.vpl> <model.gguf> [--pairs N] [--json f]  Latin minimal-pair gate\n"
                "  vpengine version\n"
                "environment: VP_LOG=off|error|warn|info|debug, VP_DATA_DIR, VP_LEXICON_DIR, VP_AUTOSAVE_MS\n",
                vp::appVersion());
@@ -70,6 +71,7 @@ int main(int argc, char** argv) {
     if (cmd == "serve") return vpcli::cmdServe(rest);
     if (cmd == "inspect") return vpcli::cmdInspect(rest);
     if (cmd == "check") return vpcli::cmdCheck(rest);
+    if (cmd == "llm-gate") return vpcli::cmdLlmGate(rest);
     std::fprintf(stderr, "unknown command: %s\n", cmd.c_str());
     usage();
     return 2;

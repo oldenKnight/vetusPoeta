@@ -1,0 +1,61 @@
+# Attic Greek word-order and construction rules for the realiser (DESIGN §1.2, §10.3 mirrored for Greek; D13).
+# Format (as order_la.txt):  RULE <id> : <condition> => <ordering or construction> ; <note>
+# Slots: VOC vocative (ὦ + vocative), CONN connector particle, S subject, IO indirect object, O object,
+#        OBL prepositional / oblique phrases, ADV adverbs, NEG οὐ / μή, V finite verb, PRED predicate noun/adjective,
+#        INF infinitive complement, WH interrogative word. Greek is written in lower case; only names are capitalised.
+RULE order.decl       : clause.type = decl                    => [VOC,] [CONN] S IO O OBL ADV [NEG] V ; Attic prose SOV-neutral ("ὁ δοῦλος τὸν λίθον αἴρει"); the negation directly before the verb
+RULE order.copula     : predicate.lemma = εἰμί & PRED         => [VOC,] [CONN] S PRED [NEG] V ; "ὁ πατήρ μου γεωργός ἐστιν": predicate noun without the article, ἐστί enclitic after the predicate
+RULE order.exist      : predicate.lemma = εἰμί & no PRED | existential / location first => [CONN] [OBL] V S ; "ἐν τῷ κήπῳ ᾤκει ἡ γαλῆ", "ποῦ ἐστιν ἡ σφαῖρα;"; existential ἔστι is orthotone
+RULE order.inf        : modal (δύναμαι, βούλομαι, ἐθέλω, μέλλω, ἐπίσταμαι) + INF => [VOC,] [CONN] S [NEG] V IO O OBL ADV INF ; "οὐ δύναμαι διελθεῖν", "τὰ ἄνθη οὐ δύναται λαλεῖν": the modal before the infinitive, the infinitive's objects between them
+RULE order.dei        : impersonal δεῖ + acc + INF            => [CONN] [NEG] V S O OBL INF ; "δεῖ ἡμᾶς ἀπιέναι": the subject of the infinitive in the accusative
+RULE order.exesti     : impersonal ἔξεστι + dat + INF         => [CONN] [NEG] V IO O OBL INF ; "ἔξεστί σοι ἀπιέναι": the person in the dative
+RULE order.yn         : clause.type = yn                      => optional ἆρα first, then decl order ("ἆρα ἡ κόρη τὴν μητέρα φιλεῖ;"); the Greek question mark ";"
+RULE order.yn.ou      : clause.type = yn & expects yes        => οὐ first, then decl order ("οὐ φιλεῖς τὴν μητέρα;")
+RULE order.yn.me      : clause.type = yn & expects no         => ἆρα μή first, then decl order ("ἆρα μὴ ὀργίζῃ;")
+RULE order.wh         : clause.type = wh                      => WH first (τίς, τί, ποῦ, ποῖ, πόθεν, πότε, πῶς, πόσος, ποῖος, πηνίκα, διὰ τί), then decl order without the WH slot; an interrogative adjective takes its noun along ("πόσους ἀδελφοὺς ἔχεις;")
+RULE order.imp        : clause.type = imp                     => [VOC,] V IO O OBL ADV ; "δός μοι τὴν σφαῖραν", "ἄνοιξον τὴν θύραν": the imperative first; a fronted time adverb stays first ("νῦν ἄκουε")
+RULE imp.number       : imperative addressee count            => singular by default; plural for a plural addressee or a plural vocative (as imp.number of order_la.txt)
+RULE imp.aspect       : imperative aspect                     => present imperative for ongoing or general commands ("ἄκουε", "λέγε"), aorist imperative for a single act ("δός", "ἄνοιξον"); the frame decides, default present
+RULE order.prohib     : clause.type = imp & polarity = neg    => μή + V + complements ; μή + present imperative ("μὴ φοβοῦ") or μή + aorist subjunctive ("μὴ φοβηθῇς"); never μή + aorist imperative
+RULE order.excl       : clause.type = excl                    => ὡς + ADJ + subject NP ("ὡς θαυμαστὸς ὁ κῆπος!"); interjections (οἴμοι, φεῦ, ὦ) first
+RULE order.voc        : vocative present                      => ὦ + vocative first (after an interjection), comma after; a bare vocative without ὦ for πάντες and pronouns
+RULE order.conn.second: connector in {δέ, γάρ, οὖν, μέν, γε, δή, τοίνυν, δήπου, τε} => second position, after the first word of the clause even when it is an article or a preposition ("ὁ δὲ ἀνήρ", "ἐν δὲ τῷ ἀγρῷ", "οὐ γὰρ οἶδα")
+RULE order.conn.first : connector in {ἀλλά, καί, οὐδέ, μηδέ, ἔπειτα, εἶτα, ἆρα} => first position
+RULE order.art        : definite NP                           => article + [attributive adjective / genitive] + noun ("ὁ καλὸς παῖς"); with two attributes: article + noun + article + adjective ("ὁ παῖς ὁ καλός")
+RULE order.art.name   : proper name of a person               => with the article in narrative ("ὁ Δικαιόπολις"), without it in the vocative and in a predicate ("Ἀλίκη εἰμί")
+RULE order.art.pred   : predicate noun                        => without the article ("γεωργός ἐστιν"); an identifying predicate may keep it (faithful)
+RULE order.dem        : demonstrative (οὗτος, ἐκεῖνος, ὅδε)   => predicate position before the article: οὗτος ὁ ἀνήρ / ὁ ἀνὴρ οὗτος; as a pronoun alone ("πῖνε τοῦτο")
+RULE order.quant      : quantity (πᾶς, ὅλος)                  => before the article ("πάντες οἱ δοῦλοι"); alone as a substantive ("πάντες")
+RULE order.poss       : possessor pronoun                     => enclitic μου / σου after the noun ("ὁ πατήρ μου"); αὐτοῦ / αὐτῆς / αὐτῶν / ἡμῶν / ὑμῶν after the noun ("τὴν κεφαλὴν αὐτοῦ"); contrastive: ἐμός / σός between article and noun ("ὁ ἐμὸς πατήρ")
+RULE order.gen        : genitive attribute                    => after the noun, with its own article ("ὁ οἶκος τοῦ γεωργοῦ")
+RULE order.num        : cardinal numeral                      => before the noun ("δύο ἀδελφούς", "μίαν ἀδελφήν"); with the article when definite ("οἱ δύο ἀδελφοί")
+RULE order.adj        : adjective modifies an indefinite noun => after the noun ("ἀνὴρ ἀγαθός"); negative and interrogative quantity words before it (οὐδείς, μηδείς, πόσος, ποῖος, πολύς, ὀλίγος) => before the noun ("οὐδεμίαν ᾠδήν")
+RULE order.prep       : prepositional phrase                  => preposition + [article] [adjective] noun ("ἐν τῷ ἀγρῷ", "εἰς τὴν οἰκίαν"); emphatic pronoun forms after a preposition ("πρὸς ἐμέ", "μετὰ σοῦ")
+RULE order.adv        : adverb                                => time adverbs (νῦν, ἤδη, αὖθις, ἀεί, σήμερον, αὔριον, ἔπειτα, τότε, οὐδέποτε, πρότερον, ἐνθάδε) at the start of the clause; manner and degree adverbs directly before the verb or the adjective they modify ("πάνυ μικρά", "ταχέως τρέχει")
+RULE order.rel        : relative clause                       => right after its antecedent; ὅς ἥ ὅ first in its clause, agreeing in gender and number, its case from its own clause
+RULE order.sub.pre    : subordinate of time / condition (ἐπεί, ὅτε, εἰ, ἐάν) => before the main clause when the source puts it first, else after; comma between
+RULE order.sub.cause  : subordinate of cause / statement (ὅτι, διότι) => after the main clause ("λέγει ὅτι ...", "χαίρει ὅτι ...")
+RULE order.sub.purp   : purpose (ἵνα / ὅπως + subjunctive)    => after the main clause; negative ἵνα μή
+RULE order.result     : result (ὥστε + infinitive)            => after the main clause; the negation of the infinitive is μή
+RULE order.dupl       : repeated exclamation in the source    => repeat identically ("ὀψὲ ἥκω! ὀψὲ ἥκω!")
+RULE neg.ou           : negation of a statement or a question  => οὐ (οὐκ before a smooth vowel, οὐχ before a rough one, οὔ at a stop); directly before the verb
+RULE neg.me           : negation in commands, prohibitions, purpose and conditional clauses, infinitives (not indirect statement) => μή
+RULE neg.single       : negative pronoun or adverb present (οὐδείς, οὐδέν, οὐδέποτε, μηδείς) => no second negation ("οὐδεὶς οἶδεν")
+RULE pron.drop        : subject pronoun ἐγώ / σύ / ἡμεῖς / ὑμεῖς => dropped unless contrastive or stressed ("ἐγὼ μὲν ..., σὺ δὲ ...")
+RULE pron.third       : third-person subject pronoun           => dropped; object αὐτόν / αὐτήν / αὐτό; "this one" => οὗτος / αὕτη / τοῦτο
+RULE pron.encl        : unstressed pronoun objects            => enclitic μου μοι με σου σοι σε after the verb ("δός μοι"); emphatic forms first in the clause and after prepositions
+RULE agree.neut.pl    : neuter plural subject                 => singular verb ("τὰ ἄνθη οὐ δύναται λαλεῖν")
+RULE tense.present    : English present / progressive          => present
+RULE tense.past.event : past simple, single event             => aorist ("εἶδες", "ἀπῆλθον")
+RULE tense.past.state : past state, background, "was ...ing", "used to" => imperfect ("ᾤκει", "ἦν")
+RULE tense.future     : will / shall / going to               => future
+RULE tense.perfect    : "has done" with a present result      => perfect only for a resulting state; otherwise aorist ("οὐδέποτε πρότερον ἔπαισα")
+RULE mood.subj        : subjunctive                            => after ἵνα / ὅπως / ἐάν, in prohibitions (μή + aorist) and deliberative questions ("τί ποιήσω;")
+RULE mood.optative    : optative                               => not used in flexible mode
+RULE voice.middle     : deponents and reflexive senses          => middle forms ("βούλομαι", "φοβοῦμαι"; "λούομαι" = I wash myself)
+RULE nu.movable       : -σι, 3rd singular -ε, ἐστί            => ν before a vowel and at the end of a sentence ("ἐστιν.", "τρέχουσιν.")
+RULE enclitic.accent  : enclitic after its host                => standard rules (vp::grc::sandhi): oxytone host keeps the acute; proparoxytone and properispomenon hosts add an acute on the ultima ("ἄνθρωπός τις", "δῶρόν τι"); after a paroxytone a disyllabic enclitic keeps its accent ("λόγος ἐστίν")
+RULE accent.grave     : acute on the ultima before another word => grave ("τὸν καλὸν παῖδα"); not before punctuation or an enclitic; never on τίς / τί
+RULE elision          : δέ ἀλλά τε ἀπό ἐπί κατά μετά παρά διά ὑπό before a vowel => off by default (setting); never crasis
+RULE punct            : punctuation                           => ";" for questions, "·" for a colon or semicolon of the source, "." "," "!" copied
+RULE caps             : capitalisation                        => lower case; only names and titles of persons capitalised; no capital at the start of a sentence

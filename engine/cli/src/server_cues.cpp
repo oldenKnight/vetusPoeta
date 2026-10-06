@@ -5,6 +5,7 @@
 
 #include "server.h"
 #include "vp/fs.h"
+#include "vp/online.h"
 #include "vp/text.h"
 
 namespace vpcli {
@@ -249,15 +250,25 @@ json Server::cmdTranslateStart(const json& p) {
     opt.useOnline = boolParam(*e, "online", false);
   }
   if (opt.useModel) {
-    opt.useModel = false;
-    warnings.push_back("model_missing");
+    std::string why;
+    if (!modelUsable(why)) {
+      opt.useModel = false;
+      warnings.push_back(why);
+    }
   }
-  if (opt.useOnline) {
-    const json s = settings_.get();
-    const bool allowed = s.contains("engines") && s["engines"].value("online", false);
-    if (!allowed) warnings.push_back("online_disabled");
-    opt.useOnline = false;   // no online client in this build
+  if (opt.useOnline && !vp::online::onlineAllowed(settings_)) {   // engines.online && online.wiktionary
+    warnings.push_back("online_disabled");
+    opt.useOnline = false;
   }
+  // TODO(C8): C2's engine_config.h makes Advisors.onlineCheck a construction-time field (EngineConfig.advisors), so
+  // it is wired where the server adopts makeEngine(EngineConfig): a hook owned by the Server that, when the engine
+  // calls it (worker thread, only for jobs with opt.useOnline), lazily creates
+  // vp::online::makeSystemTransport(settings_) and vp::online::Wiktionary::create(*transport, settings_,
+  // Config{cacheDir = <data>/online-cache}) and adapts the answer:
+  //   const vp::online::Evidence e = vp::online::makeOnlineCheck(*client)("la", lemma, gloss);  // "grc" for Greek
+  //   return vp::rules::Evidence{e.verdict == e.Agrees ? 1 : e.verdict == e.Disagrees ? -1 : 0, "wiktionary",
+  //                              e.summary + " " + e.url};
+  // Evidence only (Disagrees -> Check + an "evidence" reason). Until then no engine calls it: no request is made.
   opt.orbergise = boolParam(p, "orbergise", false);
   std::vector<size_t> positions;
   if (const json* idx = param(p, "indices")) {
@@ -274,7 +285,21 @@ json Server::cmdTranslateStart(const json& p) {
       if (!project_.cues[i].edited && !project_.cues[i].reviewed) positions.push_back(i);
   }
   const int64_t jobId = nextJob_++;
-  pendingJob_ = [this, jobId, positions, opt]() { runJob(jobId, positions, opt, "translate"); };
+  pendingJob_ = [this, jobId, positions, opt]() {
+    // Engine ii: closed-choice advisors that load the model lazily on the engine's first question inside this
+    // job; the model is unloaded when the job ends, whatever happens.
+    // TODO(C2): hand `advisors` to the rules engine once the CLI builds it with makeEngine(EngineConfig) and C2's
+    // engine_config.h (vp::rules::Advisors::chooseSense returns int, -1 = no opinion) is committed:
+    //   cfg.advisors.chooseSense = [adv](const std::string& q, const std::vector<std::string>& o) {
+    //     vp::Result<int> r = adv.chooseSense(q, o, nullptr); return r.ok() ? r.value() : -1; };
+    struct UnloadAfter {
+      vp::llm::Model& m;
+      ~UnloadAfter() { m.unload(); }
+    } guard{model_};
+    const vp::llm::Advisors advisors = opt.useModel ? vp::llm::makeAdvisors(model_, modelConfig()) : vp::llm::Advisors{};
+    (void)advisors;
+    runJob(jobId, positions, opt, "translate");
+  };
   return json{{"jobId", jobId}, {"total", positions.size()}, {"warnings", warnings}};
 }
 

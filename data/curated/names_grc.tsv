@@ -1,0 +1,62 @@
+# english	greek_nom	greek_gen	gender	declension	policy	note
+# Greek forms of common first names and a few mythological / historical names (our own list; same columns as
+# names_la.tsv). declension: 1 (-η / -α, masculine -ης / -ας), 2 (-ος), 3 (consonant stem from the genitive in -ος,
+# or -ης / -ους), 0 indeclinable. A note "voc=<form>" gives an irregular vocative. "translate" rows are titles.
+Alice	Ἀλίκη	Ἀλίκης	f	1	decline	
+Mary	Μαρία	Μαρίας	f	1	decline	
+Anna	Ἄννα	Ἄννης	f	1	decline	
+Anne	Ἄννα	Ἄννης	f	1	decline	
+Julia	Ἰουλία	Ἰουλίας	f	1	decline	
+Lucy	Λουκία	Λουκίας	f	1	decline	
+Sophia	Σοφία	Σοφίας	f	1	decline	
+Sophie	Σοφία	Σοφίας	f	1	decline	
+Helen	Ἑλένη	Ἑλένης	f	1	decline	
+Irene	Εἰρήνη	Εἰρήνης	f	1	decline	
+Dorothy	Δωροθέα	Δωροθέας	f	1	decline	
+Theodora	Θεοδώρα	Θεοδώρας	f	1	decline	
+Catherine	Αἰκατερίνη	Αἰκατερίνης	f	1	decline	
+Katherine	Αἰκατερίνη	Αἰκατερίνης	f	1	decline	
+Christina	Χριστίνα	Χριστίνης	f	1	decline	
+Melissa	Μέλιττα	Μελίττης	f	1	decline	
+Myrrhine	Μυρρίνη	Μυρρίνης	f	1	decline	
+Penelope	Πηνελόπη	Πηνελόπης	f	1	decline	
+Daphne	Δάφνη	Δάφνης	f	1	decline	
+Chloe	Χλόη	Χλόης	f	1	decline	
+Phoebe	Φοίβη	Φοίβης	f	1	decline	
+Zoe	Ζωή	Ζωῆς	f	1	decline	
+Athena	Ἀθηνᾶ	Ἀθηνᾶς	f	1	decline	
+Sparta	Σπάρτη	Σπάρτης	f	1	decline	
+Mark	Μᾶρκος	Μάρκου	m	2	decline	
+Peter	Πέτρος	Πέτρου	m	2	decline	
+Paul	Παῦλος	Παύλου	m	2	decline	
+Philip	Φίλιππος	Φιλίππου	m	2	decline	
+Alexander	Ἀλέξανδρος	Ἀλεξάνδρου	m	2	decline	
+Nicholas	Νικόλαος	Νικολάου	m	2	decline	
+George	Γεώργιος	Γεωργίου	m	2	decline	
+Stephen	Στέφανος	Στεφάνου	m	2	decline	
+Theodore	Θεόδωρος	Θεοδώρου	m	2	decline	
+Timothy	Τιμόθεος	Τιμοθέου	m	2	decline	
+Matthew	Ματθαῖος	Ματθαίου	m	2	decline	
+Dennis	Διονύσιος	Διονυσίου	m	2	decline	
+Christopher	Χριστόφορος	Χριστοφόρου	m	2	decline	
+James	Ἰάκωβος	Ἰακώβου	m	2	decline	
+Jacob	Ἰάκωβος	Ἰακώβου	m	2	decline	
+Leo	Λέων	Λέοντος	m	3	decline	
+Philemon	Φιλήμων	Φιλήμονος	m	3	decline	
+Plato	Πλάτων	Πλάτωνος	m	3	decline	
+Socrates	Σωκράτης	Σωκράτους	m	3	decline	voc=Σώκρατες
+John	Ἰωάννης	Ἰωάννου	m	1	decline	
+Andrew	Ἀνδρέας	Ἀνδρέου	m	1	decline	
+Xanthias	Ξανθίας	Ξανθίου	m	1	decline	
+Thomas	Θωμᾶς	Θωμᾶ	m	1	decline	
+Luke	Λουκᾶς	Λουκᾶ	m	1	decline	
+Hermes	Ἑρμῆς	Ἑρμοῦ	m	1	decline	
+Dicaeopolis	Δικαιόπολις	Δικαιοπόλιδος	m	3	decline	
+Daniel	Δανιήλ	Δανιήλ	m	0	decline	indeclinable
+David	Δαυίδ	Δαυίδ	m	0	decline	indeclinable
+Michael	Μιχαήλ	Μιχαήλ	m	0	decline	indeclinable
+Gabriel	Γαβριήλ	Γαβριήλ	m	0	decline	indeclinable
+Queen	βασίλεια	βασιλείας	f	1	translate	title; an ordinary noun for the checker
+King	βασιλεύς	βασιλέως	m	3	translate	title; an ordinary noun for the checker
+Master	δεσπότης	δεσπότου	m	1	translate	title
+Mistress	δέσποινα	δεσποίνης	f	1	translate	title

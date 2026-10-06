@@ -1,0 +1,69 @@
+# english	context	greek	case	note
+# English prepositions -> Attic preposition (or a bare case: "-") and the case it governs. The union of the cases
+# listed for one Greek preposition is what the checker accepts after it (A4). Our own table.
+in	place (static)	ἐν	dat	ἐν τῷ ἀγρῷ
+in	time (within)	ἐν	dat	ἐν τούτῳ
+in	time (on a day)	-	dat	bare dative of time: τῇ τρίτῃ ἡμέρᾳ
+into	motion	εἰς	acc	εἰς τὴν οἰκίαν
+to	motion toward a place	εἰς	acc	εἰς τὴν πόλιν; home = οἴκαδε (adverb)
+to	motion toward a person	πρός	acc	πρὸς τὸν πατέρα
+to	recipient / indirect object	-	dat	dative, no preposition
+to	purpose (infinitive)	-	inf	ἵνα + subjunctive in faithful mode
+towards	direction	πρός	acc	
+at	place	ἐν	dat	ἐν τῇ ἀγορᾷ
+at	someone's house	παρά	dat	παρὰ τῷ πατρί
+at	time	-	dat	bare dative: ἕκτῃ ὥρᾳ
+on	surface (static)	ἐπί	gen	ἐπὶ τῆς τραπέζης
+on	day	-	dat	bare dative of time
+onto	motion	ἐπί	acc	ἐπὶ τὸν λίθον
+upon	resting on, condition	ἐπί	dat	ἐπὶ τῇ θαλάττῃ
+against	hostile direction	ἐπί	acc	ἐπὶ τοὺς πολεμίους
+with	accompaniment	μετά	gen	μετὰ τοῦ πατρός; σύν + dat is the alternative
+with	accompaniment (alternative)	σύν	dat	σὺν θεῷ
+with	instrument	-	dat	bare dative of means: λίθῳ
+with	manner	μετά	gen	μετὰ σπουδῆς
+without	-	ἄνευ	gen	ἄνευ τοῦ πατρός
+from	out of	ἐκ	gen	ἐκ τῆς οἰκίας; ἐξ before a vowel
+from	away from	ἀπό	gen	ἀπὸ τοῦ ἀγροῦ
+from	a person	παρά	gen	παρὰ τοῦ πατρός
+from	the side of, by (oath)	πρός	gen	πρὸς θεῶν
+by	agent (person)	ὑπό	gen	ὑπὸ τοῦ δεσπότου with a passive verb
+by	means (thing)	-	dat	
+by	beside, near (static)	παρά	dat	παρὰ τῇ θαλάττῃ
+by	near (place)	πρός	dat	πρὸς τῇ πόλει
+alongside	motion to the side of	παρά	acc	παρὰ τὸν ποταμόν
+beside	static	παρά	dat	
+of	possession	-	gen	genitive
+of	partitive	-	gen	
+about	topic	περί	gen	περὶ τοῦ πολέμου
+about	approximately	ἀμφί	acc	ἀμφὶ τὰ ἑκατόν
+around	place	περί	acc	περὶ τὴν πόλιν
+through	place	διά	gen	διὰ τῆς πύλης
+because of	cause	διά	acc	διὰ τοῦτο
+after	time	μετά	acc	μετὰ τὸ δεῖπνον
+before	time	πρό	gen	πρὸ τῆς ἡμέρας
+before	place (in front of)	πρό	gen	πρὸ τῆς θύρας
+in front of	place	πρό	gen	
+for	benefit (on behalf of)	ὑπέρ	gen	ὑπὲρ τῆς πατρίδος
+for	recipient	-	dat	
+for	duration	-	acc	accusative of extent of time: πολλὰς ἡμέρας
+for	purpose (for the sake of)	ἕνεκα	gen	postpositive: τοῦ ἀργυρίου ἕνεκα
+over	above	ὑπέρ	gen	ὑπὲρ τῆς θαλάττης
+beyond	motion	ὑπέρ	acc	ὑπὲρ τὰ ὄρη
+under	static	ὑπό	dat	ὑπὸ τῷ δένδρῳ
+under	motion	ὑπό	acc	ὑπὸ τὸ δένδρον
+down	down from	κατά	gen	κατὰ τοῦ ὄρους
+along	motion along	κατά	acc	κατὰ τὴν ὁδόν
+according to	-	κατά	acc	κατὰ τὸν νόμον
+up	up along	ἀνά	acc	ἀνὰ τὸν ποταμόν
+instead of	-	ἀντί	gen	ἀντὶ τοῦ πατρός
+during	time (within which)	-	gen	νυκτός
+behind	place	ὄπισθεν	gen	ὄπισθεν τῆς οἰκίας
+near	place	ἐγγύς	gen	ἐγγὺς τῆς θαλάττης
+outside	place	ἔξω	gen	ἔξω τῆς πόλεως
+inside	place	ἔνδον	gen	
+until	time	μέχρι	gen	μέχρι τῆς νυκτός
+except	-	πλήν	gen	πλὴν τοῦ δούλου
+between	place	μεταξύ	gen	
+since	time	ἐκ	gen	ἐκ παιδός
+like	comparison	-	dat	ὅμοιος + dative

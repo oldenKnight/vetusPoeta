@@ -115,6 +115,9 @@ Server::Server(Output& out, ServeOptions opt)
     : out_(out), opt_(std::move(opt)), settings_(fs::join(opt_.dataDir, "settings.json")) {
   settings_.load();
   for (const std::string& w : settings_.warnings()) logMsg(LogLevel::Warn, "settings: " + w);
+  vp::llm::setLogSink([](int level, const char* text) {
+    logMsg(level == 1 ? LogLevel::Error : LogLevel::Warn, std::string("llm: ") + text);
+  });
   refreshSettingsCache();
   autosaveDebounceMs_ = envInt("VP_AUTOSAVE_MS", 5000, 50, 600000);
   autosaver_ = vp::Autosaver(autosaveDebounceMs_, std::max<int64_t>(60000, autosaveDebounceMs_));
@@ -306,7 +309,7 @@ void Server::handle(const json& req) {
       {"export.write", &Server::cmdExportWrite},
       {"export.preview", &Server::cmdExportPreview},
       {"model.status", &Server::cmdModelStatus},
-      {"model.unload", &Server::cmdModelStatus},
+      {"model.unload", &Server::cmdModelUnload},
       {"model.locate", &Server::cmdModelLocate},
       {"model.test", &Server::cmdModelTest},
       {"online.test", &Server::cmdOnlineTest},
@@ -354,6 +357,7 @@ void Server::tick(bool force) {
   const int64_t now = monoMs();
   if (!force && now - lastTickMs_ < kTickMs) return;
   lastTickMs_ = now;
+  if (model_.maybeUnload(now)) logMsg(LogLevel::Info, "local model unloaded after idle time");
   if (!hasProject_ || !autosaver_.due(now)) return;
   if (!settings_.get().value("autosave", true)) return;
   if (writeAutosave()) {
@@ -389,8 +393,7 @@ json Server::cmdHello(const json&) {
   return json{{"version", vp::appVersion()},
               {"engine", engine_->version()},
               {"lexicons", lexInfo_},
-              {"model", {{"available", false}, {"path", s.value("modelPath", "")}, {"sizeBytes", 0}, {"cpuOk", false},
-                         {"reason", "not_built"}}},
+              {"model", modelStatusJson(false)},
               {"threads", s.value("eco", false) ? 2 : hardwareThreads()},
               {"dataDir", opt_.dataDir},
               {"lexiconDir", opt_.lexiconDir},

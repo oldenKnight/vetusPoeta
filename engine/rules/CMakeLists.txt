@@ -19,3 +19,12 @@ file(GLOB VP_RULES_C2_SRC CONFIGURE_DEPENDS
 target_sources(vp_rules PRIVATE ${VP_RULES_C2_SRC})
 target_link_libraries(vp_rules PUBLIC vp_nlp vp_subs)
 
+# C9 (Greek side): Greek morphology helpers, realisation primitives and checker. Guarded so the block is idempotent.
+if(NOT VP_RULES_GRC_ADDED)
+  set(VP_RULES_GRC_ADDED ON)
+  file(GLOB VP_RULES_GRC_SRC CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/realise_grc/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/check_grc/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/morph_grc/*.cpp)
+  target_sources(vp_rules PRIVATE ${VP_RULES_GRC_SRC})
+endif()
