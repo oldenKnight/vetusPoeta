@@ -146,7 +146,9 @@ json Server::cmdCueGet(const json& p) {
   const std::vector<vp::rules::TokenView> toks = r.target.empty() ? std::vector<vp::rules::TokenView>() : tokensOf(pos);
   for (const vp::rules::TokenView& t : toks) tokens.push_back(tokenJson(t));
   ReasonViewCtx rc;
-  rc.lex = lexFor(langs_.target);
+  // the lexicon the tokens' lemma ids belong to: the Latin/Greek side of the pair (la-en tokens are the source's)
+  const bool classicalTarget = langs_.target == vp::rules::Lang::La || langs_.target == vp::rules::Lang::Grc;
+  rc.lex = lexFor(classicalTarget ? langs_.target : langs_.source);
   rc.latin = langs_.target == vp::rules::Lang::La;
   rc.source = sources_[pos];
   json out{{"cue", cueView(pos)}, {"alternatives", alts}, {"tokens", tokens}, {"checks", checks},
@@ -549,13 +551,18 @@ json Server::cmdCorrectionsRemove(const json& p) {
 // ---------------------------------------------------------------------------------------------- words, eval
 json Server::cmdWordsList(const json& p) {
   requireProject();
-  const vp::lex::Lexicon* lx = lexFor(langs_.target);
+  // the vocabulary of the Latin/Greek side: the target, or the source for la-en / grc-es ...
+  const bool classicalTarget = langs_.target == vp::rules::Lang::La || langs_.target == vp::rules::Lang::Grc;
+  const bool classicalSource = langs_.source == vp::rules::Lang::La || langs_.source == vp::rules::Lang::Grc;
+  const vp::rules::Lang side = classicalTarget || !classicalSource ? langs_.target : langs_.source;
+  const vp::lex::Lexicon* lx = lexFor(side);
   if (!lx)
-    fail(ErrorCode::LexiconMissing, std::string("no lexicon for '") + langCode(langs_.target) + "'",
+    fail(ErrorCode::LexiconMissing, std::string("no lexicon for '") + langCode(side) + "'",
          "The dictionary for the target language is not installed.");
   const int64_t limit = intParam(p, "limit", 2000, 1, 100000);
-  const bool greek = langs_.target == vp::rules::Lang::Grc;
-  const bool classical = greek || langs_.target == vp::rules::Lang::La;
+  const bool greek = side == vp::rules::Lang::Grc;
+  const bool classical = greek || side == vp::rules::Lang::La;
+  const bool fromSource = side != langs_.target;   // words of the source text when there are no stored tokens
   std::map<uint32_t, std::pair<int, int>> counts;   // lemma -> (count, effective tier of its first token)
   int known = 0, unknown = 0, names = 0;
   std::vector<vp::lex::Analysis> an;
@@ -577,7 +584,8 @@ json Server::cmdWordsList(const json& p) {
     if (lx->lookup(key, an) && !an.empty()) count(an[0].lemma, lx->lemma(an[0].lemma).tier);
     else ++unknown;
   };
-  for (const vp::CueRecord& r : project_.cues) {
+  for (size_t ci = 0; ci < project_.cues.size(); ++ci) {
+    const vp::CueRecord& r = project_.cues[ci];
     if (r.target.empty()) continue;
     const vp::CueReason* h = hiddenReason(r, kTokensKind);
     if (h && decodeTokens(h->data, toks)) {   // the engine's own tokens: lemma ids and effective tiers
@@ -593,15 +601,16 @@ json Server::cmdWordsList(const json& p) {
       }
       continue;
     }
-    for (size_t i = 0; i < r.target.size();) {
+    const std::string& text = fromSource ? sources_[ci] : r.target;
+    for (size_t i = 0; i < text.size();) {
       const size_t at = i;
-      const char32_t cp = vp::text::decodeUtf8(r.target, i);
+      const char32_t cp = vp::text::decodeUtf8(text, i);
       const bool sep = cp < 0x80 && !((cp >= 'a' && cp <= 'z') || (cp >= 'A' && cp <= 'Z') || cp == '-');
       if (sep || cp == 0x2014 || cp == 0x2013 || cp == 0x00AB || cp == 0x00BB || cp == 0x2019 || cp == 0x201C ||
           cp == 0x201D || cp == 0x00B7 || cp == 0x0387)
         flush();
       else
-        word.append(r.target, at, i - at);
+        word.append(text, at, i - at);
     }
     flush();
   }

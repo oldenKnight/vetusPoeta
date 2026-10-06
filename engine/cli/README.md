@@ -35,7 +35,7 @@ copied there from `VP_SAMPLES_DIR`, `<exe>/samples` or `tests/samples` above the
 and greek.vpl), `pairs` (the pairs translate.start accepts now), `pairsUnavailable [{pair, code, message, hint}]`
 (en-la/es-la: `lexicon_missing` without latin.vpl, `not_found` without the curated tables or without
 `<base>.tag.vpt/.dep.vpt` - the hint names the files; other pairs: what the rules engine answered to a one-cue
-probe, today `bad_params` "This language pair is not available yet."), `modes` ("R" when a pair is available, "M"
+probe, e.g. `bad_params` "This language pair is not available yet." for la-la and the Greek pairs), `modes` ("R" when a pair is available, "M"
 when the model file is found and the CPU is supported, "O" always: engine iii is built in and runs only when the
 settings turn it on), `model {..., rerankEnabled, reason}`, `online {allowed, mock, mockCalls}`,
 `nlp {dir, en, es}`, `curatedDir`, `samples [{lang, path}]`, `dataDir`, `lexiconDir`, `threads`.
@@ -71,6 +71,8 @@ input Latin with the output when the engine gives none). In Orbergise mode (pair
 (the line of `orbergise.start {originalPath}` aligned by index, else by time overlap; the path is kept in the
 manifest). CueView `flags`: the engine's (`emoji`, `unknownName`, `song`, `nonverbal`, `name-guessed`,
 `frame-fallback`, `tags`, ...) plus `cps`, `overflow`, `alternative` recomputed from the current target.
+For la-en / la-es (C11) the tokens describe the Latin source words (flag `source-tokens`) and the reasons of kind
+`analysis` pass through unchanged; the evidence rows and `words.list` use the Latin/Greek side's lexicon.
 `LemmaView.flags` adds `gloss-es-pivot` (lexicon flag bit 8). `words.list` counts the engine's tokens (lemma ids,
 effective tiers; capitalised unknown words as names). `settings.speakerGender` "m" | "f" | "u" ->
 `Options.speakerGender`. `CueInput.spans` carries the source cue's text/tag spans (newline = text "\n").

@@ -667,6 +667,16 @@ def part_real(exe, work, _lex):
     check(forms["m"] != forms["f"], "speakerGender: m %r, f %r" % (forms["m"], forms["f"]))
     eng.req("settings.set", {"patch": {"speakerGender": None}})
 
+    # Latin -> English (C11): source-side tokens and "analysis" reasons pass through; words.list on the Latin side
+    if "la-en" in hello["pairs"]:
+        eng.req("project.new", {"kind": "subs", "pair": "la-en", "sourcePath": samples.get("la")})
+        j = eng.req("translate.start", {})["jobId"]
+        eng.wait_event("translate.done", lambda e: e["jobId"] == j, timeout=120)
+        d = eng.req("cue.get", {"index": 0})
+        kinds = {r["kind"] for r in d["reasons"]}
+        check(d["cue"]["target"] and "analysis" in kinds and "evidence" in kinds, "la-en: target %r, reasons %s" % (d["cue"]["target"], sorted(kinds)))
+        wl = eng.req("words.list")
+        check(wl["words"] and wl["unknown"] < wl["tokens"], "la-en: words.list from the Latin side (%d words)" % len(wl["words"]))
     # a pair the engine does not serve: a hint, not lexicon_missing
     if "la-en" not in hello["pairs"]:
         eng.req("project.new", {"kind": "text", "pair": "la-en", "text": "Puella rosam videt."})
