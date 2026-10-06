@@ -25,7 +25,8 @@ enum class Det : uint8_t { None, Hic, Ille, Is, Iste };
 // Clause roles (relative pronoun role, wh role).
 enum class Role : uint8_t { None, Subject, Object, IndirectObject, Oblique, Predicate };
 enum class AdvPos : uint8_t { Auto /* order.adv: time adverbs first, others before the verb */, Front, BeforeVerb, End };
-enum class SubRel : uint8_t { Cause, Time, Condition, Purpose, Concession, Result, AccInf, IndirectQ, Coord };
+enum class SubRel : uint8_t { Cause, Time, Condition, Purpose, Concession, Result, AccInf, IndirectQ, Coord,
+                              Apposition /* C17: ", paleā fartum" agreeing with the subject / predicate noun */ };
 
 struct LaClause;
 
@@ -34,6 +35,9 @@ struct LaAdj {
   uint32_t lemma = kNone; uint8_t degree = 0; std::vector<uint32_t> adverbs; /* "nimis parva" */
   bool before = false;            // C15: before the noun whatever order.adj says ("Magnus Magus", names_la.tsv)
   bool capitalise = false;        // C15: part of a translated name ("Leō Timidus")
+  // C17: `lemma` is a verb and the adjective is its participle: feat::Perfect (passive; active for deponents),
+  // feat::Present (active) or feat::Future; 0 = an ordinary adjective
+  uint8_t participle = 0;
 };
 
 struct LaNP {
@@ -62,6 +66,7 @@ struct LaNP {
   std::string literal;            // unknown source word, kept verbatim (marked unknown)
   std::string fixed;              // ready Latin words from the phrasebook ("chartīs"): written as they are (C2b)
   bool nameWords = false;         // C15: a translated name of names_la.tsv ("Urbs Smaragdōrum"): every word is a name
+  bool indefinite = false;        // C17: "I am a Scarecrow": a description, not the speaker's name (ego is dropped)
 };
 
 struct LaOblique {
@@ -113,6 +118,10 @@ struct LaClause {
   uint32_t relPrep = kNone;                // relative pronoun inside a prepositional phrase
   std::string punct;                       // source punctuation; empty = "." / "?" by type
   bool plainQuestion = false;              // C15: a negated question said as a statement: nōn + verb first, no -ne
+  // C17: object complement (factitive verbs: "eum rēgem fēcērunt", "mē fortiōrem facit"): after the object, in the
+  // object's case; adjectives agree with the object
+  std::vector<LaNP> objPredicative;
+  std::vector<LaAdj> objPredAdj;
 };
 
 struct LaSentence {
@@ -286,7 +295,8 @@ class LatinRealiser {
   struct ClauseCtx {
     bool main = true, accInf = false, relative = false, suppressNon = false;
     uint8_t forceMood = 0;   // purpose clauses: subjunctive
-    AgreeInfo ante;          // relative clauses: the antecedent
+    AgreeInfo ante;          // relative clauses: the antecedent; C17 apposition: the word described
+    bool apposition = false; // C17: a participle / adjective phrase agreeing with `ante`
   };
   void clause(const LaClause&, const RealiseOptions&, std::vector<Word>& out, const ClauseCtx&);
   void np(const LaNP&, uint8_t case_, const LaClause* owner, const RealiseOptions&, std::vector<Word>& out);

@@ -240,7 +240,8 @@ bool Pronouns::dropSubject(const LaClause& c) const {
   if (!c.hasSubject || !c.subject.isPronoun || c.subject.emphasis || !c.subject.coord.empty()) return false;
   // pron.drop (c): "Ego sum Alīcia" keeps ego when a copula introduces the speaker by name
   // (rule pron.is: a 3rd-person pronoun is dropped before a name too: "Rēgīna Cordium est")
-  if (!c.predicative.empty() && c.predicative[0].isName && c.subject.pron.person != 3) return false;
+  if (!c.predicative.empty() && c.predicative[0].isName && !c.predicative[0].indefinite && c.subject.pron.person != 3)
+    return false;
   return true;   // pron.drop (ego/tū/nōs/vōs) and pron.is (is/ea/id)
 }
 

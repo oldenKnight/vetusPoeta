@@ -71,6 +71,7 @@ struct LatinChecker::Impl {
   Report& rep;
   std::vector<std::vector<Reading>> rd;   // readings per token
   std::vector<char> governed, attached, isVerb, boundaryBefore, relStart;
+  std::vector<char> advHint;   // C17: the generator chose an adverb that has an adjective homograph (tantum)
 
   // ---- reading classes ----
   static bool isFinite(const Reading& r) {
@@ -253,13 +254,24 @@ struct LatinChecker::Impl {
           std::all_of(rd[i].begin(), rd[i].end(), [](const Reading& r) { return (r.lflags & lex::ProperName) || r.lpos == Name; }))
         t.name = true;
     }
+    advHint.assign(rep.tokens.size(), 0);
     if (opt.hints)
       for (const TokenHint& h : *opt.hints)
-        for (CheckedToken& t : rep.tokens)
+        for (size_t ti = 0; ti < rep.tokens.size(); ++ti) {
+          CheckedToken& t = rep.tokens[ti];
           if (t.start >= h.start && t.end <= h.end) {
             if (h.name) t.name = true;
             if (h.fromRule) { t.fromRule = true; rep.fromRule = true; }
+            // C17: an adverb chosen by the generator ("Terriculum tantum sum") is not checked as an adjective when
+            // the word really has that adverb reading
+            if (h.lemma != lex::kNoLemma) {
+              const uint8_t hp = lx.lemma(h.lemma).pos;
+              if (hp == Adv || hp == Particle)
+                for (const Reading& r : rd[ti])
+                  if (r.lemma == h.lemma) advHint[ti] = 1;
+            }
           }
+        }
   }
 
   void segment() {
@@ -484,7 +496,7 @@ struct LatinChecker::Impl {
     // modifier; a pure modifier must agree with an adjacent head, or be a predicate of a copula, or stand alone as a
     // substantive (then it may not partially agree with a neighbour and may not follow a preposition's noun).
     for (size_t i = 0; i < n; ++i) {
-      if (!any(i, isModifier) || strongHead(i) || verbish(i) || relStart[i] || rep.tokens[i].name) continue;
+      if (!any(i, isModifier) || strongHead(i) || verbish(i) || relStart[i] || rep.tokens[i].name || advHint[i]) continue;
       bool relOnly = true;
       for (const Reading& r : rd[i]) relOnly = relOnly && isRelative(r);
       if (relOnly) continue;
@@ -842,7 +854,7 @@ LatinChecker::LatinChecker(const lex::Lexicon& lx, const curated::CuratedData& c
 
 void LatinChecker::check(std::string_view text, const Options& o, Report& out) {
   out.clear();
-  Impl im{lx_, cd_, nameKeys_, o, out, {}, {}, {}, {}, {}, {}};
+  Impl im{lx_, cd_, nameKeys_, o, out, {}, {}, {}, {}, {}, {}, {}};
   im.tokenise(text);
   im.analyse(hasMacron(text));
   im.names();

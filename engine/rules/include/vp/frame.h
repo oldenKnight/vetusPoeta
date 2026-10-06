@@ -64,6 +64,9 @@ struct SemAdj {
   std::vector<std::string> adverbs;   // "very", "too"
   std::vector<int> advTokens;
   uint8_t degree = 0;            // vp::feat::Degree (0 positive)
+  // C17: a verb's participle used as an adjective ("a lighted match", "the sleeping dog"): `lemma` is the verb;
+  // 1 = past participle (passive), 2 = present participle (active); 0 = an ordinary adjective
+  uint8_t participle = 0;
 };
 
 struct SemFrame;
@@ -155,6 +158,13 @@ struct SemFrame {
   std::string punct;                      // final punctuation of the clause in the source ("." "?" "!")
   std::vector<int> tokens;                // every token of the clause
   bool implicitSubject = false;           // pro-drop subject taken from the verb (Spanish) or the imperative
+  // C17: object complement of a factitive verb ("make him king", "make me braver", "call me a fool")
+  std::vector<SemNP> objComplement;
+  std::vector<SemAdj> objComplementAdj;
+  // C17: a participle or adjective phrase after a comma that describes the subject (or the predicate noun): "I am only
+  // a Scarecrow, stuffed with straw.", "I am a Cowardly Lion, afraid of everything." Each is a Frag frame with one
+  // predAdj (SemAdj::participle for participles) and its obliques.
+  std::vector<SemFrame> secondary;
 };
 
 struct SemSub { Relation relation = Relation::Cause; std::string marker; bool before = false; std::vector<SemFrame> frame; };

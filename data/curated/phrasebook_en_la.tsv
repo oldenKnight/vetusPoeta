@@ -223,3 +223,5 @@ in trouble	in perīculō	1	tail	"anyone in trouble"
 well	bene	1	lead	"Well, come to me tomorrow" -> Bene, ...
 for my part	ego	1	adv	"For my part, I have no heart" -> Ego cor nōn habeō
 i am not much of a {NP}	nōn magnus {1:nom} sum	1	stmt	"I'm not much of a magician" -> Nōn magnus magus sum
+# C17 (quality loop 3). vp rows noted "(transitive)" apply only when the verb has an object.
+starve	famē cōnficere	2	vp	(transitive) "The cruel king starved the prisoners." -> captīvōs famē cōnfēcit

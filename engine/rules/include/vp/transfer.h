@@ -111,6 +111,7 @@ class Transfer {
   bool titleNoun(const frame::SemNP& n, Ctx& c, realise::LaNP& o) const;              // C15: "the kind Stork"
   void relativeInto(const frame::SemNP& n, Ctx& c, realise::LaNP& o) const;          // C15: shared by names
   bool deponentActive(const frame::SemFrame& in, Ctx& c, frame::SemFrame& out) const; // C15: deponent passives
+  uint32_t adjectiveInto(const frame::SemAdj& a, Ctx& c, realise::LaAdj& la, Choice& ch) const;   // C17: participles
 
   const lex::Lexicon& la_;
   const curated::CuratedData& cd_;

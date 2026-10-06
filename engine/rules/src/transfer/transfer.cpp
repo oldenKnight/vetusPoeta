@@ -3,7 +3,9 @@
 // CaseAssigner (valency_la.tsv), periphrasis_la.tsv for fidelity 2/3, names through the glossary / names_la.tsv.
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
+#include "frame/english.h"
 #include "tables.h"
 #include "vp/morph.h"
 #include "vp/text.h"
@@ -428,6 +430,49 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
       x.score -= 0.05;   // a pivot reading is one step less certain
       x.why += ", via English \"" + pivotVia + "\"";
     }
+  // C17 (coordinator add-on): two lemmas with the same cleaned headword, part of speech, gender and principal parts
+  // inflect alike (the rebuilt latin.vpl lists "caelum" heaven and "caelum" chisel): they give the same Latin words,
+  // so they are one candidate. The best score represents the group (its sense is the one that fits); on equal scores
+  // the lower tier, then more paradigm cells, then the lower id. The others are dropped and never count as a
+  // competitor for the margin. Homographs that inflect differently (volō velle / volō volāre) stay apart.
+  if (sc.size() > 1) {
+    auto sig = [&](uint32_t id) {
+      const lex::Lemma l = la_.lemma(id);
+      return text::nfc(morph::cleanHead(l.head)) + "|" + std::to_string((int)l.pos) + "|" +
+             std::to_string((int)l.gender) + "|" + text::nfc(std::string(l.principal));
+    };
+    auto cellCount = [&](uint32_t id) {
+      std::vector<std::pair<uint32_t, std::string_view>> cl;
+      la_.cells(id, cl);
+      return cl.size();
+    };
+    std::vector<char> gone(sc.size(), 0);
+    for (size_t i = 0; i < sc.size(); ++i) {
+      if (gone[i]) continue;
+      const std::string si = sig(sc[i].lemma);
+      size_t win = i;
+      for (size_t j = i + 1; j < sc.size(); ++j) {
+        if (gone[j] || sig(sc[j].lemma) != si) continue;
+        const Scored& w = sc[win];
+        const Scored& x = sc[j];
+        bool better = x.score > w.score;
+        if (x.score == w.score) {
+          if (x.tier != w.tier) better = x.tier < w.tier;
+          else {
+            const size_t cx = cellCount(x.lemma), cw = cellCount(w.lemma);
+            better = cx != cw ? cx > cw : x.lemma < w.lemma;
+          }
+        }
+        if (better) { gone[win] = 1; win = j; }
+        else gone[j] = 1;
+      }
+      if (win != i) gone[i] = 1;
+    }
+    std::vector<Scored> kept;
+    for (size_t i = 0; i < sc.size(); ++i)
+      if (!gone[i]) kept.push_back(sc[i]);
+    sc.swap(kept);
+  }
   std::stable_sort(sc.begin(), sc.end(), [](const Scored& a, const Scored& b) {
     if (a.score != b.score) return a.score > b.score;
     return a.lemma < b.lemma;
@@ -445,6 +490,28 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
   }
   for (size_t i = 0; i < sc.size() && i < 6; ++i)
     c.candidates.push_back(Candidate{sc[i].lemma, sc[i].sense, std::round(sc[i].score * 1000) / 1000, sc[i].why});
+  if (sc.empty() && !es && raw.empty() && taught.empty()) {
+    // C17: a form the reverse index does not list is derived from a known word before it is given up: the parts of a
+    // hyphenated compound ("sea-shore" -> seashore, shore; "bran-new" -> new), regular endings of the part of speech
+    // ("dented" -> dent, "happier" -> happy, "gladly" -> glad)
+    const std::string upos = pos == Noun || pos == Name ? "NOUN" : pos == Verb ? "VERB" : pos == Adj ? "ADJ" : pos == Adv ? "ADV" : "";
+    const std::string low = text::lower(sourceLemma);
+    for (const std::string& b : frame::en::baseCandidates(low, upos)) {
+      std::vector<lex::Candidate> probe;
+      la_.reverse(text::en_key(b), probe);
+      std::vector<const curated::TierEntry*> tp;
+      cd_.glossTiers(b, tp);
+      if (probe.empty() && tp.empty()) continue;
+      Choice c2;
+      c2.token = c.token;
+      const uint32_t id = select(b, pos, context, hasObject, personObject, st, c2, srcGender);
+      if (id == kNone) continue;
+      c = c2;
+      c.source = sourceLemma;
+      c.note = "derived from \"" + b + "\"" + (c.note.empty() ? std::string() : "; " + c.note);
+      return id;
+    }
+  }
   if (sc.empty()) { c.unknown = true; c.kind = "unknown"; return kNone; }
   size_t pick = 0;
   for (const auto& ov : st.overrides)
@@ -473,6 +540,39 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
     }
   }
   return c.lemma;
+}
+
+// ---- adjectives (C17) ------------------------------------------------------------------------------------------------
+// An adjective of the source: its own Latin adjective; an English participle used as an adjective ("a lighted match",
+// "the sleeping dog") takes the Latin adjective of the form when the reverse index lists one ("frightened"), else
+// the participle of the Latin verb of its English verb (accēnsus, dormiēns).
+uint32_t Transfer::adjectiveInto(const frame::SemAdj& a, Ctx& c, LaAdj& la, Choice& ch) const {
+  ch.token = a.token;
+  if (a.participle && a.token >= 0 && (size_t)a.token < c.s.tokens.size()) {
+    const std::string surf = c.s.tokens[(size_t)a.token].lower;
+    Choice c1;
+    c1.token = a.token;
+    uint32_t id = surf != a.lemma ? select(surf, Adj, c.context, false, false, c.st, c1) : kNone;
+    // the form's own adjective only when it is taught or a strong sense ("stuffed" -> plēnus); else the participle
+    // ("covered" is not silvestris "covered with trees")
+    const bool strong = !c1.candidates.empty() && (c1.candidates[0].why.find("teacher gloss") != std::string::npos ||
+                                                   (c1.candidates[0].why.find("base ") == 0 &&
+                                                    std::atoi(c1.candidates[0].why.c_str() + 5) >= 150));
+    if (id != kNone && strong) { ch = c1; return id; }
+    Choice c2;
+    c2.token = a.token;
+    id = select(a.lemma, Verb, c.context, a.participle == 1, false, c.st, c2);
+    if (id != kNone) {
+      la.participle = a.participle == 2 ? (uint8_t)Present : (uint8_t)Perfect;
+      ch = c2;
+      ch.source = surf;
+      ch.note = "participle of " + std::string(la_.lemma(id).head) + " (" + surf + ")";
+      return id;
+    }
+    ch = c1;
+    return kNone;
+  }
+  return select(a.lemma, Adj, c.context, false, false, c.st, ch);
 }
 
 // ---- adverbs ---------------------------------------------------------------------------------------------------------
@@ -630,8 +730,13 @@ bool Transfer::nameTableInto(const SemNP& n, Ctx& c, LaNP& o) const {
         Choice ac;
         ac.token = a.token;
         LaAdj la;
-        la.lemma = select(a.lemma, Adj, c.context, false, false, c.st, ac);
+        la.lemma = adjectiveInto(a, c, la, ac);
         c.out.choices.push_back(ac);
+        // C17: a lower-case epithet before the name stands before it ("the brave Queen" -> fortis Rēgīna)
+        if (n.determiner != "a" && n.determiner != "an" && a.token >= 0 && a.token < n.token && (size_t)a.token < c.s.tokens.size() && c.st.lang == frame::SrcLang::En &&
+            !c.s.tokens[(size_t)a.token].text.empty() && c.s.tokens[(size_t)a.token].text[0] >= 'a' &&
+            c.s.tokens[(size_t)a.token].text[0] <= 'z')
+          la.before = true;
         if (la.lemma != kNone) o.adjectives.push_back(la);
         else c.out.unknownWords.push_back(a.lemma);
       }
@@ -673,6 +778,14 @@ bool Transfer::titleNoun(const SemNP& n, Ctx& c, LaNP& o) const {
   m.title = true;   // guard: npInto does not come back here
   npInto(m, c, o);
   o.capitalise = true;
+  // C17: an epithet written in lower case before a definite title stands before it in Latin too ("the kind Stork" ->
+  // benigna Cicōnia; cf. pius Aenēās); "a good Wizard" is a description (magum bonum)
+  for (size_t i = 0; i < o.adjectives.size() && i < n.adjectives.size(); ++i) {
+    const int at = n.adjectives[i].token;
+    if (n.determiner != "a" && n.determiner != "an" && at >= 0 && at < n.token && (size_t)at < c.s.tokens.size() && !c.s.tokens[(size_t)at].text.empty() &&
+        c.s.tokens[(size_t)at].text[0] >= 'a' && c.s.tokens[(size_t)at].text[0] <= 'z')
+      o.adjectives[i].before = true;
+  }
   return true;
 }
 
@@ -1083,7 +1196,7 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
     ch.token = a.token;
     LaAdj la;
     la.degree = a.degree;
-    la.lemma = select(a.lemma, Adj, c.context, false, false, c.st, ch);
+    la.lemma = adjectiveInto(a, c, la, ch);
     c.out.choices.push_back(ch);
     c.cover(a.token);
     if (la.lemma == kNone) { c.out.unknownWords.push_back(a.lemma); continue; }
@@ -1377,6 +1490,16 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
   // verb + state noun ("tener miedo" -> timeō; data/curated/states_en_la.tsv)
   const curated::StateEntry* sne = f.hasObject ? cd_.state(sp.lemma + " " + text::lower(f.object.head)) : nullptr;
   const char* sn = sne && sne->kind == "verb" && sne->latin.find(' ') == std::string::npos ? sne->latin.c_str() : nullptr;
+  // C17: light verbs ("make a visit" -> aliquem vīsere): words before the Latin verb are its fixed object
+  std::string snFixed, snVerb;
+  if (sne && sne->kind == "verb" && !sn) {
+    const std::vector<std::string> lw = words(sne->latin);
+    if (lw.size() >= 2 && latin(lw.back().c_str(), Verb) != kNone) {
+      snVerb = lw.back();
+      for (size_t i = 0; i + 1 < lw.size(); ++i) snFixed += (snFixed.empty() ? "" : " ") + lw[i];
+      sn = snVerb.c_str();
+    }
+  }
   // phrasal verbs (data/curated/phrasal_en_la.tsv); particle "-" = a bare verb with a fixed Latin frame ("bow")
   const curated::PhrasalEntry* ph = cd_.phrasal(sp.lemma, sp.particle.empty() ? std::string("-") : sp.particle);
   // phrasebook "vp" row ("play cards" -> chartīs lūdere): the last Latin word is the infinitive (the verb), the
@@ -1412,6 +1535,11 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     verb = latin(sn, Verb);
     c.objectInVerb = true;
     c.cover(f.object.tokens);
+    if (!snFixed.empty()) {   // C17: the light verb's fixed object ("aliquem")
+      cl.hasObject = true;
+      cl.object = LaNP{};
+      cl.object.fixed = snFixed;
+    }
     Choice ch;
     ch.token = sp.token;
     ch.source = sp.lemma + " " + f.object.head;
@@ -1553,7 +1681,9 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     cl.polarity = realise::Polarity::Pos;
   }
   // tense / aspect / voice (RULE tense.*)
-  const bool state = tables::stateVerb(la_.lemma(p.modal != kNone ? p.modal : p.lemma).key) || sp.habitual ||
+  // C17: a light verb ("made a mistake" -> errāvistī) is an event, whatever the Latin verb's state reading
+  const bool lightVerb = c.st.lang == frame::SrcLang::En && sne && sne->kind == "verb" && sp.lemma != "be" && sp.lemma != "feel";
+  const bool state = (!lightVerb && tables::stateVerb(la_.lemma(p.modal != kNone ? p.modal : p.lemma).key)) || sp.habitual ||
                      cl.pred.lemma == latin("sum", Verb);
   uint8_t tense = Present;
   if (sp.tense == frame::Tense::Future) tense = Future;
@@ -1887,6 +2017,40 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
         if (dat && acc) cl.object.case_ = Acc;
       }
   }
+  // C17: object complement of a factitive verb ("eum rēgem fēcērunt", "mē fortiōrem nōn facit"); a masculine noun of
+  // a pair takes its feminine for a feminine object ("eam servam meam facere")
+  if (cl.hasObject) {
+    for (const SemNP& pn : f.objComplement) {
+      LaNP x;
+      npInto(pn, c, x);
+      if (x.head != kNone && !x.isPronoun && !x.isName) {
+        const uint8_t og = cl.object.gender ? cl.object.gender : cl.object.isPronoun ? cl.object.pron.gender
+                         : cl.object.head != kNone ? la_.lemma(cl.object.head).gender : (uint8_t)0;
+        const lex::Lemma hl = la_.lemma(x.head);
+        if (og == F && hl.pos == Noun && (hl.gender == M) && hl.key.size() > 2 &&
+            hl.key.compare(hl.key.size() - 2, 2, "us") == 0) {
+          const std::string fem = std::string(hl.key.substr(0, hl.key.size() - 2)) + "a";
+          const uint32_t fid = morph::findLemma(la_, fem, Noun);
+          if (fid != kNone && la_.lemma(fid).gender == F) x.head = fid;
+        }
+      }
+      cl.objPredicative.push_back(x);
+    }
+    for (const frame::SemAdj& a : f.objComplementAdj) {
+      Choice ch;
+      LaAdj la;
+      la.degree = a.degree;
+      la.lemma = adjectiveInto(a, c, la, ch);
+      c.out.choices.push_back(ch);
+      c.cover(a.token);
+      if (la.lemma == kNone) { c.out.unknownWords.push_back(a.lemma); continue; }
+      for (size_t i = 0; i < a.adverbs.size(); ++i) {
+        const uint32_t av = adverb(a.adverbs[i], i < a.advTokens.size() ? a.advTokens[i] : -1, c, false);
+        if (av != kNone) la.adverbs.push_back(av);
+      }
+      cl.objPredAdj.push_back(la);
+    }
+  }
   // "tener miedo de la oscuridad" -> timēre tenebrās: the "de" attribute of the state noun is the object (C13)
   if (c.objectInVerb && !cl.hasObject && f.hasObject && !f.object.genitive.empty()) {
     cl.hasObject = true;
@@ -1948,6 +2112,11 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
       }
       LaNP x;
       npInto(pn, c, x);
+      x.indefinite = pn.determiner == "a" || pn.determiner == "an";   // C17
+      // C17: an exclamation stresses the quality: the adjective of the predicate noun comes first ("You are a wicked
+      // creature!" -> Mala bēstia es!)
+      if (c.st.lang == frame::SrcLang::En && f.punct == "!" && !x.isName && !x.nameWords)
+        for (LaAdj& xa : x.adjectives) xa.before = true;
       cl.predicative.push_back(x);
     }
     for (const frame::SemAdj& a : f.predAdj) {
@@ -1961,7 +2130,7 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
         ch.kind = "table";
         ch.note = "states_en_la.tsv";
       } else {
-        la.lemma = select(a.lemma, Adj, c.context, false, false, c.st, ch);
+        la.lemma = adjectiveInto(a, c, la, ch);
       }
       c.out.choices.push_back(ch);
       c.cover(a.token);
@@ -1979,13 +2148,66 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
       if (itSubj) { cl.subject.pron.gender = N; cl.subject.gender = N; }
     }
   }
+  // C17: participle / adjective phrases describing the subject (", paleā fartum", ", omnia timēns"): a state adjective
+  // of states_en_la.tsv kind verb is that verb's present participle with its "of" phrase as the object
+  for (const SemFrame& sf : f.secondary) {
+    LaClause sc;
+    sc.type = realise::ClauseType::Frag;
+    bool any = false;
+    for (const frame::SemAdj& a : sf.predAdj) {
+      Choice ch;
+      ch.token = a.token;
+      LaAdj la;
+      la.degree = a.degree;
+      const curated::StateEntry* se = a.participle ? nullptr : cd_.state(text::lower(a.lemma));
+      uint32_t sv = kNone;
+      if (se && se->kind == "verb" && se->latin.find(' ') == std::string::npos) sv = latin(se->latin.c_str(), Verb);
+      if (sv != kNone) {
+        la.lemma = sv;
+        la.participle = Present;
+        ch.source = a.lemma;
+        ch.lemma = sv;
+        ch.kind = "table";
+        ch.note = "states_en_la.tsv (participle)";
+      } else {
+        la.lemma = adjectiveInto(a, c, la, ch);
+      }
+      c.out.choices.push_back(ch);
+      c.cover(a.token);
+      if (la.lemma == kNone) { c.out.unknownWords.push_back(a.lemma); continue; }
+      for (size_t i = 0; i < a.adverbs.size(); ++i) {
+        const uint32_t av = adverb(a.adverbs[i], i < a.advTokens.size() ? a.advTokens[i] : -1, c, false);
+        if (av != kNone) la.adverbs.push_back(av);
+      }
+      sc.predAdj.push_back(la);
+      any = true;
+      for (const frame::SemOblique& o : sf.obliques) {
+        if (sv != kNone && (o.prep == "of" || o.prep == "about") && !sc.hasObject) {
+          sc.hasObject = true;
+          npInto(o.np, c, sc.object);
+          sc.object.case_ = Acc;
+          c.cover(o.token);
+          continue;
+        }
+      }
+    }
+    if (!any) continue;
+    for (const frame::SemOblique& o : sf.obliques) {
+      if (sc.hasObject && (o.prep == "of" || o.prep == "about")) continue;
+      if (!obliqueInto(o, c, sc)) c.cover(o.np.tokens);
+    }
+    realise::LaSub sub;
+    sub.rel = realise::SubRel::Apposition;
+    sub.clause.push_back(sc);
+    cl.subs.push_back(sub);
+  }
   // fragment adjectives ("A little.", "Very strange!")
   if (!f.hasPred && !f.predAdj.empty()) {
     for (const frame::SemAdj& a : f.predAdj) {
       Choice ch;
       ch.token = a.token;
       LaAdj la;
-      la.lemma = select(a.lemma, Adj, c.context, false, false, c.st, ch);
+      la.lemma = adjectiveInto(a, c, la, ch);
       c.out.choices.push_back(ch);
       c.cover(a.token);
       if (la.lemma == kNone) { c.out.unknownWords.push_back(a.lemma); continue; }
@@ -2033,6 +2255,24 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
       c.out.choices.push_back(ch);
       cl.adverbs.push_back(la);
       continue;
+    }
+    // C17: "I am only a Scarecrow" -> Terriculum tantum sum: "only" restricting the predicate noun follows it
+    if (a.lemma == "only" && c.st.lang == frame::SrcLang::En && f.copula && cl.predicative.size() == 1) {
+      const uint32_t tantum = latin("tantum", Adv);
+      if (tantum != kNone) {
+        LaAdj t;
+        t.lemma = tantum;
+        cl.predicative[0].adjectives.push_back(t);
+        Choice ch;
+        ch.token = a.token;
+        ch.source = a.lemma;
+        ch.lemma = tantum;
+        ch.kind = "table";
+        ch.note = "only + predicate noun: tantum after the noun";
+        c.out.choices.push_back(ch);
+        c.cover(a.token);
+        continue;
+      }
     }
     realise::LaAdverb la;
     la.lemma = adverb(a.lemma, a.token, c, c.motion);

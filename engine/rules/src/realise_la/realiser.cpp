@@ -49,6 +49,14 @@ bool startsWithVowelOrH(std::string_view s) {
   return c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u' || c == 'h';
 }
 
+// C17: the participle of a verb used as an adjective (LaAdj::participle): perfect participles are passive (active for
+// deponents), present and future participles active; case, number and gender from the noun.
+Features participleFeatures(const lex::Lexicon& lx, uint32_t verb, uint8_t tense, const AgreeInfo& a) {
+  const bool dep = (lx.lemma(verb).flags & lex::Deponent) != 0;
+  const uint8_t voice = tense == Perfect && !dep ? (uint8_t)Passive : (uint8_t)Active;
+  return morph::participle(tense, voice, a.case_, a.number, a.gender ? a.gender : (uint8_t)M);
+}
+
 }  // namespace
 
 struct LatinRealiser::Slots {
@@ -152,9 +160,9 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
     }
   } else {
     // pre-head: determiner, interrogative, numeral, quantity / demonstrative adjectives, contrastive possessive
-    auto modifierWord = [&](uint32_t lemma, uint8_t degree, const char* rule) {
+    auto modifierWord = [&](uint32_t lemma, uint8_t degree, const char* rule, uint8_t participle = 0) {
       Word w;
-      forms_.select(lemma, agree_.modifier(a, degree), w);
+      forms_.select(lemma, participle ? participleFeatures(lx_, lemma, participle, a) : agree_.modifier(a, degree), w);
       w.rule = rule;
       return w;
     };
@@ -173,7 +181,7 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
     for (const LaAdj& ad : n.adjectives) {
       if (!(order_.adjectiveBefore(ad.lemma) || exclFirst || ad.before)) continue;
       for (uint32_t adv : ad.adverbs) { Word w; literal(adv, "?", w, "order.adv"); out.push_back(std::move(w)); }
-      out.push_back(modifierWord(ad.lemma, ad.degree, exclFirst ? "order.excl" : "order.adj"));
+      out.push_back(modifierWord(ad.lemma, ad.degree, exclFirst ? "order.excl" : "order.adj", ad.participle));
       if (ad.capitalise) Punctuation::capitaliseFirst(out.back().form);
     }
     if (n.possessive != kNone && n.possContrast) out.push_back(modifierWord(n.possessive, 0, "order.poss"));
@@ -207,7 +215,7 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
     for (const LaAdj& ad : n.adjectives) {
       if (order_.adjectiveBefore(ad.lemma) || exclFirst || ad.before) continue;
       for (uint32_t adv : ad.adverbs) { Word w; literal(adv, "?", w, "order.adv"); out.push_back(std::move(w)); }
-      out.push_back(modifierWord(ad.lemma, ad.degree, "order.adj"));
+      out.push_back(modifierWord(ad.lemma, ad.degree, "order.adj", ad.participle));
       if (ad.capitalise) Punctuation::capitaliseFirst(out.back().form);
     }
     if (n.possessive != kNone && !n.possContrast) out.push_back(modifierWord(n.possessive, 0, "order.poss"));
@@ -346,7 +354,7 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
 
   // Subject agreement (person, number, gender)
   AgreeInfo subj;
-  if (ctx.relative && c.relRole == Role::Subject) subj = ctx.ante;
+  if ((ctx.relative && c.relRole == Role::Subject) || ctx.apposition) subj = ctx.ante;
   else if (c.hasSubject) subj = agree_.ofNP(c.subject, cd_);
   if (c.type == ClauseType::Imp) {
     subj.person = 2;
@@ -388,6 +396,20 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
   if (c.hasObject && !(ctx.relative && c.relRole == Role::Object)) {
     const uint8_t oc = c.object.case_ ? c.object.case_ : cases_.objectCase(c.pred.lemma);
     np(c.object, oc, &c, o, s[kO]);
+    // C17: the object complement in the object's case (adjectives agree with the object)
+    for (const LaNP& pn : c.objPredicative) np(pn, oc, &c, o, s[kO]);
+    if (!c.objPredAdj.empty()) {
+      AgreeInfo oa = agree_.ofNP(c.object, cd_);
+      oa.case_ = oc;
+      for (const LaAdj& ad : c.objPredAdj) {
+        for (uint32_t adv : ad.adverbs) { Word w; literal(adv, "?", w, "order.adv"); s[kO].push_back(std::move(w)); }
+        Word w;
+        forms_.select(ad.lemma, ad.participle ? participleFeatures(lx_, ad.lemma, ad.participle, oa)
+                                              : agree_.modifier(oa, ad.degree), w);
+        w.rule = "order.copula";
+        s[kO].push_back(std::move(w));
+      }
+    }
     if (c.object.emphasis) focus = kO;
     if (c.object.interrogative != kNone) append(s[kWH], s[kO]);
   }
@@ -452,7 +474,9 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
       if (i) { Word et; literal(k_.et, "et", et, "order.copula"); s[kPRED].push_back(std::move(et)); }
       for (uint32_t adv : c.predAdj[i].adverbs) { Word w; literal(adv, "?", w, "order.adv"); s[kPRED].push_back(std::move(w)); }
       Word w;
-      forms_.select(c.predAdj[i].lemma, agree_.modifier(pa, c.predAdj[i].degree), w);
+      forms_.select(c.predAdj[i].lemma,
+                    c.predAdj[i].participle ? participleFeatures(lx_, c.predAdj[i].lemma, c.predAdj[i].participle, pa)
+                                            : agree_.modifier(pa, c.predAdj[i].degree), w);
       w.rule = "order.copula";
       s[kPRED].push_back(std::move(w));
     }
@@ -708,15 +732,31 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
     ClauseCtx sctx;
     sctx.main = false;
     sctx.accInf = sub.rel == SubRel::AccInf;
+    if (sub.rel == SubRel::Apposition) {   // C17: agrees with the predicate noun, else with the subject; after a comma
+      sctx.apposition = true;
+      sctx.ante = subj;
+      if (!c.predicative.empty()) {
+        const AgreeInfo pn = agree_.ofNP(c.predicative[0], cd_);
+        sctx.ante.gender = pn.gender;
+        sctx.ante.number = pn.number;
+      }
+      sctx.ante.case_ = Nom;
+    }
     if (sub.rel == SubRel::Purpose) { sctx.forceMood = Subjunctive; sctx.suppressNon = neg; }
     if (sub.rel == SubRel::Result) sctx.forceMood = Subjunctive;   // C15: tam ... ut + subjunctive
     std::vector<Word> body;
     clause(sc, o, body, sctx);
+    if (sub.rel == SubRel::Apposition)   // C17: the participle / adjective last ("paleā fartum", "omnia timēns")
+      std::stable_partition(body.begin(), body.end(), [](const Word& w) { return std::string(w.rule) != "order.copula"; });
     append(sw, body);
     if (sub.before) {
       if (!sw.empty()) sw.back().punctAfter = ",";
       append(before, sw);
     } else {
+      if (sub.rel == SubRel::Apposition) {
+        if (!after.empty()) after.back().punctAfter = ",";
+        else if (!clauseWords.empty()) clauseWords.back().punctAfter = ",";
+      }
       if (!sub.sep.empty()) {   // "Certē es; aliter hīc nōn essēs"
         if (!after.empty()) after.back().punctAfter = sub.sep;
         else if (!clauseWords.empty()) clauseWords.back().punctAfter = sub.sep;

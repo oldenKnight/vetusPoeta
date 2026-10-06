@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstring>
 
+#include "english.h"
 #include "spanish.h"
 #include "vp/features.h"
 #include "vp/frame.h"
@@ -306,9 +307,14 @@ bool flatClause(std::vector<Token>& tk, int v) {
   if (v < 0 || v >= n || tk[(size_t)v].deprel == "root") return false;
   for (int i = 0; i < n; ++i) {
     if (i == v) continue;
+    // C17: a possessive 's after a noun ("The farmer's wife baked bread.")
+    if (tk[(size_t)i].upos == "PART" && (tk[(size_t)i].lower == "'s" || tk[(size_t)i].lower == "'") && i > 0 &&
+        in(tk[(size_t)i - 1].upos, {"NOUN", "PROPN"}))
+      continue;
     if (!in(tk[(size_t)i].upos, {"DET", "ADJ", "NOUN", "PROPN", "PRON", "NUM", "PUNCT", "ADV"})) return false;
   }
-  auto nominal = [&](int i) { return in(tk[(size_t)i].upos, {"NOUN", "PROPN", "PRON"}); };
+  auto possTok = [&](int i) { return i >= 0 && i < n && tk[(size_t)i].upos == "PART"; };
+  auto nominal = [&](int i) { return in(tk[(size_t)i].upos, {"NOUN", "PROPN", "PRON"}) && !possTok(i + 1); };
   int subj = -1, obj = -1;
   for (int i = 0; i < v; ++i)
     if (nominal(i)) subj = i;
@@ -321,6 +327,13 @@ bool flatClause(std::vector<Token>& tk, int v) {
     if (i == subj) { t.head = v + 1; t.deprel = "nsubj"; continue; }
     if (i == obj) { t.head = v + 1; t.deprel = "obj"; continue; }
     if (t.upos == "PUNCT" || t.upos == "ADV") { t.head = v + 1; t.deprel = t.upos == "PUNCT" ? "punct" : "advmod"; continue; }
+    if (possTok(i)) { t.head = i; t.deprel = "case"; continue; }            // C17: 's on its possessor
+    if (possTok(i + 1)) {                                                   // the possessor on the next noun
+      int owner = -1;
+      for (int j = i + 2; j < n && owner < 0; ++j)
+        if (in(tk[(size_t)j].upos, {"NOUN", "PROPN"})) owner = j;
+      if (owner >= 0) { t.head = owner + 1; t.deprel = "nmod"; continue; }
+    }
     const int noun = i < v ? subj : obj;
     if (noun < 0 || (i < v && i > subj) || (i > v && i > obj)) { t.head = v + 1; t.deprel = "dep"; continue; }
     t.head = noun + 1;
@@ -639,11 +652,20 @@ std::string FrameBuilder::lemmaOf(const Token& t) const {
   const std::string rule = nlp::ruleLemma(lang_ == SrcLang::En ? nlp::Lang::En : nlp::Lang::Es, t);
   if (t.upos == "PROPN") return t.text;
   if (in(t.upos, {"PUNCT", "SYM", "ADP", "CCONJ", "SCONJ", "PART", "DET", "PRON", "INTJ"})) return t.lower;
+  // C17: English nouns used only in the plural are their own lemma ("clothes" is not "cloth" or "clothe")
+  if (lang_ == SrcLang::En && t.upos == "NOUN" &&
+      in(t.lower, {"clothes", "scissors", "trousers", "spectacles", "riches", "goods", "wages", "stairs", "tongs",
+                   "pincers", "oats", "ashes", "thanks", "remains", "surroundings", "belongings", "manners"}))
+    return t.lower;
   if (!lex_) return rule;
   std::vector<lex::Analysis> an;
   const std::string key = lang_ == SrcLang::En ? text::en_key(t.lower) : text::es_key(t.lower);
   lex_->lookup(key, an);
   if (an.empty() && lang_ == SrcLang::Es) lex_->lookup(text::es_bare(t.lower), an);
+  if (an.empty() && lang_ == SrcLang::En) {   // C17: a form the lexicon does not list: a known base word
+    const std::string b = en::knownBase(*lex_, t.lower, t.upos);
+    if (!b.empty()) return b;
+  }
   if (an.empty()) return rule;
   // C15: the rule lemmatiser may cut a word to a non-word ("sting" -> "st"); the lexicon knows the form itself
   bool ruleKnown = rule == t.lower || lang_ != SrcLang::En;
@@ -742,6 +764,12 @@ std::string FrameBuilder::lemmaOf(const Token& t) const {
     if (!same.empty()) return same;
   } else {
     if (!same.empty()) return same;
+    if (!ruleHit.empty() && ruleHit != t.lower) return ruleHit;
+    // C17: an adjective that is a verb's participle ("a lighted match": light)
+    if (lang_ == SrcLang::En && t.upos == "ADJ") {
+      const std::string v = en::verbOfForm(*lex_, t.lower);
+      if (!v.empty()) return v;
+    }
     if (!ruleHit.empty()) return ruleHit;
     if (!other.empty() && lang_ == SrcLang::Es) return other;
   }
@@ -1023,8 +1051,20 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
         }
       if (!np.possessor.empty() && np.possessor.back().token == k) continue;
     }
-    if (d == "amod" || (d == "compound" && (kt.upos == "ADJ" || kt.upos == "NOUN"))) {
-      bool adjLike = kt.upos == "ADJ";
+    // C17: a participle before its noun ("the sleeping dog", "a broken cart") is an adjective: the verb's participle
+    uint8_t participle = 0;
+    if (en && (d == "amod" || d == "compound") && (kt.upos == "VERB" || kt.upos == "ADJ") && k < h) {
+      const uint32_t vf = fget(kt, nlp::morph::VerbFormShift);
+      if (vf == nlp::morph::VfPart || vf == nlp::morph::VfGer) {
+        bool bare = true;
+        for (int g : c.kids[(size_t)k])
+          if (c.ok(g) && c.dep(g) != "advmod") bare = false;
+        const bool ing = kt.lower.size() > 4 && kt.lower.compare(kt.lower.size() - 3, 3, "ing") == 0;
+        if (bare && (kt.upos == "VERB" || c.lem(k) != kl)) participle = ing ? 2 : 1;
+      }
+    }
+    if (participle || d == "amod" || (d == "compound" && (kt.upos == "ADJ" || kt.upos == "NOUN"))) {
+      bool adjLike = kt.upos == "ADJ" || participle;
       if (!adjLike && kt.upos == "NOUN" && lex_) {   // "white roses" tagged NOUN compound: adjective reading?
         std::vector<lex::Analysis> an;
         lex_->lookup(en ? text::en_key(kl) : text::es_key(kl), an);
@@ -1034,8 +1074,9 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
       if (adjLike) {
         SemAdj a;
         a.lemma = c.lem(k);
-        if (kt.upos != "ADJ") a.lemma = kl;
+        if (kt.upos != "ADJ" && !participle) a.lemma = kl;
         a.token = k;
+        a.participle = participle;
         if (kl == "much" || kl == "many") {
           np.determiner = kl;
           np.tokens.push_back(k);
@@ -1320,6 +1361,124 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
   const std::string hu = ht.upos;
   const std::string hl = c.lem(h);
   bool seImpers = false;   // Spanish impersonal "se" (3rd plural subject)
+
+  // C17: the object complement of a factitive verb ("They made him king.", "That doesn't make me any braver.", "The
+  // rain made the road wet."): a noun / adjective xcomp, an adjective the parser hung on the verb as a conj without a
+  // conjunction, or an adjective after the object noun
+  if (en && hu == "VERB" && obj >= 0 &&
+      in(hl, {"make", "call", "name", "elect", "appoint", "crown", "render", "paint", "consider", "keep", "leave"})) {
+    int comp = -1;
+    for (int k : c.kids[(size_t)h]) {
+      if (!c.ok(k) || k < obj) continue;
+      const std::string d = c.dep(k);
+      const std::string& u = c.t(k).upos;
+      bool mark = false, cc = false;
+      for (int g : c.kids[(size_t)k])
+        if (c.ok(g)) { mark = mark || c.dep(g) == "mark"; cc = cc || c.dep(g) == "cc"; }
+      if (d == "xcomp" && in(u, {"NOUN", "PROPN", "ADJ"}) && !mark) comp = k;
+      else if (d == "conj" && u == "ADJ" && !cc) comp = k;
+      if (comp >= 0) break;
+    }
+    if (comp < 0 && in(c.t(obj).upos, {"NOUN", "PROPN", "PRON"}))
+      for (int k : c.kids[(size_t)obj])
+        if (c.ok(k) && k > obj && c.dep(k) == "amod" && c.t(k).upos == "ADJ" && !in(hl, {"keep", "leave"})) { comp = k; break; }
+    if (comp < 0 && in(c.t(obj).upos, {"NOUN", "PROPN", "PRON"}))   // "made the girl her friend": a bare NP after it
+      for (int k : c.kids[(size_t)obj]) {
+        if (!c.ok(k) || k <= obj || c.dep(k) != "nmod" || !in(c.t(k).upos, {"NOUN", "PROPN"})) continue;
+        bool cs = false;
+        for (int g : c.kids[(size_t)k])
+          if (c.ok(g) && c.dep(g) == "case") cs = true;
+        if (!cs) { comp = k; break; }
+      }
+    if (comp >= 0) {
+      const nlp::Token& ct = c.t(comp);
+      if (ct.upos == "ADJ") {
+        SemAdj a;
+        a.lemma = c.lem(comp);
+        a.token = comp;
+        const std::string kl = ct.lower;
+        if (kl != a.lemma) {
+          if (kl.size() > 2 && kl.compare(kl.size() - 2, 2, "er") == 0) a.degree = feat::Comparative;
+          if (kl.size() > 3 && kl.compare(kl.size() - 3, 3, "est") == 0) a.degree = feat::Superlative;
+          if (kl == "better" || kl == "worse") a.degree = feat::Comparative;
+          if (kl == "best" || kl == "worst") a.degree = feat::Superlative;
+        }
+        for (int g : c.kids[(size_t)comp]) {
+          if (!c.ok(g)) continue;
+          if (c.t(g).lower == "more" || c.t(g).lower == "most") a.degree = c.t(g).lower == "more" ? feat::Comparative : feat::Superlative;
+          else if (c.dep(g) == "advmod" && c.t(g).lower != "any") { a.adverbs.push_back(c.t(g).lower); a.advTokens.push_back(g); }
+        }
+        f.objComplementAdj.push_back(a);
+      } else {
+        SemNP np;
+        buildNP(c, comp, np);
+        f.objComplement.push_back(np);
+      }
+      std::vector<int> compToks;
+      c.subtree(comp, compToks);
+      for (int k : compToks) {
+        c.consumed[(size_t)k] = 1;
+        f.tokens.push_back(k);
+        if (c.t(k).upos == "DET") c.drop(k, Drop::Other);
+      }
+    }
+  }
+
+  // C17: a participle / adjective phrase after a comma describing the subject ("I am only a Scarecrow, stuffed with
+  // straw.", "I am a Cowardly Lion, afraid of everything.", "He came home, tired and hungry."): a conj of the clause
+  // head without its own conjunction or subject, after a comma
+  if (en)
+    for (int k : c.kids[(size_t)h]) {
+      if (!c.ok(k) || k <= h || c.dep(k) != "conj") continue;
+      const nlp::Token& kt = c.t(k);
+      const uint32_t vf = fget(kt, nlp::morph::VerbFormShift);
+      const bool part = kt.upos == "VERB" && vf == nlp::morph::VfPart && fget(kt, nlp::morph::TenseShift) == nlp::morph::TensePast;
+      if (kt.upos != "ADJ" && !part) continue;
+      bool comma = k > 0 && c.t(k - 1).lower == ",", own = false;
+      for (int g : c.kids[(size_t)k])
+        if (c.ok(g) && in(c.dep(g), {"cc", "nsubj", "aux", "cop", "mark"}) && !(c.dep(g) == "cc" && g > k)) own = true;
+      if (!comma || own) continue;
+      SemFrame sf;
+      sf.type = Kind::Frag;
+      auto addAdj = [&](int a0) {
+        const nlp::Token& at = c.t(a0);
+        SemAdj a;
+        a.lemma = c.lem(a0);
+        a.token = a0;
+        const uint32_t avf = fget(at, nlp::morph::VerbFormShift);
+        if (at.upos == "VERB" || avf == nlp::morph::VfPart)
+          a.participle = fget(at, nlp::morph::TenseShift) == nlp::morph::TensePres ? 2 : 1;
+        for (int g : c.kids[(size_t)a0]) {
+          if (!c.ok(g)) continue;
+          if (c.dep(g) == "advmod") { a.adverbs.push_back(c.t(g).lower); a.advTokens.push_back(g); }
+          if (in(c.dep(g), {"obl", "nmod"}) && in(c.t(g).upos, {"NOUN", "PROPN", "PRON"})) {
+            std::string prep;
+            for (int q : c.kids[(size_t)g])
+              if (c.ok(q) && c.dep(q) == "case") prep = prep.empty() ? c.t(q).lower : prep + " " + c.t(q).lower;
+            SemOblique o;
+            o.prep = canonPrep(lang_, prep);
+            buildNP(c, g, o.np);
+            o.token = g;
+            sf.obliques.push_back(o);
+          }
+        }
+        sf.predAdj.push_back(a);
+      };
+      addAdj(k);
+      for (int g : c.kids[(size_t)k])   // "tired and hungry"
+        if (c.ok(g) && c.dep(g) == "conj" && c.t(g).upos == "ADJ") addAdj(g);
+      std::vector<int> toks;
+      c.subtree(k, toks);
+      if (k > 0 && c.t(k - 1).lower == ",") toks.push_back(k - 1);
+      for (int q : toks) {
+        c.consumed[(size_t)q] = 1;
+        sf.tokens.push_back(q);
+        f.tokens.push_back(q);
+        if (c.t(q).upos == "PUNCT" || c.t(q).upos == "ADP" || c.t(q).upos == "CCONJ" || c.t(q).upos == "DET")
+          c.drop(q, c.t(q).upos == "PUNCT" ? Drop::Punct : Drop::Other);
+      }
+      f.secondary.push_back(sf);
+    }
 
   // ---- predicate --------------------------------------------------------------------------------------------------
 
@@ -1641,6 +1800,11 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
   if (verbal && f.pred.token >= 0)
     for (const PhraseMatch& m : c.vpHits)
       if (m.first == f.pred.token && m.slots.empty()) {
+        // C17: a row noted "(transitive)" needs the verb's object ("I can starve you" -> tē famē cōnficere, not "they
+        // starved")
+        if (en && m.entry >= 0 && (size_t)m.entry < cd_.phrasebook().size() &&
+            cd_.phrasebook()[(size_t)m.entry].note.find("(transitive)") != std::string::npos && obj < 0)
+          continue;
         f.pred.fixedLatin = m.latin;
         f.pred.fixedEntry = m.entry;
         for (int k = m.first + 1; k <= m.last; ++k) {
@@ -1891,6 +2055,8 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       // C15 confidence: "make a visit", "take a walk", "have a look": the noun is the verb's meaning
       if (en && in(hl, {"make", "take", "have", "give", "pay", "do"}) && !o.isPronoun && !o.isName && o.determiner == "a")
         c.s.doubt("light-verb");
+      // C17: "get" + a thing is take, receive, fetch or obtain by context: never OK on its own
+      if (en && hl == "get" && !o.isPronoun && !o.isName) c.s.doubt("light-verb");
       continue;
     }
     if ((d == "iobj" && k == iobj) || (d == "obj" && k != obj && !f.hasIndirect && f.hasObject)) {
@@ -3035,6 +3201,13 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
   if (nlp_) nlp_->analyse(out.tokens);
   std::vector<nlp::Token>& tk = out.tokens;
   const int n = (int)tk.size();
+  // C17: forms the tagger misread, corrected from english.vpl (irregular pasts, a past read as a noun, an adjective
+  // read as a noun), then a new parse
+  if (nlp_ && lex_ && lang_ == SrcLang::En) {
+    for (nlp::Token& t : tk)
+      if (t.lower.empty()) t.lower = nlp::normalise(t.text);
+    if (en::retagForms(tk, *lex_)) nlp_->parser().parse(tk);
+  }
   // no verb at all in a sentence of three or more words: the tagger probably missed one; retag and re-parse
   // ("Light the candle." -> imperative; "My mother teaches children." -> 3rd person present)
   if (nlp_ && lex_ && lang_ == SrcLang::En && n >= 3) {
@@ -3173,6 +3346,28 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
         reparse = true;
       }
   if (reparse) nlp_->parser().parse(tk);
+  // C17: a statement whose root is a noun while its one verb hangs under a noun ("The tired horses drank water.",
+  // "The farmer's wife baked bread."): a simple clause made of nominal words around that verb is rebuilt by hand
+  if (nlp_ && lex_ && lang_ == SrcLang::En && n >= 3) {
+    int root = -1, verbAt = -1, verbs = 0;
+    for (int i = 0; i < n; ++i) {
+      if (tk[(size_t)i].head == 0) root = root < 0 ? i : -2;
+      if (tk[(size_t)i].upos == "VERB" || tk[(size_t)i].upos == "AUX") { ++verbs; verbAt = i; }
+    }
+    const bool statement = tk[(size_t)n - 1].lower == "." || tk[(size_t)n - 1].lower == "!";
+    if (root >= 0 && verbs == 1 && statement && in(tk[(size_t)root].upos, {"NOUN", "PROPN"}) &&
+        tk[(size_t)verbAt].upos == "VERB" && fget(tk[(size_t)verbAt], nlp::morph::VerbFormShift) != nlp::morph::VfGer) {
+      nlp::Token& v = tk[(size_t)verbAt];
+      bool present = false;
+      const std::string pastOf = en::verbOfForm(*lex_, v.lower, &present);
+      const bool finite = fget(v, nlp::morph::VerbFormShift) == nlp::morph::VfFin || (!pastOf.empty() && !present);
+      if (finite && flatClause(tk, verbAt)) {
+        if (fget(v, nlp::morph::VerbFormShift) != nlp::morph::VfFin)
+          v.feats = nlp::morph::fromString("Tense=Past|VerbForm=Fin|Mood=Ind");
+        out.repairs.emplace_back("clause-repair");
+      }
+    }
+  }
   if (nlp_ && lang_ == SrcLang::En) segmentParse(tk);
   if (nlp_) punctRoot(tk);
   if (nlp_) repairTree(out);
@@ -3224,6 +3419,12 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
     if (t.lower.empty()) t.lower = nlp::normalise(t.text);
     if (!nlp_) { t.upos = "X"; t.head = 0; t.deprel = "root"; }
     t.lemma = lemmaOf(t);
+    // C17: an adjective whose lemma is a verb is that verb's participle (VerbForm=Part, present for -ing)
+    if (lex_ && lang_ == SrcLang::En && t.upos == "ADJ" && t.lemma != t.lower && fget(t, nlp::morph::VerbFormShift) == 0) {
+      bool present = false;
+      if (en::verbOfForm(*lex_, t.lower, &present) == t.lemma)
+        t.feats = nlp::morph::fromString(present ? "Tense=Pres|VerbForm=Part" : "Tense=Past|VerbForm=Part");
+    }
   }
   if (lang_ == SrcLang::Es && nlp_) es::normalise(out, lex_, cd_);   // C13: clitics, personal "a", "por qué" ...
   // "six o'clock": the clock word heads the numeral and stands for "hour" (RULE time.hour)

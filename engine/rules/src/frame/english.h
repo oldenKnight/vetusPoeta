@@ -1,0 +1,36 @@
+// English helpers of the frame builder and the transfer (C17, quality loop 3): word forms the tagger misreads or the
+// lexicon does not list are derived from known lemmas before a word is given up as unknown. Internal to
+// engine/rules/src. Everything reads english.vpl only; deterministic; nothing throws.
+#pragma once
+#include <cstdint>
+#include <string>
+#include <vector>
+
+#include "vp/lex.h"
+#include "vp/nlp.h"
+
+namespace vp::frame::en {
+
+// Tags and features from english.vpl (true when a tag changed; the caller re-parses):
+//  * an irregular past the tagger read as a present ("She sang", "He swam"): Tense=Past (a participle after have/be);
+//  * a past form tagged as a noun in a sentence without a verb ("The bell rang."): a finite verb;
+//  * a word the lexicon knows only as an adjective, tagged as a noun ("My sister is braver than me"): an adjective.
+bool retagForms(std::vector<nlp::Token>& tk, const lex::Lexicon& lx);
+
+// The verb whose past (or past participle, or -ing form) this form is, when the lexicon lists the form only as such
+// under another lemma ("lighted" -> light, "sang" -> sing). `present` is set for -ing forms. Empty when none.
+std::string verbOfForm(const lex::Lexicon& lx, const std::string& lower, bool* present = nullptr);
+
+// Base words for a form the lexicon does not list at all, best first: a hyphenated compound joined ("sea-shore" ->
+// seashore) and then its last part ("bran-new" -> new); regular endings removed (-ies/-ied -> y, -es, -s, -ed, -ing,
+// -er, -est, -ly; doubled consonants: "stopped" -> stop; a dropped e: "hoped" -> hope). Only spellings; the caller
+// checks them against a lexicon.
+// `upos` (NOUN, VERB, ADJ, ADV; empty = any) keeps only the endings of that part of speech (a noun: -s/-es/-ies; a
+// verb: -s/-es/-ies/-ed/-ied/-ing; an adjective: -er/-est/-ier/-iest; an adverb: -ly/-ily).
+std::vector<std::string> baseCandidates(const std::string& lower, const std::string& upos = std::string());
+
+// The first base of baseCandidates() the English lexicon knows with a part of speech compatible with `upos`
+// (any when empty); empty when none.
+std::string knownBase(const lex::Lexicon& lx, const std::string& lower, const std::string& upos);
+
+}  // namespace vp::frame::en
