@@ -569,7 +569,7 @@
 
   function orbergBlock(change) {
     if (!change) { return null; }
-    var why = change.why && window.VP_I18n.has('why.orberg.reason.' + change.why + '.label') ? T('why.orberg.reason.' + change.why + '.label') : (change.text || '');
+    var why = change.why && window.VP_I18n.has('why.orberg.reason.' + change.why + '.label') ? T('why.orberg.reason.' + change.why + '.label') : (change.why || change.text || '');
     return el('section', { className: 'vp-why-block vp-why-orberg' }, [
       i18nEl('h3', null, 'why.orberg.title'),
       el('p', { className: 'vp-why-line vp-text', lang: 'la' }, [txt('span', 'vp-orb-was', display(change.was)), txt('span', 'vp-orb-arrow', ' → ', { 'aria-hidden': 'true' }), txt('span', 'vp-orb-now', display(change.now))]),
@@ -641,7 +641,8 @@
     }
     var change = x.orberg || null;
     if (!change) {
-      for (var i = 0; i < reasons.length; i++) { if (reasons[i].data && reasons[i].data.was) { change = { was: reasons[i].data.was, now: reasons[i].data.now, why: reasons[i].data.why, text: reasons[i].text }; } }
+      // B10: an orbergise reason with was == now ("structure kept") is not a change
+      for (var i = 0; i < reasons.length; i++) { if (reasons[i].data && reasons[i].data.was && reasons[i].data.was !== reasons[i].data.now) { change = { was: reasons[i].data.was, now: reasons[i].data.now, why: reasons[i].data.why, text: reasons[i].text }; } }
     }
     kids.push(orbergBlock(change));
     kids = kids.concat(usesBlock(tok, features, lang));

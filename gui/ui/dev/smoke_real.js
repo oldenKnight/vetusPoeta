@@ -11,7 +11,9 @@
  * words as chips with the hover card, "Why this reading?" in the Word tab, Ctrl+I interlinear lines, the plain
  * English target, the export preview = the readable sentences. grc-en / en-grc / la-la run when hello.pairs lists
  * them (Greek: lang="grc", pair-grc, Gentium Plus in the preview strip and cue list, the monotonic export preview;
- * la-la: the Orbergise panes),
+ * la-la: the Orbergise panes; B10: no identical was/now pair in the change list of any cue, the meaning chip on
+ * every cue (without and with sample.en.srt), "Choose file…" with Detect shows the engine's detected language and
+ * the aligned line, Forget unloads it; a text project of our own shows a change and a "words kept" count),
  * else they are skipped with the engine's reason. Screenshots: gui/ui/dev/out/real-*.png (gitignored).
  */
 'use strict';
@@ -305,9 +307,140 @@ function main() {
       return page.evaluate(function () { return { panes: document.querySelectorAll('.vp-orb-body .vp-pane').length, ver: document.getElementById('vp-orb-version').textContent, chip: document.querySelector('.vp-orb-chip').textContent }; });
     }).then(function (r) {
       check(r.panes === 3 && r.ver.length > 0, 'la-la: Orberg version "' + r.ver + '", ' + r.chip);
+      return orbergCues('without an original');
+    }).then(function () {
       return shot('real-orberg-light-en.png');
     }).then(function () {
+      return orbergOriginal();
+    }).then(function () {
       return closeProject('la-la');
+    }).then(function () {
+      return orbergText();
+    });
+  }
+
+  // B10: every cue of the la-la sample: the change list never shows an identical pair (the engine's
+  // "structure kept" reasons, was == now, are only counted), the meaning chip is there.
+  function orbergCues(what) {
+    var seen = { cues: 0, changes: 0, kept: 0, identical: [], noChip: [] };
+    function one(i) {
+      return page.evaluate(function (k) { window.VP_CueList.select(k); }, i).then(function () {
+        return page.waitForFunction(function (k) { var st = window.VP_Orberg.stats(); return st && st.index === k && document.querySelector('.vp-orb-chip') && !document.querySelector('.vp-orb-chip').hidden; }, i, { timeout: 5000, polling: 100 }).then(null, function () { return null; });
+      }).then(function () {
+        return wait(250);
+      }).then(function () {
+        return page.evaluate(function () {
+          var out = { pairs: [], titles: [], kept: 0, chip: null };
+          var items = document.querySelectorAll('.vp-orb-changes .vp-orb-change');
+          for (var j = 0; j < items.length; j++) { out.pairs.push([items[j].querySelector('.vp-orb-was').textContent, items[j].querySelector('.vp-orb-now').textContent]); }
+          var under = document.querySelectorAll('#vp-orb-version .vp-word-changed');
+          for (j = 0; j < under.length; j++) { out.titles.push(under[j].getAttribute('title') || ''); }
+          var chip = document.querySelector('.vp-orb-chip');
+          out.chip = chip && !chip.hidden ? chip.textContent : null;
+          out.kept = window.VP_Orberg.kept().length;
+          out.underlinedSame = window.VP_Orberg.changes().filter(function (c) { return c.was === c.now; }).length;
+          return out;
+        });
+      }).then(function (r) {
+        seen.cues++;
+        seen.changes += r.pairs.length;
+        seen.kept += r.kept;
+        r.pairs.forEach(function (pr) { if (pr[0] === pr[1]) { seen.identical.push((i + 1) + ': ' + pr[0] + ' -> ' + pr[1]); } });
+        r.titles.forEach(function (t) { var m = /^Was (.*), now (.*)$/.exec(t); if (m && m[1] === m[2]) { seen.identical.push((i + 1) + ': underlined ' + t); } });
+        if (r.underlinedSame) { seen.identical.push((i + 1) + ': ' + r.underlinedSame + ' was == now in changes()'); }
+        if (!r.chip || !/\d+\s?%/.test(r.chip)) { seen.noChip.push((i + 1) + ': ' + r.chip); }
+      });
+    }
+    return page.evaluate(function () { window.VP_CueList.setFilter('all'); return window.VP_Store.cueTotal(); }).then(function (n) {
+      var chain = Promise.resolve();
+      for (var i = 0; i < Math.min(n, 12); i++) { chain = chain.then(one.bind(null, i)); }
+      return chain;
+    }).then(function () {
+      check(seen.identical.length === 0, 'la-la ' + what + ': the change list shows no identical pairs over ' + seen.cues + ' cues (' + seen.changes + ' changes listed, ' + seen.kept + ' words kept only counted)' + (seen.identical.length ? ': ' + seen.identical.join(' / ') : ''));
+      check(seen.noChip.length === 0, 'la-la ' + what + ': the meaning chip with a percentage on every cue' + (seen.noChip.length ? ' (missing: ' + seen.noChip.join(' / ') + ')' : ''));
+      return page.evaluate(function () { window.VP_CueList.select(0); });
+    }).then(function () {
+      return wait(400);
+    }).then(function () {
+      return seen;
+    });
+  }
+
+  // B10 on sentences of our own where the engine reports both kinds: an ablative absolute rewritten as a
+  // postquam clause (a change) and "putat" kept with its structure (was == now: counted, never listed).
+  function orbergText() {
+    var text = 'Urbe captā, mīlitēs praedam dīvīsērunt.\n\nMārcus putat puellam rosam amāre.';
+    return page.evaluate(function (t) {
+      var box = document.getElementById('vp-start-orberg');
+      box.checked = true;
+      box.dispatchEvent(new Event('change', { bubbles: true }));
+      window.VP_Start.startText(t);
+    }, text).then(function () {
+      return page.waitForFunction(function () {
+        var pr = window.VP_Store.get('project');
+        return window.VP_Router.current() === 'workspace' && pr && pr.pair === 'la-la' && window.VP_Store.cueCount() === 2;
+      }, null, { timeout: 20000, polling: 100 });
+    }).then(function () {
+      return page.click('#vp-orb-run');
+    }).then(function () {
+      return wait(300);
+    }).then(function () {
+      return page.waitForFunction(function () { return !window.VP_Store.get('job') && (window.VP_Store.get('cueCounts') || {}).translated === 2; }, null, { timeout: 60000, polling: 100 });
+    }).then(function () {
+      return wait(800);
+    }).then(function () {
+      return orbergCues('on our own text');
+    }).then(function (seen) {
+      check(seen.changes >= 1 && seen.kept >= 1, 'la-la on our own text: ' + seen.changes + ' change(s) listed, ' + seen.kept + ' word(s) kept counted, not listed');
+      return page.evaluate(function () {
+        window.VP_CueList.select(1);
+      });
+    }).then(function () {
+      return wait(800);
+    }).then(function () {
+      return page.evaluate(function () { var k = document.querySelector('.vp-orb-kept'); return { kept: k && !k.hidden ? k.textContent : '', list: document.querySelectorAll('.vp-orb-changes .vp-orb-change').length }; });
+    }).then(function (r) {
+      check(/kept/.test(r.kept) && r.list === 0, 'la-la: "putat" (was == now) only in the counter "' + r.kept + '", ' + r.list + ' change(s) listed');
+      return shot('real-orberg-kept-light-en.png');
+    }).then(function () {
+      return closeProject('la-la text');
+    });
+  }
+
+  // B10: "Choose file…" with Detect (the shim answers dialog.openFile with sample.en.srt): no originalLang
+  // is sent, the pane shows the engine's detected language and the aligned original line; Forget unloads it.
+  function orbergOriginal() {
+    function jobDone() {
+      return wait(300).then(function () {
+        return page.waitForFunction(function () { return !window.VP_Store.get('job'); }, null, { timeout: 60000, polling: 100 });
+      }).then(function () { return wait(800); });
+    }
+    return page.evaluate(function () { window.VP_Toast.clearAll(); return document.getElementById('vp-orb-lang').value; }).then(function (v) {
+      check(v === '', 'la-la: the original\'s language selector defaults to Detect');
+      return page.click('[data-orb-action="choose"]');
+    }).then(function () {
+      return page.waitForFunction(function () { return !!window.VP_Orberg.original(); }, null, { timeout: 20000, polling: 100 });
+    }).then(jobDone).then(function () {
+      return page.evaluate(function () {
+        var f = document.querySelector('.vp-orb-file');
+        return { original: window.VP_Orberg.original(), file: f && !f.hidden ? f.textContent : null, text: document.querySelector('.vp-orb-orig').textContent, forget: !document.querySelector('[data-orb-action="forget"]').hidden };
+      });
+    }).then(function (r) {
+      check(r.original && r.original.lang === 'en' && r.original.detected && /English \(detected\)/.test(r.file || ''), 'la-la: original ' + (r.file || 'none') + ' (detected by the engine)');
+      check(r.text.length > 0 && r.text.indexOf('not loaded') < 0 && r.forget, 'la-la: the aligned original line "' + r.text + '" and a Forget button');
+      return shot('real-orberg-original-light-en.png');
+    }).then(function () {
+      return orbergCues('with sample.en.srt');
+    }).then(function () {
+      return page.evaluate(function () { window.VP_Toast.clearAll(); });
+    }).then(function () {
+      return page.click('[data-orb-action="forget"]');
+    }).then(function () {
+      return page.waitForFunction(function () { return !window.VP_Orberg.original(); }, null, { timeout: 20000, polling: 100 });
+    }).then(jobDone).then(function () {
+      return page.evaluate(function () { return { orberg: window.VP_Store.get('project').orberg, choose: !document.querySelector('[data-orb-action="choose"]').hidden }; });
+    }).then(function (r) {
+      check(!r.orberg.originalPath && r.choose, 'la-la: Forget unloads the original (project.orberg.originalPath null, "Choose file…" back)');
     });
   }
 

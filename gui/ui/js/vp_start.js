@@ -126,7 +126,9 @@
       fix: fix,
       canUndo: !!raw.canUndo,
       canRedo: !!raw.canRedo,
-      sourcePath: null
+      sourcePath: null,
+      // B10: the original-language file the project remembers (project.orberg; path null = none)
+      orberg: { originalPath: (raw.orberg && raw.orberg.originalPath) || null, originalLang: (raw.orberg && raw.orberg.originalPath && raw.orberg.originalLang) || null, detected: false }
     };
     if (extra) { for (var k in extra) { if (Object.prototype.hasOwnProperty.call(extra, k)) { out[k] = extra[k]; } } }
     return out;

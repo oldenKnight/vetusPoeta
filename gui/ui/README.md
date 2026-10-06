@@ -100,13 +100,19 @@ mounts `VP_Orberg` in the centre. The top bar and the start screen show the SVG 
 - `vp_words.js` (`VP_Words`): `words.list` by count with tier badges, filter by tier, share bar
   (`tierShare`), "Copy as list" / "Copy as CSV" (lemma, gloss, tier, count); at most 300 rows
   rendered.
-- `vp_orberg.js` (`VP_Orberg`, 1.2.3): Latin file | Original-language file (Choose file... ->
-  `dialog.openFile {kind:"original"}` then `orbergise.start {originalPath}`; `cue.get
-  .original` afterwards) | Orberg version (changed words underlined with their tier badge,
-  from `cue.get` reasons whose `data` has `was`/`now`; a click shows "was -> now" and the
+- `vp_orberg.js` (`VP_Orberg`, 1.2.3): Latin file | Original-language file (a selector Detect |
+  English | Spanish next to Choose file... -> `dialog.openFile {kind:"original"}` then
+  `orbergise.start {originalPath, originalLang?}`, Detect leaves `originalLang` out; the loaded
+  file is the project's `orberg {originalPath, originalLang}` from `project.open` or the
+  `orbergise.start` result, shown as "name · Spanish (detected)" with Forget =
+  `orbergise.start {originalPath: ""}`; `cue.get.original` in the pane) | Orberg version
+  (changed words underlined with their tier badge and a change list "was -> now" under the
+  text, from `cue.get` reasons of kind `orbergise`; reasons with `was == now` ("structure
+  kept") are left out of both and counted as "n words kept"; a click shows "was -> now" and the
   reason in the Word tab; Edit through `cue.set`); Meaning check chip from `cue.get
-  .meaning {percent, missing}`; options tier T1|T2, Keep names, Simplify (UI settings key
-  `orberg`), Orbergise all | selected through `VP_Workspace.cmd.orbergise`.
+  .meaning {percent, missing}` (missing on hover and listed); options tier T1|T2, Keep names,
+  Simplify, the original's language (UI settings key `orberg`), Orbergise all | selected
+  through `VP_Workspace.cmd.orbergise`.
 - `vp_export.js` (`VP_Export`, 1.3): format radios (original on), file name with the language
   code, Choose... (`dialog.saveFile`), options from the settings' export defaults (this export
   only), checks (count, fast cues -> Show them, Fix cues -> Review first + the explicit tick),
@@ -181,7 +187,10 @@ and flags `cps`, `overflow`, `emoji`, `unknownName`; `VP_MockEngine.options.noLe
 drops the Latin dictionary. For the panels it serves `cue.get` reasons and paradigm cells
 for its small lexicon, detects the name Marcus, counts the words of the file, previews and
 "writes" exports (a path containing `exists` needs `overwrite`), accepts a `.gguf` path in
-`model.locate`, rewrites Latin with simpler words in `orbergise.start`, and records
+`model.locate`, rewrites Latin with simpler words in `orbergise.start` (B10: reasons of kind
+`orbergise`, one `was == now`; `originalLang` given or detected from the file name; the project
+view's `orberg`; a `.vpoeta` path containing `orberg` reopens the orbergised Latin sample with
+the Spanish original `lesson-3.es.srt` remembered), and records
 `shell.*` calls (`VP_MockEngine.shellCalls()`).
 B8: the real engine's shapes: `engine.hello` with `engine`, `engineKind`, `pairs` (by default
 en-la, es-la, la-en, la-es, en-grc, grc-en, la-la; `options.pairs` replaces the list),
@@ -239,7 +248,8 @@ The real-engine smoke (through `dev/engine_bridge_shim.js`): pair picker = `hell
 sample to the end with the Word / Words tabs and the Export preview, la-en with the model and
 the online check asked for (warning toast and chips, source chips, card, reading, Ctrl+I,
 export preview = readable sentences, chip -> Engines tab), then grc-en, en-grc and la-la when
-`hello.pairs` lists them (else "SKIP <pair>" with the engine's reason); no router.leak, no
+`hello.pairs` lists them (else "SKIP <pair>" with the engine's reason; la-la also checks every
+cue's change list for identical pairs, the meaning chip, Choose file with Detect and Forget); no router.leak, no
 console errors, listeners back to the Start baseline after each project. Screenshots
 `dev/out/real-*.png` (`real-la-en-*`, `real-greek-*`, `real-orberg-*` when available).
 

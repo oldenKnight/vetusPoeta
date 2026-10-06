@@ -401,6 +401,14 @@
 .vp-word-changed { text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 4px; }
 .vp-orb-missinglist { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-half) var(--space-1); margin-top: var(--space-half); font-size: var(--fs-ui); }
 .vp-orb-missing { color: var(--bad); }
+.vp-orb-langwrap { display: inline-flex; }
+.vp-orb-lang { min-width: 10em; }
+.vp-orb-changelist { margin-top: var(--space-1); }
+.vp-orb-changes-title { margin: 0 0 var(--space-half); font-size: var(--fs-ui); font-weight: 600; }
+.vp-orb-changes { display: flex; flex-wrap: wrap; gap: var(--space-half) var(--space-1); margin: 0; padding: 0; list-style: none; }
+.vp-orb-change { min-height: var(--target); padding: 0 var(--space-1); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); color: var(--text); cursor: pointer; }
+.vp-orb-change:disabled { cursor: default; }
+.vp-orb-kept { margin: var(--space-half) 0 0; font-size: var(--fs-ui); }
 
 /* Export, Settings, About dialogs; help menu */
 .vp-exp fieldset { margin: 0 0 var(--space-2); padding: 0; border: 0; }

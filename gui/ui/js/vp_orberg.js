@@ -16,15 +16,30 @@
  * so nothing is sent that the engine would refuse. orbergise.start carries {tier, keepNames,
  * simplify, originalPath?, indices?} as before.
  *
+ * B10 (C8b wiring): the original file belongs to the project, not to the UI settings: the pane
+ * shows VP_Store 'project'.orberg {originalPath, originalLang, detected} (project.open's
+ * project.orberg, refreshed by VP_Workspace.cmd.orbergise from the orbergise.start result) as
+ * "lesson-3.es.srt · Spanish (detected)" with a Forget button (orbergise.start {originalPath:
+ * ""}: the cues are rewritten from the Latin alone). Before a file is loaded a small selector
+ * Detect | English | Spanish (UI setting orberg.originalLang) sits next to "Choose file…";
+ * Detect omits originalLang, so the engine detects it. Under the Orberg version a change list
+ * shows the engine's orbergise reasons {was, now, why} with was != now (a button per change
+ * opens the word); reasons with was == now ("structure kept") are only counted: "n words kept",
+ * with the words on hover. The meaning chip reads cue.get meaning.percent, missing on hover;
+ * the original pane shows cue.get original.
+ *
  * VP_Orberg.mount(el) / destroy(); available() -> {ok, key, why}; options(); setOption(key, value); chooseOriginal() ->
- * Promise; run(indices?) -> Promise; startEdit() / cancelEdit() / acceptEdit(); changes();
- * meaningChip(meaning) (pure -> {kind, percent, missing}); stats()
+ * Promise; forgetOriginal() -> Promise; original() -> {path, name, lang, detected} | null; run(indices?, extra?) ->
+ * Promise; startEdit() / cancelEdit() / acceptEdit(); changes(); kept(); meaningChip(meaning) (pure -> {kind,
+ * percent, missing}); orbergReasons(reasons) (pure -> {changes, kept}); stats()
  */
 (function () {
   'use strict';
 
   var OWNER = 'orberg';
   var DETAIL_CAP = 20;
+  var LANGS = ['', 'en', 'es'];
+  var LANG_KEYS = { '': 'orbergise.original.lang.detect.label', en: 'orbergise.original.lang.en.label', es: 'orbergise.original.lang.es.label' };
   var WORD_RE = /[^\s.,;:?!¿¡"“”«»()\[\]{}\-–—·;]+/g;
   // A token with a letter or a digit; a token made only of punctuation never becomes a word chip
   // (B9, defensive: it stays plain text and keeps its index, so tokenIndex still matches).
@@ -75,9 +90,19 @@
     };
   }
 
+  // UI options of the pane (settings key `orberg`); originalLang '' = detect.
   function options() {
     var o = settings().orberg || {};
-    return { tier: o.tier === 1 ? 1 : 2, keepNames: o.keepNames !== false, simplify: o.simplify !== false, originalPath: o.originalPath || '' };
+    var lang = o.originalLang === 'en' || o.originalLang === 'es' ? o.originalLang : '';
+    return { tier: o.tier === 1 ? 1 : 2, keepNames: o.keepNames !== false, simplify: o.simplify !== false, originalLang: lang };
+  }
+
+  // The original-language file the project has loaded (project.orberg), or null.
+  function original() {
+    var o = (window.VP_Store.get('project') || {}).orberg;
+    if (!o || !o.originalPath) { return null; }
+    var path = String(o.originalPath);
+    return { path: path, name: path.split(/[\\\/]/).pop(), lang: o.originalLang === 'en' || o.originalLang === 'es' ? o.originalLang : '', detected: !!o.detected };
   }
 
   function setOption(key, value) {
@@ -120,15 +145,26 @@
     root.appendChild(s.root);
   }
 
-  // Changed words of the rewrite: {k, was, now, why} from cue.get reasons (data.was/now).
-  function changes() {
-    var d = s && s.detail;
-    var out = [];
-    ((d && d.reasons) || []).forEach(function (r) {
-      if (r && r.data && r.data.was) { out.push({ k: r.tokenIndex, was: r.data.was, now: r.data.now, why: r.data.why || '', tier: r.data.tier }); }
+  // The engine's orbergise reasons {was, now, why} (pure): changes (was != now) and the words whose
+  // structure was kept (was == now; C8b), each {k, was, now, why, text, tier}. Notes without data skip.
+  function orbergReasons(reasons) {
+    var out = { changes: [], kept: [] };
+    (reasons || []).forEach(function (r) {
+      var x = r && r.data;
+      if (!x || typeof x !== 'object' || (r.kind !== 'orbergise' && !x.was)) { return; }
+      var was = typeof x.was === 'string' ? x.was : '';
+      var now = typeof x.now === 'string' ? x.now : '';
+      if (!was && !now) { return; }
+      var item = { k: typeof r.tokenIndex === 'number' ? r.tokenIndex : -1, was: was, now: now, why: x.why || '', text: r.text || '', tier: x.tier };
+      (was === now ? out.kept : out.changes).push(item);
     });
     return out;
   }
+
+  // Changed words of the rewrite: {k, was, now, why} from cue.get reasons (data.was/now).
+  function changes() { return orbergReasons(s && s.detail && s.detail.reasons).changes; }
+
+  function kept() { return orbergReasons(s && s.detail && s.detail.reasons).kept; }
 
   // ---------------------------------------------------------------- rendering
   function renderOptions() {
@@ -141,23 +177,59 @@
     var job = window.VP_Store.get('job');
     s.runAll.disabled = !!job || !window.VP_Store.cueTotal();
     s.runSel.disabled = !!job || s.index === null;
+    s.origChoose.disabled = !!job;
+    s.origForget.disabled = !!job;
+    s.langSel.value = o.originalLang;
   }
 
-  function renderOriginal(c) {
+  function renderOriginal() {
     var D = window.VP_Dom;
     D.clear(s.origText);
     var d = s.detail;
-    var o = options();
-    if (d && typeof d.original === 'string') {
-      s.origText.appendChild(el('span', { className: 'vp-text', text: d.original }));
-      s.origChoose.hidden = true;
-      s.origName.hidden = false;
-      s.origName.textContent = String(o.originalPath || '').split(/[\\\/]/).pop();
+    var orb = original();
+    s.origName.hidden = !orb;
+    s.origForget.hidden = !orb;
+    s.origChoose.hidden = !!orb;
+    s.langWrap.hidden = !!orb;
+    if (orb) {
+      s.origName.textContent = orb.lang ? T(orb.detected ? 'orbergise.original.fileDetected.label' : 'orbergise.original.file.label', { name: orb.name, lang: T(LANG_KEYS[orb.lang]) }) : orb.name;
+      s.origName.setAttribute('title', orb.path);
+    }
+    if (d && typeof d.original === 'string' && d.original) {
+      var a = { className: 'vp-text', text: d.original };
+      if (orb && orb.lang) { a.lang = orb.lang; }
+      s.origText.appendChild(el('span', a));
       return;
     }
-    s.origName.hidden = true;
-    s.origChoose.hidden = false;
-    s.origText.appendChild(i18nEl('span', 'vp-hint', o.originalPath ? 'orbergise.original.pending.label' : 'orbergise.original.none.label'));
+    var key = 'orbergise.original.none.label';
+    if (orb) { key = d && typeof d.original === 'string' ? 'orbergise.original.noMatch.label' : 'orbergise.original.pending.label'; }
+    s.origText.appendChild(i18nEl('span', 'vp-hint', key));
+  }
+
+  // The change list under the Orberg version: was -> now per change, "n words kept" for the rest.
+  function renderChanges() {
+    var D = window.VP_Dom;
+    D.clear(s.changeList);
+    var r = orbergReasons(s.detail && s.detail.reasons);
+    s.changeList.hidden = !r.changes.length;
+    s.changesLabel.hidden = !r.changes.length;
+    r.changes.forEach(function (x) {
+      var label = T('orbergise.changed.tooltip', { was: x.was || T('orbergise.change.empty.label'), now: x.now || T('orbergise.change.empty.label') });
+      var kids = [
+        el('span', { className: 'vp-orb-was', text: display(x.was || T('orbergise.change.empty.label')) }),
+        el('span', { className: 'vp-orb-arrow', 'aria-hidden': 'true', text: ' → ' }),
+        el('span', { className: 'vp-orb-now', text: display(x.now || T('orbergise.change.empty.label')) })
+      ];
+      var attrs = { type: 'button', className: 'vp-orb-change vp-text', lang: 'la', 'aria-label': label, title: x.why || label, dataset: { orbWord: String(x.k) } };
+      if (x.k < 0) { attrs.disabled = true; }
+      s.changeList.appendChild(el('li', null, [el('button', attrs, kids)]));
+    });
+    s.keptEl.hidden = !r.kept.length;
+    if (r.kept.length) {
+      s.keptEl.textContent = T('orbergise.kept.label', { n: r.kept.length });
+      s.keptEl.setAttribute('title', T('orbergise.kept.tooltip', { list: r.kept.map(function (x) { return display(x.now); }).join(', ') }));
+    }
+    s.changesWrap.hidden = !r.changes.length && !r.kept.length;
   }
 
   function placeTokens(text, tokens) {
@@ -197,6 +269,7 @@
       s.missingEl.appendChild(i18nEl('span', 'vp-hint', 'orbergise.meaning.missing.label'));
       m.missing.forEach(function (w) { s.missingEl.appendChild(el('span', { className: 'vp-text vp-orb-missing', lang: 'la', text: display(w) })); });
     }
+    renderChanges();
     if (!c || !c.target) {
       s.verText.appendChild(i18nEl('span', 'vp-hint', 'orbergise.version.none.label'));
       s.editBtn.disabled = true;
@@ -237,7 +310,7 @@
     if (s.index === null) { return; }
     window.VP_Dom.clear(s.srcText);
     if (c) { window.VP_Panes.renderMarkup(s.srcText, c.source); }
-    renderOriginal(c);
+    renderOriginal();
     if (s.mode !== 'edit') { renderVersion(c); }
   }
 
@@ -326,21 +399,32 @@
   }
 
   // ---------------------------------------------------------------- actions
+  // Loads the original through orbergise.start {originalPath, originalLang?}; the engine keeps it
+  // loaded (and the project remembers it), so later runs send neither.
   function chooseOriginal() {
     return window.VP_Bridge.call('dialog.openFile', { kind: 'original', filters: ['srt', 'vtt', 'ass', 'ssa', 'txt'] }).then(function (r) {
       if (!r || !r.path || r.cancelled) { return null; }
-      return setOption('originalPath', r.path).then(function () { return run(null); }).then(function () { return r.path; });
+      return run(null, { originalPath: r.path }).then(function () { return r.path; });
     }, function (err) {
       showError(err);
       return null;
     });
   }
 
-  function run(indices) {
+  // Unloads the original: orbergise.start {originalPath: ""} (the cues are rewritten from the Latin).
+  function forgetOriginal() {
+    if (!original()) { return P().resolve(false); }
+    return run(null, { originalPath: '' }).then(function (id) { return id !== null && id !== undefined; });
+  }
+
+  function run(indices, extra) {
     if (s && s.unavailable) { return P().resolve(null); }
     var o = options();
     var params = { tier: o.tier, keepNames: o.keepNames, simplify: o.simplify };
-    if (o.originalPath) { params.originalPath = o.originalPath; }
+    if (extra && typeof extra.originalPath === 'string') {
+      params.originalPath = extra.originalPath;
+      if (extra.originalPath && o.originalLang) { params.originalLang = o.originalLang; }
+    }
     if (indices) { params.indices = indices; }
     if (s) { s.details.clear(); }
     return window.VP_Workspace.cmd.orbergise(params);
@@ -358,9 +442,14 @@
   function onClick(e, btn) {
     var a = btn.getAttribute('data-orb-action');
     var tier = btn.getAttribute('data-orb-tier');
+    var word = btn.getAttribute('data-orb-word');
+    if (word !== null) {
+      openWord(Number(word));
+      return;
+    }
     if (tier) { setOption('tier', Number(tier)); } else if (a === 'keep') { setOption('keepNames', btn.getAttribute('aria-checked') !== 'true'); } else if (a === 'simplify') {
       setOption('simplify', btn.getAttribute('aria-checked') !== 'true');
-    } else if (a === 'choose') { chooseOriginal(); } else if (a === 'runAll') { run(null); } else if (a === 'runSel') {
+    } else if (a === 'choose') { chooseOriginal(); } else if (a === 'forget') { forgetOriginal(); } else if (a === 'runAll') { run(null); } else if (a === 'runSel') {
       if (s.index !== null) { run([s.index]); }
     } else if (a === 'edit') { startEdit(); } else if (a === 'cancel') { cancelEdit(); } else if (a === 'keepEdit') { acceptEdit(); }
   }
@@ -402,11 +491,21 @@
     s.srcText = el('div', { className: 'vp-pane-text vp-text', lang: src });
     s.origText = el('div', { className: 'vp-pane-text vp-orb-orig' });
     s.origChoose = i18nEl('button', 'vp-btn vp-btn-secondary', 'orbergise.original.choose.cta', null, { type: 'button', dataset: { orbAction: 'choose' } });
-    s.origName = el('span', { className: 'vp-hint vp-mono', hidden: true });
+    s.origName = el('span', { className: 'vp-hint vp-mono vp-orb-file', hidden: true });
+    s.origForget = i18nEl('button', 'vp-btn vp-btn-tertiary', 'orbergise.original.forget.cta', null, { type: 'button', hidden: true, 'data-i18n-title': 'orbergise.original.forget.tooltip', title: T('orbergise.original.forget.tooltip'), dataset: { orbAction: 'forget' } });
+    s.langSel = el('select', { id: 'vp-orb-lang', className: 'vp-input vp-orb-lang' }, LANGS.map(function (l) { return i18nEl('option', null, LANG_KEYS[l], null, { value: l }); }));
+    s.langWrap = el('span', { className: 'vp-orb-langwrap' }, [
+      el('label', { htmlFor: 'vp-orb-lang', className: 'vp-visually-hidden', 'data-i18n': 'orbergise.original.lang.aria', text: T('orbergise.original.lang.aria') }),
+      s.langSel
+    ]);
     s.verText = el('div', { id: 'vp-orb-version', className: 'vp-pane-text vp-target-view vp-text', lang: 'la', tabIndex: -1 });
     s.chipText = el('span');
     s.chip = el('span', { className: 'vp-chip vp-orb-chip', hidden: true }, [el('span', { className: 'vp-chip-shape', 'aria-hidden': 'true' }), s.chipText]);
     s.missingEl = el('p', { className: 'vp-orb-missinglist', hidden: true });
+    s.changesLabel = i18nEl('h3', 'vp-hint vp-orb-changes-title', 'orbergise.changes.label', null, { id: 'vp-orb-changes-title' });
+    s.changeList = el('ul', { className: 'vp-orb-changes', 'aria-labelledby': 'vp-orb-changes-title' });
+    s.keptEl = el('p', { className: 'vp-hint vp-orb-kept', hidden: true });
+    s.changesWrap = el('div', { className: 'vp-orb-changelist', hidden: true }, [s.changesLabel, s.changeList, s.keptEl]);
     s.editBtn = i18nEl('button', 'vp-btn vp-btn-secondary', 'target.edit.cta', null, { type: 'button', dataset: { orbAction: 'edit' } });
     s.input = el('textarea', { id: 'vp-orb-editor', className: 'vp-editor-input vp-text vp-orb-input', lang: 'la', rows: '3', spellcheck: 'false' });
     s.editor = el('div', { className: 'vp-editor', hidden: true }, [
@@ -425,7 +524,7 @@
         s.srcText
       ]),
       el('section', { className: 'vp-pane', 'aria-labelledby': 'vp-orb-orig-title' }, [
-        el('div', { className: 'vp-pane-head' }, [i18nEl('h2', 'vp-pane-title', 'orbergise.original.title', null, { id: 'vp-orb-orig-title' }), s.origName, s.origChoose]),
+        el('div', { className: 'vp-pane-head' }, [i18nEl('h2', 'vp-pane-title', 'orbergise.original.title', null, { id: 'vp-orb-orig-title' }), s.origName, s.langWrap, s.origChoose, s.origForget]),
         s.origText
       ]),
       el('section', { className: 'vp-pane vp-pane-target', 'aria-labelledby': 'vp-orb-ver-title' }, [
@@ -433,6 +532,7 @@
         s.verText,
         s.editor,
         s.missingEl,
+        s.changesWrap,
         el('div', { className: 'vp-row vp-target-actions' }, [s.editBtn])
       ])
     ]);
@@ -456,7 +556,7 @@
 
   function mount(root) {
     if (s) { destroy(); }
-    s = { gen: (mount.gen = (mount.gen || 0) + 1), index: null, detail: null, shown: null, tokens: [], mode: 'view', editOrig: '', details: lru(DETAIL_CAP), removers: [], unavailable: false };
+    s = { gen: (mount.gen = (mount.gen || 0) + 1), index: null, detail: null, shown: null, tokens: [], mode: 'view', editOrig: '', details: lru(DETAIL_CAP), removers: [], unavailable: false, jobOn: !!window.VP_Store.get('job') };
     var av = available();
     if (!av.ok) {
       mountUnavailable(root, av);
@@ -464,7 +564,8 @@
     }
     build(root);
     var D = window.VP_Dom;
-    D.delegate(s.root, '[data-orb-action], [data-orb-tier]', 'click', onClick, { owner: OWNER });
+    D.delegate(s.root, '[data-orb-action], [data-orb-tier], [data-orb-word]', 'click', onClick, { owner: OWNER });
+    D.on(s.langSel, 'change', function () { setOption('originalLang', LANGS.indexOf(s.langSel.value) > 0 ? s.langSel.value : ''); }, { owner: OWNER });
     D.on(s.verText, 'click', onVersionClick, { owner: OWNER });
     D.on(s.verText, 'keydown', onVersionKey, { owner: OWNER });
     D.on(s.input, 'keydown', function (e) {
@@ -491,7 +592,17 @@
       }
     }));
     s.removers.push(S.subscribe('settings', render));
-    s.removers.push(S.subscribe('job', renderOptions));
+    s.removers.push(S.subscribe('project', function () { if (s && s.index !== null) { renderOriginal(); } }));
+    s.removers.push(S.subscribe('job', function (job) {
+      renderOptions();
+      // A finished job may change cue.get (original, meaning, reasons) without changing the cue's
+      // target or state (a new original file, Forget): the selected cue is fetched again.
+      if (s.jobOn && !job && s.index !== null) {
+        s.details.clear();
+        fetchDetail(s.index);
+      }
+      s.jobOn = !!job;
+    }));
     s.removers.push(window.VP_I18n.onLanguageChanged(render));
     s.removers.push(window.VP_Debug.registerCache('orbergCueGet', function () { return s ? s.details.size() : 0; }));
     var sel = S.get('selection');
@@ -509,7 +620,9 @@
   }
 
   function i18nKeys() {
-    return ['orbergise.meaning.label', 'orbergise.meaning.none.label', 'orbergise.meaning.missing.tooltip', 'orbergise.meaning.ok.tooltip', 'orbergise.changed.tooltip', 'orbergise.original.pending.label', 'orbergise.original.none.label'];
+    return ['orbergise.meaning.label', 'orbergise.meaning.none.label', 'orbergise.meaning.missing.tooltip', 'orbergise.meaning.ok.tooltip', 'orbergise.changed.tooltip', 'orbergise.original.pending.label', 'orbergise.original.none.label',
+      'orbergise.original.noMatch.label', 'orbergise.original.file.label', 'orbergise.original.fileDetected.label', 'orbergise.kept.label.one', 'orbergise.kept.label.other', 'orbergise.kept.tooltip',
+      'orbergise.change.empty.label'].concat(LANGS.map(function (l) { return LANG_KEYS[l]; }));
   }
 
   window.VP_Orberg = {
@@ -520,14 +633,18 @@
     options: options,
     setOption: setOption,
     chooseOriginal: chooseOriginal,
+    forgetOriginal: forgetOriginal,
+    original: original,
     run: run,
     startEdit: startEdit,
     cancelEdit: cancelEdit,
     acceptEdit: acceptEdit,
     changes: changes,
+    kept: kept,
+    orbergReasons: orbergReasons,
     meaningChip: meaningChip,
     openWord: openWord,
-    stats: function () { return s ? { index: s.index, mode: s.mode, details: s.details.size(), changes: changes().length } : null; },
+    stats: function () { return s ? { index: s.index, mode: s.mode, details: s.details.size(), changes: changes().length, kept: kept().length } : null; },
     i18nKeys: i18nKeys
   };
 }());

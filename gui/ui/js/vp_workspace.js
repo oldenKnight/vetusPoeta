@@ -291,12 +291,20 @@
     if (window.VP_Store.get('job')) { return P().resolve(null); }
     opts = opts || {};
     var params = { tier: opts.tier === 1 ? 1 : 2, keepNames: opts.keepNames !== false, simplify: opts.simplify !== false };
-    if (opts.originalPath) { params.originalPath = opts.originalPath; }
+    // originalPath "" forgets the loaded original (B10); originalLang only when the user chose one.
+    if (typeof opts.originalPath === 'string') { params.originalPath = opts.originalPath; }
+    if (opts.originalLang === 'en' || opts.originalLang === 'es') { params.originalLang = opts.originalLang; }
     if (opts.indices) { params.indices = opts.indices; }
     window.VP_Store.set('job', { jobId: null, done: 0, total: opts.indices ? opts.indices.length : window.VP_Store.cueTotal(), cuesPerSec: 0, etaSec: 0, starting: true });
     return window.VP_Bridge.call('orbergise.start', params).then(function (r) {
       var job = window.VP_Store.get('job');
       if (job && job.starting) { window.VP_Store.set('job', copy(job, { jobId: r.jobId, starting: false })); }
+      var cur = window.VP_Store.get('project');
+      if (cur && r && r.originalPath !== undefined) {
+        // the loaded original as the engine reports it; detected = the language was not given
+        var orb = { originalPath: r.originalPath || null, originalLang: r.originalPath ? (r.originalLang || null) : null, detected: !!(r.originalPath && params.originalPath && !params.originalLang) };
+        window.VP_Store.set('project', copy(cur, { orberg: orb }));
+      }
       return r.jobId;
     }, function (err) {
       window.VP_Store.set('job', null);

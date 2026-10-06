@@ -39,6 +39,13 @@
  * form, role, confidence, alternatives, why} and the word-by-word alternative; Greek lemmas
  * (κόρη, ῥόδον, ὁράω, φίλος) have lemma.get cells with the dual and alternative spellings
  * (extra: attic, contracted) like greek.vpl; the Greek sample ends with a question (";").
+ * B10 (C8b's Orbergise shapes): orbergise.start {originalPath? ("" forgets), originalLang? en|es
+ * (else detected from the file name: ".es." / "spanish" -> es, else en)} answers {jobId, total,
+ * warnings, originalPath|null, originalLang|null}; the project view carries orberg {originalPath,
+ * originalLang}; cue.get `original` is the sentence in that language; reasons of kind "orbergise"
+ * {was, now, why}, and a "structure kept" one with was == now (rosam in the first sentence);
+ * project.open of a path containing "orberg" gives the la-la sample, orbergised, with the
+ * Spanish original lesson-3.es.srt remembered.
  * Release builds leave this file out (tools/pack_ui.py, later).
  */
 (function () {
@@ -131,7 +138,8 @@
   // Other lemmas the mock offers as candidates for "Use another word" (the first one is chosen).
   var ALTS = { puella: ['virgo'], video: ['specto', 'cerno'], serenus: ['clarus'], habito: ['vivo'] };
   // Orbergise swaps: form -> [new form, lemma id, why, loose (meaning not fully kept)].
-  var SWAPS = { 'serēnum': ['clārum', 'clarus', 'vocabulary', false], habitat: ['vīvit', 'vivo', 'vocabulary', true], videt: ['spectat', 'specto', 'vocabulary', false] };
+  var SWAPS = { 'serēnum': ['clārum', 'clarus', 'vocabulary', false], habitat: ['vīvit', 'vivo', 'vocabulary', true], videt: ['spectat', 'specto', 'vocabulary', false],
+    rosam: ['rosam', 'rosa', 'structure', false] };
   // form -> [lemma id, case, number, person, tense, gender (adjectives)]
   var FORMS = {
     puella: ['puella', 'nominative', 'singular'], puellae: ['puella', 'dative', 'singular'],
@@ -257,7 +265,7 @@
   function reset() {
     if (state && state.job) { stopJob(); }
     stopAutosave();
-    state = { settings: loadSettings(), project: null, cues: [], undo: [], redo: [], corrections: [], nextCorrection: 1, names: [], job: null, nextJob: 1, originalPath: '',
+    state = { settings: loadSettings(), project: null, cues: [], undo: [], redo: [], corrections: [], nextCorrection: 1, names: [], job: null, nextJob: 1, originalPath: '', originalLang: 'en',
       model: { available: false, path: '', sizeBytes: 0, loaded: false, lastLoadMs: 0 }, shell: [] };
     counts.requests = 0;
     counts.events = 0;
@@ -412,6 +420,7 @@
       autosavePath: (p.path || 'mock://data/unsaved/untitled.vpoeta') + '.autosave',
       manifest: { pair: p.pair, kind: p.kind, sourceFileName: p.name },
       stats: { total: s.cues, 'new': news, translated: s.translated, reviewed: s.reviewed, check: s.check, fix: s.fix },
+      orberg: { originalPath: state.originalPath || null, originalLang: state.originalLang || 'en' },
       dirty: false, canUndo: state.undo.length > 0, canRedo: state.redo.length > 0
     };
   }
@@ -450,6 +459,7 @@
     state.names = [];
     state.corrections = [];
     state.originalPath = '';
+    state.originalLang = 'en';
     return { project: manifest() };
   }
 
@@ -479,7 +489,12 @@
     if (/damaged|corrupt/i.test(path)) { throw fail('project_corrupt', 'project file is damaged', 'Open the last autosave instead.'); }
     var big = /(\d+)-cues/i.exec(path);
     var i;
-    if (big) {
+    if (/orberg/i.test(path)) {
+      newProject({ pair: 'la-la', sourcePath: 'mock://samples/sample.la.srt' });
+      state.originalPath = 'C:\\Users\\Teacher\\Videos\\lesson-3.es.srt';
+      state.originalLang = 'es';
+      for (i = 0; i < state.cues.length; i++) { orbergCue(state.cues[i], { tier: 2, simplify: true }); }
+    } else if (big) {
       var n = Math.max(1, Math.min(200000, Number(big[1])));
       newProject({ pair: 'en-la', count: n });
       var r = rng(options.seed + 2);
@@ -685,7 +700,7 @@
       var l = LEMMAS[id];
       var orb = cue.swaps && cue.swaps[k];
       if (orb) {
-        out.push({ tokenIndex: k, kind: 'candidate', text: 'Simpler word: ' + orb.was + ' -> ' + orb.now, data: { was: orb.was, now: orb.now, why: orb.why, lemmaId: id, head: l.head, tier: l.tier, chosen: true } });
+        out.push({ tokenIndex: k, kind: 'orbergise', text: orb.was + ' -> ' + orb.now + ' (' + orb.why + ')', data: { was: orb.was, now: orb.now, why: orb.why } });
       }
       var src = srcWord(cue, id);
       out.push({ tokenIndex: k, kind: 'sense', text: 'Source word "' + src + '": ' + l.glossEn, data: { source: src, sense: l.glossEn, context: words.filter(function (w, i) { return i !== k; }).slice(0, 2) } });
@@ -878,6 +893,7 @@
     needProject();
     if (state.job) { throw fail('busy', 'a job is running', 'Wait for it to finish or cancel it.'); }
     if (orberg) {
+      checkOriginalLang(params);
       if (langsOf(state.project.pair).src !== 'la') { throw fail('bad_params', 'Orbergise needs a Latin project (pair la-la)', 'Open a Latin file to orbergise it.'); }
       requirePair('la-la');
     } else {
@@ -891,7 +907,7 @@
     var random = rng(options.seed + state.nextJob);
     var started = now();
     var jb = { id: id, indices: indices.slice(), done: 0, timer: null, random: random, stats: { ok: 0, check: 0, fix: 0 }, orberg: orberg ? { tier: params.tier === 1 ? 1 : 2, simplify: params.simplify !== false } : null };
-    if (orberg && params.originalPath) { state.originalPath = String(params.originalPath); }
+    if (orberg) { setOriginal(params); }
     state.job = jb;
     var batch = Math.max(1, options.batch);
     var interval = Math.max(1, Math.round(1000 * batch / Math.max(1, options.cuesPerSecond)));
@@ -925,7 +941,35 @@
         warns.forEach(function (w) { emit({ event: 'translate.warning', jobId: id, engine: w.engine, code: w.code, message: w.message, hint: w.hint }); });
       }, 0);
     }
-    return { jobId: id, total: indices.length, warnings: warns.map(function (w) { return w.code; }) };
+    var res = { jobId: id, total: indices.length, warnings: warns.map(function (w) { return w.code; }) };
+    if (orberg) {
+      res.originalPath = state.originalPath || null;
+      res.originalLang = state.originalPath ? state.originalLang : null;
+    }
+    return res;
+  }
+
+  // orbergise.start's original file (engine/cli/README.md): a path loads it (language given or
+  // detected), "" forgets it, absent keeps it; a language alone changes the loaded file's.
+  function checkOriginalLang(params) {
+    var lang = params.originalLang;
+    if (lang !== undefined && lang !== null && lang !== 'en' && lang !== 'es') {
+      throw fail('bad_params', 'originalLang must be en or es', 'The original-language file must be English or Spanish.');
+    }
+    return lang || '';
+  }
+
+  function setOriginal(params) {
+    var lang = params.originalLang || '';
+    if (typeof params.originalPath === 'string' && params.originalPath) {
+      state.originalPath = params.originalPath;
+      state.originalLang = lang || (/[._\-]es[._\-]|spanish|espa/i.test(params.originalPath) ? 'es' : 'en');
+    } else if (params.originalPath === '') {
+      state.originalPath = '';
+      state.originalLang = 'en';
+    } else if (lang && state.originalPath) {
+      state.originalLang = lang;
+    }
   }
 
   function now() {
@@ -1016,7 +1060,7 @@
       var toks = sourceTokens(cue.pair) ? (cue.target ? tokensOf(cue.source) : []) : tokensOf(cue.target);
       var out = { cue: view(cue), alternatives: alternativesOf(cue), tokens: toks, checks: checksOf(cue), reasons: cue.target ? reasonsOf(cue) : [] };
       if (cue.meaning) { out.meaning = clone(cue.meaning); }
-      if (state.originalPath && cue.sentence !== undefined) { out.original = SENTENCES[cue.sentence].en; }
+      if (state.originalPath && cue.sentence !== undefined) { out.original = SENTENCES[cue.sentence][state.originalLang === 'es' ? 'es' : 'en']; }
       return out;
     },
     'cue.set': function (p) {
