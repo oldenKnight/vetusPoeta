@@ -110,7 +110,8 @@ describe('VP_I18n', function () {
     I.setLang('es-MX');
     Object.keys(en).forEach(function (k) {
       var vars = { n: 2, name: 'N', version: 'V', lang: 'L', total: 6, done: 1, status: 'S', text: 'T', s: 2, limit: 17, word: 'W', list: 'A, B',
-        gloss: 'G', form: 'F', pair: 'P', path: 'X', when: 'now', d: 1, m: 2, y: 2026, time: '12:03', what: 'E', ok: 1, check: 1, fix: 0, rate: 9, eta: '3 s' };
+        gloss: 'G', form: 'F', pair: 'P', path: 'X', when: 'now', d: 1, m: 2, y: 2026, time: '12:03', what: 'E', ok: 1, check: 1, fix: 0, rate: 9, eta: '3 s',
+        author: 'A', abbr: 'ab.', words: 'w', term: 't', head: 'H', source: 'S', sense: 'S', size: 1, ms: 5, pct: 50, tier: 2, seen: 1, was: 'a', now: 'b', format: '.srt', from: 'f', sel: 1 };
       var text = I.t(k, vars);
       ok(text !== k, k + ' resolves');
       ok(text.indexOf('{') < 0, k + ' has no unfilled placeholder: ' + text);

@@ -1,0 +1,176 @@
+describe('VP_Engines', function () {
+  function boot(before) {
+    var env = load('all', { search: '?mock=1&debug=1' });
+    var W = env.window;
+    var D = W.VP_Dom;
+    env.app = D.el('div', { id: 'app', className: 'vp-app' });
+    env.main = D.el('main', { id: 'vp-main' });
+    env.app.appendChild(env.main);
+    env.document.body.appendChild(env.app);
+    W.VP_MockEngine.options.latencyMs = 1;
+    if (before) { before(env); }
+    W.VP_App.boot({ root: env.main, status: D.el('div') });
+    env.clock.tick(500);
+    env.sent = [];
+    var call = W.VP_Bridge.call;
+    W.VP_Bridge.call = function (cmd, params) {
+      env.sent.push({ cmd: cmd, params: params });
+      return call(cmd, params);
+    };
+    env.cmds = function (name) { return env.sent.filter(function (s) { return s.cmd === name; }); };
+    env.q = function (sel) { return env.document.querySelector(sel); };
+    env.qa = function (sel) { return env.document.querySelectorAll(sel); };
+    W.VP_Start.openSample();
+    env.clock.tick(300);
+    env.q('#vp-translate').click();
+    env.clock.tick(3000);
+    W.VP_Toast.clearAll();
+    W.VP_Workspace.setTab('engines');
+    env.clock.tick(100);
+    return env;
+  }
+  function states(env) {
+    var out = {};
+    for (var i = 0; i < 12; i++) { var st = env.window.VP_Store.getCue(i).state; out[st] = (out[st] || 0) + 1; }
+    return out;
+  }
+
+  it('slider: left = extremely faithful = fidelity 3, middle = 2, right = flexible = 1; the effect line uses the lexicon tier counts', function () {
+    var env = boot();
+    var W = env.window;
+    var E = W.VP_Engines;
+    eq(E.sliderToFidelity(1), 3);
+    eq(E.sliderToFidelity(2), 2);
+    eq(E.sliderToFidelity(3), 1);
+    eq(E.fidelityToSlider(3), 1);
+    eq(E.fidelityToSlider(1), 3);
+    var slider = env.q('#vp-fidelity');
+    eq(slider.value, '2', 'default fidelity 2 sits in the middle');
+    eq(env.q('.vp-fid-effect').textContent, 'Uses about 3,739 common words; rarer words are avoided.');
+    eq(env.q('.vp-fid-scale .vp-fid-end').textContent, 'Extremely faithful');
+    slider.value = '1';
+    env.fire(slider, 'change');
+    env.clock.tick(50);
+    eq(W.VP_Store.get('settings').defaultFidelity, 3);
+    var sets = env.cmds('settings.set');
+    eq(sets[sets.length - 1].params.patch.defaultFidelity, 3);
+    eq(env.q('.vp-fid-effect').textContent, 'Uses any of the 63,079 words of the dictionary so the exact word can be chosen.');
+    eq(env.q('.vp-fid-stop').textContent, 'Extremely faithful: any word needed');
+    slider.value = '3';
+    env.fire(slider, 'change');
+    env.clock.tick(50);
+    eq(W.VP_Store.get('settings').defaultFidelity, 1);
+    eq(env.q('.vp-fid-effect').textContent, 'Uses about 492 basic words and may rephrase the sentence.');
+    ok(env.q('.vp-fid-share').textContent.indexOf('% of the words in this file') > 0, env.q('.vp-fid-share').textContent);
+  });
+
+  it('changing a control marks translated cues stale (grey dot) and never touches edited or reviewed cues; Translate again clears it', function () {
+    var env = boot();
+    var W = env.window;
+    W.VP_CueList.select(1);
+    env.clock.tick(50);
+    W.VP_Workspace.cmd.review([1], true);
+    env.clock.tick(50);
+    W.VP_Workspace.cmd.edit(2, 'Nauta dormit.');
+    env.clock.tick(50);
+    var before = states(env);
+    var starts = env.cmds('translate.start').length;
+    eq(before.reviewed, 1);
+    eq(before.edited, 1);
+    eq(before.translated, 10);
+    var slider = env.q('#vp-fidelity');
+    slider.value = '1';
+    env.fire(slider, 'change');
+    env.clock.tick(50);
+    var after = states(env);
+    eq(after.stale, 10);
+    eq(after.reviewed, 1);
+    eq(after.edited, 1);
+    eq(env.q('.vp-eng-stale').hidden, false);
+    eq(env.q('.vp-eng-stale').textContent, '10 cues are out of date after your change (grey dot).');
+    eq(env.cmds('translate.start').length, starts, 'nothing is re-translated silently');
+    env.q('[data-eng-action="againAll"]').click();
+    env.clock.tick(3000);
+    var ts = env.cmds('translate.start').slice(starts);
+    eq(ts.length, 1);
+    eq(ts[0].params.fidelity, 3);
+    eq(ts[0].params.indices, undefined, 'the engine skips edited and reviewed cues itself');
+    after = states(env);
+    eq(after.stale, undefined);
+    eq(after.reviewed, 1, 'reviewed cue kept');
+    eq(W.VP_Store.getCue(2).target, 'Nauta dormit.', 'edited cue kept');
+    ok(env.q('.vp-eng-stale').hidden);
+    W.VP_CueList.select(3);
+    env.clock.tick(50);
+    env.q('[data-eng-action="againSel"]').click();
+    env.clock.tick(500);
+    deepEq(env.cmds('translate.start').slice(starts)[1].params.indices, [3]);
+  });
+
+  it('model: not installed shows Install/Find; Find file calls dialog.openFile then model.locate; the switch then turns it on', function () {
+    var env = boot();
+    var W = env.window;
+    eq(env.q('#vp-eng-model').getAttribute('aria-checked'), 'false');
+    ok(env.q('#vp-eng-model').disabled, 'switch disabled without a model');
+    eq(env.q('.vp-eng-state').textContent, 'Not installed.');
+    env.q('[data-eng-action="install"]').click();
+    eq(env.q('.vp-dialog-title').textContent, 'Install the local model');
+    W.VP_Dialog.closeAll();
+    env.q('[data-eng-action="find"]').click();
+    env.clock.tick(100);
+    eq(env.cmds('dialog.openFile').length, 1);
+    deepEq(env.cmds('dialog.openFile')[0].params.filters, ['gguf']);
+    eq(env.cmds('model.locate')[0].params.path, 'C:\\Users\\Teacher\\Downloads\\latin-helper.gguf');
+    eq(env.q('.vp-eng-state').textContent, 'latin-helper.gguf · 374 MiB · loads when needed');
+    ok(!env.q('#vp-eng-model').disabled);
+    env.q('#vp-eng-model').click();
+    env.clock.tick(50);
+    eq(W.VP_Store.get('settings').engines.model, true);
+    eq(env.q('#vp-eng-model').getAttribute('aria-checked'), 'true');
+    eq(states(env).stale, 12, 'engine change marks the cues stale');
+    eq(env.q('.vp-ws-engines').textContent.indexOf('Model on') > 0, true);
+  });
+
+  it('online: the one-time explanation dialog, cancel keeps it off, confirm turns it on and remembers; Test connection reports the latency', function () {
+    var env = boot();
+    var W = env.window;
+    ok(env.q('[data-eng-action="test"]').disabled);
+    env.q('#vp-eng-online').click();
+    eq(env.q('.vp-dialog-title').textContent, 'What leaves the computer');
+    ok(env.q('.vp-dialog-body').textContent.indexOf('single word') > 0);
+    env.q('[data-dialog-action="0"]').click();
+    env.clock.tick(50);
+    eq(W.VP_Store.get('settings').engines.online, false, 'cancel keeps it off');
+    env.q('#vp-eng-online').click();
+    env.q('[data-dialog-action="1"]').click();
+    env.clock.tick(50);
+    eq(W.VP_Store.get('settings').engines.online, true);
+    eq(W.VP_Store.get('settings').onlineExplained, true);
+    eq(env.q('#vp-eng-online').getAttribute('aria-checked'), 'true');
+    ok(env.q('.vp-ws-status .vp-net-online'), 'status bar shows online');
+    env.q('[data-eng-action="test"]').click();
+    env.clock.tick(50);
+    eq(env.cmds('online.test').length, 1);
+    eq(env.q('.vp-toast-text').textContent, 'wiktionary.org answered in 120 ms.');
+    W.VP_Toast.clearAll();
+    env.q('#vp-eng-online').click();
+    env.clock.tick(50);
+    eq(W.VP_Dialog.count(), 0, 'turning off needs no dialog');
+    eq(W.VP_Store.get('settings').engines.online, false);
+    env.q('#vp-eng-online').click();
+    env.clock.tick(50);
+    eq(W.VP_Dialog.count(), 0, 'explained once only');
+    eq(W.VP_Store.get('settings').engines.online, true);
+    env.q('#vp-eng-emoji').click();
+    env.clock.tick(50);
+    eq(W.VP_Store.get('settings').showEmoji, false);
+    env.q('#vp-eng-macrons').click();
+    env.clock.tick(50);
+    eq(W.VP_Store.get('settings')['export'].macrons, true);
+    eq(W.VP_Store.get('settings')['export'].rebreak, true, 'the rest of the export object is kept');
+    eq(env.q('#vp-eng-rules').getAttribute('aria-checked'), 'true');
+    eq(env.q('#vp-eng-rules').getAttribute('aria-disabled'), 'true', 'rules locked on');
+    deepEq(W.VP_I18n.missing(), []);
+    eq(env.errors().length, 0);
+  });
+});

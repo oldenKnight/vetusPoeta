@@ -15,8 +15,15 @@
  * VP_Workspace.mount(root, params) / destroy(); panelHost(); mode() / setMode('translate' |
  * 'orberg'); toggleDrawer(open?) / drawerOpen(); save() / close() -> Promise; isMounted()
  * VP_Workspace.cmd: review(indices, reviewed, {labelKey, toastKey}), edit(index, text,
- *   remember), choose(index, alternative), undo(), redo(), translate(indices?), cancel(),
- *   refetch(indices) -> Promise
+ *   remember), choose(index, alternative), undo(), redo(), translate(indices?),
+ *   orbergise(opts), cancel(), refetch(indices) -> Promise; markStale() -> count (UI-side:
+ *   translated cues get the grey dot after an engine setting changed; edited and reviewed
+ *   cues are never touched)
+ * Right panel (B7): a tab strip Word | Engines | Names | Corrections | Words over
+ * panelHost(); each tab is a module with mount(el)/destroy(); the last tab is remembered in
+ * the settings key panelTab (UI-only). VP_Workspace.setTab(id) / tab(); PANEL_TABS. The gear
+ * opens VP_Settings, ? opens VP_App.openHelp, the Export button and Ctrl+Shift+E open
+ * VP_Export, the Orbergise mode tab mounts VP_Orberg in its tab panel.
  * Store keys it writes: selection {index}, job, saveState {kind, at}, inspect (VP_Panes),
  * cueCounts (VP_CueList).
  */
@@ -28,6 +35,13 @@
   var KEY_ACTIONS = ['nextCue', 'prevCue', 'nextReview', 'prevReview', 'accept', 'acceptNext', 'edit', 'cancelEdit', 'acceptEdit',
     'alt1', 'alt2', 'alt3', 'search', 'macrons', 'emoji', 'undo', 'redo', 'save', 'export', 'settings'];
   var INTERACTIVE = 'button, a, input, select, textarea, [role="button"], [role="tab"], [role="option"]';
+  var PANEL_TABS = [
+    { id: 'word', module: 'VP_Inspector', key: 'workspace.tab.word.label' },
+    { id: 'engines', module: 'VP_Engines', key: 'workspace.tab.engines.label' },
+    { id: 'names', module: 'VP_Names', key: 'workspace.tab.names.label' },
+    { id: 'corrections', module: 'VP_Corrections', key: 'workspace.tab.corrections.label' },
+    { id: 'words', module: 'VP_Words', key: 'workspace.tab.words.label' }
+  ];
 
   var w = null;
 
@@ -250,6 +264,39 @@
     });
   }
 
+  // Orbergise the file (PREDESIGN 1.2.3): same job plumbing and events as translate.
+  function orbergise(opts) {
+    if (window.VP_Store.get('job')) { return P().resolve(null); }
+    opts = opts || {};
+    var params = { tier: opts.tier === 1 ? 1 : 2, keepNames: opts.keepNames !== false, simplify: opts.simplify !== false };
+    if (opts.originalPath) { params.originalPath = opts.originalPath; }
+    if (opts.indices) { params.indices = opts.indices; }
+    window.VP_Store.set('job', { jobId: null, done: 0, total: opts.indices ? opts.indices.length : window.VP_Store.cueTotal(), cuesPerSec: 0, etaSec: 0, starting: true });
+    return window.VP_Bridge.call('orbergise.start', params).then(function (r) {
+      var job = window.VP_Store.get('job');
+      if (job && job.starting) { window.VP_Store.set('job', copy(job, { jobId: r.jobId, starting: false })); }
+      return r.jobId;
+    }, function (err) {
+      window.VP_Store.set('job', null);
+      showError(err);
+      return null;
+    });
+  }
+
+  // After an engine control changed: translated cues (not edited, not reviewed) show the
+  // grey dot until "Translate again". The engine has no command for this, so it is UI state
+  // until the next translate.start (which skips edited and reviewed cues anyway).
+  function markStale() {
+    var total = window.VP_Store.cueTotal();
+    var out = [];
+    for (var i = 0; i < total; i++) {
+      var c = window.VP_Store.getCue(i);
+      if (c && c.state === 'translated') { out.push(copy(c, { state: 'stale' })); }
+    }
+    if (out.length) { window.VP_Store.putCues(out); }
+    return out.length;
+  }
+
   function cancel() {
     var job = window.VP_Store.get('job');
     if (!job || !job.jobId) { return P().resolve(false); }
@@ -403,6 +450,10 @@
     w.tabOrberg.tabIndex = tr ? -1 : 0;
     w.translatePanel.hidden = !tr;
     w.orbergPanel.hidden = tr;
+    var O = window.VP_Orberg;
+    if (O) {
+      if (!tr && !O.isMounted()) { O.mount(w.orbergPanel); } else if (tr && O.isMounted()) { O.destroy(); }
+    }
     return true;
   }
 
@@ -415,8 +466,73 @@
     return want;
   }
 
-  function placeholderDialog(titleKey, textKey) {
-    return window.VP_Dialog.open({ titleKey: titleKey, textKey: textKey, actions: [{ labelKey: 'dialog.close.cta', value: true, kind: 'primary' }] });
+  function openExport() {
+    if (window.VP_Export) { window.VP_Export.open(); }
+  }
+
+  function openSettings() {
+    if (window.VP_Settings) { window.VP_Settings.open(); }
+  }
+
+  function openHelp() {
+    if (window.VP_App && typeof window.VP_App.openHelp === 'function') { window.VP_App.openHelp(); } else if (window.VP_App) { window.VP_App.openShortcuts(); }
+  }
+
+  // ---------------------------------------------------------------- right panel tabs
+  function tabById(id) {
+    for (var i = 0; i < PANEL_TABS.length; i++) { if (PANEL_TABS[i].id === id) { return PANEL_TABS[i]; } }
+    return null;
+  }
+
+  function setTab(id, focus) {
+    if (!w || !w.tabBtns) { return false; }
+    var tab = tabById(id) || PANEL_TABS[0];
+    var cur = w.tab ? tabById(w.tab) : null;
+    if (cur && cur.id !== tab.id && window[cur.module] && window[cur.module].isMounted && window[cur.module].isMounted()) { window[cur.module].destroy(); }
+    window.VP_Dom.clear(w.panelBody);
+    w.tab = tab.id;
+    PANEL_TABS.forEach(function (t) {
+      var b = w.tabBtns[t.id];
+      var on = t.id === tab.id;
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+      b.tabIndex = on ? 0 : -1;
+    });
+    w.panelBody.setAttribute('aria-labelledby', 'vp-ptab-' + tab.id);
+    var mod = window[tab.module];
+    if (mod && typeof mod.mount === 'function') {
+      mod.mount(w.panelBody);
+    } else {
+      w.panelBody.appendChild(window.VP_Dom.el('p', { className: 'vp-hint', 'data-i18n': 'workspace.panel.empty' }));
+      window.VP_I18n.bind(w.panelBody);
+    }
+    if (focus) { w.tabBtns[tab.id].focus(); }
+    if (settings().panelTab !== tab.id && window.VP_App && typeof window.VP_App.saveSettings === 'function') { window.VP_App.saveSettings({ panelTab: tab.id }); }
+    return true;
+  }
+
+  function onPanelTabKey(e) {
+    if (!w) { return; }
+    var ids = PANEL_TABS.map(function (t) { return t.id; });
+    var i = ids.indexOf(w.tab);
+    var next = null;
+    if (e.key === 'ArrowRight') { next = ids[(i + 1) % ids.length]; } else if (e.key === 'ArrowLeft') { next = ids[(i + ids.length - 1) % ids.length]; } else if (e.key === 'Home') { next = ids[0]; } else if (e.key === 'End') { next = ids[ids.length - 1]; }
+    if (!next) { return; }
+    e.preventDefault();
+    setTab(next, true);
+  }
+
+  function destroyPanel() {
+    if (!w || !w.tab) { return; }
+    var cur = tabById(w.tab);
+    if (cur && window[cur.module] && window[cur.module].isMounted && window[cur.module].isMounted()) { window[cur.module].destroy(); }
+    w.tab = null;
+  }
+
+  // An inspected word switches to the Word tab (and opens the drawer below 1180 px).
+  function onInspect(x) {
+    if (!w || !x) { return; }
+    if (w.tab !== 'word') { setTab('word'); }
+    if (w.root.getAttribute('data-drawer') !== 'open' && window.innerWidth && window.innerWidth < 1180) { toggleDrawer(true); }
   }
 
   // ---------------------------------------------------------------- save and close
@@ -488,7 +604,7 @@
   function acceptAndNext() {
     return acceptSelected().then(function () {
       if (window.VP_CueList.nextReview(1) < 0) {
-        window.VP_Toast.show({ key: 'workspace.review.allDone.label', actionKey: 'workspace.review.export.cta', onAction: function () { placeholderDialog('workspace.export.title', 'workspace.export.soon.text'); } });
+        window.VP_Toast.show({ key: 'workspace.review.allDone.label', actionKey: 'workspace.review.export.cta', onAction: openExport });
       }
     });
   }
@@ -557,8 +673,8 @@
         redo();
       },
       save: function () { save(); },
-      'export': function () { placeholderDialog('workspace.export.title', 'workspace.export.soon.text'); },
-      settings: function () { placeholderDialog('workspace.settings.title', 'workspace.settings.soon.text'); }
+      'export': function () { openExport(); },
+      settings: function () { openSettings(); }
     };
   }
 
@@ -594,24 +710,25 @@
       D.el('div', { className: 'vp-ws-job' }, [w.jobIdle, w.jobRun]),
       w.panes
     ]);
-    w.orbergPanel = D.el('div', { id: 'vp-tab-orberg-panel', className: 'vp-ws-tabpanel', role: 'tabpanel', 'aria-labelledby': 'vp-tab-orberg', hidden: true }, [
-      D.el('div', { className: 'vp-card vp-ws-soon' }, [
-        D.el('h2', { 'data-i18n': 'workspace.orberg.soon.title' }),
-        D.el('p', { className: 'vp-hint', 'data-i18n': 'workspace.orberg.soon.text' })
-      ])
-    ]);
+    w.orbergPanel = D.el('div', { id: 'vp-tab-orberg-panel', className: 'vp-ws-tabpanel', role: 'tabpanel', 'aria-labelledby': 'vp-tab-orberg', hidden: true });
+    w.tabBtns = {};
+    w.panelBody = D.el('div', { id: 'vp-panel-body', className: 'vp-panel-body', role: 'tabpanel' });
     w.host = D.el('div', { id: 'vp-panel-host', className: 'vp-panel-host' }, [
-      D.el('div', { className: 'vp-panel-empty' }, [
-        D.el('h2', { 'data-i18n': 'workspace.panel.title' }),
-        D.el('p', { className: 'vp-hint', 'data-i18n': 'workspace.panel.empty' })
-      ])
+      D.el('div', { className: 'vp-tabs vp-panel-tabs', role: 'tablist', 'data-i18n-aria': 'workspace.panel.aria' }, PANEL_TABS.map(function (t) {
+        w.tabBtns[t.id] = D.el('button', { id: 'vp-ptab-' + t.id, type: 'button', role: 'tab', className: 'vp-tab vp-ptab', 'aria-selected': 'false', 'aria-controls': 'vp-panel-body', tabIndex: -1, 'data-i18n': t.key, dataset: { panelTab: t.id } });
+        return w.tabBtns[t.id];
+      })),
+      w.panelBody
+    ]);
+    w.exportBtn = D.el('button', { id: 'vp-export-btn', type: 'button', className: 'vp-btn vp-btn-secondary vp-ws-export', 'aria-keyshortcuts': 'Control+Shift+E', dataset: { wsAction: 'export' } }, [
+      useIcon('img/icons.svg#export'), D.el('span', { 'data-i18n': 'workspace.export.cta' })
     ]);
     w.right = D.el('section', { id: 'vp-ws-panel', className: 'vp-ws-right', tabIndex: -1, 'data-i18n-aria': 'workspace.panel.aria' }, [w.host]);
     var lang = String(project.pair || '').indexOf('grc') >= 0;
     w.root = D.el('div', { className: 'vp-ws' + (lang ? ' pair-grc' : ''), 'data-drawer': 'closed', 'data-kind': project.kind || 'subs' }, [
       D.el('header', { className: 'vp-ws-top' }, [
         D.el('button', { type: 'button', className: 'vp-ws-home', 'data-i18n-aria': 'workspace.home.aria', 'data-i18n-title': 'workspace.home.aria', dataset: { wsAction: 'home' } }, [
-          D.el('span', { className: 'vp-wordmark', 'data-i18n': 'app.name' })
+          window.VP_App && typeof window.VP_App.lockup === 'function' ? window.VP_App.lockup() : D.el('span', { className: 'vp-wordmark', 'data-i18n': 'app.name' })
         ]),
         D.el('div', { className: 'vp-ws-project' }, [
           D.el('span', { className: 'vp-ws-name', text: project.name || '', title: project.path || project.sourcePath || '' }),
@@ -622,6 +739,7 @@
         D.el('span', { className: 'vp-spacer' }),
         w.undoBtn,
         w.redoBtn,
+        w.exportBtn,
         w.drawerBtn,
         D.el('button', { type: 'button', className: 'vp-btn vp-btn-icon', 'data-i18n-aria': 'workspace.settings.aria', 'data-i18n-title': 'workspace.settings.aria', dataset: { wsAction: 'settings' } }, [
           svgIcon('M8 5.5a2.5 2.5 0 1 0 0 5a2.5 2.5 0 1 0 0-5zM8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4')
@@ -649,9 +767,11 @@
   function onAction(e, btn) {
     var a = btn.getAttribute('data-ws-action');
     if (a === 'undo') { undo(); } else if (a === 'redo') { redo(); } else if (a === 'drawer') { toggleDrawer(); } else if (a === 'settings') {
-      placeholderDialog('workspace.settings.title', 'workspace.settings.soon.text');
+      openSettings();
     } else if (a === 'help') {
-      if (window.VP_App && typeof window.VP_App.openShortcuts === 'function') { window.VP_App.openShortcuts(); }
+      openHelp();
+    } else if (a === 'export') {
+      openExport();
     } else if (a === 'home') {
       close();
     } else if (a === 'translate') {
@@ -666,6 +786,10 @@
   }
 
   function onTabKey(e) {
+    if (window.VP_Dom.closest(e.target, '.vp-ptab', w.root)) {
+      onPanelTabKey(e);
+      return;
+    }
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') { return; }
     e.preventDefault();
     var next = w.mode === 'translate' ? 'orberg' : 'translate';
@@ -692,7 +816,10 @@
     w.appEl = root.parentNode && root.parentNode.classList && root.parentNode.classList.contains('vp-app') ? root.parentNode : null;
     if (w.appEl) { w.appEl.classList.add('vp-app-ws'); }
     D.delegate(w.root, '[data-ws-action]', 'click', onAction, { owner: OWNER });
-    D.delegate(w.root, '[role="tab"]', 'click', function (e, tab) { setMode(tab === w.tabOrberg ? 'orberg' : 'translate'); }, { owner: OWNER });
+    D.delegate(w.root, '[role="tab"]', 'click', function (e, tab) {
+      var pt = tab.getAttribute('data-panel-tab');
+      if (pt) { setTab(pt); } else { setMode(tab === w.tabOrberg ? 'orberg' : 'translate'); }
+    }, { owner: OWNER });
     D.delegate(w.root, '[role="tab"]', 'keydown', onTabKey, { owner: OWNER });
 
     var S = window.VP_Store;
@@ -702,6 +829,7 @@
     w.removers.push(S.subscribe('settings', renderEngines));
     w.removers.push(S.subscribe('job', renderJob));
     w.removers.push(S.subscribe('selection', renderJob));
+    w.removers.push(S.subscribe('inspect', onInspect));
     w.removers.push(window.VP_History.onChange(renderHistory));
     w.removers.push(window.VP_I18n.onLanguageChanged(function () {
       renderHistory();
@@ -719,6 +847,8 @@
     S.setCueTotal(project.cues || 0);
     window.VP_CueList.mount(w.left, { total: project.cues || 0, kind: project.kind, pair: project.pair });
     window.VP_Panes.mount(w.panes, { kind: project.kind, pair: project.pair });
+    w.tab = null;
+    setTab(params.tab || (tabById(settings().panelTab) ? settings().panelTab : 'word'));
     setMode(params.mode || (project.pair === 'la-la' ? 'orberg' : 'translate'));
     renderSave();
     renderCounts();
@@ -731,6 +861,8 @@
 
   function destroy() {
     if (!w) { return; }
+    destroyPanel();
+    if (window.VP_Orberg && window.VP_Orberg.isMounted()) { window.VP_Orberg.destroy(); }
     window.VP_Panes.destroy();
     window.VP_CueList.destroy();
     window.VP_Dom.offOwner(OWNER);
@@ -760,7 +892,10 @@
     drawerOpen: function () { return !!w && w.root.getAttribute('data-drawer') === 'open'; },
     save: save,
     close: close,
-    cmd: { review: review, edit: edit, choose: choose, undo: undo, redo: redo, translate: translate, cancel: cancel, refetch: refetch },
+    cmd: { review: review, edit: edit, choose: choose, undo: undo, redo: redo, translate: translate, orbergise: orbergise, cancel: cancel, refetch: refetch, markStale: markStale },
+    setTab: setTab,
+    tab: function () { return w ? w.tab : null; },
+    PANEL_TABS: PANEL_TABS.slice(),
     keyActions: function () { return KEY_ACTIONS.slice(); },
     i18nKeys: i18nKeys
   };

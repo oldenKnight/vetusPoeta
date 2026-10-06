@@ -15,6 +15,11 @@
  * VP_App.boot(opts) -> Promise; ready(); setLang(code) -> Promise; setTheme(theme);
  * errorText(code, hint) -> {title, hint}; showError(err); flags(); fontSample();
  * saveSettings(patch) -> Promise(settings) (store first, then settings.set)
+ * B7: every change of VP_Store 'settings' is applied to the page (theme, text scale,
+ * language) so the Settings page and the Engines tab need no extra wiring; openHelp() (the ?
+ * menu: shortcuts, tour, about); startTour() with the six steps of PREDESIGN 1.6 (shown once
+ * per TOUR_VERSION after boot, the last step offers the sample project); lockup() builds the
+ * SVG wordmark (light and dark files, aria-label "vetus poeta").
  */
 (function () {
   'use strict';
@@ -25,6 +30,17 @@
   var SAMPLE_LA = 'Mārcus et Iūlia in hortō ambulant; ĕ ŏ ŭ';
   var SAMPLE_GRC = 'ἄνθρωπος ἀγαθός · ᾰ̓́ ῐ̔͂ ᾱ̀ ῠ́';
   var SAMPLE_EMOJI = '🌹 🐺 📜';
+  var TOUR_VERSION = '1';
+  // PREDESIGN 1.6: six steps, each fixed to a real control when that screen is up (a missing
+  // target gives a centred card), the last one offers the sample project.
+  var TOUR_STEPS = [
+    { target: '.vp-drop-zone', titleKey: 'tour.step1.title', textKey: 'tour.step1.text' },
+    { target: '#vp-start-pair', titleKey: 'tour.step2.title', textKey: 'tour.step2.text' },
+    { target: '#vp-ptab-engines', titleKey: 'tour.step3.title', textKey: 'tour.step3.text' },
+    { target: '#vp-cl-filter', titleKey: 'tour.step4.title', textKey: 'tour.step4.text' },
+    { target: '.vp-word', titleKey: 'tour.step5.title', textKey: 'tour.step5.text' },
+    { target: '#vp-export-btn', titleKey: 'tour.step6.title', textKey: 'tour.step6.text', actionKey: 'tour.sample.cta' }
+  ];
 
   var booted = false;
   var isReady = false;
@@ -44,7 +60,8 @@
       debug: out.debug === '1',
       lang: LANGS.indexOf(out.lang) >= 0 ? out.lang : null,
       theme: THEMES.indexOf(out.theme) >= 0 ? out.theme : null,
-      reducedMotion: out.reducedMotion === '1'
+      reducedMotion: out.reducedMotion === '1',
+      tour: out.tour === '1'
     };
   }
 
@@ -141,13 +158,82 @@
     return nav.indexOf('es') === 0 ? 'es-MX' : 'en-US';
   }
 
-  function applySettings(s) {
+  var applied = { theme: null, textScale: null, lang: null, first: false };
+
+  // The page follows the settings in the store: theme, text size and language (first at boot
+  // with the query flags winning, then after every change, from wherever it came).
+  function applySettings(s, first) {
     if (!s) { return; }
-    setTheme(flagSet.theme || s.theme, false);
-    if (typeof s.textScale === 'number' && s.textScale >= 90 && s.textScale <= 140) {
-      document.documentElement.style.setProperty('--text-scale', String(s.textScale / 100));
+    var theme = first && flagSet.theme ? flagSet.theme : (s.theme || 'auto');
+    if (theme !== applied.theme) {
+      applied.theme = theme;
+      setTheme(theme, false);
     }
-    if (!flagSet.lang && LANGS.indexOf(s.lang) >= 0 && s.lang !== window.VP_I18n.lang()) { window.VP_I18n.setLang(s.lang); }
+    var scale = typeof s.textScale === 'number' && s.textScale >= 90 && s.textScale <= 140 ? s.textScale : 100;
+    if (scale !== applied.textScale) {
+      applied.textScale = scale;
+      document.documentElement.style.setProperty('--text-scale', String(scale / 100));
+    }
+    applied.first = true;
+    var lang = first && flagSet.lang ? flagSet.lang : s.lang;
+    if (LANGS.indexOf(lang) >= 0 && lang !== applied.lang) {
+      applied.lang = lang;
+      if (lang !== window.VP_I18n.lang()) { window.VP_I18n.setLang(lang); }
+    }
+  }
+
+  // The SVG lockup (assets/logo_wordmark*.svg copied to img/): one file per theme, the CSS
+  // shows the right one; screen readers get the name.
+  function lockup() {
+    var D = window.VP_Dom;
+    return D.el('span', { className: 'vp-wordmark vp-lockup', role: 'img', 'data-i18n-aria': 'app.name', 'aria-label': window.VP_I18n.t('app.name') }, [
+      D.el('img', { className: 'vp-wordmark-svg vp-lockup-light', src: 'img/logo_wordmark.svg', alt: '' }),
+      D.el('img', { className: 'vp-wordmark-svg vp-lockup-dark', src: 'img/logo_wordmark_dark.svg', alt: '' })
+    ]);
+  }
+
+  // ---------------------------------------------------------------- help menu and tour
+  function openHelp() {
+    var D = window.VP_Dom;
+    var body = D.el('div', { className: 'vp-helpmenu' }, [
+      D.el('button', { type: 'button', className: 'vp-btn vp-btn-secondary', 'data-i18n': 'app.help.keys.cta', dataset: { helpAction: 'keys' } }),
+      D.el('button', { type: 'button', className: 'vp-btn vp-btn-secondary', 'data-i18n': 'app.help.tour.cta', dataset: { helpAction: 'tour' } }),
+      D.el('button', { type: 'button', className: 'vp-btn vp-btn-secondary', 'data-i18n': 'app.help.about.cta', dataset: { helpAction: 'about' } })
+    ]);
+    window.VP_I18n.bind(body);
+    var handle = window.VP_Dialog.open({ titleKey: 'app.help.title', body: body, actions: [{ labelKey: 'dialog.close.cta', value: false, kind: 'tertiary' }], initialFocus: '[data-help-action="keys"]' });
+    D.delegate(body, '[data-help-action]', 'click', function (e, btn) {
+      var a = btn.getAttribute('data-help-action');
+      handle.close(a);
+      if (a === 'keys') { openShortcuts(); } else if (a === 'tour') { startTour(); } else if (a === 'about' && window.VP_About) { window.VP_About.open(); }
+    }, { owner: handle.owner });
+    return handle;
+  }
+
+  function tourSeen() {
+    saveSettings({ tourSeenVersion: TOUR_VERSION }).then(null, function () { return null; });
+  }
+
+  function startTour() {
+    window.VP_Tour.start(TOUR_STEPS, {
+      onDone: tourSeen,
+      onAction: function () {
+        tourSeen();
+        if (window.VP_Start && typeof window.VP_Start.openSample === 'function') {
+          if (window.VP_Router.current() === 'start') { window.VP_Start.openSample(); } else { window.VP_Toast.show({ key: 'tour.sample.openFirst.label' }); }
+        }
+      }
+    });
+  }
+
+  // First run: the tour starts by itself (PREDESIGN 1.6). In mock mode only with ?tour=1, so
+  // browser sessions and tests are not covered by the overlay on every reload.
+  function maybeTour(settings) {
+    if (!settings || settings.tourSeenVersion === TOUR_VERSION || window.VP_Router.current() !== 'start' || !window.VP_Start) { return; }
+    if (flagSet.mock && !flagSet.tour) { return; }
+    window.VP_Timers.setTimeout('app', function () {
+      if (window.VP_Router.current() === 'start' && !window.VP_Tour.isActive() && !window.VP_Dialog.count()) { startTour(); }
+    }, 400);
   }
 
   // ---------------------------------------------------------------- status bar (app level)
@@ -394,10 +480,12 @@
     window.VP_Store.set('engine', { state: 'connecting' });
     window.VP_Keys.bind(document);
     window.VP_Keys.handle('help', function () { openShortcuts(); }, 'app');
+    window.VP_Keys.handle('settings', function () { if (window.VP_Settings) { window.VP_Settings.open(); } }, 'app');
     window.VP_History.onTrimmed(function () { window.VP_Toast.show({ key: 'toast.historyTrimmed.label' }); });
     window.VP_Bridge.on('engine.restarted', function () { window.VP_Toast.show({ key: 'toast.engineRestarted.label' }); });
     window.VP_Store.subscribe('engine', renderStatus);
     window.VP_Store.subscribe('settings', renderStatus);
+    window.VP_Store.subscribe('settings', function (s) { if (applied.first) { applySettings(s, false); } });
     window.VP_I18n.onLanguageChanged(renderStatus);
 
     bootPromise = loadJson('i18n/en-US.json').then(function (en) {
@@ -427,7 +515,8 @@
         return window.VP_Bridge.call('settings.get');
       }).then(function (settings) {
         window.VP_Store.set('settings', settings);
-        applySettings(settings);
+        applySettings(settings, true);
+        maybeTour(settings);
       }, function (err) {
         window.VP_Store.set('engine', { state: 'failed', code: err.code, hint: err.hint });
       });
@@ -447,6 +536,11 @@
     showError: showError,
     saveSettings: saveSettings,
     openShortcuts: openShortcuts,
+    openHelp: openHelp,
+    startTour: startTour,
+    lockup: lockup,
+    TOUR_VERSION: TOUR_VERSION,
+    tourSteps: function () { return TOUR_STEPS.slice(); },
     placeholder: placeholder,
     flags: function () { return flagSet; },
     fontSample: function () { return { la: SAMPLE_LA, grc: SAMPLE_GRC, emoji: SAMPLE_EMOJI }; }

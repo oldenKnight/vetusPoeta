@@ -14,6 +14,11 @@
  * takes < 100 ms (to the next frame); closing a project returns listeners and timers to the
  * Start screen baseline. Screenshots go to gui/ui/dev/out/ (gitignored): start and
  * workspace in light/dark and en-US/es-MX.
+ * Panels (B7): every right-panel tab opens (Word with the inspector on a word, "why" and
+ * the paradigm table open; Engines; Names; Corrections; Words), the Export, Settings and
+ * About dialogs open and close, Orbergise mode runs on a Latin file, the six-step tour runs
+ * to its end on the start screen and its last step opens the sample; screenshots of each
+ * tab and dialog in light/dark and en/es; listeners and timers return to the baseline.
  */
 'use strict';
 
@@ -54,6 +59,8 @@ function findChromium() {
   }
   return null;
 }
+
+function window_tour_version() { return '1'; }
 
 function skip(why) {
   process.stdout.write('smoke: SKIP (' + why + ')\n');
@@ -346,6 +353,94 @@ function main() {
   }).then(function () {
     return shot('workspace-light-es.png');
   }).then(function () {
+    // B7: the right-panel tabs with the inspector on a word
+    return page.evaluate(function () {
+      window.VP_Panes.dismiss();
+      window.VP_Panes.openWord(0);
+      return new Promise(function (resolve) { setTimeout(resolve, 200); }).then(function () {
+        window.VP_Inspector.toggleWhy(true);
+        window.VP_Inspector.toggleForms(true);
+        return new Promise(function (resolve) { setTimeout(resolve, 200); });
+      }).then(function () {
+        var st = window.VP_Inspector.state();
+        return { tab: window.VP_Workspace.tab(), word: st.word, loaded: st.loaded, blocks: document.querySelectorAll('.vp-why-block').length, table: !!document.querySelector('.vp-paradigm'), used: document.querySelectorAll('.vp-par-used').length };
+      });
+    });
+  }).then(function (r) {
+    check(r.tab === 'word' && !!r.word && r.loaded, 'Word tab: inspector on "' + r.word + '"');
+    check(r.blocks === 4 && r.table && r.used === 1, 'four "why this word" blocks, paradigm table with the used cell highlighted');
+    return shot('panel-word-light-es.png');
+  }).then(function () {
+    return page.evaluate(function () { window.VP_App.setTheme('dark'); window.VP_App.setLang('en-US'); });
+  }).then(function () {
+    return shot('panel-word-dark-en.png');
+  }).then(function () {
+    return page.evaluate(function () { window.VP_App.setTheme('light'); });
+  }).then(function () {
+    var tabs = ['engines', 'names', 'corrections', 'words'];
+    var chain = Promise.resolve();
+    tabs.forEach(function (t) {
+      chain = chain.then(function () { return page.click('#vp-ptab-' + t); }).then(function () { return page.waitForTimeout(300); }).then(function () {
+        return page.evaluate(function (id) {
+          var mod = { engines: 'VP_Engines', names: 'VP_Names', corrections: 'VP_Corrections', words: 'VP_Words' }[id];
+          return { tab: window.VP_Workspace.tab(), mounted: window[mod].isMounted(), text: document.getElementById('vp-panel-body').textContent.length, nodes: window.VP_Debug.stats().domNodes };
+        }, t);
+      }).then(function (r) {
+        check(r.tab === t && r.mounted && r.text > 20 && r.nodes <= 800, t + ' tab mounted (' + r.text + ' characters, ' + r.nodes + ' DOM nodes)');
+        return shot('panel-' + t + '-light-en.png');
+      });
+    });
+    return chain;
+  }).then(function () {
+    return page.click('#vp-ptab-engines');
+  }).then(function () {
+    return page.waitForTimeout(200);
+  }).then(function () {
+    return page.evaluate(function () { window.VP_App.setLang('es-MX'); window.VP_App.setTheme('dark'); });
+  }).then(function () {
+    return shot('panel-engines-dark-es.png');
+  }).then(function () {
+    return page.evaluate(function () { window.VP_App.setLang('en-US'); window.VP_App.setTheme('light'); window.VP_Workspace.setTab('word'); });
+  }).then(function () {
+    // Export, Settings, About dialogs
+    return page.keyboard.press('Control+Shift+E');
+  }).then(function () {
+    return page.waitForTimeout(400);
+  }).then(function () {
+    return page.evaluate(function () { return { open: window.VP_Export.isOpen(), title: document.querySelector('.vp-dialog-title').textContent, preview: document.querySelectorAll('.vp-exp-preview .vp-preview-line').length, focus: document.activeElement.id }; });
+  }).then(function (r) {
+    check(r.open && r.title === 'Export' && r.preview >= 3, 'Ctrl+Shift+E opens Export with a 3-cue preview (focus on ' + r.focus + ')');
+    return shot('dialog-export-light-en.png');
+  }).then(function () {
+    return page.keyboard.press('Escape');
+  }).then(function () {
+    return page.keyboard.press('Control+,');
+  }).then(function () {
+    return page.waitForTimeout(300);
+  }).then(function () {
+    return page.evaluate(function () { return { open: window.VP_Settings.isOpen(), sections: document.querySelectorAll('.vp-set-section').length, exportClosed: !window.VP_Export.isOpen() }; });
+  }).then(function (r) {
+    check(r.open && r.sections === 6 && r.exportClosed, 'Ctrl+, opens Settings with six sections; Escape closed Export');
+    return shot('dialog-settings-light-en.png');
+  }).then(function () {
+    return page.evaluate(function () { window.VP_App.setTheme('dark'); window.VP_App.setLang('es-MX'); });
+  }).then(function () {
+    return shot('dialog-settings-dark-es.png');
+  }).then(function () {
+    return page.evaluate(function () { window.VP_App.setTheme('light'); window.VP_App.setLang('en-US'); window.VP_Settings.close(); window.VP_About.open('data'); });
+  }).then(function () {
+    return page.waitForTimeout(300);
+  }).then(function () {
+    return page.evaluate(function () { return { open: window.VP_About.isOpen(), notices: document.querySelectorAll('.vp-about-notice').length, text: document.querySelector('.vp-about-notice').textContent }; });
+  }).then(function (r) {
+    check(r.open && r.notices === 2 && r.text.indexOf('Wiktionary') > 0, 'About shows the lexicon notices verbatim');
+    return shot('dialog-about-light-en.png');
+  }).then(function () {
+    return page.evaluate(function () { window.VP_About.close(); return window.VP_Dialog.count(); });
+  }).then(function (n) {
+    check(n === 0, 'every dialog closed');
+    return page.evaluate(function () { window.VP_App.setLang('es-MX'); });
+  }).then(function () {
     return page.keyboard.press('e');
   }).then(function () {
     return page.keyboard.type(' xyzzy');
@@ -383,6 +478,75 @@ function main() {
     return page.waitForFunction(function () { return window.VP_Router.current() === 'start'; }, null, { timeout: 5000, polling: 50 });
   }).then(function () {
     return compareBaseline('after closing the sample project');
+  }).then(function () {
+    // Orbergise mode on a Latin file (la-la): three panes, meaning chip, changed words
+    return page.evaluate(function () {
+      document.getElementById('vp-start-orberg').checked = true;
+      document.getElementById('vp-start-orberg').dispatchEvent(new Event('change', { bubbles: true }));
+      window.VP_Start.openSample();
+    });
+  }).then(function () {
+    return page.waitForFunction(function () { return window.VP_Router.current() === 'workspace' && window.VP_Workspace.mode() === 'orberg' && window.VP_Store.cueCount() === 12; }, null, { timeout: 10000, polling: 50 });
+  }).then(function () {
+    return page.click('#vp-orb-run');
+  }).then(function () {
+    return page.waitForFunction(function () { return !window.VP_Store.get('job'); }, null, { timeout: 15000, polling: 50 });
+  }).then(function () {
+    return page.evaluate(function () {
+      window.VP_Toast.clearAll();
+      window.VP_CueList.select(1);
+      return new Promise(function (resolve) { setTimeout(resolve, 300); }).then(function () {
+        return { panes: document.querySelectorAll('.vp-orb-body .vp-pane').length, changed: document.querySelectorAll('#vp-orb-version .vp-word-changed').length, chip: document.querySelector('.vp-orb-chip').textContent, nodes: window.VP_Debug.stats().domNodes };
+      });
+    });
+  }).then(function (r) {
+    check(r.panes === 3 && r.changed === 1 && /67/.test(r.chip), 'Orbergise mode: three panes, one changed word, meaning chip "' + r.chip + '", ' + r.nodes + ' DOM nodes');
+    return shot('orberg-light-en.png');
+  }).then(function () {
+    return page.click('#vp-orb-version .vp-word-changed');
+  }).then(function () {
+    return page.waitForTimeout(300);
+  }).then(function () {
+    return page.evaluate(function () { return { tab: window.VP_Workspace.tab(), text: document.getElementById('vp-panel-body').textContent }; });
+  }).then(function (r) {
+    check(r.tab === 'word' && r.text.indexOf('habitat') >= 0 && r.text.indexOf('vīvit') >= 0, 'clicking a changed word shows "was -> now" in the Word tab');
+    return shot('orberg-word-light-en.png');
+  }).then(function () {
+    return page.click('.vp-ws-home');
+  }).then(function () {
+    return page.waitForFunction(function () { return window.VP_Router.current() === 'start'; }, null, { timeout: 5000, polling: 50 });
+  }).then(function () {
+    return page.evaluate(function () { document.getElementById('vp-start-orberg').checked = false; });
+  }).then(function () {
+    return compareBaseline('after closing the Orbergise project');
+  }).then(function () {
+    // The six-step tour on the start screen, to the end, then the sample from its last step
+    return page.evaluate(function () { window.VP_App.startTour(); return { active: window.VP_Tour.isActive(), spot: !document.querySelector('.vp-tour-spot').hidden, title: document.querySelector('.vp-tour-title').textContent }; });
+  }).then(function (r) {
+    check(r.active && r.spot && r.title === 'Open a subtitle file', 'the real tour starts on the drop zone');
+    return shot('tour-step1-light-en.png');
+  }).then(function () {
+    var chain = Promise.resolve();
+    for (var i = 0; i < 5; i++) { chain = chain.then(function () { return page.keyboard.press('ArrowRight'); }).then(function () { return page.waitForTimeout(100); }); }
+    return chain;
+  }).then(function () {
+    return page.evaluate(function () { return { index: window.VP_Tour.index(), action: !document.querySelector('.vp-tour-action').hidden, title: document.querySelector('.vp-tour-title').textContent }; });
+  }).then(function (r) {
+    check(r.index === 5 && r.action, 'last step "' + r.title + '" offers the sample project');
+    return shot('tour-step6-light-en.png');
+  }).then(function () {
+    return page.click('.vp-tour-action');
+  }).then(function () {
+    return page.waitForFunction(function () { return window.VP_Router.current() === 'workspace' && window.VP_Store.cueCount() === 12; }, null, { timeout: 10000, polling: 50 });
+  }).then(function () {
+    return page.evaluate(function () { return { tour: window.VP_Tour.isActive(), seen: window.VP_Store.get('settings').tourSeenVersion }; });
+  }).then(function (r) {
+    check(!r.tour && r.seen === window_tour_version(), 'the tour ends, opens the sample and is marked seen (' + r.seen + ')');
+    return page.click('.vp-ws-home');
+  }).then(function () {
+    return page.waitForFunction(function () { return window.VP_Router.current() === 'start'; }, null, { timeout: 5000, polling: 50 });
+  }).then(function () {
+    return compareBaseline('after the tour and the sample');
   }).then(function () {
     started = Date.now();
     return page.evaluate(function () { window.VP_Start.openPath('C:\\Users\\Teacher\\demo-50000-cues.vpoeta'); });

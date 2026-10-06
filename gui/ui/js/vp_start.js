@@ -388,9 +388,9 @@
     } else if (a === 'keep') {
       keepSaved();
     } else if (a === 'settings') {
-      window.VP_Dialog.open({ titleKey: 'workspace.settings.title', textKey: 'workspace.settings.soon.text', actions: [{ labelKey: 'dialog.close.cta', value: true, kind: 'primary' }] });
+      if (window.VP_Settings) { window.VP_Settings.open(); } else { window.VP_Dialog.open({ titleKey: 'workspace.settings.title', textKey: 'workspace.settings.soon.text', actions: [{ labelKey: 'dialog.close.cta', value: true, kind: 'primary' }] }); }
     } else if (a === 'help') {
-      window.VP_App.openShortcuts();
+      if (typeof window.VP_App.openHelp === 'function') { window.VP_App.openHelp(); } else { window.VP_App.openShortcuts(); }
     }
   }
 

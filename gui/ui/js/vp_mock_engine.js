@@ -98,7 +98,8 @@
     'sōl': ['sol', 'nominative', 'singular'], 'nāvis': ['navis', 'nominative', 'singular'],
     avis: ['avis', 'nominative', 'singular'], 'serēnum': ['serenus', 'nominative', 'singular', '', '', 'neuter'],
     habitat: ['habito', '', 'singular', 'third', 'present'], spectat: ['specto', '', 'singular', 'third', 'present'],
-    'clārum': ['clarus', 'nominative', 'singular', '', '', 'neuter'], 'vīvit': ['vivo', '', 'singular', 'third', 'present']
+    'clārum': ['clarus', 'nominative', 'singular', '', '', 'neuter'], 'vīvit': ['vivo', '', 'singular', 'third', 'present'],
+    'virgō': ['virgo', 'nominative', 'singular'], 'cernit': ['cerno', '', 'singular', 'third', 'present']
   };
   var CASES = ['nominative', 'vocative', 'accusative', 'genitive', 'dative', 'ablative'];
   var PERSONS = [['first', 'singular'], ['second', 'singular'], ['third', 'singular'], ['first', 'plural'], ['second', 'plural'], ['third', 'plural']];
@@ -564,7 +565,8 @@
 
   // Orbergise one cue: simpler words from SWAPS (tier ceiling respected), reasons per change.
   function orbergCue(cue, opts) {
-    var words = String(cue.source).split(' ');
+    var latin = langsOf(cue.pair).src === 'la' ? cue.source : SENTENCES[cue.sentence].la;
+    var words = String(latin).split(' ');
     cue.swaps = {};
     var missing = [];
     var content = 0;

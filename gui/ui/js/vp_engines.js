@@ -321,7 +321,7 @@
     s.againSel = i18nEl('button', 'vp-btn vp-btn-secondary', 'engines.again.selected.cta', null, { type: 'button', 'data-eng-action': 'againSel' });
     s.againAll = i18nEl('button', 'vp-btn vp-btn-secondary', 'engines.again.all.cta', null, { type: 'button', 'data-eng-action': 'againAll' });
     s.root = el('div', { className: 'vp-panel vp-panel-engines' }, [
-      i18nEl('h2', 'vp-panel-title', 'engines.title'),
+      i18nEl('h2', 'vp-panel-title', 'engines.panel.title'),
       el('section', { className: 'vp-eng' }, [
         row('vp-eng-rules', 'engines.rules.label', sw('vp-eng-rules', true, 'rules', { locked: true, desc: 'vp-eng-rules-hint' })),
         i18nEl('p', 'vp-hint', 'engines.rules.hint', null, { id: 'vp-eng-rules-hint' }),

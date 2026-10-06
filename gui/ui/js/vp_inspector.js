@@ -37,7 +37,10 @@
   var VOICES = ['active', 'middle', 'passive'];
   var NOMINAL = ['case', 'number', 'gender', 'degree'];
   var VERBAL = ['person', 'number', 'tense', 'mood', 'voice'];
-  var NORMAL = { '1': 'first', '2': 'second', '3': 'third', m: 'masculine', f: 'feminine', n: 'neuter', sg: 'singular', pl: 'plural' };
+  var NORMAL = { '1': 'first', '2': 'second', '3': 'third', m: 'masculine', f: 'feminine', n: 'neuter', sg: 'singular', pl: 'plural', du: 'dual',
+    nom: 'nominative', voc: 'vocative', acc: 'accusative', gen: 'genitive', dat: 'dative', abl: 'ablative', loc: 'locative',
+    pres: 'present', impf: 'imperfect', fut: 'future', perf: 'perfect', plup: 'pluperfect', ind: 'indicative', subj: 'subjunctive', imp: 'imperative', inf: 'infinitive',
+    act: 'active', pass: 'passive', mid: 'middle', comp: 'comparative', sup: 'superlative' };
   var SOURCES = ['wiktionary', 'whitaker', 'model', 'online'];
   var CHECKS = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9'];
 
@@ -682,6 +685,7 @@
           return el('option', { value: x.key, selected: x.key === group.key, text: term('mood', x.mood, 'label') + ' · ' + term('voice', x.voice, 'label') });
         }))
       ]));
+      kids[kids.length - 1].childNodes[1].value = group.key;
     }
     if (group) {
       kids.push(el('table', { className: 'vp-paradigm' }, [
@@ -797,9 +801,8 @@
         markCheck(index);
         if (s) { s.cues.drop(index); }
         window.VP_Toast.show({ key: 'inspector.another.done.label', kind: 'success' });
-        if (s && s.gen === gen) {
-          var placed = replaceToken(detail.cue.target, detail.tokens || [], v.k, form);
-          var x = { index: index, token: v.k, text: placed === null ? form : (/^[A-ZĀĒĪŌŪȲ]/.test(v.tok.text) ? form.charAt(0).toUpperCase() + form.slice(1) : form), lang: v.lang, lemmaId: d.lemmaId === undefined ? null : d.lemmaId };
+        if (s && s.cur && s.cur.index === index) {
+          var x = { index: index, token: v.k, text: /^[A-ZĀĒĪŌŪȲ]/.test(v.tok.text) ? form.charAt(0).toUpperCase() + form.slice(1) : form, lang: v.lang, lemmaId: d.lemmaId === undefined ? null : d.lemmaId };
           window.VP_Store.set('inspect', x);
         }
         return !!r;

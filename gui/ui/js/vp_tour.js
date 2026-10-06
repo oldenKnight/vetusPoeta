@@ -4,8 +4,10 @@
  * card. Each step's title gets focus so screen readers announce it. Motion is CSS only and
  * disappears under prefers-reduced-motion.
  *
- * VP_Tour.start(steps, {onDone(reason), startAt}) steps: [{target, titleKey, textKey}]
- *   (target: CSS selector; missing target = centred card without spotlight)
+ * VP_Tour.start(steps, {onDone(reason), onAction(step), startAt}) steps: [{target, titleKey,
+ *   textKey, actionKey?}] (target: CSS selector; missing target = centred card without
+ *   spotlight; actionKey adds a button to that step which ends the tour with reason
+ *   "action" and calls onAction)
  * VP_Tour.next(), back(), skip(), stop(), isActive(), index()
  */
 (function () {
@@ -60,6 +62,8 @@
     tour.counter.setAttribute('data-i18n-vars', JSON.stringify({ n: i + 1, total: tour.steps.length }));
     tour.next.setAttribute('data-i18n', last ? 'tour.done.cta' : 'tour.next.cta');
     tour.back.disabled = i === 0;
+    tour.action.hidden = !step.actionKey;
+    if (step.actionKey) { tour.action.setAttribute('data-i18n', step.actionKey); }
     T.bind(tour.root);
     position();
     tour.title.focus();
@@ -82,6 +86,14 @@
 
   function skip() {
     if (tour) { finish('skip'); }
+  }
+
+  function action() {
+    if (!tour) { return; }
+    var fn = tour.onAction;
+    var step = tour.steps[tour.i];
+    finish('action');
+    if (typeof fn === 'function') { fn(step); }
   }
 
   function stop() {
@@ -132,19 +144,20 @@
     var backBtn = D.el('button', { type: 'button', className: 'vp-btn vp-btn-secondary', 'data-i18n': 'tour.back.cta', dataset: { tour: 'back' } });
     var nextBtn = D.el('button', { type: 'button', className: 'vp-btn vp-btn-primary', dataset: { tour: 'next' } });
     var skipBtn = D.el('button', { type: 'button', className: 'vp-btn vp-btn-tertiary', 'data-i18n': 'tour.skip.cta', dataset: { tour: 'skip' } });
+    var actionBtn = D.el('button', { type: 'button', className: 'vp-btn vp-btn-secondary vp-tour-action', hidden: true, 'data-i18n': 'tour.done.cta', dataset: { tour: 'action' } });
     var card = D.el('div', { className: 'vp-tour-card' }, [
       counter, title, text,
-      D.el('div', { className: 'vp-tour-actions' }, [skipBtn, D.el('span', { className: 'vp-spacer' }), backBtn, nextBtn])
+      D.el('div', { className: 'vp-tour-actions' }, [skipBtn, D.el('span', { className: 'vp-spacer' }), actionBtn, backBtn, nextBtn])
     ]);
     var spot = D.el('div', { className: 'vp-tour-spot', hidden: true, 'aria-hidden': 'true' });
     var root = D.el('div', { className: 'vp-tour', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'vp-tour-title' }, [spot, card]);
     tour = {
       steps: steps, i: 0, root: root, card: card, spot: spot, title: title, text: text, counter: counter,
-      next: nextBtn, back: backBtn, onDone: opts.onDone, returnFocus: document.activeElement
+      next: nextBtn, back: backBtn, action: actionBtn, onDone: opts.onDone, onAction: opts.onAction, returnFocus: document.activeElement
     };
     D.delegate(root, '[data-tour]', 'click', function (e, btn) {
       var a = btn.getAttribute('data-tour');
-      if (a === 'next') { next(); } else if (a === 'back') { back(); } else { skip(); }
+      if (a === 'next') { next(); } else if (a === 'back') { back(); } else if (a === 'action') { action(); } else { skip(); }
     }, { owner: OWNER });
     D.on(root, 'keydown', onKey, { owner: OWNER });
     D.on(window, 'resize', position, { owner: OWNER });
