@@ -65,8 +65,11 @@ describe('VP_Settings', function () {
     eq(W.VP_Store.get('settings')['export'].encoding, 'utf-8', 'nested object merged, not replaced');
     change(env, '#vp-set-exp-enc', 'windows-1252');
     eq(W.VP_Store.get('settings')['export'].encoding, 'windows-1252');
+    deepEq(env.qa('#vp-set-fidelity option').map(function (o) { return o.value + ' ' + o.textContent; }),
+      ['1 Extremely faithful: any word needed', '2 Balanced: common words', '3 Flexible: basic words, may rephrase'], 'engine scale, faithful first');
     change(env, '#vp-set-fidelity', '1');
     eq(W.VP_Store.get('settings').defaultFidelity, 1);
+    eq(env.cmds('settings.set').pop().params.patch.defaultFidelity, 1, 'Extremely faithful is saved as engine fidelity 1');
     change(env, '#vp-set-cps-adult', '99');
     eq(W.VP_Store.get('settings').cps.adult, 60, 'clamped to 5..60');
     eq(W.VP_Store.get('settings').cps.child, 20);
@@ -183,5 +186,66 @@ describe('VP_Settings', function () {
     W.VP_Workspace.close();
     env.clock.tick(300);
     deepEq(W.VP_Debug.failures(), []);
+  });
+});
+
+describe('VP_Settings fidelity scale migration (B9)', function () {
+  function bootWith(saved) {
+    var env = load('all', { search: '?mock=1&debug=1' });
+    var W = env.window;
+    var D = W.VP_Dom;
+    var main = D.el('main', { id: 'vp-main' });
+    env.document.body.appendChild(main);
+    W.VP_MockEngine.options.latencyMs = 1;
+    if (saved) { W.localStorage.setItem('vp.mock.settings', JSON.stringify(saved)); }
+    env.sent = [];
+    var call = W.VP_Bridge.call;
+    W.VP_Bridge.call = function (cmd, params) {
+      env.sent.push({ cmd: cmd, params: params });
+      return call(cmd, params);
+    };
+    env.sets = function () { return env.sent.filter(function (x) { return x.cmd === 'settings.set'; }); };
+    W.VP_App.boot({ root: main, status: D.el('div') });
+    env.clock.tick(500);
+    return env;
+  }
+
+  it('migrationPatch is pure: 1 <-> 3 once, 2 kept, nothing when the flag is set', function () {
+    var env = load('all', { search: '?mock=1' });
+    var S = env.window.VP_Settings;
+    deepEq(S.migrationPatch({ defaultFidelity: 3 }), { fidelityScaleV2: true, defaultFidelity: 1 });
+    deepEq(S.migrationPatch({ defaultFidelity: 1 }), { fidelityScaleV2: true, defaultFidelity: 3 });
+    deepEq(S.migrationPatch({ defaultFidelity: 2 }), { fidelityScaleV2: true });
+    deepEq(S.migrationPatch({}), { fidelityScaleV2: true });
+    eq(S.migrationPatch({ defaultFidelity: 3, fidelityScaleV2: true }), null);
+    eq(S.DEFAULTS.fidelityScaleV2, true, 'Reset to defaults keeps the flag');
+  });
+
+  it('a saved "Extremely faithful" (old 3) becomes engine fidelity 1 at boot through one settings.set, and the next boot changes nothing', function () {
+    var env = bootWith({ defaultFidelity: 3 });
+    var W = env.window;
+    var sets = env.sets();
+    eq(sets.length, 1, 'one settings.set');
+    deepEq(sets[0].params.patch, { fidelityScaleV2: true, defaultFidelity: 1 });
+    eq(W.VP_Store.get('settings').defaultFidelity, 1);
+    eq(W.VP_Store.get('settings').fidelityScaleV2, true);
+    var stored = JSON.parse(W.localStorage.getItem('vp.mock.settings'));
+    eq(stored.fidelityScaleV2, true, 'the mock engine keeps the unknown key like the real one');
+    eq(stored.defaultFidelity, 1);
+    // second boot on the same saved settings: no inversion back
+    var env2 = bootWith(stored);
+    eq(env2.sets().length, 0, 'the migration runs once');
+    eq(env2.window.VP_Store.get('settings').defaultFidelity, 1);
+    eq(env.errors().length, 0);
+    eq(env2.errors().length, 0);
+  });
+
+  it('a saved "Flexible" (old 1) becomes 3; a fresh install only gets the flag', function () {
+    var env = bootWith({ defaultFidelity: 1 });
+    deepEq(env.sets()[0].params.patch, { fidelityScaleV2: true, defaultFidelity: 3 });
+    eq(env.window.VP_Store.get('settings').defaultFidelity, 3);
+    var fresh = bootWith(null);
+    deepEq(fresh.sets()[0].params.patch, { fidelityScaleV2: true });
+    eq(fresh.window.VP_Store.get('settings').defaultFidelity, 2);
   });
 });

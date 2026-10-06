@@ -35,15 +35,18 @@ describe('VP_Engines', function () {
     return out;
   }
 
-  it('slider: left = extremely faithful = fidelity 3, middle = 2, right = flexible = 1; the effect line uses the lexicon tier counts', function () {
+  it('slider on the engine scale (rules.h): left = extremely faithful = fidelity 1, middle = 2, right = flexible = 3; the effect line uses the lexicon tier counts', function () {
     var env = boot();
     var W = env.window;
     var E = W.VP_Engines;
-    eq(E.sliderToFidelity(1), 3);
+    eq(E.sliderToFidelity(1), 1);
     eq(E.sliderToFidelity(2), 2);
-    eq(E.sliderToFidelity(3), 1);
-    eq(E.fidelityToSlider(3), 1);
-    eq(E.fidelityToSlider(1), 3);
+    eq(E.sliderToFidelity(3), 3);
+    eq(E.fidelityToSlider(1), 1);
+    eq(E.fidelityToSlider(3), 3);
+    eq(E.sliderToFidelity(9), 3, 'clamped');
+    eq(E.maxTier(1), 3, 'fidelity 1 allows tier 3');
+    eq(E.maxTier(3), 1, 'fidelity 3 keeps to tier 1');
     var slider = env.q('#vp-fidelity');
     eq(slider.value, '2', 'default fidelity 2 sits in the middle');
     eq(env.q('.vp-fid-effect').textContent, 'Uses about 3,739 common words; rarer words are avoided.');
@@ -51,16 +54,26 @@ describe('VP_Engines', function () {
     slider.value = '1';
     env.fire(slider, 'change');
     env.clock.tick(50);
-    eq(W.VP_Store.get('settings').defaultFidelity, 3);
+    eq(W.VP_Store.get('settings').defaultFidelity, 1, 'left detent = fidelity 1');
     var sets = env.cmds('settings.set');
-    eq(sets[sets.length - 1].params.patch.defaultFidelity, 3);
+    eq(sets[sets.length - 1].params.patch.defaultFidelity, 1);
     eq(env.q('.vp-fid-effect').textContent, 'Uses any of the 63,079 words of the dictionary so the exact word can be chosen.');
     eq(env.q('.vp-fid-stop').textContent, 'Extremely faithful: any word needed');
+    eq(slider.getAttribute('aria-valuetext'), 'Extremely faithful: any word needed');
+    env.q('[data-eng-action="againAll"]').click();
+    env.clock.tick(3000);
+    var ts = env.cmds('translate.start');
+    eq(ts[ts.length - 1].params.fidelity, 1, 'translate.start sends 1 for the left detent');
     slider.value = '3';
     env.fire(slider, 'change');
     env.clock.tick(50);
-    eq(W.VP_Store.get('settings').defaultFidelity, 1);
+    eq(W.VP_Store.get('settings').defaultFidelity, 3, 'right detent = fidelity 3');
     eq(env.q('.vp-fid-effect').textContent, 'Uses about 492 basic words and may rephrase the sentence.');
+    eq(env.q('.vp-fid-stop').textContent, 'Flexible: basic words, may rephrase');
+    env.q('[data-eng-action="againAll"]').click();
+    env.clock.tick(3000);
+    ts = env.cmds('translate.start');
+    eq(ts[ts.length - 1].params.fidelity, 3, 'translate.start sends 3 for the right detent');
     ok(env.q('.vp-fid-share').textContent.indexOf('% of the words in this file') > 0, env.q('.vp-fid-share').textContent);
   });
 
@@ -93,7 +106,7 @@ describe('VP_Engines', function () {
     env.clock.tick(3000);
     var ts = env.cmds('translate.start').slice(starts);
     eq(ts.length, 1);
-    eq(ts[0].params.fidelity, 3);
+    eq(ts[0].params.fidelity, 1, 'left detent: extremely faithful = engine fidelity 1');
     eq(ts[0].params.indices, undefined, 'the engine skips edited and reviewed cues itself');
     after = states(env);
     eq(after.stale, undefined);

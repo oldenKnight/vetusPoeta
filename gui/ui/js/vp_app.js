@@ -15,6 +15,7 @@
  * VP_App.boot(opts) -> Promise; ready(); setLang(code) -> Promise; setTheme(theme);
  * errorText(code, hint) -> {title, hint}; showError(err); flags(); fontSample();
  * saveSettings(patch) -> Promise(settings) (store first, then settings.set)
+ * B9: after settings.get the boot runs VP_Settings.migrate() (one-time fidelity scale move).
  * B7: every change of VP_Store 'settings' is applied to the page (theme, text scale,
  * language) so the Settings page and the Engines tab need no extra wiring; openHelp() (the ?
  * menu: shortcuts, tour, about); startTour() with the six steps of PREDESIGN 1.6 (shown once
@@ -517,6 +518,12 @@
         return window.VP_Bridge.call('settings.get');
       }).then(function (settings) {
         window.VP_Store.set('settings', settings);
+        // B9: a defaultFidelity saved on the old inverted scale is moved once; the store changes
+        // at once, settings.set follows without holding the boot.
+        if (window.VP_Settings && typeof window.VP_Settings.migrate === 'function') {
+          window.VP_Settings.migrate();
+          settings = window.VP_Store.get('settings') || settings;
+        }
         applySettings(settings, true);
         maybeTour(settings);
       }, function (err) {

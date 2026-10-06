@@ -269,7 +269,8 @@
     var st = settings();
     var params = {
       engines: { rules: true, model: !!(st.engines && st.engines.model), online: !!(st.engines && st.engines.online) },
-      fidelity: st.defaultFidelity || 2
+      // The engine's scale (rules.h): 1 extremely faithful .. 3 flexible, as the slider stores it.
+      fidelity: st.defaultFidelity >= 1 && st.defaultFidelity <= 3 ? st.defaultFidelity : 2
     };
     if (indices) { params.indices = indices; }
     window.VP_Store.set('job', { jobId: null, done: 0, total: indices ? indices.length : window.VP_Store.cueTotal(), cuesPerSec: 0, etaSec: 0, starting: true });

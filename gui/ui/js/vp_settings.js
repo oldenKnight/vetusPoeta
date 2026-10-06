@@ -9,8 +9,14 @@
  * memory now -> model.unload), Learning (reading speed adult/child, Reset tour), Reset to
  * defaults (DESIGN 9.1 defaults, one settings.set). Shortcut Ctrl+, (VP_Workspace / VP_App).
  *
+ * defaultFidelity is on the engine's scale (rules.h: 1 extremely faithful .. 3 flexible); the
+ * select lists 1, 2, 3 in that order. Builds before B9 saved it inverted (3 = faithful):
+ * migrate() inverts a saved 1 or 3 once and sets fidelityScaleV2 in the same settings.set
+ * (VP_App runs it after settings.get at boot); with the flag present nothing changes.
+ *
  * VP_Settings.open() -> dialog handle; close(); isOpen(); apply(path, value) -> Promise;
- * reset() -> Promise; DEFAULTS; SECTIONS
+ * reset() -> Promise; migrationPatch(settings) -> patch | null (pure); migrate() ->
+ * Promise(bool); DEFAULTS; SECTIONS
  */
 (function () {
   'use strict';
@@ -26,7 +32,8 @@
     'export': { emoji: false, macrons: false, encoding: 'utf-8', bom: false, rebreak: true },
     engines: { model: false, online: false },
     online: { wiktionary: false, latinitium: false },
-    modelPath: '', eco: false, autosave: true, cps: { adult: 17, child: 20 }, tourSeenVersion: ''
+    modelPath: '', eco: false, autosave: true, cps: { adult: 17, child: 20 }, tourSeenVersion: '',
+    fidelityScaleV2: true
   };
   var TOUR_VERSION = '1';
   var d = null;
@@ -79,6 +86,30 @@
       if (d) { render(); }
       return r;
     });
+  }
+
+  // One-time move of defaultFidelity to the engine's scale (B9): null when already done.
+  function migrationPatch(st) {
+    if (!st || st.fidelityScaleV2 === true) { return null; }
+    var patch = { fidelityScaleV2: true };
+    var f = Number(st.defaultFidelity);
+    if (f === 1 || f === 3) { patch.defaultFidelity = 4 - f; }
+    return patch;
+  }
+
+  // The store first, then settings.set; the engine's answer is not written back, so a boot
+  // with dev query flags (theme, lang) is not re-applied by this one-time write.
+  function migrate() {
+    var cur = window.VP_Store.get('settings');
+    var patch = migrationPatch(cur);
+    if (!patch) { return P().resolve(false); }
+    var next = {};
+    var k;
+    for (k in cur) { if (Object.prototype.hasOwnProperty.call(cur, k)) { next[k] = cur[k]; } }
+    for (k in patch) { if (Object.prototype.hasOwnProperty.call(patch, k)) { next[k] = patch[k]; } }
+    window.VP_Store.set('settings', next);
+    if (window.VP_Bridge.kind() === 'none') { return P().resolve(true); }
+    return window.VP_Bridge.call('settings.set', { patch: patch }).then(function () { return true; }, function () { return false; });
   }
 
   function reset() {
@@ -185,7 +216,7 @@
       ]),
       section('translation', [
         field('vp-set-pair', 'settings.translation.pair.label', select('vp-set-pair', 'defaultPair', pairKeys(), function (v) { return window.VP_Start ? window.VP_Start.pairLabelKey(v) : 'start.pair.enLa.label'; })),
-        field('vp-set-fidelity', 'settings.translation.fidelity.label', select('vp-set-fidelity', 'defaultFidelity', [3, 2, 1], function (v) { return 'fidelity.stop.t' + v + '.label'; })),
+        field('vp-set-fidelity', 'settings.translation.fidelity.label', select('vp-set-fidelity', 'defaultFidelity', [1, 2, 3], function (v) { return 'fidelity.stop.f' + v + '.label'; })),
         i18nEl('h4', 'vp-set-sub', 'settings.translation.export.title'),
         toggle('vp-set-exp-emoji', 'export.options.emoji.label', 'export.emoji', 'export.options.emoji.hint'),
         toggle('vp-set-exp-macrons', 'export.options.macrons.label', 'export.macrons', null),
@@ -401,6 +432,8 @@
     isOpen: function () { return d !== null; },
     apply: apply,
     reset: reset,
+    migrationPatch: migrationPatch,
+    migrate: migrate,
     patchFor: patchFor,
     DEFAULTS: DEFAULTS,
     SECTIONS: SECTIONS.slice(),

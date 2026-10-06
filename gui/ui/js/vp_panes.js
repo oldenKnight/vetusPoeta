@@ -45,6 +45,10 @@
   var CHECK_MS = 300;
   var LINE_MAX = 42;
   var WORD_RE = /[^\s.,;:?!¿¡"“”«»()\[\]{}\-–—·;]+/g;
+  // A token with a letter or a digit; a token made only of punctuation never becomes a word chip
+  // (B9, defensive: it stays plain text and keeps its index, so tokenIndex still matches).
+  var WORDISH_RE = /[0-9A-Za-z\u00AA\u00B5\u00BA\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02AF\u0370-\u03FF\u1E00-\u1FFF]/;
+  function isWordTok(t) { return WORDISH_RE.test(String((t && t.text) || '')); }
   var EMOJI_RE = /[☀-➿]️?|[\ud83c-\ud83e][\udc00-\udfff]️?/g;
   var MARKUP_RE = /(<\/?[a-zA-Z][^>]*>|\{\\[^}]*\})/g;
   var CHECK_LANGS = { la: true, grc: true };
@@ -277,6 +281,10 @@
     var pos = 0;
     while (chips.k < chips.list.length) {
       var t = chips.list[chips.k];
+      if (!isWordTok(t)) {
+        chips.k++;
+        continue;
+      }
       var at = line.indexOf(t.text, pos);
       if (at < 0) { break; }
       if (at > pos) { target.appendChild(document.createTextNode(line.slice(pos, at))); }
@@ -344,7 +352,7 @@
     p.ilBtn.setAttribute('aria-pressed', interlinearOn() ? 'true' : 'false');
     p.ilBtn.disabled = !p.srcToks.length;
     if (p.cardTok !== null && !p.srcToks[p.cardTok]) { hideCard(); }
-    if (p.srcToks.length && interlinearOn()) { for (var k = 0; k < p.srcToks.length; k++) { fetchSrcWord(k); } }
+    if (p.srcToks.length && interlinearOn()) { for (var k = 0; k < p.srcToks.length; k++) { if (isWordTok(p.srcToks[k])) { fetchSrcWord(k); } } }
     if (focusTok !== null && focusTok !== undefined) {
       var again = window.VP_Dom.qs('[data-src-tok="' + focusTok + '"]', p.srcText);
       if (again) { again.focus(); }
@@ -395,6 +403,10 @@
     var pos = 0;
     for (var k = 0; k < toks.length; k++) {
       var t = toks[k];
+      if (!isWordTok(t)) {
+        p.tokens.push(t);
+        continue;
+      }
       if (t.at > pos) { p.view.appendChild(document.createTextNode(display(text.slice(pos, t.at)))); }
       var cls = 'vp-word' + (t.unknown ? ' vp-word-unknown' : '');
       var attrs = { className: cls, tabIndex: 0, role: 'button', 'data-tok': String(k), text: display(t.display || t.text) };

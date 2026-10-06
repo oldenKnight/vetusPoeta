@@ -3,6 +3,10 @@
  * the tier share bar (% of words per tier, with names), "Copy as list" (one lemma per line)
  * and "Copy as CSV" for flashcards (lemma, gloss, tier, count). The list renders at most
  * ROW_CAP rows (the rest is counted in a hint) so the DOM budget holds for big files.
+ * B9 (defensive): entries whose lemma head has no letter (punctuation that leaked into the
+ * tokens) are dropped, and brackets or quotes stuck to a head ("((caelum") are trimmed. The
+ * "above the level" line reads defaultFidelity on the engine's scale (1 faithful = tier 3
+ * allowed .. 3 flexible = tier 1).
  *
  * VP_Words.mount(el) / destroy(); reload() -> Promise; setFilter('all'|'1'|'2'|'3');
  * filter(); listText(words) / csv(words) (pure); copyList() / copyCsv() -> Promise; stats()
@@ -40,7 +44,13 @@
     return st.showMacrons === false && window.VP_CueList ? window.VP_CueList.stripMacrons(String(text || '')) : String(text || '');
   }
 
-  function head(w) { return String((w.lemma && w.lemma.head) || '').split(/,\s*/)[0]; }
+  // Letters of the scripts the lexicons use (Latin with macrons and breves, Greek, polytonic).
+  var LETTER_RE = /[A-Za-z\u00AA\u00B5\u00BA\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02AF\u0370-\u03FF\u1E00-\u1FFF]/;
+  var EDGE_PUNCT_RE = /^[\s()\[\]{}"\u201C\u201D\u00AB\u00BB.,;:?!\u00BF\u00A1\u00B7\u0387]+|[\s()\[\]{}"\u201C\u201D\u00AB\u00BB.,;:?!\u00BF\u00A1\u00B7\u0387]+$/g;
+
+  function fullHead(w) { return String((w && w.lemma && w.lemma.head) || '').replace(EDGE_PUNCT_RE, ''); }
+  function head(w) { return fullHead(w).split(/,\s*/)[0]; }
+  function isWord(w) { return LETTER_RE.test(fullHead(w)); }
 
   function gloss(w) {
     return window.VP_Inspector ? window.VP_Inspector.glossOf(w.lemma).text : ((w.lemma && (w.lemma.glossEn || w.lemma.glossEs)) || '');
@@ -54,12 +64,12 @@
   }
 
   function listText(words) {
-    return (words || []).map(function (w) { return head(w) || (w.lemma && w.lemma.head) || ''; }).join('\n') + '\n';
+    return (words || []).map(function (w) { return head(w) || fullHead(w); }).join('\n') + '\n';
   }
 
   function csv(words) {
     var rows = [['lemma', 'gloss', 'tier', 'count']];
-    (words || []).forEach(function (w) { rows.push([(w.lemma && w.lemma.head) || '', gloss(w), tierOf(w) || '', w.count || 0]); });
+    (words || []).forEach(function (w) { rows.push([fullHead(w), gloss(w), tierOf(w) || '', w.count || 0]); });
     return rows.map(function (r) { return r.map(csvCell).join(','); }).join('\r\n') + '\r\n';
   }
 
@@ -90,8 +100,9 @@
     })));
     var st = window.VP_Store.get('settings') || {};
     var f = st.defaultFidelity >= 1 && st.defaultFidelity <= 3 ? st.defaultFidelity : 2;
-    var outside = (f < 2 ? sh.t2 || 0 : 0) + (f < 3 ? sh.t3 || 0 : 0);
-    s.share.appendChild(el('p', { className: 'vp-hint', text: T('words.share.outside.label', { pct: Math.round(outside * 100), tier: f }) }));
+    var top = 4 - f;
+    var outside = (top < 2 ? sh.t2 || 0 : 0) + (top < 3 ? sh.t3 || 0 : 0);
+    s.share.appendChild(el('p', { className: 'vp-hint', text: T('words.share.outside.label', { pct: Math.round(outside * 100), tier: top }) }));
   }
 
   function render() {
@@ -128,7 +139,7 @@
     var gen = s.gen;
     return window.VP_Bridge.call('words.list', {}).then(function (r) {
       if (!s || s.gen !== gen) { return null; }
-      s.words = ((r && r.words) || []).slice().sort(function (a, b) { return (b.count || 0) - (a.count || 0) || (head(a) < head(b) ? -1 : 1); });
+      s.words = ((r && r.words) || []).filter(isWord).sort(function (a, b) { return (b.count || 0) - (a.count || 0) || (head(a) < head(b) ? -1 : 1); });
       s.tierShare = (r && r.tierShare) || null;
       s.loaded = true;
       render();

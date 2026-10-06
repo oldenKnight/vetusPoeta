@@ -104,6 +104,41 @@ describe('VP_Panes', function () {
     ok(lines[0].textContent.indexOf('insula') > 0 || lines[1].textContent.indexOf('insula') >= 0, 'export default: no macrons in the preview');
   });
 
+  it('B9: tokens made only of punctuation never become word chips (target and source panes); the chips keep the engine token index', function () {
+    var env = setup();
+    var W = env.window;
+    var target = 'Puella ((rosam)) amat.';
+    var toks = [{ text: 'Puella' }, { text: '((' }, { text: 'rosam' }, { text: '))' }, { text: 'amat' }, { text: '.' }];
+    var call = W.VP_Bridge.call;
+    W.VP_Bridge.call = function (cmd, params) {
+      if (cmd !== 'cue.get') { return call(cmd, params); }
+      return call(cmd, params).then(function (r) {
+        r.cue.target = target;
+        r.tokens = toks;
+        return r;
+      });
+    };
+    var Pn = ready(env, { path: 'C:\\x\\Fabula.vpoeta' }, 0);
+    var i = translated(env, 1);
+    var c = JSON.parse(JSON.stringify(W.VP_Store.getCue(i)));
+    c.target = target;
+    c.lines = [target];
+    W.VP_Store.putCues([c]);
+    W.VP_Store.set('selection', { index: i });
+    env.clock.tick(100);
+    var words = env.document.querySelectorAll('#vp-target-view .vp-word');
+    deepEq(words.map(function (w) { return w.textContent; }), ['Puella', 'rosam', 'amat']);
+    deepEq(words.map(function (w) { return w.getAttribute('data-tok'); }), ['0', '2', '4']);
+    eq(q(env, '#vp-target-view').textContent, target, 'the punctuation stays as plain text');
+    eq(Pn.tokens().length, 6, 'token list still aligned with the engine');
+    var box = W.VP_Dom.el('div');
+    eq(W.VP_Panes.renderMarkup(box, target, toks), 6);
+    var src = box.querySelectorAll('.vp-src-word');
+    deepEq(src.map(function (w) { return w.textContent; }), ['Puella', 'rosam', 'amat']);
+    deepEq(src.map(function (w) { return w.getAttribute('data-src-tok'); }), ['0', '2', '4']);
+    eq(box.textContent, target);
+  });
+
   it('editor state machine: E edits, Esc cancels without a call, Ctrl+Enter keeps through cue.set, then the remember chip', function () {
     var env = setup();
     var W = env.window;

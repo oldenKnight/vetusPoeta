@@ -5,10 +5,13 @@
  * not installed -> "Install..." (how to get the file) and "Find file..." (dialog.openFile, then
  * model.locate); installed -> file name, size, "loads when needed". Online check: switch
  * (engines.online) with a one-time explanation dialog of what leaves the computer, and "Test
- * connection" (online.test). Fidelity slider, 3 detents, left = "Extremely faithful" (tier 3
- * allowed, fidelity 3), middle = tier 2, right = "Flexible" (tier 1 with paraphrase, fidelity
- * 1) (DESIGN 13), with a line that states the effect in numbers (tier counts of the lexicon
- * when engine.hello has them, the file's share from words.list). Emoji in the app
+ * connection" (online.test). Fidelity slider, 3 detents on the engine's scale (rules.h,
+ * DESIGN 9 and 13): left = "Extremely faithful" = fidelity 1 (tier 3 allowed), middle = 2
+ * (tier 2), right = "Flexible" = fidelity 3 (tier 1 with paraphrase); slider position ==
+ * fidelity == settings defaultFidelity == translate.start fidelity. A line states the effect
+ * in numbers (tier counts of the lexicon when engine.hello has them, the file's share from
+ * words.list); the strings are keyed by the fidelity value (fidelity.stop.fN,
+ * fidelity.effect.fN). Emoji in the app
  * (showEmoji) and macrons in the exported file (export.macrons). "Translate again" for the
  * selected cue or all cues. Changing fidelity or an engine marks translated cues stale
  * through VP_Workspace.cmd.markStale (grey dot); edited and reviewed cues are never touched.
@@ -23,7 +26,7 @@
  * under their engine with the engine's hint.
  *
  * VP_Engines.mount(el) / destroy(); setFidelity(1..3); sliderToFidelity(pos) /
- * fidelityToSlider(f); setModel(bool) / setOnline(bool) -> Promise; findModel() -> Promise;
+ * fidelityToSlider(f) (identity, clamped to 1..3); maxTier(f) (4 - f); setModel(bool) / setOnline(bool) -> Promise; findModel() -> Promise;
  * testOnline() -> Promise; translateAgain('selected'|'all'); stats()
  */
 (function () {
@@ -57,10 +60,13 @@
     if (window.VP_App && typeof window.VP_App.showError === 'function') { window.VP_App.showError(err); }
   }
 
-  // Slider position 1 (left, "Extremely faithful") .. 3 (right, "Flexible"); fidelity = the
-  // highest tier allowed: 3 = every word, 2 = common words, 1 = core words with paraphrase.
-  function sliderToFidelity(pos) { return 4 - Math.max(1, Math.min(3, Math.round(Number(pos) || 2))); }
-  function fidelityToSlider(f) { return 4 - Math.max(1, Math.min(3, Math.round(Number(f) || 2))); }
+  // The slider uses the engine's scale: position 1 (left, "Extremely faithful") = fidelity 1
+  // (every word, tier 3 allowed) .. position 3 (right, "Flexible") = fidelity 3 (core words
+  // with paraphrase, tier 1). maxTier(f) = the highest lexicon tier the engine may use.
+  function clampFidelity(f) { return Math.max(1, Math.min(3, Math.round(Number(f) || 2))); }
+  function sliderToFidelity(pos) { return clampFidelity(pos); }
+  function fidelityToSlider(f) { return clampFidelity(f); }
+  function maxTier(f) { return 4 - clampFidelity(f); }
 
   function fidelity() {
     var f = settings().defaultFidelity;
@@ -90,24 +96,26 @@
   function effect(f) {
     var t = lexTiers();
     if (t && typeof t.t1 === 'number') {
-      var n = f === 1 ? t.t1 : (f === 2 ? t.t1 + (t.t2 || 0) : t.t1 + (t.t2 || 0) + (t.t3 || 0));
-      return { key: 'fidelity.effect.t' + f + '.label', vars: { n: n } };
+      var mt = maxTier(f);
+      var n = t.t1 + (mt >= 2 ? t.t2 || 0 : 0) + (mt >= 3 ? t.t3 || 0 : 0);
+      return { key: 'fidelity.effect.f' + f + '.label', vars: { n: n } };
     }
-    return { key: 'fidelity.effect.t' + f + '.fixed', vars: null };
+    return { key: 'fidelity.effect.f' + f + '.fixed', vars: null };
   }
 
   function renderFidelity() {
     if (!s) { return; }
     var f = fidelity();
     s.slider.value = String(fidelityToSlider(f));
-    s.slider.setAttribute('aria-valuetext', T('fidelity.stop.t' + f + '.label'));
-    setText(s.stopEl, 'fidelity.stop.t' + f + '.label');
+    s.slider.setAttribute('aria-valuetext', T('fidelity.stop.f' + f + '.label'));
+    setText(s.stopEl, 'fidelity.stop.f' + f + '.label');
     var e = effect(f);
     setText(s.effectEl, e.key, e.vars);
     var share = s.share;
     s.shareEl.hidden = !share;
     if (share) {
-      var within = (share.t1 || 0) + (f >= 2 ? share.t2 || 0 : 0) + (f >= 3 ? share.t3 || 0 : 0) + (share.names || 0);
+      var mt = maxTier(f);
+      var within = (share.t1 || 0) + (mt >= 2 ? share.t2 || 0 : 0) + (mt >= 3 ? share.t3 || 0 : 0) + (share.names || 0);
       setText(s.shareEl, 'fidelity.share.label', { pct: Math.round(within * 100) });
     }
   }
@@ -209,7 +217,7 @@
   }
 
   function setFidelity(f) {
-    f = Math.max(1, Math.min(3, Math.round(Number(f) || 2)));
+    f = clampFidelity(f);
     if (f === fidelity()) {
       renderFidelity();
       return P().resolve(f);
@@ -435,7 +443,8 @@
     D.on(s.slider, 'change', function () { setFidelity(sliderToFidelity(s.slider.value)); }, { owner: OWNER });
     D.on(s.slider, 'input', function () {
       var f = sliderToFidelity(s.slider.value);
-      setText(s.stopEl, 'fidelity.stop.t' + f + '.label');
+      setText(s.stopEl, 'fidelity.stop.f' + f + '.label');
+      s.slider.setAttribute('aria-valuetext', T('fidelity.stop.f' + f + '.label'));
       var e = effect(f);
       setText(s.effectEl, e.key, e.vars);
     }, { owner: OWNER });
@@ -462,7 +471,7 @@
 
   function i18nKeys() {
     var keys = ['engines.stale.label', 'engines.model.ready.label', 'fidelity.share.label', 'engines.online.test.ok.label', 'engines.online.test.fail.label', 'app.lexicon'];
-    [1, 2, 3].forEach(function (f) { keys.push('fidelity.stop.t' + f + '.label', 'fidelity.effect.t' + f + '.label', 'fidelity.effect.t' + f + '.fixed'); });
+    [1, 2, 3].forEach(function (f) { keys.push('fidelity.stop.f' + f + '.label', 'fidelity.effect.f' + f + '.label', 'fidelity.effect.f' + f + '.fixed'); });
     return keys;
   }
 
@@ -473,6 +482,7 @@
     setFidelity: setFidelity,
     sliderToFidelity: sliderToFidelity,
     fidelityToSlider: fidelityToSlider,
+    maxTier: maxTier,
     setModel: setModel,
     setOnline: setOnline,
     findModel: findModel,

@@ -26,6 +26,10 @@
   var OWNER = 'orberg';
   var DETAIL_CAP = 20;
   var WORD_RE = /[^\s.,;:?!¿¡"“”«»()\[\]{}\-–—·;]+/g;
+  // A token with a letter or a digit; a token made only of punctuation never becomes a word chip
+  // (B9, defensive: it stays plain text and keeps its index, so tokenIndex still matches).
+  var WORDISH_RE = /[0-9A-Za-z\u00AA\u00B5\u00BA\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02AF\u0370-\u03FF\u1E00-\u1FFF]/;
+  function isWordTok(t) { return WORDISH_RE.test(String((t && t.text) || '')); }
   var s = null;
 
   function T(key, vars) { return window.VP_I18n.t(key, vars); }
@@ -205,6 +209,10 @@
     changes().forEach(function (ch) { byK[ch.k] = ch; });
     var pos = 0;
     toks.forEach(function (t, k) {
+      if (!isWordTok(t.tok)) {
+        s.tokens.push(t.tok);
+        return;
+      }
       if (t.at > pos) { s.verText.appendChild(document.createTextNode(display(text.slice(pos, t.at)))); }
       var ch = byK[k];
       var attrs = { className: 'vp-word' + (ch ? ' vp-word-changed' : ''), tabIndex: 0, role: 'button', 'data-tok': String(k), text: display(t.tok.display || t.tok.text) };

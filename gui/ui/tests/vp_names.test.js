@@ -152,6 +152,57 @@ describe('VP_Names, VP_Corrections, VP_Words', function () {
   });
 });
 
+describe('VP_Words defensive filter and fidelity scale (B9)', function () {
+  it('lists only entries whose lemma head has a letter, trims brackets stuck to a head, and reads the slider on the engine scale', function () {
+    var env = load('all', { search: '?mock=1&debug=1' });
+    var W = env.window;
+    var D = W.VP_Dom;
+    var main = D.el('main', { id: 'vp-main' });
+    env.document.body.appendChild(main);
+    W.VP_MockEngine.options.latencyMs = 1;
+    W.VP_App.boot({ root: main, status: D.el('div') });
+    env.clock.tick(500);
+    var call = W.VP_Bridge.call;
+    W.VP_Bridge.call = function (cmd, params) {
+      if (cmd !== 'words.list') { return call(cmd, params); }
+      return call(cmd, params).then(function (r) {
+        r.words = r.words.concat([
+          { lemma: { head: '((', glossEn: '' }, count: 99, tier: 0 },
+          { lemma: { head: ',', glossEn: '' }, count: 50, tier: 0 },
+          { lemma: { head: '\u00AB\u00BB', glossEn: '' }, count: 40, tier: 0 },
+          { lemma: { head: '((caelum', glossEn: 'sky' }, count: 98, tier: 1 }
+        ]);
+        return r;
+      });
+    };
+    W.VP_Start.openSample();
+    env.clock.tick(300);
+    env.document.querySelector('#vp-translate').click();
+    env.clock.tick(3000);
+    W.VP_Workspace.setTab('words');
+    env.clock.tick(100);
+    var heads = env.document.querySelectorAll('.vp-wordrow-head').map(function (h) { return h.textContent; });
+    eq(heads.indexOf('(('), -1, 'punctuation-only entry dropped');
+    eq(heads.indexOf(','), -1);
+    eq(heads.indexOf('\u00AB\u00BB'), -1);
+    eq(heads[0], 'caelum', 'brackets trimmed, the word kept');
+    heads.forEach(function (h) { ok(/[A-Za-z\u00C0-\u024F\u0370-\u03FF\u1F00-\u1FFF]/.test(h), 'letter in ' + h); });
+    var hint = function () { var ps = env.document.querySelectorAll('.vp-share > p.vp-hint'); return ps[ps.length - 1].textContent; };
+    W.VP_Engines.setFidelity(1);
+    env.clock.tick(50);
+    ok(hint().indexOf('above level 3') > 0, 'fidelity 1 (extremely faithful) allows level 3: ' + hint());
+    ok(hint().indexOf('0%') === 0, 'nothing is above level 3');
+    W.VP_Engines.setFidelity(3);
+    env.clock.tick(50);
+    ok(hint().indexOf('above level 1') > 0, 'fidelity 3 (flexible) keeps to level 1: ' + hint());
+    W.VP_Toast.clearAll();
+    W.VP_Workspace.close();
+    env.clock.tick(300);
+    deepEq(W.VP_Debug.failures(), []);
+    eq(env.errors().length, 0);
+  });
+});
+
 describe('VP_Names without detection (the real engine, B8)', function () {
   it('no names yet: the list is hidden, the "Add a name" form sends names.set and the new name is listed without a count', function () {
     var env = load('all', { search: '?mock=1&debug=1' });
