@@ -18,18 +18,16 @@ Last updated: 2026-10-05 (session 1, step 1 of the production process).
   missing, check `data/raw/dl-*.log` and rerun the curl commands (they resume with `-C -`).
 
 ## Next step (updated 2026-10-06, evening)
-- 33 modules DONE (waves A-C, D1). Running: B4c LIB-4 (Greek supplement, Spanish gloss_en; output to data/work/next,
-  the main agent swaps the .vpl files after tests) and C17 RULES-E (quality loop 3 with generalisation guards).
-- After C17: main agent re-runs the held-out measurement (`tools/eval/run_eval.py --heldout`, see STATUS E2 for the
-  baseline numbers) and then the release packaging pass R1 on a quiet tree: clean rebuild, sanitizers, model tests,
-  xcompile with GUI+LLM, tools/make_dist.py, CHANGELOG.
+- 35 modules DONE (waves A-C, D1, B4c, C17). No implementer running. The main agent is in R1 (release packaging
+  pass on the quiet tree: clean rebuild, sanitizers, model tests, xcompile with GUI+LLM, tools/make_dist.py,
+  CHANGELOG); see the R1 row in STATUS for what is already checked.
 - Review protocol: `git archive HEAD | tar -x -C <scratch>` then build + ctest + xcompile there, so other
   implementers' uncommitted files do not pollute the verification. Commit the ledger with pathspecs
   (`git commit docs/STATUS.md -m ...`) so staged files of implementers are not swept in.
 - Gold Latin: tests/regression/expected/*.gold.txt (main agent). Held-out hygiene: nobody reads tests/heldout,
   tests/eval_gold or data/work/eval/heldout-*; BURNED.txt lists the 100 cues moved to the tuning sample.
-- Quality state (honest): tuned EN 114/114, ES 100/100, Greek 111/114, oz_sample 53/100; held-out automatic errors
-  own 7/74, oz 164/700; wrong among OK 0 everywhere; model gate 74.9 % so Latin reranking is off.
+- Quality state (honest): tuned EN 114/114, ES 100/100, Greek 114/114, oz_sample 71/100; held-out automatic errors
+  own 5/74 (6.8 %), oz 132/700 (18.9 %); wrong among OK 0 everywhere; model gate 74.9 % so Latin reranking is off.
 
 ## Open items for the owner
 - Create the `main` branch so a draft pull request can be opened for claude/fervent-cannon-6qif8i.
