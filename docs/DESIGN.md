@@ -312,6 +312,12 @@ and `translated`; a new cue has state `new` and confidence `check`; `export.writ
 `project.close {discard?}`; `translate.start` without `indices` skips edited and reviewed cues; tags around a cue's
 text are kept on export, tags inside the text are dropped with a `tags_dropped` warning.
 
+Settled by the shell implementation (gui/shell/README.md): `dialog.openFile` -> `{path|null, paths, cancelled}`,
+`dialog.saveFile` -> `{path|null, cancelled}`; `filters` may be a plain extension list; `dialog.droppedFiles {paths,
+source:"drop"|"launch"}`; `engine.restarted {recovered, reopened, path|null}`; requests during a recovery get `busy`;
+native shell messages use the UI string keys `app.shell.*` with English/Spanish fallbacks compiled in; window state
+lives in `<data>/window.json`.
+
 Shell-handled commands (never reach the engine): `dialog.openFile`, `dialog.saveFile`, `shell.revealFile`,
 `shell.openExternal`, `dialog.droppedFiles` (event), `power.status` (event), `engine.restarted` (event).
 
