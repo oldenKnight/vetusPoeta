@@ -110,9 +110,16 @@ class TagStats(object):
 _DEFAULT_STATS = TagStats()
 
 
+# head templates of particles; "grc-particle" starts with "grc-part" and must not be read as a participle (B4b)
+PARTICLE_TEMPLATES = frozenset(("grc-part", "grc-particle", "la-particle"))
+
+
 def pos_name(kaikki_pos, head_template="", head_arg2=""):
-    """features.POS key for a Kaikki entry; participles are recognised by their head template."""
+    """features.POS key for a Kaikki entry; participles are recognised by their head template ("la-part",
+    "grc-part-1&2", "grc-part-1&3", "grc-part form"), particles by theirs ("grc-particle") or the Kaikki pos."""
     ht = head_template or ""
+    if ht in PARTICLE_TEMPLATES or kaikki_pos == "particle":
+        return "particle"
     if ht.startswith("la-part") or ht.startswith("grc-part") or "participle" in (head_arg2 or ""):
         return "participle"
     return KAIKKI_POS.get(kaikki_pos or "", "other")

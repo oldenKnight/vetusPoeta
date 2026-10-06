@@ -14,6 +14,9 @@ alt-of, or its gloss reads like "second-person plural present passive indicative
   alttable   only alt-of senses and a table of its own (conpello)
   form / alt only form / alt-of senses, no table: a form page (formpages.tsv only)
 lemma, formtable and alttable entries become lemma records with sequential ids.
+Greek clean-up (B4b, grcfix.py): word-final sigma written as U+03C3 becomes U+03C2 in every display (head, cells,
+form pages); "article + word" cells lose the article; romanised cells (and head-line forms) are dropped; a nominal table
+without a dialect marker whose forms are Epic/Ionic (-οιο, -ῃσι) gets that dialect prepended to its marker.
 """
 import collections
 import json
@@ -21,6 +24,7 @@ import os
 import re
 import time
 
+import grcfix
 import tagmap
 import vptext
 from common import TsvWriter, iter_jsonl, log, peak_rss_mb, RAW_FILES
@@ -56,6 +60,7 @@ GREEK_CLASS_ROWS = {"First declension": ["declension-1"], "Second declension": [
                                                                                             "declension-2"],
                     "First and third declension": ["declension-1", "declension-3"]}
 GENDERS = ("masculine", "feminine", "neuter")
+NOMINAL_FPOS = frozenset(("noun", "name", "adj", "pron", "det", "num", "participle", "article"))
 ERA_TAGS = tagmap.LATIN_ERAS
 ES_GLOSS_RULES = [  # (regex on the lower-cased Spanish gloss, tags)
     (re.compile(r"\bprimera persona\b"), ["first-person"]), (re.compile(r"\bsegunda persona\b"), ["second-person"]),
@@ -191,6 +196,7 @@ class KaikkiStage(object):
         self.table = TsvWriter(os.path.join(self.dir, "table_forms.tsv"))
         self.formpages = TsvWriter(os.path.join(self.dir, "formpages.tsv"))
         self.extra_writers = {}
+        self.article_lemmas = set()
 
     def writer(self, name):
         w = self.extra_writers.get(name)
@@ -221,8 +227,16 @@ class KaikkiStage(object):
         for c in cands:
             c = vptext.nfc(c.strip())
             if c and self.key(c) == key:
-                return c
-        return vptext.nfc(word)
+                return self.fix_display(c)
+        return self.fix_display(vptext.nfc(word))
+
+    def fix_display(self, s):
+        if self.lang != "grc":
+            return s
+        f = grcfix.final_sigma(s)
+        if f != s:
+            self.c["grc_final_sigma_fixed"] += 1
+        return f
 
     # -- per entry -----------------------------------------------------------------------------
     def entry(self, e):
@@ -267,7 +281,7 @@ class KaikkiStage(object):
             lemma_id = self.next_id
             self.next_id += 1
             self.write_lemma(e, lemma_id, word, key, display, kpos, fpos, ht, kind, real, formsenses, cells)
-            self.write_table(e, lemma_id, cells, forms, has_table)
+            self.write_table(e, lemma_id, cells, forms, has_table, fpos)
         for (fkind, targets, gtags), s in formsenses:
             tags = set(s.get("tags") or [])
             tags.update(gtags)
@@ -278,6 +292,8 @@ class KaikkiStage(object):
             tagstr = " ".join(sorted(tags))
             for t in targets:
                 t = vptext.nfc(t)
+                if lang == "grc":
+                    t = grcfix.final_sigma(t)
                 self.formpages.write(word, key, display, self.key(t), tagstr, fpos, fkind, t)
                 c["formpage_rows"] += 1
         if lang == "en":
@@ -367,15 +383,52 @@ class KaikkiStage(object):
             stack.extend(d.get("descendants") or [])
         return found
 
-    def write_table(self, e, lemma_id, cells, forms, has_table):
-        lang = self.lang
-        multi_ok = lang in ("la", "grc")
+    def greek_cells(self, lemma_id, cells, fpos):
+        """[(form, tags, src, marker)] after the Greek clean-up (see the module docstring)."""
+        nominal = fpos in NOMINAL_FPOS
+        guess = {}
+        if nominal:
+            groups = collections.OrderedDict()
+            for r, marker, src in cells:
+                groups.setdefault((src, marker), []).append((r.get("form") or "", r.get("tags") or []))
+            for (src, marker), rows in groups.items():
+                if any(t[:1].isupper() for t in marker.split()):
+                    continue
+                g = grcfix.dialect_guess(rows)
+                if g:
+                    guess[(src, marker)] = (g + " " + marker).strip()
+                    self.c["grc_dialect_tables_guessed"] += 1
+        out = []
         for r, marker, src in cells:
             form = vptext.nfc(r["form"].strip())
+            if grcfix.latin_script(form):
+                self.c["grc_romanised_cells_dropped"] += 1
+                continue
+            form, stripped = grcfix.strip_article(form)  # any POS: suffix tables, mis-tagged participles
+            if stripped:
+                self.c["grc_article_cells_stripped"] += 1
+                if lemma_id not in self.article_lemmas:
+                    self.article_lemmas.add(lemma_id)
+                    self.c["grc_article_lemmas"] += 1
+            fixed = grcfix.final_sigma(form)
+            if fixed != form:
+                self.c["grc_final_sigma_cells"] += 1
+                form = fixed
+            out.append((form, r.get("tags") or [], src, guess.get((src, marker), marker)))
+        return out
+
+    def write_table(self, e, lemma_id, cells, forms, has_table, fpos=""):
+        lang = self.lang
+        multi_ok = lang in ("la", "grc")
+        if lang == "grc":
+            rows = self.greek_cells(lemma_id, cells, fpos)
+        else:
+            rows = [(vptext.nfc(r["form"].strip()), r.get("tags") or [], src, marker) for r, marker, src in cells]
+        for form, rtags, src, marker in rows:
             if not multi_ok and " " in form:
                 self.c["skipped_multiword"] += 1
                 continue
-            tags = " ".join(sorted(set(r.get("tags") or [])))
+            tags = " ".join(sorted(set(rtags)))
             self.table.write(lemma_id, form, self.key(form), tags, src, marker)
             self.c["table_rows"] += 1
         # head-line forms: all of them for en/es (their "tables" are mostly head-line forms), only alternative
@@ -395,6 +448,14 @@ class KaikkiStage(object):
             if not alt and not (tags & FEATURE_TAG_SET):
                 continue
             form = vptext.nfc(form)
+            if lang == "grc":
+                if grcfix.latin_script(form):
+                    self.c["grc_romanised_head_forms_dropped"] += 1
+                    continue
+                fixed = grcfix.final_sigma(form)
+                if fixed != form:
+                    self.c["grc_final_sigma_head_forms"] += 1
+                    form = fixed
             if not multi_ok and " " in form:
                 self.c["skipped_multiword"] += 1
                 continue

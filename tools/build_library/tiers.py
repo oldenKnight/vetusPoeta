@@ -1,7 +1,8 @@
 """Stage `tiers` (la, grc): vocabulary tier, frequency rank, Whitaker frequency letter, emoji and shared_el per lemma.
 
 Rules (DECISIONS D12, PREPLAN 1.8; tools/build_library/README.md has the code letter meanings and their source):
-  Latin  tier 1  data/curated/tiers_la.tsv (tier_source as written there: derived = 1, teacher = 2)
+  Latin  tier 1  data/curated/tiers_la.tsv (tier_source as written there: derived = 1, teacher = 2); rows of that
+                 file with tier 2 give tier 2 (both languages, B4b)
          tier 2  DCC Latin core (all rows that join) + Whitaker frequency A/B with age X ("in use throughout the
                  ages") or C ("classical") joined to a Kaikki lemma that has an inflection table, proper names
                  excluded (Kaikki POS name, capitalised headword, Whitaker noun kinds N/L/G); tier_source derived
@@ -11,7 +12,10 @@ Rules (DECISIONS D12, PREPLAN 1.8; tools/build_library/README.md has the code le
   freq_rank      DCC rank when present, else a coarse bucket from the best Whitaker frequency letter
                  (WHIT_BUCKET), else 0
   emoji          data/curated/emoji_<lang>.tsv joined by key (nouns first); unmatched keys are reported
-Outputs: tiers.tsv, freq.tsv, review_tier_sheet.csv (for the teacher).
+Outputs: tiers.tsv, freq.tsv, review_tier_sheet.csv (for the teacher), and in <out> the teacher's review sheet
+review_tier_sheet_<lang>.csv (B4b; docs/TEACHER_REVIEW.md): key, head, pos, tier, source (why the lemma has its tier:
+teacher | curated | dcc+el | dcc | whitaker | candidate), dcc_rank, whitaker_code (best Whitaker frequency letter),
+gloss_en, gloss_es, lemma_id; tiers 1 and 2, plus Latin tier-3 candidates with Whitaker frequency A or B.
 """
 import collections
 import csv
@@ -92,8 +96,9 @@ def curated_path(lang, name):
     return os.path.join(CURATED, "%s_%s.tsv" % (name, lang))
 
 
-def tier1(lang, infos, by_key, sig, curated_dir=None):
-    """{lemma id: tier_source} for tier 1, and the list of curated rows that did not join."""
+def curated_ids(lang, infos, by_key, sig, curated_dir=None, want="1", reasons=None):
+    """{lemma id: tier_source} for the rows of data/curated/tiers_<lang>.tsv with tier `want`, and the keys that did
+    not join. reasons (a dict) gets lemma id -> "teacher" / "curated"."""
     cdir = curated_dir or CURATED
     key_fn = vptext.key_for(lang)
     res = {}
@@ -101,7 +106,7 @@ def tier1(lang, infos, by_key, sig, curated_dir=None):
     for row in lexdata.read_curated(os.path.join(cdir, "tiers_%s.tsv" % lang)):
         row = (row + [""] * 6)[:6]
         key, head, pos, tier, source = row[0], row[1], row[2], row[3], row[4]
-        if tier != "1":
+        if tier != want:
             continue
         k = key_fn(key or head)  # the curated `key` column is written without the v->u fold
         ids = lexdata.pick_lemmas(by_key.get(k), infos, pos or None) or lexdata.pick_lemmas(by_key.get(k), infos)
@@ -113,16 +118,31 @@ def tier1(lang, infos, by_key, sig, curated_dir=None):
             missing.append(k)
             continue
         res[i] = max(res.get(i, 0), SOURCE_CODE.get(source, 1))
+        if reasons is not None:
+            reasons[i] = "teacher" if res[i] == 2 else "curated"
+    return res, missing
+
+
+def tier1(lang, infos, by_key, sig, curated_dir=None, reasons=None):
+    """{lemma id: tier_source} for tier 1, and the list of curated rows that did not join. reasons (a dict) gets
+    lemma id -> "teacher" / "curated" / "dcc+el"."""
+    res, missing = curated_ids(lang, infos, by_key, sig, curated_dir, "1", reasons)
     if lang == "grc":
         for i in sig["dcc"]:
             if infos[i].rec is not None and infos[i].rec.get("el") == 1 and i not in res:
                 res[i] = 1
+                if reasons is not None:
+                    reasons[i] = "dcc+el"
     return res, missing
 
 
-def assign(lang, infos, by_key, sig, has_gloss, curated_dir=None):
+def assign(lang, infos, by_key, sig, has_gloss, curated_dir=None, reasons=None):
     """{id: (tier, tier_source)} for every lemma, plus stats."""
-    t1, missing = tier1(lang, infos, by_key, sig, curated_dir)
+    t1, missing = tier1(lang, infos, by_key, sig, curated_dir, reasons)
+    # tier-2 rows of the curated file (B4b: before, only tier-1 rows were read at build time)
+    r2 = {}
+    t2, missing2 = curated_ids(lang, infos, by_key, sig, curated_dir, "2", r2)
+    missing = missing + missing2
     out = {}
     for info in infos:
         i = info.id
@@ -130,6 +150,10 @@ def assign(lang, infos, by_key, sig, has_gloss, curated_dir=None):
             out[i] = (0, 0)
         elif i in t1:
             out[i] = (1, t1[i])
+        elif i in t2:
+            out[i] = (2, t2[i])
+            if reasons is not None:
+                reasons[i] = r2[i]
         elif i in sig["dcc"]:
             out[i] = (2, 1)
         elif lang == "la" and i in sig["whit_t2"] and info.has_table and not is_name(info):
@@ -184,7 +208,8 @@ def run(lang, out, curated_dir=None):
     infos, by_key = lexdata.load_lemmas(out, lang, keep_rec=(lang == "grc"))
     sig = load_signals(out, lang, infos)
     glossed = read_gloss_presence(out, lang)
-    tiers, missing = assign(lang, infos, by_key, sig, lambda i: i in glossed, curated_dir)
+    reasons = {}
+    tiers, missing = assign(lang, infos, by_key, sig, lambda i: i in glossed, curated_dir, reasons)
     emoji, unmatched = load_emoji(lang, infos, by_key, curated_dir)
     gl = {}
     for r in lexdata.read_rows(os.path.join(d, "gloss.tsv")):
@@ -215,6 +240,7 @@ def run(lang, out, curated_dir=None):
             sheet_rows.append((tier, dr or 99999, info.key, i, info.head, info.fpos, src, wl, g[0], g[1]))
     w.close()
     wf.close()
+    write_teacher_sheet(os.path.join(out, "review_tier_sheet_%s.csv" % lang), lang, infos, tiers, reasons, sig, gl, c)
     sheet_rows.sort()
     with open(os.path.join(d, "review_tier_sheet.csv"), "w", encoding="utf-8", newline="") as f:
         cw = csv.writer(f, lineterminator="\n")
@@ -232,5 +258,34 @@ def run(lang, out, curated_dir=None):
     return res
 
 
+def write_teacher_sheet(path, lang, infos, tiers, reasons, sig, gl, c):
+    """The teacher's review sheet (docs/TEACHER_REVIEW.md): tiers 1 and 2 with the reason of the tier, plus Latin
+    tier-3 lemmas with Whitaker frequency A/B (candidates for promotion). Sorted by tier, DCC rank, key."""
+    rows = []
+    for info in infos:
+        i = info.id
+        tier, _src = tiers[i]
+        wl = sig["whit"].get(i, "")
+        dr = sig["dcc"].get(i, 0)
+        if tier in (1, 2):
+            why = reasons.get(i) or ("dcc" if dr else "whitaker")
+        elif tier == 3 and lang == "la" and wl in ("A", "B") and not is_name(info):
+            why = "candidate"
+        else:
+            continue
+        g = gl.get(i, ("", ""))
+        rows.append((tier, dr or 99999, info.key, i, info.head, info.fpos, why, wl, g[0], g[1]))
+    rows.sort()
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        cw = csv.writer(f, lineterminator="\n")
+        cw.writerow(["key", "head", "pos", "tier", "source", "dcc_rank", "whitaker_code", "gloss_en", "gloss_es",
+                     "lemma_id"])
+        for tier, dr, key, i, head, pos, why, wl, ge, gs in rows:
+            cw.writerow([key, head, pos, tier, why, "" if dr == 99999 else dr, wl, ge, gs, i])
+    c["teacher_sheet_rows"] = len(rows)
+
+
 def outputs(lang):
-    return ["tiers.tsv", "freq.tsv", "review_tier_sheet.csv"] if lang in ("la", "grc") else []
+    if lang not in ("la", "grc"):
+        return []
+    return ["tiers.tsv", "freq.tsv", "review_tier_sheet.csv", os.path.join("..", "review_tier_sheet_%s.csv" % lang)]

@@ -11,6 +11,9 @@ Greek tables are grouped by their table-tags marker row ("Attic declension-2", "
 tables naming no dialect or naming Attic are kept as Attic (extra attic bit when named), others get bit4;
 an uncontracted table that has a contracted twin (present / contracted present) also gets bit4, and the
 contracted twin gets the extra contracted bit. Greek verb cells carry no tense: it comes from the marker.
+Greek form pages that name no dialect at all do not vote on bit4 when they merge with a table row (B4b): an Epic
+table form stays non-Attic although its form page is silent about the dialect (internal bit FLAG_NODIAL, never
+written).
 """
 import collections
 import heapq
@@ -26,6 +29,7 @@ from common import TsvWriter, log, peak_rss_mb, read_tsv
 
 FLAG_TABLE, FLAG_FORMPAGE, FLAG_WHITAKER, FLAG_ALT, FLAG_DIALECT, FLAG_LATE, FLAG_RARE, FLAG_ENCLITIC = (
     1, 2, 4, 8, 16, 32, 64, 128)
+FLAG_NODIAL = 1 << 15  # internal (resolve only): a Greek form-page row that names no dialect
 RARE_TAGS = frozenset(("poetic", "rare", "archaic", "obsolete", "dated", "uncommon"))
 MAX_DEPTH = 3
 CHUNK_ROWS = 1500000
@@ -96,8 +100,15 @@ QUALIFIER_BITS = FLAG_ALT | FLAG_DIALECT | FLAG_LATE | FLAG_RARE
 
 def merge_flags(a, b):
     """Provenance bits are OR-ed (any source counts); qualifier bits are AND-ed: a form found in an Attic table and
-    in an Ionic table is not dialectal, a form that is also a plain spelling is not an alternative spelling."""
-    return ((a | b) & PROVENANCE_BITS) | (a & b & QUALIFIER_BITS)
+    in an Ionic table is not dialectal, a form that is also a plain spelling is not an alternative spelling.
+    A row carrying FLAG_NODIAL does not vote on bit4 (the other row's bit4 is kept)."""
+    q = a & b & QUALIFIER_BITS
+    an, bn = a & FLAG_NODIAL, b & FLAG_NODIAL
+    if an and not bn:
+        q = (q & ~FLAG_DIALECT) | (b & FLAG_DIALECT)
+    elif bn and not an:
+        q = (q & ~FLAG_DIALECT) | (a & FLAG_DIALECT)
+    return ((a | b) & PROVENANCE_BITS) | q | (an & bn)
 
 
 def fold_attic(group):
@@ -308,6 +319,8 @@ def run(lang, out_dir):
         fl = FLAG_FORMPAGE | tag_flags(tl, lang)
         if kind == "alt":
             fl |= FLAG_ALT
+        if lang == "grc" and not any(tagmap.DIALECT_ALIASES.get(t, t) in tagmap.GREEK_DIALECTS for t in tl):
+            fl |= FLAG_NODIAL
         packs = tagmap.tags_to_feature_list(tl, fpos, stats=stats)
         for i in ids:
             lp = lemma_pos[i]
@@ -327,6 +340,7 @@ def run(lang, out_dir):
         if lang == "grc" and len(group) > 1:
             group = fold_attic(group)
         for packed, display, fl in group:
+            fl &= ~FLAG_NODIAL
             out.write(key, lemma, packed, display, fl)
             for b in range(8):
                 if fl & (1 << b):

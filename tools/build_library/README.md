@@ -162,3 +162,32 @@ bit3/bit4. GENX: one display form per (lemma, feature word): table rows before h
 alternative / non-Attic / Late / rare flags, then table order; the other forms stay as ANAL rows.
 English and Spanish files: NOTE STRS KEYS ANAL LEMM FEAT only; multi-word lemmas (phrases) are left out and the
 lemma ids renumbered densely. NOTE carries the licences above and the Kaikki dump dates from data/raw/SOURCES.json.
+
+## B4b (LIB-3) additions (details, counts and the swap procedure: docs/LIBRARY_CHANGES.md)
+    python3 tools/build_library/build.py --raw data/raw --out data/work --next --stage kaikki,resolve
+    python3 tools/build_library/build.py --raw data/raw --out data/work --next --stage import_aux,gloss,tiers,pack
+    python3 tools/build_library/build.py --out data/work/next --check            # drift rule on the next build
+    python3 tools/build_library/coverage.py data/work/next/english.vpl FILE...   # numbers only (held-out safe)
+* `--next` builds into `<out>/next/` (intermediates in `next/<lang>/`, the `.vpl` files in `next/`); inputs a
+  requested stage needs that `next/` lacks are **copied** (never linked) from `<out>/<lang>/`. `--out-vpl DIR` sends
+  the `.vpl` files elsewhere. The live `data/work/*.vpl` are never written by a `--next` build.
+* Greek clean-up in the kaikki stage (`grcfix.py`): word-final σ -> ς in every display (head, cells, form pages; keys
+  unchanged), "article + word" cells lose the article (any POS), romanised cells and head-line forms are dropped, a nominal
+  table without a dialect marker whose genitive singular ends in -οιο (Epic) or dative plural in -ῃσι(ν)/-ῃς (Ionic)
+  gets that dialect prepended to its marker (-> ANAL bit4). Particles: head templates `grc-particle` / `grc-part`
+  and Kaikki pos `particle` map to POS particle (12), never participle (`tagmap.pos_name`).
+* resolve: a Greek form page that names no dialect does not vote on bit4 when it merges with a table row (an Epic
+  table form whose form page is silent stays non-Attic).
+* pack: `data/curated/lexicon_overrides_grc.tsv` (key, tags, form, old, note) sets GENX cells and adds their ANAL
+  rows (`old` = `dialect` demotes the replaced form's analysis to bit4); `@from <tense>` rows build a compound's
+  missing tenses from its simplex (`grcfix.compound`: elision, aspiration, recessive accent of disyllables).
+  LEMM deponent (bit2) also for Greek -μαι verbs without an Attic/unmarked present active cell and Latin -or verbs
+  whose present active 1st singular cells are all -r forms. Latin: `data/curated/macron_overrides.tsv` applied to
+  GENX cells and ANAL displays (the headword stays the dictionary's); Whitaker-only ANAL rows (`whitaker_gen.py`,
+  bit2, only for keys no lemma has, all rows also in `la/whitaker_only.tsv`). English/Spanish: lemma selection (`morphcut.py`: UD treebank lemma/form, top
+  60,000 by senses + translation rows, curated words) and ANAL display = key.
+* gloss (grc): an es.wiktionary gloss sharing no word with the Spanish translations of the English first sense is
+  replaced by the EN->ES pivot of sense 0 (head words after a colon when the gloss has one).
+* gloss: inputs now declare `en/lemma_index.tsv` and `es/lemma_index.tsv` (the lemmatiser read them silently).
+* tiers: curated rows with tier 2 now give tier 2 (before only tier-1 rows were read); teacher review sheets
+  `<out>/review_tier_sheet_{la,grc}.csv` (docs/TEACHER_REVIEW.md).

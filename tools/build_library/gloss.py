@@ -16,6 +16,10 @@ Reverse-index score (DESIGN 5.2), computed in integer hundredths so rounding is 
   -30 sense tagged rare/archaic/poetic/Medieval/New Latin (or the translation row carries such a tag),
   -20 proper-name lemma and a keyword that was written lower-case; score = clamp(0, 255).
 Spanish gloss words from the EN->ES pivot count as "other content word" (+35) only.
+Greek gloss_es (B4b): an es.wiktionary gloss that shares no word with the Spanish translations of the English first
+sense belongs to another sense (λόγος "cálculo, cómputo" for "that which is said: word, ... speech"); the EN->ES pivot
+of sense 0 replaces it (gloss_es_src pivot, counted as gloss_es_eswikt_replaced). For Greek the pivot reads the head
+words after a colon when the gloss has one ("that which is said: word, speech" -> word, speech).
 One candidate per (keyword, lemma): the best-scoring sense, lowest sense index on ties.
 """
 import collections
@@ -512,39 +516,111 @@ def run(lang, out, curated_dir=None):
                     gloss_es[j], gloss_es_src[j] = one_line(g), "eswikt"
                 es_kw[j].append((g, "gloss"))
     # EN -> ES pivot: English head words of gloss_en -> their most common Spanish translation
+    def plain_heads(i):
+        kws = sense_kw[i][0] if sense_kw[i] else extract_keywords(gloss_en[i], lem_en, stop_en)
+        return kws[0][:3]
+
+    def pivot_heads(i):
+        if lang == "grc":
+            g0 = (infos[i].rec.get("senses") or [{}])[0].get("g", "") if sense_kw[i] else gloss_en[i]
+            if ":" in g0:
+                after = extract_keywords(g0.split(":", 1)[1], lem_en, stop_en)
+                if after[0]:
+                    return after[0][:3]
+        return plain_heads(i)
+
+    recheck = []
+    if lang == "grc":  # es.wiktionary glosses checked against the Spanish translations of English sense 0
+        recheck = [i for i in range(n) if gloss_es_src[i] == "eswikt" and sense_kw[i]]
     heads_needed = collections.defaultdict(set)
     for i in range(n):
         if not gloss_es[i] and gloss_en[i]:
-            kws = sense_kw[i][0] if sense_kw[i] else extract_keywords(gloss_en[i], lem_en, stop_en)
-            for h in kws[0][:3]:
+            for h in pivot_heads(i) + plain_heads(i):
                 heads_needed[h].add(i)
+    def sense0_words(i):
+        """Every word of the first sense (stop words too: "from", "other" carry the meaning of ἐκ, ἄλλος)."""
+        heads, others, _caps = sense_kw[i][0]
+        g0 = (infos[i].rec.get("senses") or [{}])[0].get("g", "")
+        return heads + others + pivot_heads(i) + [lem_en(w) for w, _ in gloss_words(g0)]
+
+    for i in recheck:
+        for h in sense0_words(i) + plain_heads(i):
+            heads_needed[h].add(i)
     es_counts = collections.defaultdict(collections.Counter)  # (en word, pos) -> Counter(es word)
     tpath = os.path.join(out, "en", "translations_es.tsv")
     if os.path.exists(tpath):
         for r in read_tsv(tpath):
             if len(r) >= 4 and vptext.en_key(r[0]) in heads_needed and r[3]:
                 es_counts[(vptext.en_key(r[0]), tagmap.KAIKKI_POS.get(r[1], "other"))][vptext.nfc(r[3])] += 1
-    for i in range(n):
-        if gloss_es[i] or not gloss_en[i]:
-            continue
-        kws = sense_kw[i][0] if sense_kw[i] else extract_keywords(gloss_en[i], lem_en, stop_en)
-        want = EN_POS_OF.get(infos[i].fpos, ())
+    es_any = collections.defaultdict(collections.Counter)  # en word -> Counter(es word), every POS
+    for (w, _p), cc in es_counts.items():
+        es_any[w].update(cc)
+
+    def es_norm(w):
+        w = vptext.es_bare(w)
+        return w[:-2] if w.endswith("es") and len(w) > 4 else (w[:-1] if w.endswith("s") and len(w) > 3 else w)
+
+    replaced = {}
+
+    # Greek: the words of a lemma's own es.wiktionary senses steer the choice among the Spanish translations of an
+    # English head word (λόγος: speech -> discurso, which es.wiktionary lists, rather than alocución)
+    native = {}
+    if lang == "grc":
+        for i in recheck:
+            native[i] = set(es_norm(w) for text, kind in es_kw.get(i, ()) if kind == "gloss"
+                            for w, _ in gloss_words(text))
+
+    def pivot_words(i, heads, want):
         got = []
-        for h in kws[0][:3]:
+        for h in heads:
             cnt = collections.Counter()
             for p in want:
                 cnt.update(es_counts.get((h, p), {}))
             if not cnt:
-                for (w, p), cc in es_counts.items():
-                    if w == h:
-                        cnt.update(cc)
+                cnt = es_any.get(h, cnt)
             if cnt:
-                best = min(cnt.items(), key=lambda kv: (-kv[1], kv[0]))[0]
+                items = list(cnt.items())
+                nat = native.get(i)
+                if nat:
+                    pref = [kv for kv in items if any(es_norm(w) in nat for w, _ in gloss_words(kv[0]))]
+                    items = pref or items
+                best = min(items, key=lambda kv: (-kv[1], kv[0]))[0]
                 if best not in got:
                     got.append(best)
+        return got
+
+    for i in recheck:
+        pset = set()
+        for h in sense0_words(i):
+            for es_word in es_any.get(h, ()):
+                for ew, _ in gloss_words(es_word):
+                    pset.add(es_norm(ew))
+        if not pset:
+            continue
+        words = [w for w, _ in gloss_words(gloss_es[i])]
+        own = set(es_norm(w) for w in words if w not in stop_es) or set(es_norm(w) for w in words)
+        if own & pset:
+            c["gloss_es_eswikt_kept"] += 1
+            continue
+        replaced[i] = gloss_es[i]
+        gloss_es[i], gloss_es_src[i] = "", ""
+    for i in range(n):
+        if gloss_es[i] or not gloss_en[i]:
+            continue
+        want = EN_POS_OF.get(infos[i].fpos, ())
+        got = pivot_words(i, pivot_heads(i), want)
+        if not got and pivot_heads(i) != plain_heads(i):
+            got = pivot_words(i, plain_heads(i), want)
         if got:
             gloss_es[i], gloss_es_src[i] = one_line(", ".join(got)), "pivot"
             es_kw[i].append((", ".join(got), "pivot"))
+    for i, old in sorted(replaced.items()):
+        if gloss_es[i]:
+            c["gloss_es_eswikt_replaced"] += 1
+        else:  # no pivot either: the es.wiktionary gloss stays (another sense, but a real one)
+            gloss_es[i], gloss_es_src[i] = old, "eswikt"
+            c["gloss_es_eswikt_kept_no_pivot"] += 1
+
     for i in range(n):
         if gloss_en[i] or gloss_es[i]:
             c["gloss_es_" + (gloss_es_src[i] or "none")] += 1

@@ -1,0 +1,21 @@
+# key	tags	form	old	note
+# Lexicon overrides applied by tools/build_library/pack.py (B4b; docs/LIBRARY_CHANGES.md). Written by the project.
+# key   = greek_key of the lemma headword (final sigma written σ). The row applies to every lemma with that key that has
+#         an inflection table.
+# tags  = the cell, as Kaikki-style tags: tense, voice, mood, person, number (+ "Attic" when the lemma's table is
+#         Attic-marked, so the feature word is the table's own). "@from <tense> ..." builds the compound's cells of
+#         these tenses from the simplex (only when the compound has no table of that tense).
+# form  = the Attic form for the cell (the display is taken from the lemma's table when it lists the same form with
+#         length marks); for "@from" rows: <prefix>+<simplex headword>.
+# old   = "dialect": the replaced form's analysis for this cell gets ANAL bit4 (non-Attic); "keep": stays as it is.
+# πίνω aorist imperative: no row. The cell πίε stays: LSJ s.v. πίνω gives "imper. πίε Od. 9.347, Men. 151 ...; also
+# πῖθι Cratin., Ar. V. 1489, Antiph. ..." (both Attic; πίε is LSJ's first form). The engine's attested override
+# (πῖθι) remains its own choice.
+δεῖ	Attic active indicative present singular third-person	δεῖ	dialect	impersonal; the table lists uncontracted δέει first
+δεῖ	Attic active infinitive present	δεῖν	dialect	δέειν is Ionic
+δεῖ	Attic active indicative imperfect singular third-person	ἔδει	dialect	ἔδεε / ἔδεεν are Ionic
+δεῖ	Attic active indicative future singular third-person	δεήσει	keep	already the table's form; listed for completeness
+εἰμί	Attic active indicative imperfect second-person singular	ἦσθα	keep	the table's first form is ἦς
+βούλομαι	indicative mediopassive present second-person singular	βούλει	keep	Attic -ει (the table lists βούλῃ first)
+οἴομαι	Attic indicative middle present second-person singular	οἴει	keep	Attic -ει (the table lists οἴῃ first)
+ἀποφεύγω	@from aorist	ἀπο+φεύγω	keep	the lexicon has only the present of ἀποφεύγω

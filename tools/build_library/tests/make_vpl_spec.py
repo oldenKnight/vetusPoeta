@@ -190,7 +190,8 @@ def run_pipeline(root, out_root):
     raw = os.path.join(root, "raw")
     cur = os.path.join(root, "curated")
     res = {"import_aux": import_aux.run("la", os.path.join(raw, "aux"), out),
-           "gloss": gloss.run("la", out, cur), "tiers": tiers.run("la", out, cur), "pack": pack.run("la", out, raw)}
+           "gloss": gloss.run("la", out, cur), "tiers": tiers.run("la", out, cur),
+           "pack": pack.run("la", out, raw, curated=cur)}
     with open(os.path.join(out, "latin.vpl"), "rb") as f:
         return f.read(), out, res
 

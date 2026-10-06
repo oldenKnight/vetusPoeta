@@ -4,6 +4,10 @@
   python3 tools/build_library/build.py --raw data/raw --out data/work --lang la,grc,en,es --stage kaikki,resolve
   python3 tools/build_library/build.py --out data/work --check      # compare counts with expected_counts.json
   python3 tools/build_library/build.py --out data/work --report     # print <out>/report.json
+  python3 tools/build_library/build.py --raw data/raw --out data/work --next --stage kaikki,resolve,import_aux,gloss,tiers,pack
+      # builds into data/work/next/ (intermediates in next/<lang>/, the .vpl files in next/), never touching the live
+      # data/work/*.vpl; inputs a requested stage needs but next/ lacks are copied from data/work/<lang>/ first
+  --out-vpl DIR   where the pack stage writes the .vpl files (default: --out, or --out/next with --next)
 
 Each stage writes <out>/<lang>/<stage>.json (input SHA-256s, code hash, output sizes, counts, duration, peak RSS)
 and is skipped when its inputs, its code and its outputs are unchanged, unless --force.
@@ -22,13 +26,14 @@ sys.path.insert(0, HERE)
 from common import LANGS, RAW_FILES, file_info, log, peak_rss_mb, read_json, write_json  # noqa: E402
 
 STAGES = ("kaikki", "resolve", "import_aux", "gloss", "tiers", "pack")
-STAGE_CODE = {"kaikki": ("kaikki.py", "common.py", "vptext.py", "tagmap.py", "features.py"),
+STAGE_CODE = {"kaikki": ("kaikki.py", "common.py", "vptext.py", "tagmap.py", "features.py", "grcfix.py"),
               "resolve": ("resolve.py", "common.py", "vptext.py", "tagmap.py", "features.py"),
               "import_aux": ("import_aux.py", "betacode.py", "lexdata.py", "common.py", "vptext.py"),
               "gloss": ("gloss.py", "tiers.py", "lexdata.py", "common.py", "vptext.py", "tagmap.py",
                         "stopwords_en.txt", "stopwords_es.txt"),
               "tiers": ("tiers.py", "lexdata.py", "common.py", "vptext.py"),
-              "pack": ("pack.py", "resolve.py", "lexdata.py", "common.py", "vptext.py", "tagmap.py", "features.py")}
+              "pack": ("pack.py", "resolve.py", "lexdata.py", "common.py", "vptext.py", "tagmap.py", "features.py",
+                       "grcfix.py", "morphcut.py", "whitaker_gen.py")}
 # stages that exist only for some languages
 STAGE_LANGS = {"import_aux": ("la", "grc"), "gloss": ("la", "grc"), "tiers": ("la", "grc")}
 CURATED = os.path.normpath(os.path.join(HERE, "..", "..", "data", "curated"))
@@ -89,17 +94,29 @@ def stage_inputs(stage, lang, raw, out):
         names = ["lemmas.jsonl"] + import_aux.outputs(lang)
         extra = [os.path.join(out, "en", "translations_%s.tsv" % lang), os.path.join(out, "en", "translations_es.tsv"),
                  os.path.join(out, "es", "translations_%s.tsv" % lang), os.path.join(out, "es", "latin_glosses.tsv"),
-                 os.path.join(out, "en", "analyses.tsv"), os.path.join(out, "es", "analyses.tsv")]
+                 os.path.join(out, "en", "analyses.tsv"), os.path.join(out, "es", "analyses.tsv"),
+                 # the gloss lemmatiser also reads the lemma indexes (undeclared before B4b)
+                 os.path.join(out, "en", "lemma_index.tsv"), os.path.join(out, "es", "lemma_index.tsv")]
         cur = ["tiers_%s.tsv" % lang, "gloss_es_%s.tsv" % lang, "valency_%s.tsv" % lang]
         return _work(out, lang, names) + extra + _curated(cur)
     if stage == "tiers":
         names = ["lemmas.jsonl", "gloss.tsv"] + [n for n in import_aux.outputs(lang) if not n.startswith("ls")]
         return _work(out, lang, names) + _curated(["tiers_%s.tsv" % lang, "emoji_%s.tsv" % lang])
     if stage == "pack":
+        import morphcut
+        import pack
         names = ["lemmas.jsonl", "analyses.tsv"]
         if lang in ("la", "grc"):
             names += ["table_forms.tsv", "tiers.tsv"] + gloss.outputs(lang)
-        return _work(out, lang, names)
+        extra = []
+        if lang == "la":
+            names += ["whitaker.tsv", "whitaker_inflects.tsv"]
+            extra = _curated([pack.LA_MACRONS])
+        elif lang == "grc":
+            extra = _curated([pack.GRC_OVERRIDES])
+        else:
+            extra = morphcut.input_files(out, raw, CURATED, lang)
+        return _work(out, lang, names) + extra
     raise ValueError(stage)
 
 
@@ -111,7 +128,8 @@ def stage_outputs(stage, lang):
     import importlib
     if stage == "pack":
         import pack
-        return [os.path.join("..", pack.FILE_NAMES[lang])]
+        outs = [os.path.join(VPL_DIR or "..", pack.FILE_NAMES[lang])]
+        return outs + (["whitaker_only.tsv"] if lang == "la" else [])
     return importlib.import_module(stage).outputs(lang)
 
 
@@ -119,6 +137,51 @@ def input_name(p):
     """Key of an input in the stage meta: the basename for the A4 stages (unchanged), parent/basename otherwise."""
     parent = os.path.basename(os.path.dirname(p))
     return os.path.basename(p) if parent in LANGS or parent in ("raw",) else parent + "/" + os.path.basename(p)
+
+
+# --out-vpl: the directory the pack stage writes the .vpl files to (None = <out>)
+VPL_DIR = None
+
+
+def seed_next(base, out, stages, langs, raw):
+    """--next: copy into <out>/<lang>/ the inputs of the requested stages that <out> lacks but <base> has (with their
+    stage meta), so a partial rebuild in next/ never reads or writes the live files. Copies, never links: a stage
+    rewriting an intermediate in place must not truncate the live one."""
+    import shutil
+    copied = 0
+    produced = set()  # outputs of the requested stages are written by the build itself: never seeded
+    for lang in langs:
+        for stage in STAGES:
+            if stage in stages and stage_applies(stage, lang):
+                produced.update(os.path.abspath(os.path.join(out, lang, n)) for n in stage_outputs(stage, lang))
+    for lang in langs:
+        for stage in STAGES:
+            if stage not in stages or not stage_applies(stage, lang):
+                continue
+            try:
+                inputs = stage_inputs(stage, lang, raw, out)
+            except Exception:  # noqa: BLE001 - a missing module input is reported by run_stage
+                inputs = []
+            for p in inputs:
+                rel = os.path.relpath(p, out)
+                if rel.startswith(".."):
+                    continue  # raw or curated input
+                src = os.path.join(base, rel)
+                if os.path.abspath(p) in produced or os.path.exists(p) or not os.path.exists(src):
+                    continue
+                os.makedirs(os.path.dirname(p), exist_ok=True)
+                shutil.copy2(src, p)
+                copied += 1
+                # the stage meta of the producing stage, so an unchanged stage is still skipped
+                d = os.path.dirname(src)
+                for prod in STAGES:
+                    m = os.path.join(d, prod + ".json")
+                    t = os.path.join(os.path.dirname(p), prod + ".json")
+                    if os.path.exists(m) and not os.path.exists(t) and prod not in stages:
+                        shutil.copy2(m, t)
+    if copied:
+        log("--next: copied %d input file(s) from %s" % (copied, base))
+    return copied
 
 
 def up_to_date(meta, stage, lang, inputs, out):
@@ -183,7 +246,7 @@ m = importlib.import_module(stage)
 if stage == "import_aux":
     res = m.run(lang, os.path.join(raw, "aux"), out)
 elif stage == "pack":
-    res = m.run(lang, out, raw)
+    res = m.run(lang, out, raw, sys.argv[6] or None)
 else:
     res = m.run(lang, out)
 with open(dest, "w", encoding="utf-8") as f:
@@ -198,7 +261,8 @@ def run_isolated(stage, lang, raw, out):
     fd, dest = tempfile.mkstemp(prefix="stage-", suffix=".json", dir=os.path.join(out, lang))
     os.close(fd)
     try:
-        subprocess.run([sys.executable, "-c", ISOLATED % HERE, stage, lang, raw, out, dest], check=True)
+        subprocess.run([sys.executable, "-c", ISOLATED % HERE, stage, lang, raw, out, dest, VPL_DIR or ""],
+                       check=True)
         return read_json(dest)
     finally:
         os.unlink(dest)
@@ -353,7 +417,18 @@ def main(argv=None):
     ap.add_argument("--report", action="store_true", help="print <out>/report.json")
     ap.add_argument("--write-expected", action="store_true", help="write expected_counts.json from this run")
     ap.add_argument("--expected", default=EXPECTED_PATH)
+    ap.add_argument("--next", action="store_true",
+                    help="build into <out>/next (intermediates and .vpl files); the live <out> stays untouched")
+    ap.add_argument("--out-vpl", default="", help="directory for the .vpl files (default: the output directory)")
     a = ap.parse_args(argv)
+    global VPL_DIR
+    base = a.out
+    if a.next:
+        a.out = os.path.join(a.out, "next")
+        os.makedirs(a.out, exist_ok=True)
+    VPL_DIR = os.path.abspath(a.out_vpl) if a.out_vpl else None
+    if VPL_DIR:
+        os.makedirs(VPL_DIR, exist_ok=True)
     langs = [x for x in a.lang.split(",") if x]
     for lang in langs:
         if lang not in LANGS:
@@ -363,6 +438,8 @@ def main(argv=None):
         if s not in STAGES:
             ap.error("unknown stage %r (this build has %s)" % (s, ", ".join(STAGES)))
     t0 = time.time()
+    if a.next and stages:
+        seed_next(base, a.out, stages, langs, a.raw)
     for lang in langs:
         for s in STAGES:
             if s in stages and stage_applies(s, lang):
