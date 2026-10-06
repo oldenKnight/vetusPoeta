@@ -14,6 +14,10 @@
 #   lex     content word override: latin lemma key + part of speech (noun verb adj adv) -> English; note tags:
 #           person (a person: who, Spanish "a"), mass (no article), unique (the sun), time:<prep> (bare ablative of
 #           time: "at night"), place (towns: bare locative)
+#   lexh    a lex row for the OTHER lemma of a key two lemmas share (volō want / volō fly): note = an English word of
+#           that lemma's senses, which picks it
+#   lex note direct-in / direct-ex (verbs): in + accusative / ē, ex + ablative is a plain object ("enter the temple",
+#           "leave the house"); from-ex: ē/ex + ablative is "from" ("set out from the city")
 #   phrase  several Latin words (keys, space separated) -> English chunk
 #   name    Latin name key -> English spelling
 # ---- personal pronouns ----
@@ -528,7 +532,7 @@ lex	abeo	verb	go away
 lex	redeo	verb	come back
 lex	exeo	verb	go out
 lex	ineo	verb	go in
-lex	intro	verb	enter
+lex	intro	verb	enter	direct-in
 lex	ascendo	verb	climb
 lex	descendo	verb	go down
 lex	cado	verb	fall
@@ -582,7 +586,7 @@ lex	ruber	adj	red
 lex	uiridis	adj	green
 lex	caeruleus	adj	blue
 lex	flauus	adj	yellow
-lex	clarus	adj	famous
+lex	clarus	adj	bright
 lex	miser	adj	poor
 lex	mirus	adj	strange
 lex	fortis	adj	brave
@@ -668,3 +672,10 @@ lex	fio	verb	happen
 lex	ientaculum	noun	breakfast	event
 lex	prandium	noun	lunch	event
 lex	pensum	noun	homework	mass
+# ---- C11b: homographs (lexh) and deponents ----
+lexh	uolo	verb	fly	fly
+lexh	occido	verb	fall	fall
+lex	ingredior	verb	enter	direct-in
+lex	egredior	verb	leave	direct-ex
+lex	proficiscor	verb	set out	from-ex
+lex	fons	noun	fountain	

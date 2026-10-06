@@ -655,7 +655,7 @@ lex	ruber	adj	rojo
 lex	uiridis	adj	verde	
 lex	caeruleus	adj	azul	
 lex	flauus	adj	amarillo	
-lex	clarus	adj	famoso	
+lex	clarus	adj	claro	
 lex	miser	adj	pobre	
 lex	mirus	adj	extraño	
 lex	fortis	adj	valiente	
@@ -752,3 +752,10 @@ lex	fio	verb	suceder
 lex	ientaculum	noun	desayuno	event
 lex	prandium	noun	comida	event
 lex	pensum	noun	tarea	mass
+# ---- C11b: homographs (lexh, see readable_en.tsv) and deponents ----
+lexh	uolo	verb	volar	fly
+lexh	occido	verb	caer	fall
+lex	ingredior	verb	entrar	
+lex	egredior	verb	salir	
+lex	proficiscor	verb	partir	
+lex	fons	noun	fuente	

@@ -183,10 +183,15 @@ class Es {
         w = present ? es::verb(w, es::VTense::Gerund, 3, 1) : es::verb(w, es::VTense::PastPart, 3, 1);
         if (present) return w;
       }
-      w = es::adjective(w, gender, (uint8_t)number);
       const uint8_t deg = a.degree ? a.degree : t.f.degree;
-      if (deg == Comparative) w = "más " + w;
-      else if (deg == Superlative) w = "muy " + w;
+      if (deg == Comparative && (lx.word == "bueno" || lx.word == "malo")) {   // mejor / peor
+        w = lx.word == "bueno" ? "mejor" : "peor";
+        if (number == 2) w += "es";
+      } else {
+        w = es::adjective(w, gender, (uint8_t)number);
+        if (deg == Comparative) w = "más " + w;
+        else if (deg == Superlative) w = "muy " + w;
+      }
     }
     std::string out;
     for (const std::string& k : a.adverbs) appendWord(out, tab_.text("adv", k, {"-"}));
@@ -268,6 +273,14 @@ class Es {
       appendWord(out, adjective(x.adjectives[0], g, x.number));
       return out;
     }
+    // a quantifier / demonstrative standing alone as the head ("ab omnibus": by everyone)
+    if (x.token >= 0 && x.determiner.empty() && x.adjectives.empty() && x.genitive.empty() && x.relative.empty() &&
+        tab_.has("det", ti_[(size_t)x.token].key) &&
+        (ti_[(size_t)x.token].lpos == Adj || ti_[(size_t)x.token].lpos == Det)) {
+      SemNP y = x;
+      y.determiner = ti_[(size_t)x.token].key;
+      return standalone(y, role);
+    }
     return nounPhrase(x, role, definite);
   }
 
@@ -277,6 +290,12 @@ class Es {
     const std::string gk = g0 == F ? "f" : g0 == N ? "n" : "m";
     const std::string nk = pl ? "pl" : "sg";
     const std::string k = x.determiner.empty() ? x.pronLemma : x.determiner;
+    // compared with a thing after quam ("hic equus celerior est quam ille"): aquel, not él
+    if (x.token > 0 && ti_[(size_t)x.token - 1].key == "quam" && ti_[(size_t)x.token - 1].lpos == Conj &&
+        !curSubj_.personNoun && (k == "ille" || k == "hic" || k == "iste")) {
+      const std::string d = tab_.text("det", k, {(gk == "n" ? std::string("m") : gk) + "." + nk, nk});
+      if (!d.empty()) return d;
+    }
     std::string w = tab_.text("det", k, {"pron." + gk + "." + nk, "pron." + nk, "pron"});
     if (w.empty()) w = tab_.text("det", k, {(gk == "n" ? std::string("m") : gk) + "." + nk, nk});
     if (w == "él" || w == "ella" || w == "ellos" || w == "ellas") {
@@ -335,16 +354,18 @@ class Es {
     if (!hasDet && role != R::Voc) {
       const bool mentioned = in_.disc->seen(lemma);
       const bool hasGen = !x.genitive.empty();
-      bool def = definite || lx.unique || mentioned || hasGen;
+      // a restrictive relative clause makes the noun definite ("the book which you gave me")
+      const bool hasRel = !x.relative.empty();
+      bool def = definite || lx.unique || mentioned || hasGen || hasRel;
       bool indef = false;
       if (!def) {
         if (role == R::Subj || role == R::Iobj || role == R::Prep) def = true;
         else if (num != 2 && !lx.mass) indef = true;
       }
-      if (lx.mass && !mentioned && !hasGen && (!definite || role == R::Prep) && role != R::Subj) { def = false; indef = false; }
+      if (lx.mass && !mentioned && !hasGen && !hasRel && (!definite || role == R::Prep) && role != R::Subj) { def = false; indef = false; }
       if (lx.mass && role == R::Subj) def = true;
-      if (num == 2 && !mentioned && !hasGen && (role == R::Obj || role == R::Pred)) def = false;
-      if (role == R::Pred && num != 2 && !mentioned && !lx.mass && !lx.unique) { def = false; indef = true; }
+      if (num == 2 && !mentioned && !hasGen && !hasRel && (role == R::Obj || role == R::Pred)) def = false;
+      if (role == R::Pred && num != 2 && !mentioned && !lx.mass && !lx.unique && !hasGen && !hasRel) { def = false; indef = true; }
       if (def) pre.push_back(article(true, g, num, word));
       else if (indef) pre.push_back(article(false, g, num, word));
     }
@@ -758,6 +779,11 @@ class Es {
       }
       if (a.lemma == "quaeso") w = ", " + w;
       if (a.lemma == "ualde" && f.hasPred) w = "mucho";
+      // an adverb compared after quam ("clārius quam herī": than yesterday)
+      if (a.token > 0 && ti_[(size_t)a.token - 1].key == "quam" && ti_[(size_t)a.token - 1].lpos == Conj) {
+        end.push_back("que " + w);
+        continue;
+      }
       if (tab_.tagged("adv", a.lemma, "pre")) pre.push_back(w);
       else end.push_back(w);
     }

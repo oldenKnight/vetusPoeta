@@ -472,6 +472,16 @@ struct Analyser::Impl {
           }
         }
       }
+      // a pluperfect spelled without -erā- (pārat "syncopated" from paveō) is a present of another verb
+      if (f.pos == Verb && f.tense == Pluperfect && f.mood == Indicative && !hasLengthMark(t.text)) {
+        const std::string k = text::latin_key(t.text);
+        bool er = false;
+        for (const char* e : {"eram", "eras", "erat", "eramus", "eratis", "erant"}) {
+          const size_t el = std::char_traits<char>::length(e);
+          er = er || (k.size() > el && k.compare(k.size() - el, el, e) == 0);
+        }
+        if (!er) p -= 1.0;
+      }
       // a form found only on a form page of this lemma while another lemma's own table has it (volat: volō "fly",
       // not volō "want"; edit: edō "eat", not ēdō)
       if (!(r.aflags & lex::FromTable)) {
@@ -481,12 +491,18 @@ struct Analyser::Impl {
             break;
           }
       }
-      // homographs under several lemmas: the core lemma first (tier 1 before tier 2 before tier 3)
-      if (!r.name) {
-        const uint8_t mine = readingTier(r);
+      // homographs under several lemmas of one kind (verb / verb, noun / noun): the core lemma first (tier 1 before
+      // tier 2 before tier 3); across kinds the clause decides (lacrimās: a verb where the clause needs one)
+      if (!r.name && (l.pos == Verb || l.pos == Participle || l.pos == Noun || l.pos == Adj)) {
+        auto kind = [&](uint32_t lm) {   // verbs with participles; nouns with adjectives (laetī: laetus adj, not the noun)
+          const uint8_t k = lx.lemma(lm).pos;
+          return k == Participle ? (uint8_t)Verb : k == Adj ? (uint8_t)Noun : k;
+        };
+        const uint8_t mine = readingTier(r), myKind = kind(r.lemma);
         uint8_t bestOther = 9;
         for (const Reading& o : all)
-          if (o.lemma != r.lemma && o.lemma != lex::kNoLemma && !o.name) bestOther = std::min(bestOther, readingTier(o));
+          if (o.lemma != r.lemma && o.lemma != lex::kNoLemma && !o.name && kind(o.lemma) == myKind)
+            bestOther = std::min(bestOther, readingTier(o));
         if (bestOther <= 2 && mine >= 3) p -= 0.5;
         else if (bestOther == 1 && mine == 2) p -= 0.2;
       }
@@ -608,6 +624,13 @@ struct Analyser::Impl {
       for (const char* k : kMotion)
         if (o.key == k) o.motion = true;
     }
+    // perfect participle: a participle lemma in -us (not the future -ūrus), or a verb's perfect participle cell
+    if (o.partic) {
+      const bool usKey = o.key.size() > 2 && o.key.compare(o.key.size() - 2, 2, "us") == 0 &&
+                         !(o.key.size() > 4 && o.key.compare(o.key.size() - 4, 4, "urus") == 0);
+      o.perfPart = (pos == Verb && f.tense == Perfect) || (o.lpos == Participle && usKey);
+    }
+    o.placeAcc = f.case_ == Acc && (o.key == "domus" || o.key == "rus");
   }
 
   // ---- segmentation -----------------------------------------------------------------------------------------------------
@@ -671,7 +694,8 @@ struct Analyser::Impl {
         if (r->key == "cum" && !r->conj) open = false;
       } else if (r && r->key == "ubi" && !(question && i == 0) && r->lpos == Adv) {
         open = true;   // ubi as "when" / relative "where"
-      } else if (r && r->rel && i > 0) {
+      } else if (r && r->rel && i > 0 && s.clauses[(size_t)cur].marker != (int)i) {
+        // (not when the preposition before it already opened this relative clause: "in quā habitāmus")
         // relative pronoun after a noun (or after a comma that follows a noun)
         size_t j = i;
         while (j > 0 && s.tokens[j - 1].kind == TokKind::Punct && s.tokens[j - 1].text == ",") --j;
@@ -851,6 +875,9 @@ struct Analyser::Impl {
           } else {
             d -= 1.5;
           }
+        } else if (!gov && nom->placeAcc) {
+          // domum / rūs: "home", "to the country" (an adverb of place, not an object)
+          d += verb->motion ? 0.6 : verb->accOK ? 0.4 : 0.0;
         } else if (!gov && nom->f.case_ == Acc) {
           if (verb->accOK) { d += 0.8; if (why && nom == &b) why->push_back("object of " + c.s->tokens[j].text); }
           else if (verb->copula || verb->intrOnly) d -= 0.8;
@@ -876,8 +903,26 @@ struct Analyser::Impl {
         if (other->head && other->f.case_ == Acc && infv->accOK) d += 0.4;
       }
     }
+    // an adjective next to a form of sum, agreeing in number: the predicate (laetī sunt), not a noun subject
+    if (same && dist <= 2) {
+      const RI* adj = (a.lpos == Adj && a.modifier && a.f.case_ == Nom) ? &a : (b.lpos == Adj && b.modifier && b.f.case_ == Nom) ? &b : nullptr;
+      const RI* cop = adj == &a ? &b : adj == &b ? &a : nullptr;
+      if (adj && cop && cop->finite && cop->key == "sum" && !cop->imper && adj->f.number == cop->f.number) d += 0.6;
+    }
+    // perfect participle + sum: one verb (amātus erat, ingressus est, secūtae sunt)
+    if (same && dist <= 3) {
+      const RI* part = a.perfPart ? &a : b.perfPart ? &b : nullptr;
+      const RI* aux = part == &a ? &b : part == &b ? &a : nullptr;
+      if (part && aux && aux->finite && !aux->imper && aux->key == "sum" && !part->adjToo &&
+          (part->f.case_ == Nom || part->f.case_ == 0) && (part->f.number == 0 || part->f.number == aux->f.number)) {
+        d += dist == 1 ? 1.8 : 1.2;
+        if (why) why->push_back(part == &b ? "with " + c.s->tokens[j].text + ": one verb" : "with " + c.s->tokens[j].text + ": one verb");
+      }
+    }
     // coordinated nominals (X et Y) prefer one number
     if (dist == 2 && a.head && b.head && a.f.case_ == b.f.case_ && c.coordBefore[i] && a.f.number == b.f.number) d += 0.3;
+    // ... and one case (gladium et scūtum: both objects)
+    if (dist == 2 && a.head && b.head && a.f.case_ && a.f.case_ == b.f.case_ && c.coordBefore[i] && same) d += 1.2;
     // nōlī + infinitive
     if (a.nolo && b.inf) d += 1.0;
     // genitive attribute next to a noun
@@ -928,7 +973,7 @@ struct Analyser::Impl {
     const Clause& C = s.clauses[(size_t)cl];
     double d = 0;
     int finite = 0, words = 0, finiteReadings = 0, lastWord = -1, lastFinite = -1, noms = 0;
-    bool coord = false, copula = false, subj = false, inf = false;
+    bool coord = false, copula = false, subj = false, inf = false, transVerb = false, accSeen = false;
     for (int i = C.first; i <= C.last; ++i) {
       if (co[(size_t)i] != cl || s.tokens[(size_t)i].kind != TokKind::Word || ri[(size_t)i].empty()) continue;
       ++words;
@@ -948,12 +993,17 @@ struct Analyser::Impl {
       if (r.inf) inf = true;
       if (r.coord) coord = true;
       if (r.head && r.f.case_ == Nom && !r.rel && !c.coordBefore[(size_t)i]) ++noms;
+      if (r.finite && (r.accOK || !r.intrOnly) && !r.copula) transVerb = true;   // valency: not intransitive-only
+      if (r.nominal && r.f.case_ == Acc && !r.placeAcc &&
+          !(i > C.first && !ri[(size_t)(i - 1)].empty() && ri[(size_t)(i - 1)][ch[(size_t)(i - 1)]].prep))
+        accSeen = true;
     }
     if (finite == 1) d += 1.0;
     else if (finite == 0 && words >= 2 && finiteReadings > 0) d -= 0.5;
     else if (finite >= 2) d -= 1.6 * (finite - 1);
     if (finite >= 1 && lastFinite == lastWord && words >= 2) d += 0.4;
-    if (noms > 1 && !copula) d -= 0.6 * (noms - 1);
+    // two nominatives with a transitive verb and no object: the second is the object (Puer dōnum habet)
+    if (noms > 1 && !copula) d -= (transVerb && !accSeen ? 1.5 : 0.6) * (noms - 1);
     // a genitive with no noun next to it to depend on
     for (int i = C.first; i <= C.last; ++i) {
       if (co[(size_t)i] != cl || s.tokens[(size_t)i].kind != TokKind::Word || ri[(size_t)i].empty()) continue;
@@ -1242,12 +1292,30 @@ struct Analyser::Impl {
       }
       if (!keep.empty()) t.readings = keep;
     }
+    // past context: words that are past-only finite verbs (dormīvit, gaudēbat) or past adverbs (heri, ōlim)
+    std::vector<char> pastWord(n, 0);
+    for (size_t i = 0; i < n; ++i) {
+      const Token& t = s.tokens[i];
+      if (t.kind != TokKind::Word) continue;
+      const std::string k = text::latin_key(t.text);
+      if (k == "heri" || k == "olim" || k == "nuper" || k == "pridie") { pastWord[i] = 1; continue; }
+      bool fin = false, nonPast = false;
+      for (const Reading& r : t.readings) {
+        const Features f = unpack(r.packed);
+        if (f.pos != Verb || !f.person || (f.mood != Indicative && f.mood != Subjunctive)) continue;
+        fin = true;
+        if (f.tense != Perfect && f.tense != Imperfect && f.tense != Pluperfect) nonPast = true;
+      }
+      pastWord[i] = fin && !nonPast;
+    }
     // priors, ordering, cap
     std::vector<std::vector<RI>> ri(n);
     std::vector<std::vector<double>> pri(n);
     for (size_t i = 0; i < n; ++i) {
       Token& t = s.tokens[i];
-      for (Reading& r : t.readings) r.prior = prior(t, r, t.readings);
+      bool pastCtx = false;
+      for (size_t j = 0; j < n; ++j) pastCtx = pastCtx || (j != i && pastWord[j]);
+      for (Reading& r : t.readings) r.prior = prior(t, r, t.readings, pastCtx);
       std::stable_sort(t.readings.begin(), t.readings.end(), [](const Reading& a, const Reading& b) {
         if (a.prior != b.prior) return a.prior > b.prior;
         if (a.lemma != b.lemma) return a.lemma < b.lemma;
@@ -1256,10 +1324,13 @@ struct Analyser::Impl {
       if (t.readings.size() > 14) t.readings.resize(14);
       ri[i].resize(t.readings.size());
       pri[i].resize(t.readings.size());
+      bool adj = false;
       for (size_t k = 0; k < t.readings.size(); ++k) {
         info(t.readings[k], ri[i][k]);
         pri[i][k] = t.readings[k].prior;
+        adj = adj || ri[i][k].lpos == Adj;
       }
+      for (RI& x : ri[i]) x.adjToo = adj;
     }
     // segmentation <-> search until stable
     std::vector<int> pick(n, 0), clauseOf, prevClauses;

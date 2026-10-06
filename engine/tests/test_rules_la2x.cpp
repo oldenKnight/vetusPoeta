@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "../rules/src/la2x/internal.h"
+#include "vp/check.h"
 #include "vp/curated.h"
 #include "vp/engine_config.h"
 #include "vp/features.h"
@@ -215,10 +216,12 @@ TEST_CASE("rules-la2x: lemma and features per token") {
     }
     const la2x::Word* w = wordAt(out, r[1]);
     REQUIRE_MESSAGE(w != nullptr, r[0] << ": no word " << r[1]);
-    const bool good = w->head == r[2] && w->featureText == r[3];
+    // optional 5th column: the English interlinear gloss (tells homograph lemmas with one head apart: volō want / fly)
+    const bool glossOk = r.size() < 5 || r[4].empty() || w->gloss == r[4];
+    const bool good = w->head == r[2] && w->featureText == r[3] && glossOk;
     ok += good;
-    CHECK_MESSAGE(good, r[0] << ": " << r[1] << " = " << w->head << " [" << w->featureText << "], expected " << r[2]
-                               << " [" << r[3] << "]");
+    CHECK_MESSAGE(good, r[0] << ": " << r[1] << " = " << w->head << " [" << w->featureText << "] '" << w->gloss
+                               << "', expected " << r[2] << " [" << r[3] << "]" << (r.size() >= 5 ? " '" + r[4] + "'" : ""));
   }
   MESSAGE("tokens: " << ok << "/" << rows.size() << " lemma + features exact");
 }
@@ -274,6 +277,72 @@ TEST_CASE("rules-la2x: disambiguation by context") {
   CHECK(wordAt(o, "rosam")->confidence == doctest::Approx(1.0));
   CHECK(wordAt(o, "puellae")->confidence < 1.0);
   CHECK(!wordAt(o, "puellae")->alternatives.empty());
+}
+
+TEST_CASE("rules-la2x: periphrases are one verb, both words noted (C11b)") {
+  NEED_WORLD();
+  const auto rows = readTsv(repoDir() / "tests" / "fixtures" / "la2x" / "sentences.tsv");
+  int n = 0;
+  for (const auto& r : rows) {
+    if (r.size() < 4 || r[3].compare(0, 11, "periphrasis") != 0) continue;
+    ++n;
+    la2x::SentenceOut o;
+    W.tr->resetDiscourse();
+    W.tr->sentence(r[0], la2x::Target::En, o);
+    int noted = 0, verbs = 0;
+    for (const la2x::Word& w : o.words) {
+      noted += !w.note.empty();
+      verbs += w.role == "verb";
+    }
+    CHECK_MESSAGE(noted == 2, r[0] << ": " << noted << " words carry the periphrasis note");
+    CHECK_MESSAGE(verbs == 2, r[0] << ": " << verbs << " words have the role verb");
+  }
+  CHECK(n >= 15);
+  la2x::SentenceOut en, es;
+  W.tr->resetDiscourse();
+  W.tr->sentence("Mārcus in templum ingressus est.", la2x::Target::En, en);
+  REQUIRE(wordAt(en, "ingressus") != nullptr);
+  CHECK(wordAt(en, "ingressus")->note == "ingressus est = entered (one verb: perfect of the deponent ingredior)");
+  CHECK(wordAt(en, "est")->note == wordAt(en, "ingressus")->note);
+  CHECK(std::find(en.analysis.tokens[(size_t)wordAt(en, "est")->token].why.begin(),
+                  en.analysis.tokens[(size_t)wordAt(en, "est")->token].why.end(),
+                  wordAt(en, "est")->note) != en.analysis.tokens[(size_t)wordAt(en, "est")->token].why.end());
+  W.tr->resetDiscourse();
+  W.tr->sentence("Puer ā mātre amātus erat.", la2x::Target::Es, es);
+  REQUIRE(wordAt(es, "amātus") != nullptr);
+  CHECK(wordAt(es, "amātus")->note == "amātus erat = había sido amado (un solo verbo: pluscuamperfecto pasivo de amō)");
+  // the cue's word-by-word line gives the verb once
+  rules::EngineConfig cfg = rules::defaultEngineConfig();
+  cfg.curatedDir = (repoDir() / "data" / "curated").string();
+  cfg.dataDir = workDir().string();
+  cfg.nlpDir = (workDir() / "nlp").string();
+  std::unique_ptr<rules::Engine> eng = rules::makeEngine(cfg);
+  REQUIRE(eng->setLexicons(&W.la, nullptr, nullptr, nullptr).ok());
+  std::vector<rules::CueInput> cues(1);
+  cues[0].sourceText = "Puella Mārcum secūta est.";
+  rules::Options opt;
+  opt.source = rules::Lang::La;
+  opt.target = rules::Lang::En;
+  auto r = eng->translate(cues, opt, rules::Context(), nullptr, nullptr);
+  REQUIRE(r.ok());
+  CHECK(r.value()[0].target == "The girl followed Marcus.");
+  REQUIRE(!r.value()[0].alternatives.empty());
+  CHECK(r.value()[0].alternatives[0].text == "girl Marcus followed");
+  bool noteInReasons = false;
+  for (const rules::Reason& x : r.value()[0].reasons)
+    noteInReasons = noteInReasons || x.data.find("\"note\":\"secūta est = followed") != std::string::npos;
+  CHECK(noteInReasons);
+}
+
+TEST_CASE("rules-la2x: A6 counts a participle at its verb's tier (C11b, check.cpp)") {
+  NEED_WORLD();
+  check::LatinChecker ck(W.la, *W.cd);
+  check::Options o;
+  o.tierCeiling = 1;
+  const check::Report rep = ck.check("Epistula lēcta est.", o);   // lēctus (participle lemma, tier 3) -> legō, tier 1
+  CHECK_MESSAGE(rep.ok("A6"), "A6: " << rep.checks.back().detail);
+  CHECK(ck.check("Puella Mārcum secūta est.", o).ok("A6"));      // secūtus -> sequor, tier 1
+  CHECK(!ck.check("Epistula lēcta est et gladius nitidus est.", o).ok("A6"));   // a tier-3 word still fails
 }
 
 TEST_CASE("rules-la2x: interlinear view") {
@@ -606,7 +675,8 @@ TEST_CASE("rules-la2x: dev dump (VP_LA2X_DUMP=<file or sentence>)") {
     for (const la2x::Word& w : en.words)
     {
       std::cout << "   " << w.text << " = " << w.head << " [" << w.featureText << "] '" << w.gloss << "' c=" << w.confidence
-                << " role=" << w.role << (w.alternatives.empty() ? "" : " alt: " + w.alternatives[0]) << "\n";
+                << " role=" << w.role << (w.alternatives.empty() ? "" : " alt: " + w.alternatives[0])
+                << (w.note.empty() ? "" : " note: " + w.note) << "\n";
       if (std::getenv("VP_LA2X_SCORES")) {
         const la2x::Token& tk = en.analysis.tokens[(size_t)w.token];
         for (const la2x::Reading& r : tk.readings)

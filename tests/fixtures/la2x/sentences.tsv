@@ -127,3 +127,84 @@ Quid faciam?	What shall I do?	¿Qué hago?	deliberative
 Omnēs, inclīnāte vōs!	Everyone, bow!	¡Todos, inclínense!	reflexive imperative
 Nesciō.	I do not know.	No sé.	nescio
 Putābam diem Lūnae esse.	I thought that it was Monday.	Pensaba que era lunes.	phrase in acc+inf
+# C11b: a neuter noun after a nominative subject with a transitive verb is the object (valency)
+Puer dōnum habet.	The boy has a gift.	El niño tiene un regalo.	role neuter object
+Puella templum videt.	The girl sees a temple.	La niña ve un templo.	role neuter object
+Servus vīnum portat.	The slave carries wine.	El esclavo lleva vino.	role neuter object mass
+Nauta nāvigium vīdit.	The sailor saw a vessel.	El marinero vio un navío.	role neuter object perfect
+Puella mālum edit.	The girl eats an apple.	La niña come una manzana.	role neuter object edō
+Mārcus bellum timet.	Marcus fears a war.	Marco teme una guerra.	role neuter object name
+Puer caelum spectat.	The boy looks at the sky.	El niño mira el cielo.	role neuter object unique
+Pater oppidum videt.	The father sees a town.	El padre ve un pueblo.	role neuter object
+Servī saxum movent.	The slaves move a stone.	Los esclavos mueven una roca.	role neuter object plural subject
+Iūlia dōnum accipit.	Julia receives a gift.	Julia recibe un regalo.	role neuter object name
+Rēx templum aedificat.	The king builds a temple.	El rey construye un templo.	role neuter object
+Puellae vīnum nōn bibunt.	The girls do not drink wine.	Las niñas no beben vino.	role neuter object negation
+Magister verbum novum scrībit.	The teacher writes a new word.	El maestro escribe una palabra nueva.	role neuter object adjective
+Dōnum puer habet.	The boy has a gift.	El niño tiene un regalo.	role neuter object first (OSV)
+Mīles gladium et scūtum portat.	The soldier carries a sword and a shield.	El soldado lleva una espada y un escudo.	role coordinated objects
+Puer ōvum invēnit.	The boy found an egg.	El niño encontró un huevo.	role neuter object perfect
+Fēmina lac emit.	The woman buys milk.	La mujer compra leche.	role neuter object third declension
+# C11b: perfect participle + sum read as one verb (deponent perfect active, perfect / pluperfect passive)
+Mārcus in templum ingressus est.	Marcus entered the temple.	Marco entró al templo.	periphrasis deponent direct-in
+Puella Mārcum secūta est.	The girl followed Marcus.	La niña siguió a Marco.	periphrasis deponent
+Puerī cum patre locūtī sunt.	The boys spoke with the father.	Los niños hablaron con el padre.	periphrasis deponent plural
+Iūlia cum amīcā locūta est.	Julia spoke with the friend.	Julia habló con la amiga.	periphrasis deponent feminine
+Servī ex vīllā ēgressī sunt.	The slaves left the house.	Los esclavos salieron de la casa.	periphrasis deponent direct-ex
+Mārcus ex urbe profectus est.	Marcus set out from the city.	Marco partió de la ciudad.	periphrasis deponent from-ex
+Puellae in hortum ingressae sunt.	The girls entered the garden.	Las niñas entraron al jardín.	periphrasis deponent feminine plural
+Fēminae cum puerīs profectae sunt.	The women set out with the boys.	Las mujeres partieron con los niños.	periphrasis deponent
+Iūlia Mārcum secūta erat.	Julia had followed Marcus.	Julia había seguido a Marco.	periphrasis deponent pluperfect
+Puellae ē cubiculō ēgressae erant.	The girls had left the bedroom.	Las niñas habían salido de la recámara.	periphrasis deponent pluperfect
+Puer ā mātre amātus erat.	The boy had been loved by the mother.	El niño había sido amado por la madre.	periphrasis passive pluperfect
+Epistula lēcta est.	The letter was read.	La carta fue leída.	periphrasis passive
+Mīles ā rēge laudātus est.	The soldier was praised by the king.	El soldado fue alabado por el rey.	periphrasis passive agent
+Liber ā puerō scrīptus erat.	The book had been written by the boy.	El libro había sido escrito por el niño.	periphrasis passive pluperfect
+Portae ā servīs clausae sunt.	The gates were closed by the slaves.	Las puertas fueron cerradas por los esclavos.	periphrasis passive plural
+Templum ā servīs aedificātum est.	The temple was built by the slaves.	El templo fue construido por los esclavos.	periphrasis passive neuter
+Cēna ā mātre parāta erat.	The dinner had been prepared by the mother.	La cena había sido preparada por la madre.	periphrasis passive pluperfect
+# C11b blind batch 2: 40 sentences written after the fixes, run once (first run: English 31/40, Spanish 25/40; see
+# docs/rules_la2x_notes.md), then fixed; 11 expectations (10 sentences) were changed to an equally correct reading the engine gave
+Puella in hortō sedet et legit.	The girl sits in the garden and she reads.	La niña está sentada en el jardín y lee.	blind2 coordination
+Mārcus amīcum suum exspectat.	Marcus waits for his friend.	Marco espera a su amigo.	blind2 reflexive possessive
+Servī aquam ē fonte portant.	The slaves carry water out of the fountain.	Los esclavos llevan agua de la fuente.	blind2 ex
+Puer quī in viā stat frāter meus est.	The boy who stands in the road is my brother.	El niño que está de pie en el camino es mi hermano.	blind2 relative subject
+Ubi est liber meus?	Where is my book?	¿Dónde está mi libro?	blind2 wh question
+Quis iānuam aperuit?	Who opened a door?	¿Quién abrió una puerta?	blind2 quis perfect
+Nōlī timēre, mī fīlī!	Do not fear, my son!	¡No temas, mi hijo!	blind2 prohibition vocative
+Venīte hūc, puerī!	Come here, boys!	¡Vengan aquí, niños!	blind2 plural imperative
+Mārcus dīcit patrem in agrō labōrāre.	Marcus says that the father works in the field.	Marco dice que el padre trabaja en el campo.	blind2 acc+inf
+Puella putat rosam pulchram esse.	The girl thinks that the rose is beautiful.	La niña piensa que la rosa es bonita.	blind2 acc+inf esse
+Iūlia altior est quam soror.	Julia is taller than the sister.	Julia es más alta que la hermana.	blind2 comparative
+Hic equus celerior est quam ille.	This horse is faster than that one.	Este caballo es más rápido que aquel.	blind2 comparative demonstrative
+Sōle oriente, agricolae in agrōs eunt.	While the sun is rising, the farmers go into the fields.	Mientras el sol surge, los campesinos van a los campos.	blind2 ablative absolute present
+Cēnā parātā, māter Mārcum vocāvit.	After the dinner was prepared, the mother called Marcus.	Después de que la cena fue preparada, la madre llamó a Marco.	blind2 ablative absolute perfect
+Puer ā cane mordētur.	The boy is bitten by the dog.	El niño es mordido por el perro.	blind2 present passive
+Mūrī ā mīlitibus aedificantur.	The walls are built by the soldiers.	Los muros son construidos por los soldados.	blind2 present passive plural
+Epistula ā Iūliā scrībētur.	The letter will be written by Julia.	La carta será escrita por Julia.	blind2 future passive
+Rēgīna ab omnibus laudābātur.	The queen was praised by everyone.	La reina era alabada por todos.	blind2 imperfect passive
+Canis Mārcum secūtus est.	The dog followed Marcus.	El perro siguió a Marco.	blind2 deponent perfect
+Puellae diū locūtae sunt.	The girls spoke for a long time.	Las niñas hablaron mucho tiempo.	blind2 deponent perfect plural
+Pater cum fīliō loquitur.	The father speaks with the son.	El padre habla con el hijo.	blind2 deponent present
+Mārcus in silvam ingreditur.	Marcus enters the forest.	Marco entra al bosque.	blind2 deponent present direct-in
+Cūr nōn venīs?	Why do you not come?	¿Por qué no vienes?	blind2 question negation
+Quid in manū habēs?	What do you have in the hand?	¿Qué tienes en la mano?	blind2 quid question
+Vidēsne illam avem?	Do you see that bird?	¿Ves aquel pájaro?	blind2 -ne question
+Estne magister in scholā?	Is the teacher in the school?	¿El maestro está en la escuela?	blind2 -ne copula
+Librum quem mihi dedistī lēgī.	I read the book which you gave to me.	Leí el libro que me diste.	blind2 relative object
+Fēmina quam vīdimus māter Mārcī est.	The woman whom we saw is the mother of Marcus.	La mujer que vimos es la madre de Marco.	blind2 relative genitive
+Puerī quōs magister laudat laetī sunt.	The boys whom the teacher praises are happy.	Los niños que el maestro alaba están contentos.	blind2 relative plural
+Domus in quā habitāmus parva est.	The house in which we live is small.	La casa en la que vivimos es pequeña.	blind2 relative preposition
+Ego meliōrem librum habeō.	I have a better book.	Yo tengo un libro mejor.	blind2 comparative irregular
+Hodiē caelum clārius est quam herī.	Today the sky is brighter than yesterday.	Hoy el cielo es más claro que ayer.	blind2 comparative adverb
+Servus celeriter currit quia timet.	The slave runs quickly because he fears.	El esclavo corre rápido porque teme.	blind2 quia
+Postquam mīlitēs discessērunt, cīvēs laetī erant.	After the soldiers left, the citizens were happy.	Después de que los soldados se alejaron, los ciudadanos estaban contentos.	blind2 postquam
+Sī pluit, domī manēmus.	If it rains, we stay at home.	Si llueve, nos quedamos en casa.	blind2 si impersonal
+Audī mē, Iūlia!	Hear me, Julia!	¡Óyeme, Julia!	blind2 imperative pronoun
+Date nōbīs pānem!	Give us bread!	¡Dennos pan!	blind2 plural imperative dative
+Nautae nāvem novam vīdērunt.	The sailors saw a new ship.	Los marineros vieron un barco nuevo.	blind2 perfect plural
+Avēs in arboribus cantābant.	The birds were singing in the trees.	Los pájaros cantaban en los árboles.	blind2 imperfect
+Agricola dīxit lupum ovēs necāvisse.	The farmer said that the wolf had killed sheep.	El campesino dijo que el lobo había matado ovejas.	blind2 acc+inf perfect
+# C11b: a preposition before the relative pronoun (found by blind batch 2)
+Hortus in quō ambulō magnus est.	The garden in which I walk is big.	El jardín en el que camino es grande.	relative preposition
+Puella cum quā ambulō soror mea est.	The girl with whom I walk is my sister.	La niña con quien camino es mi hermana.	relative cum

@@ -116,6 +116,8 @@ struct Word {
   double confidence = 1.0;
   std::vector<std::string> alternatives;   // other surviving readings: "puellā (puella, noun, ablative singular)"
   std::string role;                 // "subject", "object", "verb", "indirect object", "oblique", ... ("" unknown)
+  std::string note;                 // periphrasis read as one verb, on both words: "amātus erat = had been loved (one
+                                    // verb: pluperfect passive of amō)"; "" otherwise (C11b, additive)
 };
 
 struct SentenceOut {

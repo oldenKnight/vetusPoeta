@@ -88,3 +88,65 @@ implemented for edited cues"). The translator is rebuilt when the Latin lexicon 
 4. CLI/UI (C8): la-en tokens are source tokens; `reasons` kind "analysis" carries {lemmaId, head, gloss, glossLang,
    pivot, form, role, confidence, alternatives, why}; `alternatives[0]` is a word-by-word gloss line. Show them?
 5. Should readable_*.tsv grow into a teacher-editable core-vocabulary gloss list (now ~230 content words)?
+
+## C11b: analyser fixes found by Orbergise (2026-10-06)
+Files: `src/la2x/{analyse,readable,translator,realise_en,realise_es}.cpp`, `internal.h`, `vp/la2x.h` (one additive field),
+`src/check/check.cpp` (A6 hunk only), tests `test_rules_la2x.cpp`, fixtures `sentences.tsv` / `tokens.tsv`, rows in
+`readable_en.tsv` / `readable_es.tsv` (la2x's own tables).
+1. **Lemma preference** (priors in `analyse.cpp`): homographs of one kind (verb / verb incl. participles, noun / noun incl.
+   adjectives) prefer the core lemma (tier 1/2 over tier 3: -0.5; tier 1 over tier 2: -0.2; participles count at their
+   verb's tier); across kinds the clause decides (lacrimās is a verb where the clause needs one). A form known only from
+   a form page while another lemma's own table has it loses 0.8 (volat: volō "fly", edit: edō "eat"). est / sunt / erat
+   ... are always sum. A pluperfect not spelled -erā- (pārat "from paveō") loses 1.0. Present vs perfect spelled alike
+   (legit, venit, invenit, fugit; text without macrons): the present unless the sentence is set in the past (another
+   past-only finite verb, heri, ōlim, nūper, prīdiē), then the perfect. domum / rūs with a verb of motion is an adverb of
+   place, not a penalised object (this is what made "Mārcus domum vēnit" read vēneō). A lex row of readable_*.tsv keyed
+   by a Latin key two lemmas share applies only to the lemma whose English senses name the row's word; new kind `lexh`
+   gives the other lemma's word (volō fly / volar, occidō fall / caer); malformed headwords ("((caelum") do not count.
+2. **Roles**: two nominatives with a verb that is not intransitive-only (valency_la.tsv, else the lexicon's sense tags)
+   and no object cost 1.5 per extra nominative (was 0.6): "Puer dōnum habet", "Dōnum puer habet" read dōnum as the
+   object. Coordinated nominals agree in case (+1.2: gladium et scūtum). An adjective next to sum agreeing in number is
+   the predicate (laetī sunt), not a noun subject.
+3. **Periphrases**: a perfect participle (participle lemma in -us or a verb's perfect participle cell, no adjective
+   reading of the token) within 3 words of a form of sum in its clause, agreeing in number, scores +1.8 (adjacent) /
+   +1.2, so ingressus / amātus are no longer nouns. The frame builder reads the pair as one verb: the participle's verb
+   (`verbOfParticipleLemma`: the participle headword as a "verb ... participle" analysis of its verb), deponent ->
+   active (secūta est = followed, locūtī sunt = spoke, ēgressae erant = had left), else passive (amātus erat = had been
+   loved). Interlinear: both words keep their own entry (role verb) and carry `Word::note` ("amātus erat = had been
+   loved (one verb: pluperfect passive of amō)", Spanish "había sido amado (un solo verbo: pluscuamperfecto pasivo de
+   amō)"), also pushed to the token's `why` (UI "Why this reading?") and to the reasons data (`note`); the word-by-word
+   line gives the verb form once. readable_en: verbs tagged direct-in / direct-ex take in + acc / ex + abl as a plain
+   object (entered the temple, left the house), from-ex renders ex as "from" (set out from the city).
+4. **A6** (check.cpp): a participle lemma counts at its verb's tier (lowest tier among the verbs listing it as their
+   participle); a hint naming the verb matches the participle reading. Test: "Epistula lēcta est." and "Puella Mārcum
+   secūta est." pass A6 at ceiling 1 (the second failed before), a tier-3 word still fails.
+5. Also fixed from the blind batch: relative pronoun after a preposition (in quā, cum quā) opened two nested clauses;
+   a restrictive relative clause or a genitive attribute makes the noun definite (also as a predicate); quantifiers /
+   demonstratives standing alone as the head (ab omnibus: by everyone / por todos; quam ille after a thing: that one /
+   aquel); an adverb after comparative quam (than yesterday / que ayer); comparative lemma of celer; Spanish mejor /
+   peor; fons, clārus (bright / claro).
+
+Cases added: tokens.tsv 45 rows (33 homograph readings incl. vēnit/venit/legit/est/volat/vīs/canis/portās/eō/edit/
+occidit/occīdit/caelō, 8 neuter objects, 4 periphrasis participles; optional 5th column = English interlinear gloss,
+checked), sentences.tsv 17 role sentences + 17 periphrases (15+ required; the new test checks both words carry the note
+and the role verb) + blind batch 2 (40) + 2 relative-with-preposition sentences.
+
+## Blind batch 2 (C11b)
+40 new beginner-reader sentences (deponents, passives, relative clauses, indirect statement, questions, imperatives,
+ablative absolute, comparatives) written with their expected English and Spanish AFTER items 1-4 were done, run once.
+**First run: English 31/40, Spanish 25/40** (strict normalised match against the expectations as first written).
+Misses: fōns glossed "water issuing from the ground"; celerior in Spanish ("más comparativo de celer"); quam ille ->
+"than he"; ab omnibus -> "the everies"; antecedent of a relative clause and a predicate with a genitive got "a/un";
+laetī read as the noun laetus; "in quā" relative broke the sentence; meliōrem -> "más bueno"; clārius quam herī lost
+"than" and glossed "famous"; plus 11 Spanish/English wording differences where the engine's reading is equally correct
+(está de pie / parado, mi hijo / hijo mío, surge / sale, mucho tiempo / por mucho tiempo, rápido / rápidamente, se
+alejaron / se fueron, Hear me / Listen to me, Óyeme / Escúchame, gave to me / gave me, by everyone / by all, es / está
+más claro). Counting those as right, the first run was 32/40 in both languages. After the fixes of item 5 and the 11
+expectation changes (listed in the fixture header): 40/40 and 40/40; the batch is in sentences.tsv (now 201 rows, all
+pass in both languages; tokens 380/380).
+
+## Left as it is (C11b)
+* "Hic est liber meus." -> "This book is my." (demonstrative subject + predicate NP); "Iam nox est." -> "The night is
+  already."; "Populus Rōmānus" reads Rōmānus as a name; hostis glossed "an enemy of the state" (no readable row).
+* Article policy unchanged: first-mention objects stay indefinite ("The girl followed a mother").
+* Spanish "sēdit" in a coordinated clause gives "estuvo sentado" without agreement.

@@ -756,9 +756,31 @@ struct LatinChecker::Impl {
       if (opt.hints)
         for (const TokenHint& h : *opt.hints)
           if (rep.tokens[i].start >= h.start && rep.tokens[i].end <= h.end) hinted = h.lemma;
+      // C11b: a participle lemma (lēcta <- lēctus) counts at its verb's tier (legō): the lexicon lists the
+      // participle's headword as a "verb ... participle" analysis of the verb itself
+      auto verbOf = [&](const Reading& r) -> uint32_t {
+        if (r.lpos != Participle) return lex::kNoLemma;
+        const lex::Lemma pl = lx.lemma(r.lemma);
+        std::vector<lex::Analysis> an;
+        lx.lookup(pl.key, an);
+        uint32_t v = lex::kNoLemma;
+        uint8_t vt = 9;
+        for (const lex::Analysis& a : an) {
+          const lex::Lemma vl = lx.lemma(a.lemma);
+          if (vl.pos != Verb || unpack(lx.feature(a.feat)).mood != ParticipleMood) continue;
+          const uint8_t t = cd.effectiveTier(vl.key, vl.pos, vl.tier);
+          if (t < vt || (t == vt && a.lemma < v)) { vt = t; v = a.lemma; }
+        }
+        return v;
+      };
       for (const Reading& r : rd[i]) {
-        if (hinted != lex::kNoLemma && r.lemma != hinted) continue;
-        const uint8_t t = cd.effectiveTier(r.key, r.lpos, r.tier);
+        const uint32_t v = verbOf(r);
+        if (hinted != lex::kNoLemma && r.lemma != hinted && v != hinted) continue;
+        uint8_t t = cd.effectiveTier(r.key, r.lpos, r.tier);
+        if (v != lex::kNoLemma) {
+          const lex::Lemma vl = lx.lemma(v);
+          t = std::min(t, cd.effectiveTier(vl.key, vl.pos, vl.tier));
+        }
         best = std::min(best, t);
       }
       if (best == 9 && hinted != lex::kNoLemma) {   // C15: the realiser generated the form from the hinted lemma

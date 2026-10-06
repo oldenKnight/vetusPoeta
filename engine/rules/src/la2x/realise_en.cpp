@@ -232,6 +232,14 @@ class En {
       appendWord(out, x.number == 2 ? "ones" : "one");
       return out;
     }
+    // a quantifier / demonstrative standing alone as the head ("ab omnibus": by everyone)
+    if (x.token >= 0 && x.determiner.empty() && x.adjectives.empty() && x.genitive.empty() && x.relative.empty() &&
+        tab_.has("det", ti_[(size_t)x.token].key) &&
+        (ti_[(size_t)x.token].lpos == Adj || ti_[(size_t)x.token].lpos == Det)) {
+      SemNP y = x;
+      y.determiner = ti_[(size_t)x.token].key;
+      return standalone(y, role);
+    }
     return nounPhrase(x, role, definite);
   }
 
@@ -243,6 +251,10 @@ class En {
     const std::string gk = g == F ? "f" : g == N ? "n" : "m";
     const std::string nk = pl ? "pl" : "sg";
     const std::string k = x.determiner.empty() ? x.pronLemma : x.determiner;
+    // compared with a thing after quam ("hic equus celerior est quam ille"): that one, not he
+    if (x.token > 0 && ti_[(size_t)x.token - 1].key == "quam" && ti_[(size_t)x.token - 1].lpos == Conj &&
+        !curSubj_.personNoun && (k == "ille" || k == "hic" || k == "iste"))
+      return k == "hic" ? (pl ? "these" : "this one") : (pl ? "those" : "that one");
     std::string w = tab_.text("det", k, {"pron." + gk + "." + nk, "pron." + nk, "pron"});
     if (w.empty()) w = tab_.text("det", k, {nk});
     if (w == "he" || w == "she" || w == "they" || w == "it") {
@@ -298,15 +310,17 @@ class En {
     if (!hasDet && role != R::Voc) {
       const bool mentioned = in_.disc->seen(lemma);
       const bool hasGen = !x.genitive.empty();
-      bool def = definite || lx.unique || mentioned || hasGen;
+      // a restrictive relative clause makes the noun definite ("the book which you gave me")
+      const bool hasRel = !x.relative.empty();
+      bool def = definite || lx.unique || mentioned || hasGen || hasRel;
       bool indef = false;
       if (!def) {
         if (role == R::Subj || role == R::Iobj || role == R::Prep) def = true;
         else if (x.number != 2 && !lx.mass) indef = true;
       }
       if (lx.mass && !mentioned && !hasGen && (!definite || role == R::Prep) && !x.relative.size()) { def = false; indef = false; }
-      if (x.number == 2 && !mentioned && !hasGen && (role == R::Obj || role == R::Pred)) def = false;
-      if (role == R::Pred && x.number != 2 && !mentioned && !lx.mass && !lx.unique) { def = false; indef = true; }
+      if (x.number == 2 && !mentioned && !hasGen && !hasRel && (role == R::Obj || role == R::Pred)) def = false;
+      if (role == R::Pred && x.number != 2 && !mentioned && !lx.mass && !lx.unique && !hasGen && !hasRel) { def = false; indef = true; }
       if (def) pre.push_back(tab_.text("article", "def", {"-"}));
       else if (indef) {
         const std::string next = !adjs.empty() ? adjs[0] : nounWord(x, role);
@@ -739,6 +753,12 @@ class En {
       const Lexical lx = lexOf(o.np.token);
       if (lx.timePrep.empty() && !lx.event) w = tab_.text("prep", prep, {cs + ".place"});
     }
+    // "enter the temple", not "enter into"; "leave the house", not "leave out of": verbs tagged "direct-in" take
+    // in + accusative, "direct-ex" ē/ex + ablative as a plain object
+    if (!curVerbKey_.empty() && ((prep == "in" && cs == "acc" && tab_.tagged("lex", curVerbKey_, "direct-in")) ||
+                                 (prep == "ex" && tab_.tagged("lex", curVerbKey_, "direct-ex"))))
+      return np(o.np, R::Prep, true);
+    if (w.empty() && prep == "ex" && !curVerbKey_.empty() && tab_.tagged("lex", curVerbKey_, "from-ex")) w = "from";
     if (w.empty()) w = tab_.text("prep", prep, {cs});
     if (w.empty()) w = s_.tokens[(size_t)std::max(0, o.token)].text;
     std::string out = w;
@@ -746,6 +766,7 @@ class En {
     return out;
   }
   bool curPassive_ = false;
+  std::string curVerbKey_;   // Latin key of the clause's lexical verb (the participle's verb in a periphrasis)
 
   void adverbs(const SemFrame& f, std::vector<std::string>& pre, std::vector<std::string>& end) {
     for (const frame::SemAdverb& a : f.adverbs) {
@@ -761,6 +782,11 @@ class En {
       }
       if (a.lemma == "quaeso") w = ", " + w;
       if (a.lemma == "ualde" && f.hasPred) w = "very much";
+      // an adverb compared after quam ("clārius quam herī": than yesterday)
+      if (a.token > 0 && ti_[(size_t)a.token - 1].key == "quam" && ti_[(size_t)a.token - 1].lpos == Conj) {
+        end.push_back("than " + w);
+        continue;
+      }
       if (tab_.tagged("adv", a.lemma, "pre")) pre.push_back(w);
       else end.push_back(w);
     }
@@ -888,6 +914,12 @@ class En {
     (void)how;
     std::string out;
     curPassive_ = f.pred.voice == frame::Voice::Passive;
+    {
+      const int lt = f.pred.complementToken >= 0 && f.pred.particle == "peri" ? f.pred.complementToken : f.pred.token;
+      curVerbKey_.clear();
+      if (lt >= 0 && (size_t)lt < ti_.size())
+        curVerbKey_ = ti_[(size_t)lt].verbLemma != lex::kNoLemma ? std::string(f.pred.lemma) : ti_[(size_t)lt].key;
+    }
     mainPast_ = f.pred.tense == frame::Tense::Past;
     // fixed phrase covering the clause
     std::string phraseFront, phraseEnd;

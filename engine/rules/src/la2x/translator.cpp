@@ -2,6 +2,7 @@
 // lexicon's glosses cleaned to one plain word), names, the interlinear view, the cue-level output for the engine pairs
 // la-en / la-es and the A9 round-trip overlap for the EN/ES -> LA engine.
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <exception>
 #include <sstream>
@@ -227,14 +228,73 @@ struct Translator::Impl final : public detail::LexicalSource {
     return w;
   }
 
+  // A readable "lex" row is keyed by the Latin key, which two lemmas can share (volō "want" / volō "fly", occīdō "kill"
+  // / occidō "fall"). For such a homograph the row applies only to the lemma whose English senses name the row's word;
+  // the other lemma may have a "lexh" row (note = an English word of its senses: "lexh uolo verb fly fly").
+  bool sensesName(uint32_t lemma, std::string w) const {
+    if (startsWith(w, "be ") && w.size() > 3) w = w.substr(3);
+    const size_t sp = w.find(' ');
+    if (sp != std::string::npos) w = w.substr(0, sp);
+    if (w.empty()) return false;
+    auto has = [&](std::string_view g) {
+      const std::string low = text::lower(std::string(g));
+      size_t at = low.find(w);
+      while (at != std::string::npos) {
+        const bool b0 = at == 0 || !std::isalpha((unsigned char)low[at - 1]);
+        const bool b1 = at + w.size() >= low.size() || !std::isalpha((unsigned char)low[at + w.size()]);
+        if (b0 && b1) return true;
+        at = low.find(w, at + 1);
+      }
+      return false;
+    };
+    if (has(lx.lemma(lemma).glossEn)) return true;
+    std::vector<lex::Sense> senses;   // local: callers may be iterating senseBuf
+    lx.senses(lemma, senses);
+    for (const lex::Sense& se : senses)
+      if (has(se.glossEn)) return true;
+    return false;
+  }
+  mutable std::unordered_map<uint32_t, char> rowFit;   // lemma -> fits (capped)
+  bool rowFits(uint32_t lemma, const std::string& key, uint8_t pos) const {
+    auto it = rowFit.find(lemma);
+    if (it != rowFit.end()) return it->second != 0;
+    bool fits = true;
+    const detail::Row* enRow = en.find("lex", key, posName(pos));
+    if (enRow && !enRow->text.empty()) {
+      std::vector<lex::Analysis> an;   // local: callers may be iterating anaBuf
+      lx.lookup(key, an);
+      bool other = false;
+      const uint8_t lp = lx.lemma(lemma).pos;
+      auto wordHead = [](std::string_view h) {   // "((caelum" and other malformed headwords do not count
+        for (char ch : h)
+          if (ch == '(' || ch == ')' || ch == '-' || ch == ' ' || (ch >= '0' && ch <= '9')) return false;
+        return !h.empty();
+      };
+      for (const lex::Analysis& a : an) {
+        const lex::Lemma ol = lx.lemma(a.lemma);
+        if (a.lemma != lemma && ol.key == key && ol.pos == lp && wordHead(ol.head)) other = true;
+      }
+      if (other) fits = sensesName(lemma, enRow->text);
+    }
+    if (rowFit.size() > 4096) rowFit.clear();
+    rowFit.emplace(lemma, fits ? 1 : 0);
+    return fits;
+  }
+  const detail::Row* lexRow(const detail::Tables& tab, uint32_t lemma, const std::string& key, uint8_t pos) const {
+    const detail::Row* r = tab.find("lex", key, posName(pos));
+    if (!r || lemma == lex::kNoLemma || rowFits(lemma, key, pos)) return r;
+    for (const detail::Row& h : tab.rows())
+      if (h.kind == "lexh" && h.latin == key && h.feature == posName(pos) && sensesName(lemma, h.note)) return &h;
+    return nullptr;
+  }
+
   std::string glossFor(uint32_t lemma, uint8_t pos, Target t, bool* pivot, int depth = 0) const {
     const lex::Lemma l = lx.lemma(lemma);
     const std::string key(l.key);
-    const char* pn = posName(pos ? pos : l.pos);
     const detail::Tables& tab = t == Target::En ? en : es;
     if (pivot) *pivot = false;
-    if (const detail::Row* r = tab.find("lex", key, pn)) return r->text;
-    if (t == Target::Es) {
+    if (const detail::Row* r = lexRow(tab, lemma, key, pos ? pos : l.pos)) return r->text;
+    if (t == Target::Es && rowFits(lemma, key, pos ? pos : l.pos)) {
       if (const detail::GlossEsRow* g = curatedEs(key, l.head)) return firstItem(g->gloss);
     }
     return lexiconGloss(lemma, pos ? pos : l.pos, t, pivot, depth);
@@ -283,12 +343,12 @@ struct Translator::Impl final : public detail::LexicalSource {
     const std::string key(l.key);
     const char* pn = posName(pos);
     const detail::Tables& tab = lang == Target::En ? en : es;
-    const detail::Row* row = tab.find("lex", key, pn);
-    const detail::Row* enRow = en.find("lex", key, pn);
+    const detail::Row* row = lexRow(tab, lemma, key, pos);
+    const detail::Row* enRow = lexRow(en, lemma, key, pos);
     if (!row && pos == Adj && key.size() > 3 && key.compare(key.size() - 3, 3, "ior") == 0) {
       // a comparative lemma: the positive's word ("altior" -> altus -> tall; the realiser adds "-er")
       const std::string st = key.substr(0, key.size() - 3);
-      for (const char* e : {"us", "is", "er"}) {
+      for (const char* e : {"us", "is", "er", ""}) {   // "" : celer -> celerior
         if ((row = tab.find("lex", st + e, pn))) { enRow = en.find("lex", st + e, pn); break; }
       }
     }
@@ -425,8 +485,9 @@ struct Translator::Impl final : public detail::LexicalSource {
     }
     const detail::Tables& tab = t == Target::En ? en : es;
     if (t == Target::Es)
-      if (const detail::GlossEsRow* g = curatedEs(key, l.head)) return g->gloss;
-    if (const detail::Row* r = tab.find("lex", key, posName(p ? p : l.pos))) return r->text;
+      if (rowFits(lemma, key, p ? p : l.pos))
+        if (const detail::GlossEsRow* g = curatedEs(key, l.head)) return g->gloss;
+    if (const detail::Row* r = lexRow(tab, lemma, key, p ? p : l.pos)) return r->text;
     // closed classes: the readable table's word
     for (const char* kind : {"prep", "conj", "adv", "intj", "det", "sub"}) {
       if (const detail::Row* r = tab.best(kind, key, {"abl", "acc", "sg", "-", "ind"})) {
@@ -503,6 +564,60 @@ struct Translator::Impl final : public detail::LexicalSource {
       }
       out.push_back(std::move(w));
     }
+    // periphrases (participle + sum = one verb): both words carry the note
+    for (const detail::Periphrasis& pp : b.periphrases) {
+      const std::string note = periphrasisNote(s, ti, pp, t);
+      for (Word& w : out)
+        if (w.token == pp.participle || w.token == pp.aux) w.note = note;
+    }
+  }
+
+  // "amātus erat = had been loved (one verb: pluperfect passive of amō)" / "secūta est = siguió (un solo verbo:
+  // perfecto del deponente sequor)"
+  std::string periphrasisNote(const Sentence& s, const std::vector<TokInfo>& ti, const detail::Periphrasis& pp,
+                              Target t) const {
+    if (pp.participle < 0 || pp.aux < 0 || (size_t)pp.participle >= ti.size() || (size_t)pp.aux >= ti.size()) return {};
+    const TokInfo& part = ti[(size_t)pp.participle];
+    const TokInfo& aux = ti[(size_t)pp.aux];
+    const uint32_t verbL = part.verbLemma != lex::kNoLemma ? part.verbLemma : part.lemma;
+    if (verbL == lex::kNoLemma) return {};
+    const std::string base = lexical(part, t).word;
+    const int person = aux.f.person ? aux.f.person : 3, number = aux.f.number == Pl ? 2 : 1;
+    const int tense = pp.auxTense;
+    std::string form;
+    if (t == Target::En) {
+      using detail::en::VForm;
+      const std::string ppart = detail::en::verb(base, VForm::PastPart);
+      if (pp.deponent) form = tense == Imperfect ? "had " + ppart : tense == Future ? "will have " + ppart
+                                                                                    : detail::en::verb(base, VForm::Past);
+      else form = tense == Imperfect ? "had been " + ppart : tense == Future ? "will have been " + ppart
+                                                                             : (number == 2 ? "were " : person == 2 ? "were " : "was ") + ppart;
+    } else {
+      using detail::es::VTense;
+      const std::string inf = detail::es::unreflexive(base);
+      const uint8_t g = part.f.gender ? part.f.gender : (uint8_t)M;
+      const std::string ppart = detail::es::verb(inf, VTense::PastPart, 3, 1);
+      if (pp.deponent) form = tense == Imperfect ? detail::es::verb("haber", VTense::Imperfect, person, number) + " " + ppart
+                            : tense == Future ? detail::es::verb("haber", VTense::Future, person, number) + " " + ppart
+                                              : detail::es::verb(inf, VTense::Preterite, person, number);
+      else {
+        const std::string agr = detail::es::adjective(ppart, g == F ? (uint8_t)F : (uint8_t)M, (uint8_t)number);
+        form = tense == Imperfect ? detail::es::verb("haber", VTense::Imperfect, person, number) + " sido " + agr
+             : tense == Future ? detail::es::verb("haber", VTense::Future, person, number) + " sido " + agr
+                               : detail::es::verb("ser", VTense::Preterite, person, number) + " " + agr;
+      }
+    }
+    const std::string words = s.tokens[(size_t)pp.participle].text + " " + s.tokens[(size_t)pp.aux].text;
+    const std::string head = morph::displayForm(lx.lemma(verbL).head, true);
+    std::string what;
+    if (t == Target::En) {
+      what = tense == Imperfect ? "pluperfect" : tense == Future ? "future perfect" : "perfect";
+      what = pp.deponent ? what + " of the deponent " + head : what + " passive of " + head;
+      return words + " = " + form + " (one verb: " + what + ")";
+    }
+    what = tense == Imperfect ? "pluscuamperfecto" : tense == Future ? "futuro perfecto" : "perfecto";
+    what = pp.deponent ? what + " del deponente " + head : what + " pasivo de " + head;
+    return words + " = " + form + " (un solo verbo: " + what + ")";
   }
 
   void sentence(std::string_view latin, Target t, SentenceOut& out, const std::vector<rules::GlossaryEntry>* glossary) {
@@ -523,6 +638,11 @@ struct Translator::Impl final : public detail::LexicalSource {
     out.text = t == Target::En ? detail::realiseEnglish(b, in, out.flags) : detail::realiseSpanish(b, in, out.flags);
     out.frame = b.frames.empty() ? std::string() : frame::describe(b.frames[0]);
     words(out.analysis, ti, b, t, out.words);
+    for (const Word& w : out.words)   // the periphrasis note also explains the reading ("Why this reading?")
+      if (!w.note.empty() && w.token >= 0) {
+        std::vector<std::string>& why = out.analysis.tokens[(size_t)w.token].why;
+        if (std::find(why.begin(), why.end(), w.note) == why.end()) why.push_back(w.note);
+      }
     // confidence: token confidences x frame fill x penalties
     double c = 1.0;
     size_t n = 0;
@@ -781,13 +901,14 @@ std::vector<rules::CueOutput> Translator::cues(const std::vector<rules::CueInput
                              std::to_string(w.confidence).substr(0, 5) + ",\"alternatives\":[";
           for (size_t k = 0; k < w.alternatives.size(); ++k)
             data += (k ? ",\"" : "\"") + jsonEscape(w.alternatives[k]) + "\"";
-          data += "],\"why\":[";
+          data += "],\"note\":\"" + jsonEscape(w.note) + "\",\"why\":[";
           const Token& tk = so.analysis.tokens[(size_t)w.token];
           for (size_t k = 0; k < tk.why.size(); ++k) data += (k ? ",\"" : "\"") + jsonEscape(tk.why[k]) + "\"";
           data += "]}";
           std::string txt = w.head.empty() ? w.text : w.head;
           if (!w.featureText.empty()) txt += " (" + w.featureText + ")";
           if (!w.gloss.empty()) txt += ": " + w.gloss + (w.glossPivot ? (t == Target::Es ? " (vía inglés)" : " (via English)") : "");
+          if (!w.note.empty()) txt += "; " + w.note;
           o.reasons.push_back(rules::Reason{ti, "analysis", txt, data});
           if (w.unknown) { unknown = true; unknownWords.push_back(w.text); }
           if (w.confidence < 0.6) { ambiguous = true; ambiguousWords.push_back(w.text); }
@@ -795,7 +916,14 @@ std::vector<rules::CueOutput> Translator::cues(const std::vector<rules::CueInput
           std::string g = w.gloss.empty() ? w.text : w.gloss;
           const size_t comma = g.find(',');
           if (comma != std::string::npos) g = g.substr(0, comma);
-          if (!wordByWord.empty()) wordByWord += ' ';
+          // a periphrasis: the verb form once, on the participle ("had been loved"); the form of sum adds nothing
+          if (!w.note.empty()) {
+            const size_t eq = w.note.find(" = "), par = w.note.find(" (", eq == std::string::npos ? 0 : eq);
+            const bool isAux = w.role == "verb" && w.lemma != lex::kNoLemma && std::string(impl_->lx.lemma(w.lemma).key) == "sum";
+            if (isAux) g.clear();
+            else if (eq != std::string::npos && par != std::string::npos) g = w.note.substr(eq + 3, par - eq - 3);
+          }
+          if (!g.empty() && !wordByWord.empty()) wordByWord += ' ';
           wordByWord += g;
         }
         sents.push_back(std::move(so));
