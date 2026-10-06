@@ -1,0 +1,43 @@
+# Frame-builder expectations (own sentences). Columns: sentence <TAB> expectations (space separated key=value).
+# Keys are checked on the first clause unit: kind pred tense aspect mod neg subj obj iobj sub wh exist passive obl;
+# "phrase" is the pattern of the first phrasebook unit, "units" the number of units. Unlisted keys are not checked.
+The boy reads a book.	kind=decl pred=read tense=present aspect=simple mod=none neg=0 subj=boy obj=book
+The girls are singing in the garden.	kind=decl pred=sing aspect=progressive subj=girl obl=in:garden
+My sister has found a small key.	kind=decl pred=find tense=present aspect=perfect subj=sister obj=key
+We will visit our grandmother tomorrow.	kind=decl pred=visit tense=future subj=we obj=grandmother obl=-:tomorrow
+Did you see the white horse?	kind=yn pred=see tense=past subj=you obj=horse
+Where does your brother live?	kind=wh pred=live wh=where:adverb subj=brother
+Who opened the window?	kind=wh pred=open tense=past wh=who:subject obj=window
+What are you eating?	kind=wh pred=eat aspect=progressive wh=what:object subj=you
+Close the door!	kind=imp pred=close obj=door neg=0
+Don't touch the flowers.	kind=imp pred=touch neg=1 obj=flower
+Please sit here.	units=2 phrase=please kind=imp pred=sit
+I can swim.	kind=decl pred=swim mod=can subj=i
+You must listen to the teacher.	kind=decl pred=listen mod=must obl=to:teacher
+She wants to buy a red apple.	kind=decl pred=buy mod=want subj=she obj=apple
+Let's go home.	kind=decl pred=go mod=let subj=we
+The cat is very hungry.	kind=decl pred=be subj=cat neg=0
+The house was old and dark.	kind=decl pred=be tense=past subj=house
+There is a dog in the kitchen.	kind=decl pred=be exist=1 subj=dog obl=in:kitchen
+Nobody saw the thief.	kind=decl pred=see tense=past subj=nobody obj=thief
+I never drink milk.	kind=decl pred=drink neg=1 subj=i obj=milk
+He does not like fish.	kind=decl pred=like neg=1 subj=he obj=fish
+The children played because the sun was shining.	kind=decl pred=play tense=past subj=child sub=cause:because
+When the teacher came, the pupils were quiet.	kind=decl pred=be tense=past subj=pupil sub=time:when
+If it rains, we will stay at home.	kind=decl pred=stay tense=future subj=we sub=condition:if
+I know that you are tired.	kind=decl pred=know subj=i sub=complement:that
+The man who lives here is a doctor.	kind=decl pred=be subj=man
+The book that I read was long.	kind=decl pred=be tense=past subj=book
+Give the letter to your mother.	kind=imp pred=give obj=letter obl=to:mother
+They walked to the river with their dog.	kind=decl pred=walk tense=past subj=they obl=to:river
+The soldiers fought with swords.	kind=decl pred=fight tense=past subj=soldier obl=with:sword
+How beautiful the night is!	kind=excl subj=night
+What a big house!	kind=excl subj=house
+Good morning, Anna.	units=2 phrase=good morning
+Thank you, my friend.	units=2 phrase=thank you
+The bread was eaten by the mice.	kind=decl pred=eat passive=1 subj=bread obl=by:mouse
+Mark and Julia are friends.	kind=decl pred=be subj=Mark
+I gave my brother two apples.	kind=decl pred=give tense=past subj=i obj=apple iobj=brother
+Are you happy?	kind=yn pred=be subj=you
+Why is the baby crying?	kind=wh pred=cry aspect=progressive wh=why:adverb subj=baby
+I don't know any songs.	kind=decl pred=know neg=1 subj=i obj=song

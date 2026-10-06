@@ -9,3 +9,13 @@ add_library(vp_rules STATIC ${VP_RULES_SRC})
 target_include_directories(vp_rules PUBLIC include PRIVATE src)
 target_link_libraries(vp_rules PUBLIC vp_lex vp_core)
 target_compile_features(vp_rules PUBLIC cxx_std_17)
+
+# C2 (source side and engine assembly): frame builder, transfer, cue assembly, makeEngine(). Links vp_nlp and vp_subs.
+file(GLOB VP_RULES_C2_SRC CONFIGURE_DEPENDS
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/frame/*.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/transfer/*.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/cue/*.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/*.cpp)
+target_sources(vp_rules PRIVATE ${VP_RULES_C2_SRC})
+target_link_libraries(vp_rules PUBLIC vp_nlp vp_subs)
+

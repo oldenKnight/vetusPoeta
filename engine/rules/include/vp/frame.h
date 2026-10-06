@@ -1,0 +1,257 @@
+// Source analysis for the rule engine (DESIGN.md §10.1): cue -> sentence mapping, tokenisation with the contraction
+// table, tagging + parsing through vp::nlp, lemmatisation through the English/Spanish lexicon, the phrasebook
+// pre-pass and the dependency-to-frame mapping. Output: one SemSentence per source sentence, made of units (fixed
+// phrasebook pieces and clause frames) in source order. Language neutral from here on: English and Spanish fill the
+// same structures. Deterministic; nothing here throws across the module boundary (callers catch at the engine).
+#pragma once
+#include <cstdint>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include "vp/curated.h"
+#include "vp/lex.h"
+#include "vp/nlp.h"
+
+namespace vp::frame {
+
+enum class SrcLang : uint8_t { En, Es };
+
+// ---- cue -> sentence mapping (§10.1 item 1) -------------------------------------------------------------------------
+enum class CueKind : uint8_t { Speech, Song, Nonverbal, Empty };
+
+// One part of a sentence that comes from one cue: [start, end) are byte offsets in SourceSentence::text.
+struct CuePart { size_t cue = 0; int start = 0, end = 0; };
+
+struct SourceSentence {
+  std::string text;              // the sentence (speech: joined across cues with one space; song: text between ♪)
+  CueKind kind = CueKind::Speech;
+  std::vector<CuePart> parts;    // in order; more than one when the sentence spans cues (split points = parts[i].start)
+  bool dash = false;             // started with a speaker dash ("- ")
+  std::string prefix, suffix;    // song: the ♪ marks around the text; nonverbal: the brackets ("[", "]")
+};
+
+// Classifies cues and joins them into sentences: a speech cue that ends without terminal punctuation continues into
+// the next speech cue (unless that one starts with a speaker dash); speaker dashes start new sentences; cues with ♪
+// are songs; text entirely in [...] or (...) is nonverbal (bracket groups inside a speech cue become nonverbal
+// sentences of their own). Abbreviations (Mr. Mrs. Dr. St. Sr. Sra.) do not end a sentence.
+std::vector<SourceSentence> mapSentences(const std::vector<std::string>& cueTexts);
+// True when the text ends a sentence (. ! ? … possibly followed by closing quotes/brackets).
+bool endsSentence(std::string_view text);
+
+// ---- semantic frame (§10.1 item 5) ---------------------------------------------------------------------------------
+enum class Kind : uint8_t { Decl, Yn, Wh, Imp, Excl, Frag, Nonverbal, Song };
+enum class Tense : uint8_t { Present, Past, Future };
+enum class Aspect : uint8_t { Simple, Progressive, Perfect };
+enum class Modality : uint8_t { None, Can, Must, May, Want, Should, Will, Let };
+enum class Voice : uint8_t { Active, Passive };
+enum class SrcMood : uint8_t { Indicative, Subjunctive, Conditional };
+enum class Relation : uint8_t { Cause, Time, Condition, Purpose, Concession, Relative, Complement, Result, Manner, Coord };
+enum class Role : uint8_t { None, Subject, Object, IndirectObject, Oblique, Predicate, Adverb, Determiner };
+
+struct SemPronoun {
+  uint8_t person = 0;            // 1..3
+  uint8_t number = 0;            // 1 singular, 2 plural, 0 unknown ("you")
+  uint8_t gender = 0;            // vp::feat::Gender (M, F, N), 0 unknown
+  bool reflexive = false;        // myself, se
+  bool emphatic = false;         // "I myself", "you too"
+};
+
+struct SemAdj {
+  std::string lemma;             // source lemma ("small")
+  int token = -1;
+  std::vector<std::string> adverbs;   // "very", "too"
+  std::vector<int> advTokens;
+  uint8_t degree = 0;            // vp::feat::Degree (0 positive)
+};
+
+struct SemFrame;
+
+struct SemNP {
+  std::string head;              // source lemma; names keep the written form ("Alice")
+  std::string surface;           // the head as written
+  int token = -1;                // head token (index into SemSentence::tokens), -1 for none
+  uint8_t number = 1;            // 1 sg, 2 pl
+  bool definite = false;
+  std::string determiner;        // lower-case source determiner: the a this that these those some any no every all ...
+  std::vector<SemNP> possessor;  // 0 or 1 ("my" -> pronoun NP; "the queen's" -> NP)
+  std::vector<SemAdj> adjectives;
+  std::string numeral;           // "two", "6"
+  int numeralValue = 0;          // 0 unknown
+  bool ordinal = false;          // numeral is an ordinal ("six o'clock" -> sexta)
+  std::vector<SemNP> genitive;   // "of" attributes
+  std::vector<SemFrame> relative;   // 0 or 1 relative clause
+  bool isName = false;
+  bool title = false;            // capitalised common noun used as a title ("Queen of Hearts")
+  bool isPronoun = false;
+  SemPronoun pron;
+  std::string pronLemma;         // closed-class pronoun as written (lower): "everyone", "this", "nobody", "one"
+  std::vector<SemNP> coord;      // further conjuncts
+  std::string coordConj;         // "and", "or"
+  bool negative = false;         // nobody, nothing, "no X"
+  bool interrogative = false;    // who, what, "which way", "how many"
+  std::string wh;                // the wh word when interrogative
+  bool literalUnknown = false;   // could not be analysed (kept verbatim)
+  uint8_t srcGender = 0;         // grammatical gender of the source noun (Spanish), vp::feat::Gender M/F, 0 unknown
+  std::vector<int> tokens;       // all tokens of the NP
+};
+
+struct SemOblique { std::string prep; SemNP np; int token = -1; bool front = false; };
+
+struct SemPredicate {
+  std::string lemma;             // main verb lemma ("be" for copula clauses)
+  std::string particle;          // phrasal particle ("away", "back", "off", "up")
+  std::string prepVerb;          // preposition that turns its object into the verb's object ("wait for", "look at")
+  int token = -1;
+  Tense tense = Tense::Present;
+  Aspect aspect = Aspect::Simple;
+  Modality modality = Modality::None;
+  Voice voice = Voice::Active;
+  SrcMood mood = SrcMood::Indicative;
+  bool habitual = false;         // "used to"
+  bool pastModal = false;        // could / was able to
+  bool deliberative = false;     // "what shall I do?"
+  bool ellipsis = false;         // "This one does." / "This one can.": the verb is the previous clause's
+  bool impersonal = false;       // expletive "it" subject ("it doesn't matter", "it is raining")
+  std::string complementVerb;    // xcomp verb with the modal or catenative verb ("want to go": lemma=want, complement=go)
+  int complementToken = -1;
+  std::vector<int> auxTokens;
+};
+
+struct SemAdverb { std::string lemma; int token = -1; bool front = false; };
+
+struct SemSub;
+struct SemWh { std::string word; Role role = Role::None; int token = -1; };
+
+struct SemFrame {
+  Kind type = Kind::Decl;
+  bool negative = false;
+  bool expectYes = false;        // "don't you ...?", tag questions
+  bool hasPred = false;
+  SemPredicate pred;
+  bool hasSubject = false, hasObject = false, hasIndirect = false;
+  SemNP subject, object, indirectObject;
+  std::vector<SemOblique> obliques;
+  bool copula = false, existential = false;
+  std::vector<SemNP> predicative;     // copula + noun
+  std::vector<SemAdj> predAdj;        // copula + adjective(s)
+  std::vector<SemNP> vocatives;
+  std::vector<std::string> interjections;
+  std::vector<SemAdverb> adverbs;
+  std::vector<std::string> discourse;     // well, oh, now (discourse markers)
+  std::vector<std::string> connectors;    // clause-initial and / but / so / then / or
+  std::vector<SemSub> subordinate;
+  SemWh wh;
+  bool exclQuam = false;                  // "what a ...!", "how ...!"
+  bool imperativePlural = false;          // addressee count > 1 ("everyone", "you all")
+  std::string punct;                      // final punctuation of the clause in the source ("." "?" "!")
+  std::vector<int> tokens;                // every token of the clause
+  bool implicitSubject = false;           // pro-drop subject taken from the verb (Spanish) or the imperative
+};
+
+struct SemSub { Relation relation = Relation::Cause; std::string marker; bool before = false; std::vector<SemFrame> frame; };
+
+// ---- phrasebook (§10.1 item 4) -------------------------------------------------------------------------------------
+enum class SlotKind : uint8_t { NP, Name, VP, Adj, Num };
+struct PhraseSlot {
+  SlotKind kind = SlotKind::NP;
+  int first = 0, last = 0;       // token range [first, last]
+  SemNP np;                      // NP / NAME / NUM slots
+  std::vector<SemFrame> vp;      // VP slot: the clause frame (no subject)
+  SemAdj adj;                    // ADJ slot
+};
+struct PhraseMatch {
+  int entry = -1;                // index into CuratedData::phrasebook()
+  int first = 0, last = 0;       // token range [first, last]
+  std::string pattern, latin, reg, note;
+  uint8_t tier = 0;
+  std::vector<PhraseSlot> slots; // in slot-number order ({1}, {2} ...)
+};
+
+// One compiled phrasebook (patterns with contractions expanded, alternatives and optional groups).
+class Phrasebook {
+ public:
+  void build(const std::vector<curated::PhraseEntry>& entries, const std::vector<curated::PairEntry>& contractions);
+  // Longest match starting at token `from` (patterns are matched against each token's lower form and lemma);
+  // slots are filled with token ranges only. Ties: the earlier table row wins.
+  bool match(const std::vector<nlp::Token>& toks, int from, PhraseMatch& out) const;
+  size_t size() const { return pats_.size(); }
+
+ private:
+  struct Elem { std::vector<std::string> words; bool optional = false; int slot = -1; SlotKind kind = SlotKind::NP; };
+  struct Pattern { std::vector<Elem> elems; int entry = -1; };
+  bool matchFrom(const std::vector<nlp::Token>& toks, const Pattern& p, size_t ei, int at,
+                 std::vector<PhraseSlot>& slots, int& end) const;
+  std::vector<Pattern> pats_;
+};
+
+// ---- sentence analysis result ----------------------------------------------------------------------------------------
+struct Unit {
+  enum Type : uint8_t { Clause, Phrase } type = Clause;
+  SemFrame frame;                // Clause
+  PhraseMatch phrase;            // Phrase
+  int first = 0, last = -1;      // token range covered (inclusive)
+  bool vocative = false;         // Clause holding a bare NP addressed to someone ("..., child?")
+  std::string sepAfter;          // source punctuation between this unit and the next ("," ";" ":" or "")
+};
+
+// Why a source token does not need a Latin counterpart (A7 bookkeeping).
+enum class Drop : uint8_t { No, Punct, Article, Aux, Marker, Particle, Phrase, Discourse, Copula, Other };
+
+struct SemSentence {
+  SrcLang lang = SrcLang::En;
+  std::string text;                     // the sentence as given
+  std::vector<nlp::Token> tokens;       // expanded tokens; start/end are offsets into `text`
+  std::vector<Drop> drop;               // per token
+  std::vector<Unit> units;
+  std::string finalPunct;               // ".", "?", "!", "...", "" (from the source)
+  bool question = false;
+  void clear() { text.clear(); tokens.clear(); drop.clear(); units.clear(); finalPunct.clear(); question = false; }
+};
+
+// ---- frame builder -----------------------------------------------------------------------------------------------------
+class FrameBuilder {
+ public:
+  // `pipeline` may be null (then every sentence becomes one fragment of unknown words); `srcLex` may be null (the nlp
+  // rule lemmatiser is used); `cd` gives the contraction table and the phrasebook.
+  FrameBuilder(SrcLang lang, const nlp::Pipeline* pipeline, const lex::Lexicon* srcLex, const curated::CuratedData& cd);
+
+  // Full analysis of one sentence.
+  void analyse(std::string_view sentence, SemSentence& out) const;
+
+  // Pieces (exposed for tests).
+  // Tokenise + contraction expansion; every expanded token keeps the byte range of the original word.
+  void tokenize(std::string_view sentence, std::vector<nlp::Token>& out) const;
+  // Lexicon lemma of an analysed token (upos + feats set); falls back to vp::nlp::ruleLemma.
+  std::string lemmaOf(const nlp::Token& t) const;
+  const Phrasebook& phrasebook() const { return book_; }
+  SrcLang lang() const { return lang_; }
+
+ private:
+  struct Ctx;
+  void buildUnits(SemSentence& s) const;
+  void buildClause(Ctx& c, int head, SemFrame& f) const;
+  void buildNP(Ctx& c, int head, SemNP& np) const;
+  void fillSlot(Ctx& c, PhraseSlot& slot) const;
+
+  SrcLang lang_;
+  const nlp::Pipeline* nlp_;
+  const lex::Lexicon* lex_;
+  const curated::CuratedData& cd_;
+  Phrasebook book_;
+  std::vector<std::pair<std::string, std::vector<std::string>>> contractions_;   // sorted by form
+};
+
+// Small helpers shared with transfer and tests.
+const char* kindName(Kind k);
+const char* tenseName(Tense t);
+const char* aspectName(Aspect a);
+const char* modalityName(Modality m);
+const char* relationName(Relation r);
+const char* roleName(Role r);
+// One-line description of a frame for tests and debug output:
+// "decl pred=know tense=present aspect=simple mod=none neg subj=I(pron1) obj=song sub=cause:..."
+std::string describe(const SemFrame& f);
+std::string describe(const SemSentence& s);
+
+}  // namespace vp::frame
