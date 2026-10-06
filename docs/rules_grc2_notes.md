@@ -99,3 +99,12 @@ Additive only: `curated::CuratedData::replacePhrasebooks(en, es)` (a copy with t
 builder). New public headers `vp/transfer_grc.h` (GreekTables, GreekTransfer, toMonotonic, capitaliseGreek,
 greekBreakHints) and `vp/grc2x.h` (Translator, splitSentences). Internal `src/engine_grc/engine_grc.h` (GreekPath).
 Wish for the CLI: call `vp::grc::toMonotonic` on Greek cue text when exporting with greek:"monotonic".
+
+
+## Decisions by the main agent (2026-10-06) on C12's questions
+1. A9 for Greek output uses the Greek -> English path (grc2x) exactly as la2x serves Latin (task C16).
+2. The monotonic export's monosyllable rule (accent dropped on one-syllable words except ἤ and the question words)
+   is accepted: it is the standard modern convention.
+3. δήπου for "of course" + clause stays, tier 2.
+4. The Spanish personal "a" before specific animals is kept ("¿Viste al gato?").
+Gold: "οὐδέποτε ἔπαισα" and "ἔστιν οὐδὲν ποτόν" accepted as alternatives in the Greek gold.
