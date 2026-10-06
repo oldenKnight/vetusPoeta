@@ -1,0 +1,103 @@
+# beta code	expected Unicode (hand-written from the Beta Code rules; NFC)	note
+a	α	letter
+b	β	letter
+g	γ	letter
+d	δ	letter
+e	ε	letter
+z	ζ	letter
+h	η	letter
+q	θ	letter
+i	ι	letter
+k	κ	letter
+l	λ	letter
+m	μ	letter
+n	ν	letter
+c	ξ	letter
+o	ο	letter
+p	π	letter
+r	ρ	letter
+t	τ	letter
+u	υ	letter
+f	φ	letter
+x	χ	letter
+y	ψ	letter
+w	ω	letter
+v	ϝ	digamma
+s	ς	lone sigma is word-final
+sa	σα	medial sigma
+*a	Α	capital
+*b	Β	capital
+*g	Γ	capital
+*q	Θ	capital
+*s	Σ	capital sigma never final
+*w	Ω	capital
+a)	ἀ	smooth
+a(	ἁ	rough
+a/	ά	acute
+a\	ὰ	grave
+a=	ᾶ	circumflex
+a|	ᾳ	iota subscript
+i+	ϊ	diaeresis
+u+	ϋ	diaeresis
+a)/	ἄ	smooth acute
+a(/	ἅ	rough acute
+a)\	ἂ	smooth grave
+a(\	ἃ	rough grave
+a)=	ἆ	smooth circumflex
+a(=	ἇ	rough circumflex
+a)/|	ᾄ	smooth acute iota
+a(=|	ᾇ	rough circumflex iota
+h=|	ῇ	circumflex iota
+w/|	ῴ	acute iota
+w(=|	ᾧ	rough circumflex iota
+i+/	ΐ	diaeresis acute
+u+/	ΰ	diaeresis acute
+i+\	ῒ	diaeresis grave
+e)	ἐ	smooth epsilon
+o(	ὁ	rough omicron
+u(	ὑ	rough upsilon
+r(	ῥ	rough rho
+*)a	Ἀ	capital smooth (marks first)
+*(a	Ἁ	capital rough
+*)/a	Ἄ	capital smooth acute
+*(/a	Ἅ	capital rough acute
+*)=a	Ἆ	capital smooth circumflex
+*(e	Ἑ	capital epsilon rough
+*(rw/mh	Ῥώμη	Rome
+*a)/	Ἄ	capital with marks after the letter
+s1	σ	explicit medial sigma
+s2	ς	explicit final sigma
+s3	ϲ	lunate sigma
+qeo/s1	θεόσ	explicit medial at the end
+a_	ᾱ	macron
+a^	ᾰ	breve
+i_	ῑ	macron iota
+lo/gos	λόγος	word with final sigma
+a)/nqrwpos	ἄνθρωπος	anthropos
+po/lis	πόλις	polis
+kalo/s	καλός	kalos
+me/gas	μέγας	megas
+kai/	καί	kai
+ou)	οὐ	ou
+ou)k	οὐκ	ouk
+ei)mi/	εἰμί	eimi
+le/gw	λέγω	lego
+e)/xw	ἔχω	echo
+qeo/s	θεός	theos
+yuxh/	ψυχή	psyche
+tw=|	τῷ	dative article
+th=s	τῆς	genitive article
+h(me/ra	ἡμέρα	hemera
+w)=	ὦ	vocative particle
+pro\s	πρὸς	grave on final syllable
+*swkra/ths	Σωκράτης	capital then final sigma
+o(do/s	ὁδός	rough breathing then final sigma
+a)i+/w	ἀΐω	smooth then diaeresis acute
+pai=s	παῖς	circumflex and final sigma
+lo/gos kai\ qeo/s	λόγος καὶ θεός	several words, finals
+lo/gos, kai/	λόγος, καί	final sigma before a comma
+e)sti/:	ἐστί·	ano teleia
+a)ll'	ἀλλ’	elision
+ti/s;	τίς;	question mark
+A)/NQRWPOS	ἄνθρωπος	upper-case ASCII read as lower-case
+dh=mos-	δῆμος-	final sigma before a hyphen

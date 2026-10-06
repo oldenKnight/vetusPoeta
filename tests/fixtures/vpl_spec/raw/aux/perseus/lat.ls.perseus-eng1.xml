@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE TEI.2 PUBLIC "-//TEI P4//DTD Main DTD Driver File//EN" "http://www.tei-c.org/Vault/P4/xml/schema/dtd/tei2.dtd" [
+<!ENTITY % PersDict PUBLIC "-//Perseus P4//DTD Perseus Dictionaries//EN" "http://www.perseus.tufts.edu/DTD/1.0/PersDict.dtd">
+%PersDict;
+]>
+<TEI.2><text><body><div0>
+<entryFree id="t1" type="main" key="aqua"><orth extent="full" lang="la">ăqua</orth>, <itype>ae</itype>, <gen>f.</gen> <sense id="t1.0" n="I" level="1"><hi rend="ital">water</hi>: <trans><tr>rain-water</tr></trans></sense></entryFree>
+<entryFree id="t2" type="main" key="amo1"><orth extent="full" lang="la">ămo</orth>, <itype>āvi, ātum, 1</itype>, <pos>v. a.</pos> <sense id="t2.0" n="I" level="1"><hi rend="ital">to love</hi> <usg type="style">poet.</usg> <trans><tr>love each other</tr></trans></sense></entryFree>
+<entryFree id="t3" type="main" key="Zzyzx"><orth extent="full" lang="la">Zzyzx</orth>, <itype>i</itype>, <gen>m.</gen> <sense id="t3.0" n="I" level="1"><hi rend="ital">a word made up for a test</hi></sense></entryFree>
+</div0></body></text></TEI.2>

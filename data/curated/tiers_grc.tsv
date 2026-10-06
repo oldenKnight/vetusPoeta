@@ -1,0 +1,23 @@
+# key	head	pos	tier	source	note
+# Greek tier 1 seed (placeholder until the teacher's Athenaze list): 20 obvious core words written by the
+# project. key = greek_key(head) (DESIGN 4). DCC Greek core words shared with Modern Greek are added by the build.
+εἰμί	εἰμί	verb	1	derived	
+λέγω	λέγω	verb	1	derived	
+ἔχω	ἔχω	verb	1	derived	
+ἄνθρωποσ	ἄνθρωπος	noun	1	derived	
+πόλισ	πόλις	noun	1	derived	
+καλόσ	καλός	adj	1	derived	
+μέγασ	μέγας	adj	1	derived	
+καί	καί	conj	1	derived	
+οὐ	οὐ	particle	1	derived	
+θεόσ	θεός	noun	1	derived	
+λόγοσ	λόγος	noun	1	derived	
+ποιέω	ποιέω	verb	1	derived	
+ὁράω	ὁράω	verb	1	derived	
+γυνή	γυνή	noun	1	derived	
+ἀνήρ	ἀνήρ	noun	1	derived	
+οἶκοσ	οἶκος	noun	1	derived	
+ὕδωρ	ὕδωρ	noun	1	derived	
+ἀγαθόσ	ἀγαθός	adj	1	derived	
+δέ	δέ	particle	1	derived	
+ἐν	ἐν	prep	1	derived	

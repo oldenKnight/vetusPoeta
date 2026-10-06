@@ -21,9 +21,17 @@ sys.path.insert(0, HERE)
 
 from common import LANGS, RAW_FILES, file_info, log, peak_rss_mb, read_json, write_json  # noqa: E402
 
-STAGES = ("kaikki", "resolve")
+STAGES = ("kaikki", "resolve", "import_aux", "gloss", "tiers", "pack")
 STAGE_CODE = {"kaikki": ("kaikki.py", "common.py", "vptext.py", "tagmap.py", "features.py"),
-              "resolve": ("resolve.py", "common.py", "vptext.py", "tagmap.py", "features.py")}
+              "resolve": ("resolve.py", "common.py", "vptext.py", "tagmap.py", "features.py"),
+              "import_aux": ("import_aux.py", "betacode.py", "lexdata.py", "common.py", "vptext.py"),
+              "gloss": ("gloss.py", "tiers.py", "lexdata.py", "common.py", "vptext.py", "tagmap.py",
+                        "stopwords_en.txt", "stopwords_es.txt"),
+              "tiers": ("tiers.py", "lexdata.py", "common.py", "vptext.py"),
+              "pack": ("pack.py", "resolve.py", "lexdata.py", "common.py", "vptext.py", "tagmap.py", "features.py")}
+# stages that exist only for some languages
+STAGE_LANGS = {"import_aux": ("la", "grc"), "gloss": ("la", "grc"), "tiers": ("la", "grc")}
+CURATED = os.path.normpath(os.path.join(HERE, "..", "..", "data", "curated"))
 KAIKKI_OUTPUTS = {"la": [], "grc": [], "en": ["translations_la.tsv", "translations_grc.tsv", "translations_es.tsv"],
                   "es": ["latin_glosses.tsv", "translations_la.tsv", "translations_grc.tsv"]}
 BASE_OUTPUTS = ["lemmas.jsonl", "table_forms.tsv", "formpages.tsv"]
@@ -37,7 +45,14 @@ CHECKED = {"kaikki": ("entries", "lemma_records", "lemmas_with_table", "form_pag
                       "es_entries_la", "es_entries_grc", "es_translations_la", "es_translations_grc", "el_desc",
                       "el_same"),
            "resolve": ("lemmas", "analyses", "distinct_keys", "formpage_rows", "unresolved_rows",
-                       "unresolved_pages", "lemma_self_analyses")}
+                       "unresolved_pages", "lemma_self_analyses"),
+           "import_aux": ("whitaker_entries", "whitaker_joined", "whitaker_inflects", "ls_entries", "ls_joined",
+                          "lsj_entries", "lsj_joined_exact", "dcc_la_joined", "dcc_la_es_joined", "dcc_grc_joined"),
+           "gloss": ("gloss_en_covered", "gloss_es_covered", "gloss_es_pivot", "gloss_es_eswikt", "gloss_es_dcc",
+                     "gloss_es_curated", "senses", "revx_en_keywords", "revx_en_candidates", "revx_es_keywords",
+                     "revx_es_candidates", "pivot_rows_joined"),
+           "tiers": ("tier1", "tier2", "tier3", "tier0", "emoji_matched", "freq_rank_whitaker", "shared_el"),
+           "pack": ("lemmas", "analyses", "senses", "candidates", "genx_cells", "size")}
 MIN_EXPECTED = 100
 
 
@@ -49,16 +64,61 @@ def code_hash(stage):
     return h.hexdigest()
 
 
+def stage_applies(stage, lang):
+    return lang in STAGE_LANGS.get(stage, LANGS)
+
+
+def _work(out, lang, names):
+    return [os.path.join(out, lang, n) for n in names]
+
+
+def _curated(names):
+    return [os.path.join(CURATED, n) for n in names if os.path.exists(os.path.join(CURATED, n))]
+
+
 def stage_inputs(stage, lang, raw, out):
     if stage == "kaikki":
         return [os.path.join(raw, RAW_FILES[lang])]
-    return [os.path.join(out, lang, n) for n in BASE_OUTPUTS]
+    if stage == "resolve":
+        return [os.path.join(out, lang, n) for n in BASE_OUTPUTS]
+    import import_aux
+    import gloss
+    if stage == "import_aux":
+        return import_aux.inputs(lang, os.path.join(raw, "aux")) + _work(out, lang, ["lemmas.jsonl", "formpages.tsv"])
+    if stage == "gloss":
+        names = ["lemmas.jsonl"] + import_aux.outputs(lang)
+        extra = [os.path.join(out, "en", "translations_%s.tsv" % lang), os.path.join(out, "en", "translations_es.tsv"),
+                 os.path.join(out, "es", "translations_%s.tsv" % lang), os.path.join(out, "es", "latin_glosses.tsv"),
+                 os.path.join(out, "en", "analyses.tsv"), os.path.join(out, "es", "analyses.tsv")]
+        cur = ["tiers_%s.tsv" % lang, "gloss_es_%s.tsv" % lang, "valency_%s.tsv" % lang]
+        return _work(out, lang, names) + extra + _curated(cur)
+    if stage == "tiers":
+        names = ["lemmas.jsonl", "gloss.tsv"] + [n for n in import_aux.outputs(lang) if not n.startswith("ls")]
+        return _work(out, lang, names) + _curated(["tiers_%s.tsv" % lang, "emoji_%s.tsv" % lang])
+    if stage == "pack":
+        names = ["lemmas.jsonl", "analyses.tsv"]
+        if lang in ("la", "grc"):
+            names += ["table_forms.tsv", "tiers.tsv"] + gloss.outputs(lang)
+        return _work(out, lang, names)
+    raise ValueError(stage)
 
 
 def stage_outputs(stage, lang):
     if stage == "kaikki":
         return BASE_OUTPUTS + KAIKKI_OUTPUTS[lang]
-    return RESOLVE_OUTPUTS
+    if stage == "resolve":
+        return RESOLVE_OUTPUTS
+    import importlib
+    if stage == "pack":
+        import pack
+        return [os.path.join("..", pack.FILE_NAMES[lang])]
+    return importlib.import_module(stage).outputs(lang)
+
+
+def input_name(p):
+    """Key of an input in the stage meta: the basename for the A4 stages (unchanged), parent/basename otherwise."""
+    parent = os.path.basename(os.path.dirname(p))
+    return os.path.basename(p) if parent in LANGS or parent in ("raw",) else parent + "/" + os.path.basename(p)
 
 
 def up_to_date(meta, stage, lang, inputs, out):
@@ -68,7 +128,7 @@ def up_to_date(meta, stage, lang, inputs, out):
     for p in inputs:
         if not os.path.exists(p):
             return False
-        old = old_in.get(os.path.basename(p))
+        old = old_in.get(input_name(p))
         if not old or file_info(p, old)["sha256"] != old.get("sha256"):
             return False
     for name, info in meta.get("outputs", {}).items():
@@ -86,19 +146,22 @@ def run_stage(stage, lang, raw, out, force):
     inputs = stage_inputs(stage, lang, raw, out)
     for p in inputs:
         if not os.path.exists(p):
-            raise SystemExit("missing input for %s/%s: %s" % (lang, stage, p))
+            hint = " (run tools/build_library/fetch.sh aux)" if stage == "import_aux" else ""
+            raise SystemExit("missing input for %s/%s: %s%s" % (lang, stage, p, hint))
     if not force and up_to_date(meta, stage, lang, inputs, out):
         log("[%s %s] inputs unchanged, skipped (use --force to rerun)" % (lang, stage))
         return meta
     old_in = (meta or {}).get("inputs", {})
-    in_info = {os.path.basename(p): file_info(p, old_in.get(os.path.basename(p))) for p in inputs}
+    in_info = {input_name(p): file_info(p, old_in.get(input_name(p))) for p in inputs}
     t0 = time.time()
     if stage == "kaikki":
         import kaikki
         res = kaikki.run(lang, raw, out)
-    else:
+    elif stage == "resolve":
         import resolve
         res = resolve.run(lang, out)
+    else:
+        res = run_isolated(stage, lang, raw, out)
     outputs = {}
     for name in stage_outputs(stage, lang):
         p = os.path.join(d, name)
@@ -106,9 +169,39 @@ def run_stage(stage, lang, raw, out, force):
             outputs[name] = {"size": os.path.getsize(p)}
     meta = dict(res)
     meta.update({"stage": stage, "lang": lang, "inputs": in_info, "code": code_hash(stage), "outputs": outputs,
-                 "wall_s": round(time.time() - t0, 1), "peak_rss_mb": peak_rss_mb()})
+                 "wall_s": round(time.time() - t0, 1),
+                 "peak_rss_mb": res.get("peak_rss_mb") if stage not in ("kaikki", "resolve") else peak_rss_mb()})
     write_json(meta_path, meta)
     return meta
+
+
+ISOLATED = """import json, os, sys
+sys.path.insert(0, %r)
+stage, lang, raw, out, dest = sys.argv[1:6]
+import importlib
+m = importlib.import_module(stage)
+if stage == "import_aux":
+    res = m.run(lang, os.path.join(raw, "aux"), out)
+elif stage == "pack":
+    res = m.run(lang, out, raw)
+else:
+    res = m.run(lang, out)
+with open(dest, "w", encoding="utf-8") as f:
+    json.dump(res, f)
+"""
+
+
+def run_isolated(stage, lang, raw, out):
+    """Run a B4 stage in a fresh interpreter so its peak RSS is its own (ru_maxrss of the child)."""
+    import subprocess
+    import tempfile
+    fd, dest = tempfile.mkstemp(prefix="stage-", suffix=".json", dir=os.path.join(out, lang))
+    os.close(fd)
+    try:
+        subprocess.run([sys.executable, "-c", ISOLATED % HERE, stage, lang, raw, out, dest], check=True)
+        return read_json(dest)
+    finally:
+        os.unlink(dest)
 
 
 def dump_date(raw):
@@ -141,6 +234,32 @@ def lang_report(out, lang):
                     "lossy_tags": r.get("tags", {}).get("lossy", {}), "resolve_counts": rc})
         rep["time_s"]["resolve"] = r.get("wall_s")
         rep["peak_rss_mb"]["resolve"] = r.get("peak_rss_mb")
+    for stage in ("import_aux", "gloss", "tiers", "pack"):
+        m = read_json(os.path.join(out, lang, stage + ".json"))
+        if not m:
+            continue
+        rep["time_s"][stage] = m.get("wall_s")
+        rep["peak_rss_mb"][stage] = m.get("peak_rss_mb")
+        mc = m.get("counts", {})
+        if stage == "import_aux":
+            rep["join_rates"] = {k: v for k, v in sorted(m.get("join", {}).items()) if not isinstance(v, dict)}
+            rep["whitaker_letters"] = {k: v for k, v in m.get("join", {}).items() if isinstance(v, dict)}
+            rep["import_aux_counts"] = mc
+        elif stage == "gloss":
+            rep["gloss_en"] = {k[9:]: v for k, v in sorted(mc.items()) if k.startswith("gloss_en_")}
+            rep["gloss_es"] = {k[9:]: v for k, v in sorted(mc.items()) if k.startswith("gloss_es_")}
+            rep["revx"] = {k: mc.get(k, 0) for k in ("revx_en_keywords", "revx_en_candidates", "revx_es_keywords",
+                                                     "revx_es_candidates")}
+            rep["gloss_counts"] = mc
+        elif stage == "tiers":
+            rep["tiers"] = {k: mc.get(k, 0) for k in ("tier1", "tier2", "tier3", "tier0")}
+            rep["emoji"] = {"matched": mc.get("emoji_matched", 0), "unmatched": mc.get("emoji_unmatched", 0),
+                            "unmatched_keys": m.get("emoji_unmatched", [])}
+            rep["tiers_counts"] = mc
+            rep["curated_tier_unmatched"] = m.get("curated_unmatched", [])
+        else:
+            rep["vpl"] = {"file": m.get("file"), "size": m.get("size"), "sha256": m.get("sha256"),
+                          "sections": m.get("sections"), "counts": mc}
     rep["time_s"]["total"] = round(sum(v for v in rep["time_s"].values() if v), 1)
     tv = parse_time_v(os.path.join(out, lang, "time-v.txt"))
     if tv:
@@ -246,7 +365,7 @@ def main(argv=None):
     t0 = time.time()
     for lang in langs:
         for s in STAGES:
-            if s in stages:
+            if s in stages and stage_applies(s, lang):
                 run_stage(s, lang, a.raw, a.out, a.force)
     if stages or a.report or a.write_expected:
         full = write_reports(a.out, a.raw)
