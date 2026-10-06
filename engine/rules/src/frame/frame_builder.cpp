@@ -646,11 +646,16 @@ std::string FrameBuilder::lemmaOf(const Token& t) const {
   if (an.empty() && lang_ == SrcLang::Es) lex_->lookup(text::es_bare(t.lower), an);
   if (an.empty()) return rule;
   // C15: the rule lemmatiser may cut a word to a non-word ("sting" -> "st"); the lexicon knows the form itself
-  bool ruleKnown = rule == t.lower;
-  if (!ruleKnown && lang_ == SrcLang::En) {
+  bool ruleKnown = rule == t.lower || lang_ != SrcLang::En;
+  if (!ruleKnown) {   // the rule lemma must be a lemma of the tagged part of speech ("st" is an abbreviation)
     std::vector<lex::Analysis> ra;
     lex_->lookup(text::en_key(rule), ra);
-    ruleKnown = !ra.empty();
+    const uint8_t want = t.upos == "VERB" || t.upos == "AUX" ? feat::Verb : t.upos == "NOUN" ? feat::Noun
+                       : t.upos == "ADJ" ? feat::Adj : 0;
+    for (const lex::Analysis& a : ra) {
+      const lex::Lemma l = lex_->lemma(a.lemma);
+      if (text::lower(l.head) == rule && (!want || l.pos == want)) ruleKnown = true;
+    }
   }
   auto posOk = [&](uint8_t pos) {
     if (t.upos == "NOUN") return pos == feat::Noun;
@@ -714,6 +719,11 @@ std::string FrameBuilder::lemmaOf(const Token& t) const {
     if (agree(a) < bestAgree) continue;
     std::string h = text::lower(l.head);
     if (h.find(' ') != std::string::npos) continue;
+    {   // C15: abbreviations ("ST", "STing") are never the lemma of an ordinary word
+      bool caps = l.head.size() > 1;
+      for (size_t q = 0; q < 2 && q < l.head.size(); ++q) caps = caps && l.head[q] >= 'A' && l.head[q] <= 'Z';
+      if (caps && t.text.size() > 1 && !(t.text[1] >= 'A' && t.text[1] <= 'Z')) continue;
+    }
     const std::string hk = lang_ == SrcLang::En ? text::en_key(h) : text::es_key(h);
     if (hk == key) { if (same.empty()) same = h; if (h == same) sameFeats.push_back(a.feat); }
     else { if (other.empty()) other = h; if (h == other) otherFeats.push_back(a.feat); }
@@ -825,7 +835,7 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
       if (in(w, {"everyone", "everybody", "everything", "someone", "somebody", "something", "anyone", "anybody",
                  "anything", "nobody", "nothing", "none", "this", "that", "these", "those", "who", "whom", "what",
                  "which", "one", "ones", "all", "both", "each", "another", "other", "others", "many", "few",
-                 "some", "any", "much"})) {
+                 "some", "any", "much", "mine", "yours", "ours"})) {
         np.isPronoun = true;
         np.pronLemma = w == "somebody" ? "someone" : w == "everybody" ? "everyone" : w == "anybody" ? "anyone"
                      : w == "whom" ? "who" : w;
@@ -1122,6 +1132,17 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
     }
     if (d == "acl") {
       // relative clause (acl:relcl collapsed): built as a frame; the role of the gap is set by the transfer
+      {   // C15 confidence: a relative clause without a relative word, a to-infinitive or a participle on a noun
+        bool relWord = false, toMark = false;
+        for (int g : c.kids[(size_t)k]) {
+          if (!c.ok(g)) continue;
+          if (in(c.t(g).lower, {"who", "whom", "which", "that", "whose", "where", "when", "que", "quien", "donde"})) relWord = true;
+          if (c.dep(g) == "mark" && c.t(g).lower == "to") toMark = true;
+        }
+        if (en && toMark) c.s.doubt("noun-infinitive");
+        else if (en && fget(c.t(k), nlp::morph::VerbFormShift) == nlp::morph::VfPart && !relWord) c.s.doubt("participle-phrase");
+        else if (en && !relWord) c.s.doubt("contact-relative");
+      }
       SemFrame rf;
       std::vector<SemOblique>* keep = c.lifted;
       std::vector<SemAdverb>* keepAdv = c.liftedAdv;
@@ -1134,11 +1155,34 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
       c.liftedAdv = keepAdv;
       rf.obliques.insert(rf.obliques.end(), l2.begin(), l2.end());
       rf.adverbs.insert(rf.adverbs.end(), a2.begin(), a2.end());
+      // C15: a stranded preposition of a contact relative ("I told you of") is the relative pronoun's preposition
+      if (en)
+        for (size_t q = 0; q < rf.adverbs.size(); ++q) {
+          const std::string& w = rf.adverbs[q].lemma;
+          if (!in(w, {"of", "about", "with", "to", "for", "from", "in", "on", "at"})) continue;
+          bool last = true;
+          for (int x : rf.tokens)
+            if (x > rf.adverbs[q].token && !isPunctTok(c.t(x))) last = false;
+          if (!last) continue;
+          SemOblique o;
+          o.prep = w;
+          o.token = rf.adverbs[q].token;
+          o.np.isPronoun = true;
+          o.np.pronLemma = "which";
+          o.np.pron.person = 3;
+          o.np.token = rf.adverbs[q].token;
+          o.np.tokens.push_back(rf.adverbs[q].token);
+          rf.obliques.push_back(o);
+          rf.adverbs.erase(rf.adverbs.begin() + (long)q);
+          c.drop(o.token, Drop::Marker);
+          break;
+        }
       np.relative.push_back(rf);
       np.tokens.insert(np.tokens.end(), rf.tokens.begin(), rf.tokens.end());
       continue;
     }
     if (d == "conj") {
+      if (en && (kt.upos == "VERB" || kt.upos == "AUX")) c.s.doubt("participle-phrase");   // C15: a verb hung on a noun
       SemNP g;
       buildNP(c, k, g);
       for (int x : c.kids[(size_t)k])
@@ -1155,6 +1199,11 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
         SemAdverb a;
         a.lemma = c.lem(k);
         a.token = k;
+        // C15: a sentence-initial adverb hung on a predicate NP ("Now the Golden Cap is yours") stays first
+        bool firstWord = true;
+        for (int q = 0; q < k; ++q)
+          if (!isPunctTok(c.t(q)) && c.dep(q) != "cc") firstWord = false;
+        a.front = firstWord && k < h;
         c.liftedAdv->push_back(a);
       }
       c.take(k);
@@ -1778,7 +1827,7 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       for (int k : c.kids[(size_t)h])
         if (c.ok(k) && c.dep(k) == "advmod") {
           if (in(c.t(k).lower, {"how", "qué"}) && !c.question) { f.type = Kind::Excl; f.exclQuam = true; c.drop(k, Drop::Marker); }
-          else { a.adverbs.push_back(c.t(k).lower); a.advTokens.push_back(k); }
+          else { a.adverbs.push_back(c.t(k).lower); a.advTokens.push_back(k); c.take(k); }   // once (C15: "Valdē valdē")
         }
       f.predAdj.push_back(a);
     } else if (hu == "ADV" || hu == "ADP") {
@@ -1823,6 +1872,12 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     if (k == nsubj || k == cop || k == expl) continue;
     if (std::find(auxes.begin(), auxes.end(), k) != auxes.end()) continue;
     if (d == "punct") { c.drop(k, Drop::Punct); continue; }
+    if (en && kl == "to" && c.kids[(size_t)k].empty() && k > h) {   // C15: "if I wanted to," (the verb is understood)
+      bool last = true;
+      for (int x : f.tokens)
+        if (x > k && !isPunctTok(c.t(x))) last = false;
+      if (last) { c.drop(k, Drop::Marker); c.s.doubt("ellipsis"); continue; }
+    }
     // Spanish clitics normalised by es::normalise (C13): the particle of a pronominal verb, passive / impersonal "se"
     if (d == "expl:pv") { f.pred.particle = "se"; c.drop(k, Drop::Particle); continue; }
     if (d == "expl:pass") { f.pred.voice = Voice::Passive; f.pred.particle = "se"; c.drop(k, Drop::Particle); continue; }
@@ -1833,6 +1888,9 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       buildNP(c, k, o);
       f.hasObject = true;
       f.object = o;
+      // C15 confidence: "make a visit", "take a walk", "have a look": the noun is the verb's meaning
+      if (en && in(hl, {"make", "take", "have", "give", "pay", "do"}) && !o.isPronoun && !o.isName && o.determiner == "a")
+        c.s.doubt("light-verb");
       continue;
     }
     if ((d == "iobj" && k == iobj) || (d == "obj" && k != obj && !f.hasIndirect && f.hasObject)) {
@@ -1942,6 +2000,29 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
         c.drop(k, Drop::Particle);   // accounted for by the phrasal verb (A7)
         continue;
       }
+      // C15: "get back to Kansas": the particle carries the goal phrase; the goal belongs to the clause
+      if (en && particleWord(kl) && f.hasPred && f.pred.particle.empty() && k > h && kt.upos == "ADV") {
+        bool onlyObl = true;
+        for (int g : c.kids[(size_t)k])
+          if (c.ok(g) && !in(c.dep(g), {"obl", "nmod"})) onlyObl = false;
+        if (onlyObl) {
+          f.pred.particle = kl;
+          c.drop(k, Drop::Particle);
+          for (int g : c.kids[(size_t)k]) {
+            if (!c.ok(g) || !c.free(g)) continue;
+            std::string prep;
+            for (int x : c.kids[(size_t)g])
+              if (c.ok(x) && c.dep(x) == "case") { prep = prep.empty() ? c.t(x).lower : prep + " " + c.t(x).lower; c.drop(x, Drop::Marker); }
+            SemOblique o;
+            o.prep = prep;
+            buildNP(c, g, o.np);
+            o.token = g;
+            c.take(g);
+            f.obliques.push_back(o);
+          }
+          continue;
+        }
+      }
       // "then" / "so" at the start of the clause: connector
       if ((k == first || k == firstContent) && in(kl, {"then", "so", "entonces", "luego", "also", "therefore", "however",
                                                        "besides", "still"})) {
@@ -1987,6 +2068,29 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
         c.drop(k, Drop::Marker);
       }
       continue;
+    }
+    if (en && (d == "conj" || d == "advcl" || d == "parataxis") && kt.upos == "VERB" &&
+        fget(kt, nlp::morph::VerbFormShift) == nlp::morph::VfPart) {   // C15: "a Scarecrow, stuffed with straw"
+      bool own = false;
+      for (int g : c.kids[(size_t)k])
+        if (c.ok(g) && in(c.dep(g), {"nsubj", "aux", "cop"})) own = true;
+      if (!own) c.s.doubt("participle-phrase");
+    }
+    if (d == "conj" && en && f.hasObject && f.object.coord.empty() && (kt.upos == "NOUN" || kt.upos == "PROPN")) {
+      // C15: "to build this City, and my Palace" -> hanc Urbem et Rēgiam meam aedificāre: a bare noun coordinated with
+      // the verb is a second object
+      bool clauseLike = false;
+      for (int g : c.kids[(size_t)k])
+        if (c.ok(g) && in(c.dep(g), {"nsubj", "cop", "aux", "obj"})) clauseLike = true;
+      if (!clauseLike) {
+        SemNP g2;
+        for (int g : c.kids[(size_t)k])
+          if (c.ok(g) && c.dep(g) == "cc") { f.object.coordConj = canonConnector(lang_, c.t(g).lower); c.drop(g, Drop::Marker); c.take(g); }
+        buildNP(c, k, g2);
+        f.object.coord.push_back(g2);
+        f.object.tokens.insert(f.object.tokens.end(), g2.tokens.begin(), g2.tokens.end());
+        continue;
+      }
     }
     if (d == "conj") {
       const std::string ku = kt.upos;
@@ -2051,6 +2155,9 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       }
       s.marker = marker;
       s.before = k < h;
+      if (en && s.relation == Relation::Purpose && marker == "to" &&
+          !in(hl, {"go", "come", "run", "walk", "hurry", "travel", "return", "send", "get"}))
+        c.s.doubt("purpose-guess");
       SemFrame sf;
       buildClause(c, k, sf);
       // C15: a dependent clause is never a yes/no question of its own ("help me find my way?" -> ut viam inveniam)
@@ -2195,7 +2302,11 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
   // questions: "?" or aux/copula before the subject
   if (f.type != Kind::Wh && f.type != Kind::Excl && f.hasPred) {
     // English inversion marks a question; Spanish verb-subject order does not ("Son todos muy groseros.") (C13)
-    const bool inverted = en && nsubj >= 0 && ((cop >= 0 && cop < nsubj) || (!auxes.empty() && auxes.front() < nsubj));
+    bool inverted = en && nsubj >= 0 && ((cop >= 0 && cop < nsubj) || (!auxes.empty() && auxes.front() < nsubj));
+    // C15: "nor do I know ...", "never have I seen ...": inversion after a negative word is not a question
+    if (inverted && !c.question)
+      for (int i : f.tokens)
+        if (!isPunctTok(c.t(i))) { if (in(c.t(i).lower, {"nor", "neither", "never", "only", "rarely", "seldom"})) inverted = false; break; }
     if (f.hasSubject && f.subject.interrogative && f.subject.isPronoun) {
       f.type = Kind::Wh;
       f.wh.word = f.subject.pronLemma;
@@ -2228,9 +2339,14 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     // first content token of the clause (skipping connectors, discourse, interjections, "then", "please")
     const int vtok0 = cop >= 0 ? cop : (f.pred.token >= 0 ? f.pred.token : h);
     int lead = -1;
+    // C15: a fronted adverbial clause ("if you wish for anything, ring the bell") does not hide the imperative
+    std::vector<int> frontSub;
+    for (int k : c.kids[(size_t)h])
+      if (k < h && in(c.dep(k), {"advcl", "ccomp"})) c.subtree(k, frontSub);
     for (int i : f.tokens) {
       const Token& x = c.t(i);
       if (isPunctTok(x) || c.consumed[(size_t)i]) continue;
+      if (std::find(frontSub.begin(), frontSub.end(), i) != frontSub.end()) continue;
       const std::string xd = x.deprel;
       if (xd == "cc" || xd == "discourse" || xd == "vocative" || xd == "intj" ||
           (xd == "advmod" && in(x.lower, {"then", "now", "so", "just", "please", "first", "also"})) ||
@@ -2529,7 +2645,7 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
                             ((topDep == "advmod" || topDep == "discourse") &&
                              (e.reg == "answer" || e.reg == "excl" || e.reg == "polite"));
       // C15: register "tail": an adverbial phrase that closes a clause ("in my day", "as soon as you can")
-      if (e.reg == "tail" && rightOk) leftOk = true;
+      if (e.reg == "tail" && rightOk && !leftOk) { leftOk = true; s.doubt("phrase-order"); }
       if (leftOk && (rightOk || prefixOk)) {
         m.pattern = e.pattern;
         m.latin = e.latin;
@@ -2586,6 +2702,12 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
         if (groupOf[(size_t)i] != heads[it.idx] && !isPunctTok(s.tokens[(size_t)i])) c.consumed[(size_t)i] = 1;
       buildClause(c, heads[it.idx], u.frame);
       c.consumed = keep;
+      // C15: only the clause that carries the question mark is the question ("Even if I wanted to, how could I ...?")
+      if (u.frame.type == Kind::Yn && s.question && &it != &items.back()) {
+        bool qmark = false;
+        for (int k = it.first; k <= it.last + 1 && k < n; ++k) qmark = qmark || s.tokens[(size_t)k].text == "?";
+        if (!qmark) u.frame.type = Kind::Decl;
+      }
       // a bare NP after/before a comma next to another unit is a vocative ("What is your name, child?")
       if (u.frame.type == Kind::Frag && u.frame.hasSubject && !u.frame.subject.isPronoun && items.size() > 1 &&
           u.frame.adverbs.empty())
@@ -2669,6 +2791,79 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
 void FrameBuilder::repairTree(SemSentence& s) const {
   std::vector<nlp::Token>& tk = s.tokens;
   const int n = (int)tk.size();
+  if (lang_ == SrcLang::En) {
+    auto stranded = [&](int i) {   // a preposition without its noun ("I told you of.")
+      if (tk[(size_t)i].upos != "ADP" && !(tk[(size_t)i].upos == "ADV" && in(tk[(size_t)i].lower, {"of"}))) return false;
+      if (!in(tk[(size_t)i].lower, {"of", "about", "with", "to", "for", "from", "in", "on", "at"})) return false;
+      for (int j = 0; j < n; ++j)
+        if (tk[(size_t)j].head == i + 1) return false;
+      return tk[(size_t)i].deprel == "obl" || tk[(size_t)i].deprel == "advmod" || tk[(size_t)i].deprel == "case" ||
+             tk[(size_t)i].deprel == "compound";
+    };
+    // C15: "the Great Wizard I told you of." / "a man I know": a noun read as the subject of a verb that has a
+    // pronoun subject right after it is the antecedent of a contact relative clause
+    for (int v = 0; v < n; ++v) {
+      if (tk[(size_t)v].upos != "VERB") continue;
+      int nounSubj = -1, pronSubj = -1;
+      for (int j = 0; j < n; ++j) {
+        if (tk[(size_t)j].head != v + 1 || tk[(size_t)j].deprel != "nsubj") continue;
+        if ((tk[(size_t)j].upos == "NOUN" || tk[(size_t)j].upos == "PROPN") && nounSubj < 0) nounSubj = j;
+        else if (tk[(size_t)j].upos == "PRON") pronSubj = j;
+      }
+      if (nounSubj < 0 || pronSubj != nounSubj + 1 || pronSubj > v) continue;
+      tk[(size_t)nounSubj].head = tk[(size_t)v].head;
+      tk[(size_t)nounSubj].deprel = tk[(size_t)v].deprel;
+      for (int j = 0; j < n; ++j)
+        if (tk[(size_t)j].head == v + 1 && j < nounSubj) tk[(size_t)j].head = nounSubj + 1;   // its determiners
+      for (int j = 0; j < n; ++j)
+        if (j != v && tk[(size_t)j].head == v + 1 && tk[(size_t)j].deprel == "punct" && j == n - 1) tk[(size_t)j].head = nounSubj + 1;
+      tk[(size_t)v].head = nounSubj + 1;
+      tk[(size_t)v].deprel = "acl";
+      s.repairs.emplace_back("reroot");
+      break;
+    }
+    // C15: "The woman who sings is my mother." parsed as "woman [who sings mother]" with an orphan copula on the
+    // object: the object is the predicate, the noun with its relative clause the subject
+    for (int cp = 0; cp < n; ++cp) {
+      if (tk[(size_t)cp].deprel != "cop") continue;
+      const int x = tk[(size_t)cp].head - 1;
+      if (x < 0 || tk[(size_t)x].deprel != "obj") continue;
+      const int v = tk[(size_t)x].head - 1;
+      if (v < 0 || tk[(size_t)v].deprel != "acl" || x < cp) continue;
+      const int nn = tk[(size_t)v].head - 1;
+      if (nn < 0 || tk[(size_t)nn].head != 0 || cp < v) continue;
+      tk[(size_t)x].head = 0;
+      tk[(size_t)x].deprel = "root";
+      tk[(size_t)nn].head = x + 1;
+      tk[(size_t)nn].deprel = "nsubj";
+      for (int j = 0; j < n; ++j)
+        if (tk[(size_t)j].head == nn + 1 && tk[(size_t)j].deprel == "punct" && j > x) tk[(size_t)j].head = x + 1;
+      s.repairs.emplace_back("reroot");
+      break;
+    }
+    // C15: a to-infinitive hung on the verb of a contact relative after its stranded preposition ("the arts I know of
+    // to keep you from harm") belongs to the main clause (purpose)
+    for (int v = 0; v < n; ++v) {
+      if (tk[(size_t)v].deprel != "acl") continue;
+      int prepAt = -1;
+      for (int j = v + 1; j < n; ++j)
+        if (tk[(size_t)j].head == v + 1 && stranded(j)) { prepAt = j; break; }
+      if (prepAt < 0) continue;
+      const int noun = tk[(size_t)v].head - 1;
+      if (noun < 0) continue;
+      const int mainV = tk[(size_t)noun].head - 1;
+      if (mainV < 0 || (tk[(size_t)mainV].upos != "VERB" && tk[(size_t)mainV].upos != "AUX")) continue;
+      for (int j = prepAt + 1; j < n; ++j) {
+        if (tk[(size_t)j].head != v + 1 || tk[(size_t)j].upos != "VERB") continue;
+        bool to = false;
+        for (int g = 0; g < n; ++g)
+          if (tk[(size_t)g].head == j + 1 && tk[(size_t)g].lower == "to") to = true;
+        if (!to) continue;
+        tk[(size_t)j].head = mainV + 1;
+        tk[(size_t)j].deprel = "advcl";
+      }
+    }
+  }
   // "Here the cat always sleeps.": a fronted adverb made the root, the real clause hung on it as advcl -> the verb is
   // the root, the adverb its (fronted) advmod
   for (int r = 0; r < n; ++r) {
@@ -2721,8 +2916,14 @@ bool FrameBuilder::troubled(const SemSentence& s) {
   for (const Unit& u : s.units) {
     if (u.type != Unit::Clause || u.vocative) continue;
     bool verb = false;
+    // C15: verbs of a relative clause on the fragment's noun are where they belong ("the Great Wizard I told you of.")
+    std::vector<int> relTok;
+    if (u.frame.hasSubject)
+      for (const SemFrame& r : u.frame.subject.relative) relTok.insert(relTok.end(), r.tokens.begin(), r.tokens.end());
     for (int k = u.first; k <= u.last && k < (int)s.tokens.size(); ++k)
-      if (s.tokens[(size_t)k].upos == "VERB" && s.drop[(size_t)k] == Drop::No) verb = true;
+      if (s.tokens[(size_t)k].upos == "VERB" && s.drop[(size_t)k] == Drop::No &&
+          std::find(relTok.begin(), relTok.end(), k) == relTok.end())
+        verb = true;
     if (verb && (!u.frame.hasPred || u.frame.type == Kind::Frag)) return true;
   }
   return false;
@@ -2740,7 +2941,9 @@ bool FrameBuilder::segmentParse(std::vector<Token>& tk) const {
     if (at > 0 && at < n && std::find(cuts.begin(), cuts.end(), at) == cuts.end()) cuts.push_back(at);
   };
   for (int i = 0; i + 1 < n; ++i)
-    if (hardBreak(tk[(size_t)i])) addCut(i + 1);
+    if (hardBreak(tk[(size_t)i]) || (tk[(size_t)i].lower == "to" && i > 0 && tk[(size_t)i + 1].text == "," &&
+                                     tk[(size_t)i - 1].upos == "VERB" && i + 2 < n))   // C15: "Even if I wanted to, ..."
+      addCut(tk[(size_t)i].lower == "to" ? i + 2 : i + 1);
   // starts of comma-delimited spans
   std::vector<int> starts = {0};
   for (int i = 0; i + 1 < n; ++i)
@@ -2931,6 +3134,44 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
       tk[(size_t)i].feats = 0;
       reparse = true;
     }
+  // C15: "how am I to get back?" = how shall I get back: the "be" is a future auxiliary, "to" a marker
+  if (nlp_ && lang_ == SrcLang::En)
+    for (int i = 0; i + 3 < n; ++i)
+      if (in(tk[(size_t)i].lower, {"am", "is", "are"}) && tk[(size_t)i + 1].upos == "PRON" && tk[(size_t)i + 2].lower == "to" &&
+          (tk[(size_t)i + 3].upos == "VERB" || tk[(size_t)i + 3].upos == "AUX" || tk[(size_t)i + 3].upos == "NOUN")) {
+        tk[(size_t)i].lower = "will";
+        tk[(size_t)i].upos = "AUX";
+        tk[(size_t)i].feats = 0;
+        tk[(size_t)i + 2].upos = "PART";
+        tk[(size_t)i + 3].upos = "VERB";
+        tk[(size_t)i + 3].feats = nlp::morph::fromString("VerbForm=Inf");
+        reparse = true;
+      }
+  // C15: "The woman who sings ...": after a relative pronoun an -s word the lexicon knows as a verb is the verb
+  if (nlp_ && lex_ && lang_ == SrcLang::En)
+    for (int i = 1; i + 1 < n; ++i) {
+      nlp::Token& t = tk[(size_t)i];
+      if (!in(tk[(size_t)i - 1].lower, {"who", "which", "that"}) || t.upos != "NOUN" || t.lower.size() < 4 ||
+          t.lower.back() != 's')
+        continue;
+      std::vector<lex::Analysis> an;
+      lex_->lookup(text::en_key(t.lower), an);
+      bool verb = false;
+      for (const lex::Analysis& a : an) verb = verb || lex_->lemma(a.lemma).pos == feat::Verb;
+      if (!verb) continue;
+      t.upos = "VERB";
+      t.feats = nlp::morph::fromString("Number=Sing|Person=3|Tense=Pres|VerbForm=Fin|Mood=Ind");
+      reparse = true;
+    }
+  // C15: lexicalised -ed adjectives the tagger reads as participles ("I have been wicked")
+  if (nlp_ && lang_ == SrcLang::En)
+    for (nlp::Token& t : tk)
+      if (t.upos == "VERB" && in(t.lower, {"wicked", "naked", "crooked", "rugged", "ragged", "sacred", "wretched",
+                                           "beloved", "aged", "learned", "blessed", "cursed", "jagged", "dogged"})) {
+        t.upos = "ADJ";
+        t.feats = 0;
+        reparse = true;
+      }
   if (reparse) nlp_->parser().parse(tk);
   if (nlp_ && lang_ == SrcLang::En) segmentParse(tk);
   if (nlp_) punctRoot(tk);

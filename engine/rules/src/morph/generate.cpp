@@ -45,7 +45,22 @@ bool genderAdmits(uint8_t have, uint8_t want) {
 uint32_t packedOf(const lex::Lexicon& lx, const lex::Analysis& a) { return lx.feature(a.feat); }
 
 // ---- display -----------------------------------------------------------------------------------------------------
-std::string displayForm(std::string_view form, bool macrons) {
+// C15: some library headwords carry editorial marks ("((caelum", "((alius"): a word never keeps brackets or
+// punctuation at its edges.
+std::string cleanHead(std::string_view w) {
+  auto mark = [](char c) {
+    return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}' || c == '*' || c == '?' || c == '!' ||
+           c == ',' || c == ';' || c == ':' || c == '"' || c == '<' || c == '>' || c == '|' || c == '.';
+  };
+  if (w.size() > 2 && w.front() == '[' && w.back() == ']') return std::string(w);   // an unknown word "[x]" stays marked
+  size_t a = 0, b = w.size();
+  while (a < b && mark(w[a])) ++a;
+  while (b > a && mark(w[b - 1])) --b;
+  return std::string(w.substr(a, b - a));
+}
+
+std::string displayForm(std::string_view form0, bool macrons) {
+  const std::string form = cleanHead(form0);
   std::string d = text::nfd(form);
   // Anceps vowels carry both U+0304 and U+0306 ("egō̆", "mihī̆"): show them plain.
   std::u32string u = text::toUtf32(d), o;

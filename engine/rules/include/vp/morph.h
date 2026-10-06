@@ -74,6 +74,8 @@ uint32_t packedOf(const lex::Lexicon&, const lex::Analysis&);
 bool genderAdmits(uint8_t have, uint8_t want);
 // Display cleanup used everywhere a form is shown: NFC, anceps vowels (macron + breve on one vowel, "egō̆") shown
 // plain, combining tie bars / double breves (U+035C-0362, "de͡inde") dropped, and display_latin(macrons).
+// C15: a headword or form without editorial marks at its edges ("((caelum" -> "caelum"); displayForm applies it.
+std::string cleanHead(std::string_view word);
 std::string displayForm(std::string_view form, bool macrons);
 // Principal parts parsed from a lemma's `principal` line (both the Wiktionary head line "amō (present infinitive
 // amāre, perfect active amāvī, supine amātum); first conjugation" and the short "amō, amāre, amāvī, amātum").

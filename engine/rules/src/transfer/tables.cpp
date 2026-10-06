@@ -36,6 +36,11 @@ bool animateNoun(const std::string& l) {
                 "señora", "dios"});
 }
 
+bool narrativeNoun(const std::string& l) {
+  return in(l, {"story", "tale", "fable", "history", "joke", "news", "legend", "adventure", "dream", "cuento",
+                "historia", "fábula"});
+}
+
 bool personalPronoun(const std::string& w) {
   return in(w, {"i", "me", "myself", "you", "yourself", "yourselves", "he", "him", "himself", "she", "her", "herself",
                 "it", "itself", "we", "us", "ourselves", "they", "them", "themselves", "thee", "thou", "ye", "yo", "mí",
@@ -62,7 +67,7 @@ const char* adverb(const std::string& l, bool motion) {
       {"later", "posteā"},     {"once", "semel"},          {"gladly", "libenter"},    {"badly", "male"},
       {"everywhere", "ubīque"}, {"nowhere", "nusquam"},    {"far", "procul"},         {"near", "prope"},
       {"yes", "ita"},          {"no", "nōn"},              {"certainly", "certē"},    {"quite", "satis"},
-      {"rather", "potius"},    {"even", "etiam"},     {"as", "tam"},     {"hereafter", "posthāc"},
+      {"rather", "potius"},    {"even", "etiam"},     {"as", "tam"},     {"all", "omnīnō"},     {"hereafter", "posthāc"},
       {"besides", "praetereā"}, {"however", "tamen"},  {"exactly", "plānē"},          {"ever", "umquam"},        {"long", "diū"},
       {"loudly", "magnā vōce"}, {"truly", "vērē"},         {"together", "ūnā"},       {"up", "sursum"},
       {"down", "deorsum"},     {"forward", "porrō"},       {"why", "cūr"},            {"how", "quōmodo"},

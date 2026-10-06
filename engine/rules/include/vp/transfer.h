@@ -109,6 +109,7 @@ class Transfer {
   bool nameTableInto(const frame::SemNP& n, Ctx& c, realise::LaNP& o) const;          // C15: names_la.tsv phrases
   bool latinNameNP(const std::string& latin, realise::LaNP& o) const;                 // C15: "Leō Timidus" as an NP
   bool titleNoun(const frame::SemNP& n, Ctx& c, realise::LaNP& o) const;              // C15: "the kind Stork"
+  void relativeInto(const frame::SemNP& n, Ctx& c, realise::LaNP& o) const;          // C15: shared by names
   bool deponentActive(const frame::SemFrame& in, Ctx& c, frame::SemFrame& out) const; // C15: deponent passives
 
   const lex::Lexicon& la_;

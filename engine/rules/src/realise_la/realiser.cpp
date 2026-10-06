@@ -361,6 +361,7 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
   }
   if (c.pred.person) subj.person = c.pred.person;
   if (c.pred.number) subj.number = c.pred.number;
+  if (!c.hasSubject && c.predGender && c.predAdj.empty()) subj.gender = c.predGender;   // C15: "dictum est"
   const uint8_t subjCase = (c.exclO || ctx.accInf) ? (uint8_t)Acc : (uint8_t)Nom;
 
   // Interjections, vocatives, connectors
@@ -544,7 +545,9 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
     for (int sl : {kFRONT, kIO, kO, kOBL, kADV, kPRED, kTADV}) words += s[sl].size();
     // "Prīmum nōmen tuum scrībe": a fronted adverb keeps V last; so does a time adverb ("Crās ad mē venī", C15)
     append(s[kFRONT], s[kTADV]);
-    const bool shortImp = words <= 3 && s[kFRONT].empty();
+    bool frontSub = false;   // C15: after a fronted clause the verb comes last ("sī quid vīs, tintinnābulum pulsā")
+    for (const LaSub& sb : c.subs) frontSub = frontSub || sb.before;
+    const bool shortImp = words <= 3 && s[kFRONT].empty() && !frontSub;
     if (prohib) {
       orderRule = "order.prohib";
       if (words <= 1) seq = {kFRONT, kV, kIO, kO, kOBL, kADV, kINF};
@@ -604,6 +607,36 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
         else seq.insert(std::find(seq.begin(), seq.end(), kV), kNEG);
         orderRule = "order.neg.degree";
       }
+    }
+    // C15: a negated question said as a statement ("Nōn potes dēscendere?", "Nescīs?"): nōn + verb first
+    if (c.type == ClauseType::Decl && c.plainQuestion && !s[kNEG].empty() && !s[kV].empty()) {
+      for (int sl : {kINF, kV, kNEG}) {
+        auto it = std::find(seq.begin(), seq.end(), sl);
+        if (it != seq.end()) seq.erase(it);
+      }
+      auto at = std::find(seq.begin(), seq.end(), kFRONT);
+      at = at == seq.end() ? seq.begin() : at + 1;
+      auto wh = std::find(seq.begin(), seq.end(), kWH);
+      if (wh != seq.end() && wh >= seq.begin()) at = std::max(at, wh + 1);
+      at = seq.insert(at, kINF);
+      at = seq.insert(at, kV);
+      seq.insert(at, kNEG);
+    }
+    // C15: "Why not ...?": in a negated cūr question nōn follows the question word ("Cūr nōn circum foveam
+    // ambulāvistī?", "Cūr nōn curris?")
+    if (c.type == ClauseType::Wh && c.polarity == Polarity::Neg && !s[kNEG].empty() && c.wh.lemma != kNone &&
+        text::latin_key(lx_.lemma(c.wh.lemma).head) == "cur") {
+      auto ng = std::find(seq.begin(), seq.end(), kNEG);
+      if (ng != seq.end()) seq.erase(ng);
+      auto wh = std::find(seq.begin(), seq.end(), kWH);
+      seq.insert(wh == seq.end() ? seq.begin() : wh + 1, kNEG);
+    }
+    // C15: an unstressed personal pronoun in the dative follows a noun object ("Fābulam meam tibi nārrābō")
+    if (c.type != ClauseType::Imp && c.hasIndirect && c.indirect.isPronoun && !c.indirect.emphasis && c.hasObject && !c.object.isPronoun &&
+        !s[kO].empty() && !s[kIO].empty()) {
+      auto io = std::find(seq.begin(), seq.end(), kIO);
+      auto ob = std::find(seq.begin(), seq.end(), kO);
+      if (io != seq.end() && ob != seq.end() && io < ob) std::iter_swap(io, ob);
     }
     // yes/no questions: nōnne / num first; otherwise -ne on the verb (or the focused word), moved first
     if (c.type == ClauseType::Yn && !nonne && c.bias != YnBias::ExpectNo) {
@@ -689,6 +722,16 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
         else if (!clauseWords.empty()) clauseWords.back().punctAfter = sub.sep;
       }
       append(after, sw);
+    }
+  }
+  // C15: a first-position connector opens the whole sentence, also before a fronted clause ("et sī quid vīs, ...")
+  if (!before.empty()) {
+    size_t nc = 0;
+    while (nc < clauseWords.size() && std::string(clauseWords[nc].rule) == "order.conn.first") ++nc;
+    if (nc > 0) {
+      std::vector<Word> conn(clauseWords.begin(), clauseWords.begin() + (long)nc);
+      clauseWords.erase(clauseWords.begin(), clauseWords.begin() + (long)nc);
+      append(out, conn);
     }
   }
   append(out, before);

@@ -219,3 +219,180 @@ errors), which is the likely cause.
   #109; second position as in "Abī igitur".
 - #67 add "Adiuvā nōs, quaesō!" - nothing in the text says the helper is more than one person.
 - #86 add "In domō parvā prope flūmen habitāmus." - domus is the T1 exact word for "house"; casa means hut/cottage.
+
+## Quality loop 2 (C15, 2026-10-06)
+Tuning material: tests/regression/oz_sample.en.srt (100 cues burned from the public-domain held-out dialogue; gold
+tests/regression/expected/oz_sample.la.gold.txt by the main agent) and tests/samples/sample.en.srt. Measured with
+`engine/tests/test_rules_en.cpp` (fidelity 2, speaker f), reports `<build>/regression_report_oz.txt`,
+`<build>/regression_report.txt`, `<build>/regression_report_es.txt`. tests/heldout/ was not opened. The oz sample was
+used for tuning: the held-out number will be lower.
+
+### Before / after
+| file | start of C15 | end of C15 |
+|---|---|---|
+| own_dialogue EN (114) | 114 / 114, ok 69 / check 45 / fix 0 | 114 / 114, ok 66 / check 48 / fix 0 |
+| own_dialogue ES (100) | 100 / 100, ok 78 / check 22 / fix 0 | 100 / 100, ok 79 / check 21 / fix 0 |
+| oz_sample EN (100) | 6 / 100, ok 7 / check 61 / fix 32, wrong among OK 5 | **50 / 100** (exact 33), ok 21 / check 60 / fix 19, wrong among OK 0 (+3 with a proposed gold alternative) |
+| sample.en.srt (12) | cue 3 "Aqua colōnicior hastārum.", cue 11 "ad portōrium" | 12 / 12 as written in the test |
+
+The target of 70 / 100 was **not** reached. Roughly a third of the remaining mismatches need a free rendering the rules
+cannot derive from the English (#5, #13, #23, #30, #34, #46, #65, #74, #80, #85, #88, #97), another third are
+lexical / idiom choices of the gold (#18, #21, #35, #39, #55, #70, #76, #77, #93, #98) and the rest structural gaps
+listed below.
+
+Measurement log (oz_sample): 6 start; 7 cue boundaries; 16 names, connectors, segments, lexical rows, sense head
+words; 20 negative questions, coordination, complements; 25 tense/indirect question/deponent/velim; 29 passive
+say/tell, look like, rogō, have no, fronted clauses; 38 comparison, particle goals, dative after impersonal adjectives,
+IO pronoun after the object, plain negative questions; 42 alius, possessive on the last conjunct, motion particles;
+44 lemma fixes (sting, come), literal fallback; 46 contact relatives with stranded prepositions; 48 participles as
+taught adjectives, nor-inversion, trailing comma; 50 "even if I wanted to" (etiam sī vellem), "how could I" (possem),
+a bare noun coordinated with the verb as a second object.
+
+### Calibration (deliverable 6)
+Wrong among OK: 0 (cues 1, 41, 82 are correct variants: proposed gold alternatives below; the test lists them).
+New Check signals (frame.h `SemSentence::doubts`, flag names in CueOutput.flags): `fragment` (a cue that starts in
+lower case or ends with , ; : - is a clause cut from its sentence), `contact-relative` (relative clause without a
+relative word), `noun-infinitive` ("no right to take" rendered as a relative clause), `purpose-guess` (a to-infinitive
+read as purpose after a verb that is not one of motion), `light-verb` ("make a visit"), `phrase-order` (a phrasebook
+tail phrase placed after its clause), `participle-phrase` ("a Scarecrow, stuffed with straw"); `could-not-parse` is
+Fix; `ellipsis` (a dangling "to": "if I wanted to,", "anything you want me to") is Check. Why the oz cues are Check /
+Fix: fragment 38, A6 12, margin < 0.15 9, A1 9, A7 9, A3 8, purpose-guess 8, A8 7, A9 7, contact-relative 5,
+noun-infinitive 5, light-verb 3, phrase-order 3, participle-phrase 3, frame-fallback 3, A4 3, ellipsis 2.
+The OK share fell (36 -> 21 during the loop) because the fragment signal is strict: 38 of the 100 cues are fragments.
+
+### What changed (C15)
+- Never nonsense (1). Root cause of "The farmer carries water." -> "Aqua colōnicior hastārum.": the tagger read
+  "farmer" as the comparative of "farm" (ADJ, lemma farm) and "carries" as a plural noun; the verbless-sentence retag
+  required a noun before the -s word. Now a tagged ADJ/VERB that english.vpl never reads that way takes the lexicon's
+  reading (lexicon veto), the retag accepts it, and a clause made only of nominal words around one verb is rebuilt
+  (verb root, subject, object). Lemma fixes: a rule lemma that is not a lemma of the tagged part of speech ("sting" ->
+  "st") or an all-caps abbreviation ("ST") is never chosen; "have come" keeps come (not the homograph "cum"). When the
+  parse still has no clause for the source verb (or a statement of four or more content words has no verb at all while
+  a noun can be one), the sentence is given word by word in dictionary forms, unknown words in brackets, flag
+  `could-not-parse`, confidence Fix, reason "could not parse".
+- Sense head words (2): the head of a gloss item (last word before a preposition for nouns/adjectives, first word for
+  verbs) matching the source word: +0.05 when it is the first item; the word only inside an item as a modifier: -0.3
+  (nouns/adjectives; "harbour" inside portōrium's "upkeep of public harbours"). British spellings also look up the
+  American key (harbour -> harbor, colour, centre, realise). An intransitive sense with an object: -0.25 (hurt ->
+  noceō, not doleō). Determiner lemmas may stand for adjectives (alius).
+- Token hygiene (3): `morph::cleanHead` strips editorial marks from headwords ("((caelum", "((alius", "((locus" are in
+  latin.vpl); `displayForm` applies it, so lookups (findLemma) and every displayed form are clean; "[x]" unknown
+  markers stay. The checker tokenises on word characters only (A1 re-analysis sees the same words).
+  **For C8b (CLI, not this task's directory):** words.list prints `lex.lemma(id).head` raw; it should print
+  `vp::morph::cleanHead(head)`. **For LIB:** latin.vpl carries headwords with "((" (data bug).
+- Fragments and discourse (4): a cue ending with , ; : or a dash no longer continues into a next cue that starts a
+  clause (a capital or a conjunction / subordinator); "I was walking" + "to the river." still joins. Segmented parse:
+  a sentence-initial discourse word before a comma, a vocative between commas (my dear, comrades, your Majesty), a
+  parenthetical between commas (you know, as I said, however, I suppose ...) and each clause after ; : or a dash are
+  parsed apart. Lead connectors set off by a comma open the next clause (however -> tamen, besides -> praetereā,
+  therefore -> itaque, for -> nam, still -> tamen); "for" + subject pronoun + verb is the conjunction nam; "Then" in a
+  statement -> tum (first), in an imperative / question -> igitur (as before); "and then" -> et tum; adverb "then" ->
+  tum. Phrasebook registers: `lead` (only before a comma at the start: "Why," -> Quid?, "Well," -> Bene), `paren`
+  (you know -> ut scīs, as I said -> ut dīxī), `conn` (", however;" moves to the front of its clause: Tamen ...),
+  `tail` (closes a clause: as soon as you can -> quam prīmum, in my day, in trouble). A unit ending in ? or ! takes no
+  separator ("Quid? Nescīs?").
+- Constructions (5): comparative predicate (-er, more, better) + than -> comparative + quam + the compared in the
+  nominative after the verb; as X as -> tam X quam; so X that -> tam ... ut + subjunctive (result); verbs of ordering /
+  teaching / allowing / wanting + object + to-inf -> object + infinitive (Eōs iussī ... aedificāre); help / ask / tell
+  + object + inf -> ut + subjunctive with the object as subject; help / refuse / promise ... + to-inf -> infinitive;
+  purpose clauses take the person of the controller; a state verb (anxious -> cupiō) and an impersonal adjective
+  ("It is better for people to keep away") take the infinitive, "for X" as a dative after the verb; must / have to /
+  can / could (past -> poteram) as before; "shall I / shall we?" (yes/no) -> deliberative subjunctive, "what shall we
+  do" -> future; "should/would like to" -> velim; "like to V" -> libenter + V; "am I to" -> future; passives of
+  deponent verbs are said actively ("quem Saga ōsculāta est"); "it is said that S ..." -> dīcitur + infinitive
+  (personal); "we have been told that ..." -> nōbīs dictum est + acc + inf; "say that" -> acc + inf (as before);
+  "some" -> quīdam; "no one / nobody" -> nēmō; "not ... anybody / anything" -> nēminem / nihil (one negation);
+  "anything / anyone" after sī / nisi -> quid / quis; "not know" -> nesciō; "have no X" -> X nōn habeō; negated yes/no
+  questions -> "Nōn potes dēscendere?" (nōn + verb first, no particle); "Why not" -> cūr nōn ...; relative clauses
+  without a relative word, with a stranded preposition -> dē quō / quās (verbprep obj); look / seem like -> similis +
+  dative; indirect questions -> subjunctive with the sequence of tenses; whether -> num + subjunctive; where + get /
+  receive -> unde; "is gone" -> abiit; "was always" -> perfect; "tomorrow / this morning" -> crās / hodiē māne; time
+  adverbs right after the subject (order.adv amended); possessive pronoun predicates (yours -> tuus est); a shared
+  possessive on the last conjunct; an unstressed dative pronoun after a noun object (not in imperatives); a first
+  connector before a fronted clause ("et sī quid vīs, ...") and the imperative after it verb last.
+  Names (names_la.tsv "translate" rows): Oz (indeclinable, keep), Kansas -> Kansia (country: in + acc), Dorothy ->
+  Dorothēa, Scarecrow -> Terriculum, Tin Woodman -> Lignātor Stanneus, Cowardly Lion -> Leō Timidus, Wicked Witch ->
+  Saga Mala, Emerald City / City of Emeralds -> Urbs Smaragdōrum (place: ad + acc), Great Wizard -> Magnus Magus,
+  Witch of the North -> Saga Septentriōnis, Golden Cap -> Pilleus Aureus, Power of Evil -> Potestās Malī, King of
+  Beasts -> Rēx Bēstiārum. Several Latin words are declined as noun + adjective / genitive (LaAdj::before,
+  LaNP::nameWords); a capitalised English common noun inside the sentence is a title, translated and capitalised
+  ("the kind Stork" -> Cicōnia, "this City" -> Urbem, "my Palace" -> Rēgiam).
+- Rows added: tiers_la.tsv 46 rows (portus, palea, noceō, socius, amita, avunculus, cupiō, cōnstituō, potestās,
+  follis, ōsculor, fateor, saga, magus, rēgia, sēricum, cūriōsitās, tintinnābulum, omnīnō, cicōnia, pungō, arceō,
+  pergō, dēscendō, arcessō, caedō, aedificō, lignātor, terriculum, stannum, stanneus, fax, praetereā, libet,
+  perīculum, quīdam, quisquam, maior, apis, māne adv, vesperī, posthāc, malum2 "evil", alius det) and notes on 11
+  rows (accipiō, ferō, alius, vestis, homō, dīcō, nārrō, faciō, putō, plēnus, fessus, timidus, pulsō); phrasebook 21
+  rows (my dear corrected); phrasal 5; verbprep 6; states 3; preps 1 (amongst); names 14; order_la.txt: order.adv
+  (time adverbs after the subject, imperative), order.adj (alius, ūllus before the noun).
+
+### Remaining oz mismatches (fidelity 2)
+| # | source | gold (alternatives with /) | ours | confidence, findings |
+|---|---|---|---|---|
+| 1 | Therefore we still have witches and wizards amongst us. | Itaque adhuc sagae et magī inter nōs sunt. | Itaque adhūc sāgās et magōs inter nōs habēmus. | ok|
+| 2 | He is more powerful than all the rest of us together. | Potentior est quam nōs omnēs ūnā. / Potentior est omnibus nōbīs ūnā. | Ūnā fortior est quam omnēs requiētēs nostrī. | fix A3 |
+| 4 | Can you help me find my way? | Potesne mē adiuvāre ut viam inveniam? | Potesne mē adiuvāre ut viam meam inveniam? | check A8 emoji cps |
+| 5 | there is a great desert, and none could live to cross it. | magna dēserta est, et nēmō ea trānsīre vīvus potest. / ingēns dēserta est, nec quisquam vīvus trānsīre potest. | Est dignitās magna et nēmō vīvere poterat ut eam trānseat. | check purpose-guess fragment |
+| 12 | and no one will dare injure a person who has been kissed by the Witch of the North. | et nēmō audēbit nocēre eī quem Saga Septentriōnis ōsculāta est. | Et nēmō hominī quem Sāga Septentriōnis ōsculāta est nocēre audēbit. | check fragment |
+| 13 | They would be just the thing to take a long walk in, for they could not wear out. | Ad longum iter aptissimī essent, quia numquam dēterī possent. / Ad longum iter optimī essent, quia numquam terī possent. | Rēs quae viam longam intrō sūmit et gallus nōn essent. | fix A3 A6 A7 noun-infinitive light-verb participle-phrase emoji |
+| 14 | Besides, you have white in your frock, and only witches and sorceresses wear white. | Praetereā album in veste habēs, et sōlae sagae albō vestiuntur. / Praetereā album in veste tuā est, et sōlae sagae alba gerunt. | Praetereā habēs ut album in veste tuā et modo et venēficae ut portet ut album [witch]. | fix A1 A6 A8 purpose-guess emoji overflow |
+| 18 | I feel like a new man. | Novus homō mihi videor. / Quasi novus homō sum. | Vir novus mihi videor. | fix A3 emoji |
+| 21 | it’s a lighted match. | fax accēnsa est. | Certāmen est [lighted]. | fix A1 A9 fragment |
+| 23 | It is such an uncomfortable feeling to know one is a fool. | Molestum est scīre sē stultum esse. / Valdē molestum est scīre sē stultum esse. | Sēnsus incommodus quī ūnum hominem scit est et mora est. | check noun-infinitive |
+| 26 | They are rusted so badly that I cannot move them at all; | Tam rōbīgine corrupta sunt ut ea movēre nōn possim; / Tam rōbīginōsa sunt ut ea omnīnō movēre nōn possim; | Rōbīginātī sunt ut eōs apud omnīs movēre nōn possim [so badly]; | fix A1 A6 A7 fragment |
+| 30 | When they scratched against the tin it made a cold shiver run down my back. | Cum stannum rādēbant, frīgus per tergum meum currēbat. / Cum stannum rādēbant, frīgore horrēbam. | Quandō contrā stannum quod tremōrem frīgidum fēcit tergō meō cucurrisse scalpsērunt [down]. | fix A1 A6 A8 contact-relative light-verb cps overflow |
+| 33 | but that doesn’t make me any braver, | sed hoc mē fortiōrem nōn facit, | Sed id [braver] mē facit, | fix A1 unknown fragment |
+| 34 | for you can carry us all over on your back, one at a time. | nam nōs omnēs trāns portāre potes in tergō, singulōs. / nam nōs omnēs singulōs in tergō trāns portāre potes. | Nam omnīs in tergō tuō super portāre potes et ūnus homo tempore. | fix A3 fragment |
+| 35 | or the Tin Woodman badly dented on the rocks below. | aut Lignātor Stanneus in saxīs īnfrā graviter contūsus. / aut Lignātor Stanneus in saxīs īnfrā graviter laesus. | Aut Lignātor Stanneus in saxīs male īnfrā [maccare]. | fix A3 A6 missing-form fragment emoji |
+| 37 | but the kind Stork saved me, | sed benigna Cicōnia mē servāvit, | Sed Cicōnia benigna mē servāvit, | check A8 fragment cps |
+| 38 | I always like to help anyone in trouble. | Semper eōs quī in perīculō sunt adiuvāre libet. / Semper libenter adiuvō eōs quī in perīculō sunt. | Semper aliquem libenter adiuvō in perīculō. | check phrase-order |
+| 39 | and get out of this deadly flower bed as soon as you can. | et ex hōc flōrum lētālī agrō quam prīmum exī. / et ex hōc papāverum agrō mortiferō quam prīmum exī. | Et dē hōc lectō mortiferō flōris exī quam prīmum. | fix A3 A6 phrase-order fragment emoji |
+| 41 | Oh, thank you! | Ō, grātiās tibi! | Ō, grātiās tibi agō! | ok|
+| 43 | Oh, yes; you can save our friend, the Cowardly Lion, who is asleep in the poppy bed. | Ō ita; amīcum nostrum servāre potes, Leōnem Timidum, quī in agrō papāverum dormit. | Ō, ita; amīcum nostrum Leōnem Timidum servāre potes et quis in lectō dormit [poppy]. | fix A1 A8 emoji overflow |
+| 46 | Why, it is said that he never lets anyone come into his presence. | Dīcunt eum nēminem umquam ad sē admittere. / Quid? Dīcitur nēminem umquam ad sē admittere. | Quid? Dīcitur numquam aliquem sinere. | check contact-relative |
+| 47 | nor do I know of any living person who has seen him. | nec quemquam vīvum nōvī quī eum vīdit. | Neque hominem carbunculī quī eum vīdit sciō. | check A6 fragment |
+| 50 | But to those who are not honest, or who approach him from curiosity, | Sed eīs quī nōn sunt honestī, aut quī cūriōsitāte ad eum accēdunt, / Sed eīs quī nōn probī sunt, aut quī cūriōsitāte ad eum adeunt, | Sed; aut quis eī ā cūriōsitāte appropinquat | check A7 fragment frame-fallback |
+| 54 | Then he asked me what you looked like, | Tum mē rogāvit quālis essēs, / Tum mē rogāvit quālis vidērēris, | Tum mē rogāvit, | check A7 fragment |
+| 55 | and he decided he would admit you to his presence. | et cōnstituit sē tē ad sē admissūrum esse. / et cōnstituit tē admittere. | Et cōnstituit sē tē ad praesentiam suam fatērī. | check fragment |
+| 59 | I am only a Scarecrow, stuffed with straw. | Terriculum tantum sum, paleā plēnum. / Terriculum tantum sum, paleā fartum. | Ego paleā modo Terriculum sum. | check participle-phrase |
+| 61 | I am a Cowardly Lion, afraid of everything. | Leō Timidus sum, omnia timēns. / Leō Timidus sum, quī omnia timeō. | Leō Timidus sum. | check A9 emoji |
+| 62 | so that in reality I may become the King of Beasts, as men call me. | ut rē vērā Rēx Bēstiārum fīam, ut hominēs mē vocant. | Tam vēritās quam fortāsse fīō ut Rēx Bēstiārum quia virī mē vocant. | check A7 frame-fallback contact-relative purpose-guess fragment emoji |
+| 65 | so get behind me and I will meet them as they come. | itaque post mē stā, et eīs venientibus occurram. / itaque post mē stāte, et eīs venientibus occurram. | Itaque accipe post mē et eōs nancīscar quia veniunt. | check fragment |
+| 67 | You have called us for the third and last time. | Tertium et ultimum nōs vocāvistī. | Nōs tempus tertium vocāvistī. | check A7 |
+| 69 | I can still make her my slave, for she does not know how to use her power. | Eam tamen servam meam facere possum, nam potestāte suā ūtī nescit. | Adhūc eam facere possum ut servus meus nam potestāte suā ūtī nescit. | check purpose-guess |
+| 70 | I can starve you. | Famē tē necāre possum. / Tē famē cōnficere possum. | Tē [verb] possum. | fix A1 A9 missing-form |
+| 71 | You are a wicked creature! | Mala bēstia es! / Scelesta es! | Bēstia mala es! | check|
+| 72 | You have no right to take my shoe from me. | Nōn licet tibi calceum meum mihi auferre. / Iūs nōn habēs calceum meum mihi auferre. | Iūs quod calceum meum ā mē sūmit nōn habēs. | check noun-infinitive emoji |
+| 74 | Well, in a few minutes I shall be all melted, | Bene, paucīs minūtīs tōta liquēscam, / Bene, mox tōta liquēscam, | Bene, paucīs corpusculīs omnīnō colliquefacta erō, | check A6 fragment |
+| 76 | Are any of your people tinsmiths? | Suntne inter tuōs fabrī stannāriī? / Estne quisquam ē tuīs faber stannārius? | Estne [any]? | fix A1 unknown |
+| 77 | and bend him back into shape again, and solder him together where he is broken? | et eum iterum in fōrmam reflectere, et ubi frāctus est cōnferrūmināre? / et eum rūrsus in fōrmam flectere, et ubi frāctus est coniungere? | Et inclīnatne eum in figūram retrō iterum et eum ūnā plumbat cum frāctus est? | fix A3 A4 A6 fragment |
+| 78 | I’ll chop it down, and then we can get the Scarecrow’s clothes. | Eam caedam, et tum vestēs Terriculī capere poterimus. / Arborem caedam, et tum vestēs Terriculī sūmere possumus. | Eam caedam et tum pannōs Terriculī accipere possumus. | check|
+| 80 | It seems to me I can scarcely wait till I get to Oz, | Vix exspectāre posse mihi videor dum ad Oz perveniam, / Vix exspectāre possum dum ad Oz perveniam, | Expectātiō mihi haud videt, | fix A4 A6 A7 fragment |
+| 81 | and you must admit this is a very long journey. | et fatērī dēbēs hoc iter longissimum esse. | Et fatērī dēbēs hoc iter valdē longum esse. | check fragment |
+| 82 | Why didn’t we think of that before? | Cūr id anteā nōn cōgitāvimus? | Cūr nōn anteā dē eō cōgitāvimus? | ok|
+| 85 | Well, come to me tomorrow, for I must have time to think it over. | Bene, crās ad mē venī, nam tempus mihi est ut dē hōc cōgitem. / Bene, crās ad mē venī, nam tempus ad cōgitandum mihi opus est. | Bene, crās ad mē venī nam tempus eī super putāre dēbeō. | check|
+| 86 | But don’t strike me—please don’t—and I’ll do anything you want me to. | Sed nōlī mē ferīre, quaesō, nōlī, et faciam quidquid vīs. | Sed nōlī mē pulsāre— quaesō nōlī pulsāre— et aliquid faciam et mē vīs. | check ellipsis |
+| 88 | How was it that you appeared to me as a great Head? | Quōmodo mihi ut Caput magnum appāruistī? | Quōmodo mihi erat quam Caput magnum [appeared]? | fix A1 A7 emoji |
+| 91 | I cannot tell you how to use them, however; you must find that out for yourself. | Tamen tibi dīcere nōn possum quōmodo eīs ūtāris; id ipsa invenīre dēbēs. / Tamen tibi dīcere nōn possum quōmodo eīs ūtendum sit; id ipsa invenīre dēbēs. | Tamen tibi dīcere nōn possum ut quam ūtar; id tibi cognōscere dēbēs. | fix A4 purpose-guess |
+| 93 | Hereafter you will be a great man, for I have given you a lot of bran-new brains. | Posthāc vir magnus eris, nam multum cerebrī novī tibi dedī. / Posthāc vir magnus eris, nam cerebrum novum tibi dedī. | Posthāc vir magnus et dēlātor eris. | fix A3 A6 A7 participle-phrase emoji |
+| 95 | Sit down, my dear; I think I have found the way to get you out of this country. | Sedē, mea cāra; putō mē viam invēnisse quā ex hāc terrā exeās. | Sedē, mea cāra; putō mē viam quae tē ex hāc terrā accipit invēnisse. | check speaker-gender noun-infinitive emoji |
+| 97 | I have plenty of silk in the Palace, so it will be no trouble to make the balloon. | Multum sēricī in Rēgiā habeō, itaque facile erit follem facere. / Multum sēricī in Rēgiā habeō, itaque nūllus labor erit follem facere. | Cōpiam sēricī in Rēgiā habeō et tam opera quae follem facit nōn erō. | check noun-infinitive |
+| 98 | I am now going away to make a visit. | Nunc abeō ut amīcum vīsam. / Nunc proficīscor ut aliquem vīsam. | Nunc abeō ut officium faciam. | check light-verb |
+| 100 | I should like to cry a little because Oz is gone, | Paulum flēre velim, quia Oz abiit, | Flēre velim quia Oz paulum abiit, | check name-kept fragment |
+
+### Proposed gold alternatives (for the main agent; the gold file is unchanged)
+- #1 add "Itaque adhūc sagās et magōs inter nōs habēmus." - "have X among us" kept as habēre; same meaning.
+- #4 add "Potesne mē adiuvāre ut viam meam inveniam?" - the gold keeps the possessive of the subject elsewhere
+  ("Fābulam meam tibi nārrābō", "Rēgiam meam").
+- #17 (matches now): "Nōn potes dēscendere?" - the rule is "nōn + verb first" for negated questions.
+- #37 add "sed Cicōnia benigna mē servāvit," - order.adj puts a plain adjective after the noun.
+- #41 add "Ō, grātiās tibi agō!" - the phrasebook's "thank you" (grātiās tibi agō) as in own_dialogue.
+- #71 add "Bēstia mala es!" - order.adj.
+- #81 add "et fatērī dēbēs hoc iter valdē longum esse." - own_dialogue renders "very" + adjective as valdē.
+- #82 add "Cūr nōn anteā dē eō cōgitāvimus?" - "think of" is cōgitāre dē (verbprep_en_la.tsv); nōn after cūr as in
+  #27 and #36.
+
+### Decisions to confirm
+1. Negated yes/no questions are said as statements with nōn first ("Nōn potes dēscendere?", "Nescīs?"), following the
+   oz gold; DESIGN §10.3 says "don't you ..." -> nōnne. nōnne stays for tag questions.
+2. "Then" in a statement is tum (oz #6, #54), in an imperative / question igitur (own_dialogue).
+3. The fragment signal makes every cue that starts in lower case or ends with a comma Check.

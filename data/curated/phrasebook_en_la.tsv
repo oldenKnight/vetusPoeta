@@ -220,3 +220,6 @@ in reality	rē vērā	1	adv
 in my day	in diēbus meīs	1	tail	
 i feel like {NP}	{1:nom} mihi videor	1	stmt	"I feel like a new man." -> Novus homō mihi videor.
 in trouble	in perīculō	1	tail	"anyone in trouble"
+well	bene	1	lead	"Well, come to me tomorrow" -> Bene, ...
+for my part	ego	1	adv	"For my part, I have no heart" -> Ego cor nōn habeō
+i am not much of a {NP}	nōn magnus {1:nom} sum	1	stmt	"I'm not much of a magician" -> Nōn magnus magus sum

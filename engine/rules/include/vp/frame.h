@@ -4,6 +4,7 @@
 // phrasebook pieces and clause frames) in source order. Language neutral from here on: English and Spanish fill the
 // same structures. Deterministic; nothing here throws across the module boundary (callers catch at the engine).
 #pragma once
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -220,8 +221,16 @@ struct SemSentence {
   // (a clause hung on a noun), "clause-repair" (a clause buried under an adverb/oblique relabelled), "split"
   // (re-analysed as separate clauses), "simplified" (discourse words dropped), "no-verb" (a fragment with a verb).
   std::vector<std::string> repairs;
+  // C15: constructions the analysis renders by a rule of thumb (confidence Check, never OK): "contact-relative" (a
+  // relative clause without a relative word: "the arts I know of"), "noun-infinitive" ("no right to take"),
+  // "purpose-guess" (a to-infinitive read as purpose), "light-verb" ("make a visit"), "phrase-order" (a phrasebook
+  // phrase placed after its clause), "participle-phrase" ("a Scarecrow, stuffed with straw").
+  std::vector<std::string> doubts;
+  void doubt(const char* what) {
+    if (std::find(doubts.begin(), doubts.end(), what) == doubts.end()) doubts.emplace_back(what);
+  }
   void clear() { text.clear(); tokens.clear(); drop.clear(); units.clear(); finalPunct.clear(); question = false;
-                 repairs.clear(); }
+                 repairs.clear(); doubts.clear(); }
 };
 
 // ---- frame builder -----------------------------------------------------------------------------------------------------

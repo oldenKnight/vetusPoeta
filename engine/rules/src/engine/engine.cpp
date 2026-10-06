@@ -459,6 +459,60 @@ class RulesEngine final : public Engine {
                                  "\",\"tier\":" + std::to_string((int)m.tier) + "}"});
   }
 
+  // C15: word-by-word rendering for a sentence the analysis could not parse: each content word in its Latin
+  // dictionary form (the best candidate), names as written, "not" as nōn, unknown words in brackets.
+  void literalRender(const SemSentence& s, const transfer::Settings& st, SentOut& so, std::vector<int>& covered) {
+    cue::Latin L;
+    so.choices.clear();
+    so.unknown.clear();
+    for (size_t i = 0; i < s.tokens.size(); ++i) {
+      const nlp::Token& t = s.tokens[i];
+      std::string word;
+      uint32_t lemma = lex::kNoLemma;
+      uint8_t pos = t.upos == "NOUN" ? feat::Noun : t.upos == "VERB" ? feat::Verb : t.upos == "ADJ" ? feat::Adj
+                  : t.upos == "ADV" ? feat::Adv : 0;
+      if (t.lower == "not" || t.lower == "n't" || t.lower == "never") {
+        word = t.lower == "never" ? "numquam" : "nōn";
+        lemma = xfer_->latin(word.c_str(), feat::Adv);
+      } else if (t.upos == "PROPN" && !(i == 0 && la_)) {
+        word = t.text;
+      } else if (pos || t.upos == "PROPN") {
+        if (!pos) pos = feat::Adj;   // a capitalised first word: try it as a word
+        if (t.upos == "PROPN" && xfer_->latin(t.lower.c_str()) == lex::kNoLemma) {
+          transfer::Choice probe;
+          if (xfer_->select(t.lower, feat::Adj, {}, false, false, st, probe) == lex::kNoLemma &&
+              xfer_->select(t.lower, feat::Noun, {}, false, false, st, probe) != lex::kNoLemma)
+            pos = feat::Noun;
+        }
+        transfer::Choice ch;
+        ch.token = (int)i;
+        lemma = xfer_->select(t.upos == "PROPN" ? t.lower : t.lemma.empty() ? t.lower : t.lemma, pos, {}, false, false, st, ch);
+        so.choices.push_back(ch);
+        if (lemma != lex::kNoLemma) word = morph::displayForm(la_->lemma(lemma).head, true);
+        else { word = "[" + t.text + "]"; so.unknown.push_back(t.text); }
+      } else {
+        continue;
+      }
+      covered.push_back((int)i);
+      cue::Latin one;
+      rules::TokenView tv;
+      tokenInfo(word, tv);
+      tv.text = tv.display = word;
+      if (lemma != lex::kNoLemma) { tv.lemmaId = lemma; tv.hasLemma = true; }
+      tv.unknown = word[0] == '[';
+      tv.start = 0;
+      tv.end = (int)word.size();
+      one.text = word;
+      one.tokens.push_back(tv);
+      cue::append(L, one);
+    }
+    so.latin = L;
+    so.srcOffset.assign(L.tokens.size(), -1);
+    so.reasons.erase(std::remove_if(so.reasons.begin(), so.reasons.end(), [](const Reason& r) { return r.tokenIndex >= 0; }),
+                     so.reasons.end());
+    so.reasons.push_back(Reason{-1, "form", "could not parse: the words are given one by one (dictionary forms)", ""});
+  }
+
   // ---- one sentence ---------------------------------------------------------------------------------------------------
   // Parser-failure fallback (C2b): the sentence split at ", or" / ", and" / ";" and each piece translated on its own,
   // joined with ";"; Check.
@@ -718,14 +772,65 @@ class RulesEngine final : public Engine {
       if (endsWithAny(L.text, "?!")) capNext = i + 1 < units.size();
       else if (i + 1 < units.size() && !ut.sep.empty()) L.text += ut.sep;
     }
+    // C15 "never nonsense": the parse failed (no clause could hold the source verb) and the Latin has no verb: a
+    // confident-looking sentence would be invented. The words are given one by one instead (dictionary forms,
+    // unknown words in brackets), marked Fix with the reason "could not parse".
+    // A statement of three or more content words without any verb, made only of fragments, while one of its nouns
+    // can be read as a verb ("Colorless green ideas sleep furiously.") is a failed parse too.
+    bool verblessStatement = false;
+    if (st.lang == frame::SrcLang::En && en_ && (s.finalPunct == "." || s.finalPunct == "!")) {
+      int content = 0;
+      bool anyVerb = false, nounVerb = false, allFrag = !s.units.empty();
+      for (const frame::Unit& u : s.units)
+        if (u.type != frame::Unit::Clause || u.frame.type != frame::Kind::Frag || u.vocative) allFrag = false;
+      for (size_t i = 0; i < s.tokens.size(); ++i) {
+        const nlp::Token& t = s.tokens[i];
+        if (t.upos == "VERB" || t.upos == "AUX") anyVerb = true;
+        if (t.upos == "NOUN" || t.upos == "ADJ" || t.upos == "ADV" || t.upos == "PROPN") ++content;
+        if (t.upos == "NOUN" && i > 0) {
+          std::vector<lex::Analysis> an;
+          en_->lookup(text::en_key(t.lower), an);
+          for (const lex::Analysis& a : an) nounVerb = nounVerb || en_->lemma(a.lemma).pos == feat::Verb;
+        }
+      }
+      verblessStatement = allFrag && !anyVerb && nounVerb && content >= 4;
+    }
+    if (((std::find(s.repairs.begin(), s.repairs.end(), "no-verb") != s.repairs.end()) || verblessStatement) &&
+        st.lang == frame::SrcLang::En) {
+      bool srcVerb = verblessStatement, laVerb = false;
+      for (size_t i = 0; i < s.tokens.size(); ++i)
+        if (s.tokens[i].upos == "VERB" && s.drop[i] == frame::Drop::No) srcVerb = true;
+      for (const rules::TokenView& t : L.tokens) laVerb = laVerb || t.features.pos == "verb";
+      if (srcVerb && !laVerb) {
+        literalRender(s, st, so, covered);
+        flags.push_back("could-not-parse");
+      }
+    }
     if (!s.repairs.empty()) {   // the analysis used a fallback: the structure may be wrong (Check)
       std::string what;
       for (const std::string& r : s.repairs) what += (what.empty() ? "" : ", ") + r;
       addFlag(flags, "frame-fallback");
       so.reasons.push_back(Reason{-1, "form", "sentence analysis fallback (" + what + "): check the structure", ""});
     }
+    // C15: constructions rendered by a rule of thumb (frame.h SemSentence::doubts) and clause fragments cut from
+    // their sentence are never OK (Check): the reader should look at them
+    for (const std::string& d : s.doubts) {
+      addFlag(flags, d);
+      so.reasons.push_back(Reason{-1, "form", "construction rendered by a rule of thumb (" + d + "): check it", ""});
+    }
+    {
+      const bool lowerStart = !text.empty() && text[0] >= 'a' && text[0] <= 'z';
+      size_t e = text.size();
+      while (e > 0 && text[e - 1] == ' ') --e;
+      const bool openEnd = e > 0 && (text[e - 1] == ',' || text[e - 1] == ';' || text[e - 1] == ':' || text[e - 1] == '-');
+      if (st.lang == frame::SrcLang::En && (lowerStart || openEnd)) {
+        addFlag(flags, "fragment");
+        so.reasons.push_back(Reason{-1, "form", "a clause cut from its sentence: check it in context", ""});
+      }
+    }
     std::string fp = s.finalPunct;
     if (fp.empty() && frame::endsSentence(text)) fp = ".";
+    if (fp.empty() && !text.empty() && (text.back() == ',' || text.back() == ';')) fp = std::string(1, text.back());   // C15
     if (fp == "\xE2\x80\xA6") fp = "...";
     while (!L.text.empty() && endsWithAny(L.text, ",;:")) L.text.pop_back();
     L.text += fp;
@@ -1206,10 +1311,13 @@ class RulesEngine final : public Engine {
       bool a5fix = false;   // A5 is a Fix unless the only finding is an approximated tag position (Check)
       for (const Check& k : o.checks)
         if (k.id == "A5" && !k.ok && k.detail != "tag position approximated") a5fix = true;
-      const bool fix = !checkOk(o, "A1") || !checkOk(o, "A3") || !checkOk(o, "A4") || unknown || a5fix;
+      const bool fix = !checkOk(o, "A1") || !checkOk(o, "A3") || !checkOk(o, "A4") || unknown || a5fix ||
+                       std::find(o.flags.begin(), o.flags.end(), "could-not-parse") != o.flags.end();
       bool chk = !checkOk(o, "A5") || !checkOk(o, "A6") || !checkOk(o, "A7") || !checkOk(o, "A8") || !checkOk(o, "A9") ||
                  a.minMargin < 0.15 || a.song || a.nonverbal || onlineDisagree;
-      for (const char* f : {"name-guessed", "from-rule", "addressee-guess", "missing-form", "merged", "frame-fallback"})
+      for (const char* f : {"name-guessed", "from-rule", "addressee-guess", "missing-form", "merged", "frame-fallback",
+                            "fragment", "contact-relative", "noun-infinitive", "purpose-guess", "light-verb",
+                            "phrase-order", "participle-phrase", "ellipsis", "could-not-parse"})
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       // a tier 3 word chosen while a tier 1/2 word of the same sense existed (fidelity 1, a correction aside)
       for (const transfer::Choice& c : a.choices)

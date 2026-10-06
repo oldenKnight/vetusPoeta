@@ -717,7 +717,16 @@ struct LatinChecker::Impl {
               person = true;
             else if (r.lpos == Name || (r.lflags & lex::ProperName))
               person = true;
-          if (person) issue("A4", (int)j, "agent '" + T(j) + "' of a passive verb needs ā/ab");
+          // C15: an impersonal passive of saying takes the person in the dative ("nōbīs dictum est"): a dative
+          // reading with a neuter singular participle is not an agent
+          bool impersDat = false;
+          if (hasCase(j, Dat))
+            for (size_t q = b; q < e; ++q)
+              for (const Reading& r : rd[q])
+                if ((r.f.mood == ParticipleMood || r.lpos == Participle) && r.f.gender == N && r.f.number == Sg &&
+                    (r.f.case_ == Nom || r.f.case_ == 0))
+                  impersDat = true;
+          if (person && !impersDat) issue("A4", (int)j, "agent '" + T(j) + "' of a passive verb needs ā/ab");
         }
       }
       b = e;

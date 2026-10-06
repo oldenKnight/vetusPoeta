@@ -112,6 +112,7 @@ struct LaClause {
   Role relRole = Role::None;               // set when the clause is a relative clause
   uint32_t relPrep = kNone;                // relative pronoun inside a prepositional phrase
   std::string punct;                       // source punctuation; empty = "." / "?" by type
+  bool plainQuestion = false;              // C15: a negated question said as a statement: nōn + verb first, no -ne
 };
 
 struct LaSentence {

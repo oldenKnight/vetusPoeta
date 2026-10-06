@@ -9,6 +9,7 @@
 namespace vp::transfer::tables {
 
 bool animateNoun(const std::string& lemma);           // person / animal nouns (EN + ES)
+bool narrativeNoun(const std::string& lemma);   // C15: "tell a story" -> nārrō
 bool personalPronoun(const std::string& w);           // i, me, you, he ... yo, tú, él ...
 const char* adverb(const std::string& lemma, bool motion);   // here -> hīc (motion: hūc) ...; nullptr if not listed
 bool dropAdverb(const std::string& lemma);            // adverbs with no Latin counterpart needed ("just")

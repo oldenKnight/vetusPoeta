@@ -5,8 +5,8 @@ sum	sum	verb	1	derived
 possum	possum	verb	1	derived	
 habeo	habeō	verb	1	derived	
 do	dō	verb	1	derived	
-facio	faciō	verb	1	derived	
-dico	dīcō	verb	1	derived	
+facio	faciō	verb	1	derived	make, do
+dico	dīcō	verb	1	derived	say, tell
 video	videō	verb	1	derived	
 venio	veniō	verb	1	derived	
 eo	eō	verb	1	derived	
@@ -15,7 +15,7 @@ nolo	nōlō	verb	1	derived
 debeo	dēbeō	verb	1	derived	
 scio	sciō	verb	1	derived	
 nescio	nesciō	verb	1	derived	
-puto	putō	verb	1	derived	
+puto	putō	verb	1	derived	think, suppose, believe
 amo	amō	verb	1	derived	
 voco	vocō	verb	1	derived	
 saluto	salūtō	verb	1	derived	
@@ -105,7 +105,7 @@ nascor	nāscor	verb	1	derived
 cresco	crēscō	verb	1	derived	
 fio	fīō	verb	1	derived	
 loquor	loquor	verb	1	derived	
-narro	nārrō	verb	1	derived	
+narro	nārrō	verb	1	derived	narrate, relate
 nuntio	nūntiō	verb	1	derived	
 ostendo	ostendō	verb	1	derived	
 monstro	mōnstrō	verb	1	derived	
@@ -302,7 +302,7 @@ ultimus	ultimus	adj	1	derived
 laetus	laetus	adj	1	derived	
 tristis	trīstis	adj	1	derived	
 iratus	īrātus	adj	1	derived	
-fessus	fessus	adj	1	derived	
+fessus	fessus	adj	1	derived	tired, weary
 aeger	aeger	adj	1	derived	
 sanus	sānus	adj	1	derived	
 fortis	fortis	adj	1	derived	
@@ -312,7 +312,7 @@ prudens	prūdēns	adj	1	derived
 sapiens	sapiēns	adj	1	derived	
 pauper	pauper	adj	1	derived	
 dives	dīves	adj	1	derived	
-plenus	plēnus	adj	1	derived	
+plenus	plēnus	adj	1	derived	full, stuffed, filled
 vacuus	vacuus	adj	1	derived	
 albus	albus	adj	1	derived	
 niger	niger	adj	1	derived	
@@ -577,3 +577,5 @@ apis	apis	noun	2	teacher	bee
 mane	māne	adv	1	teacher	in the morning, early
 vesperi	vesperī	adv	2	teacher	in the evening
 posthac	posthāc	adv	2	teacher	hereafter, from now on
+alius	alius	det	1	teacher	other, another
+malum2	malum	noun	1	teacher	evil, harm, misfortune
