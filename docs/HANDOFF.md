@@ -48,3 +48,8 @@ Last updated: 2026-10-05 (session 1, step 1 of the production process).
   and Greek treebanks are CC BY-NC-SA and must not be used.
 - No pull request yet: the repo has no default branch besides ours, so there is no base to
   open a PR against. The owner should create `main` (or say which base to use).
+
+## Interruption protocol (used 2026-10-06 03:30 UTC after an API session limit)
+When implementers die mid-task: `git add` their task paths and commit one `wip: checkpoint ...` commit, push,
+then resume each agent (same agent, same context) with a message naming the checkpoint commit and asking it to
+re-check `git status` and re-run its tests before continuing. Done so for B2, B7, C1, C4 (commit 196d87d).
