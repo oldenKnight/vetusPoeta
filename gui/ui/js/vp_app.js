@@ -2,14 +2,19 @@
  * connected (WebView2, or the mock with ?mock=1), engine.hello, settings applied (theme,
  * language, text size), router started on the start screen.
  *
- * Until vp_start.js exists, the start screen is a placeholder that shows the engine status
- * line, the EN/ES and theme switches, the bundled-font sample and the shared components.
+ * Screens: "start" (VP_Start, or the placeholder below when vp_start.js is absent) and
+ * "workspace" (VP_Workspace). The router follows VP_Store 'project': a project object routes
+ * to the workspace, null routes back to the start screen (deferred by one tick so a screen
+ * never destroys itself inside its own handler). The placeholder (engine status line, EN/ES
+ * and theme switches, the bundled-font sample, the shared components) stays available as
+ * VP_App.placeholder for the smoke test's font checks.
  * index.html marks #app with data-autoboot="true"; tests call VP_App.boot({root, status}).
  *
  * Query flags (dev): mock=1, debug=1, lang=en-US|es-MX, theme=light|dark|auto,
  * reducedMotion=1.
  * VP_App.boot(opts) -> Promise; ready(); setLang(code) -> Promise; setTheme(theme);
- * errorText(code, hint) -> {title, hint}; showError(err); flags(); fontSample()
+ * errorText(code, hint) -> {title, hint}; showError(err); flags(); fontSample();
+ * saveSettings(patch) -> Promise(settings) (store first, then settings.set)
  */
 (function () {
   'use strict';
@@ -77,12 +82,42 @@
   }
 
   function persist(patch) {
-    if (window.VP_Bridge.kind() === 'none') { return; }
-    window.VP_Bridge.call('settings.set', { patch: patch }).then(function (s) {
+    if (window.VP_Bridge.kind() === 'none') { return window.Promise.resolve(window.VP_Store.get('settings') || null); }
+    return window.VP_Bridge.call('settings.set', { patch: patch }).then(function (s) {
       window.VP_Store.set('settings', s);
+      return s;
     }, function (err) {
       if (window.console) { window.console.warn('[VP_App] settings.set failed: ' + err.code); }
+      throw err;
     });
+  }
+
+  // Settings the UI changes (view toggles, default pair, recent details): the store first so
+  // the screen reacts at once, then the engine, whose answer becomes the store value.
+  function saveSettings(patch) {
+    var cur = window.VP_Store.get('settings') || {};
+    var next = {};
+    var k;
+    for (k in cur) { if (Object.prototype.hasOwnProperty.call(cur, k)) { next[k] = cur[k]; } }
+    for (k in patch) { if (Object.prototype.hasOwnProperty.call(patch, k)) { next[k] = patch[k]; } }
+    window.VP_Store.set('settings', next);
+    return persist(patch).then(null, function () { return null; });
+  }
+
+  // ---------------------------------------------------------------- routing
+  function route(project) {
+    var want = project ? 'workspace' : 'start';
+    if (!window.VP_Router.has(want)) { return; }
+    window.VP_Timers.setTimeout('app', function () {
+      var cur = !!window.VP_Store.get('project');
+      var name = cur ? 'workspace' : 'start';
+      if (window.VP_Router.current() !== name && window.VP_Router.has(name)) {
+        // Notices belong to the screen that showed them (an Undo after closing a project
+        // would act on nothing), so they go with it.
+        window.VP_Toast.clearAll();
+        window.VP_Router.go(name);
+      }
+    }, 0);
   }
 
   function setTheme(theme, save) {
@@ -90,13 +125,13 @@
     var html = document.documentElement;
     if (theme === 'auto') { html.removeAttribute('data-theme'); } else { html.setAttribute('data-theme', theme); }
     html.setAttribute('data-theme-pref', theme);
-    if (save !== false) { persist({ theme: theme }); }
+    if (save !== false) { persist({ theme: theme }).then(null, function () { return null; }); }
     return theme;
   }
 
   function setLang(code, save) {
     var ok = window.VP_I18n.setLang(code);
-    if (ok && save !== false) { persist({ lang: code }); }
+    if (ok && save !== false) { persist({ lang: code }).then(null, function () { return null; }); }
     return ok;
   }
 
@@ -378,7 +413,9 @@
     }).then(function () {
       window.VP_I18n.setLang(initialLang());
       if (!window.VP_Router.has('start')) { window.VP_Router.register('start', window.VP_Start || placeholder); }
-      window.VP_Router.start(root, 'start');
+      if (!window.VP_Router.has('workspace') && window.VP_Workspace) { window.VP_Router.register('workspace', window.VP_Workspace); }
+      window.VP_Store.subscribe('project', route);
+      window.VP_Router.start(root, window.VP_Store.get('project') && window.VP_Router.has('workspace') ? 'workspace' : 'start');
       renderStatus();
       var kind = window.VP_Bridge.init({ mock: flagSet.mock });
       if (kind === 'none') {
@@ -408,6 +445,7 @@
     setTheme: setTheme,
     errorText: errorText,
     showError: showError,
+    saveSettings: saveSettings,
     openShortcuts: openShortcuts,
     placeholder: placeholder,
     flags: function () { return flagSet; },

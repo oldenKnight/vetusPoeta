@@ -5,8 +5,15 @@
  * Checks: no console errors, CSP violations or failed requests; boot with the mock engine;
  * 50 mounts/destroys of the start screen return VP_Debug.stats() to baseline; Gentium Plus
  * renders the Latin (macrons, breves) and polytonic Greek sample (document.fonts.check plus
- * Chromium's own platform-font report); auto dark follows the system; DOM and heap budgets;
- * shortcut dialog and tour by keyboard. Screenshots go to gui/ui/dev/out/ (gitignored).
+ * Chromium's own platform-font report, on the B3 placeholder screen mounted for it); auto
+ * dark follows the system; DOM and heap budgets; shortcut dialog and tour by keyboard.
+ * Screens (B6): the sample project opens in the workspace, a mock translation runs to the
+ * end and leaves "Needs review (n)" with the first cue to review selected; the editor
+ * underlines an unknown word; the drawer below 1180 px; a 50,000-cue project is paged in,
+ * scrolled to the end and back (rendered cue rows <= 40, DOM nodes <= 800); selecting a cue
+ * takes < 100 ms (to the next frame); closing a project returns listeners and timers to the
+ * Start screen baseline. Screenshots go to gui/ui/dev/out/ (gitignored): start and
+ * workspace in light/dark and en-US/es-MX.
  */
 'use strict';
 
@@ -64,6 +71,53 @@ function main() {
   var errors = [];
   var started = 0;
 
+  var baseline = null;
+
+  // Selecting a cue: VP_CueList.select() renders the row and the panes synchronously; the
+  // time runs until the next animation frame, so it includes style and layout.
+  function measureSelect(n, what) {
+    return page.evaluate(function (count) {
+      var total = window.VP_CueList.total();
+      var times = [];
+      var i = 0;
+      return new Promise(function (resolve) {
+        function one() {
+          if (i >= count) {
+            resolve(times);
+            return;
+          }
+          var index = Math.floor((i * 7919) % total);
+          i++;
+          var t0 = performance.now();
+          window.VP_CueList.select(index);
+          var row = document.querySelector('.vp-cue-row-selected');
+          var height = row ? row.offsetHeight : 0; // reading it forces style and layout
+          var sync = performance.now() - t0;
+          requestAnimationFrame(function () {
+            times.push([performance.now() - t0, sync, height]);
+            setTimeout(one, 30);
+          });
+        }
+        one();
+      });
+    }, n).then(function (pairs) {
+      var frame = pairs.map(function (p) { return p[0]; }).sort(function (a, b) { return a - b; });
+      var sync = pairs.map(function (p) { return p[1]; }).sort(function (a, b) { return a - b; });
+      var max = frame[frame.length - 1];
+      check(max < 100, 'selecting a cue (' + what + '): to the next frame median ' + frame[Math.floor(frame.length / 2)].toFixed(1) + ' ms, max ' + max.toFixed(1) +
+        ' ms (< 100 ms); render plus layout median ' + sync[Math.floor(sync.length / 2)].toFixed(1) + ' ms, max ' + sync[sync.length - 1].toFixed(1) + ' ms');
+    });
+  }
+
+  function compareBaseline(when) {
+    return page.waitForTimeout(100).then(function () {
+      return page.evaluate(function () { return window.VP_Debug.stats(); });
+    }).then(function (s) {
+      check(s.listeners === baseline.listeners && s.timers === baseline.timers, when + ': listeners ' + baseline.listeners + '->' + s.listeners + ', timers ' + baseline.timers + '->' + s.timers + ' (baseline of the Start screen)');
+      check(s.cueRows === 0 && s.domNodes <= baseline.domNodes + 10, when + ': ' + s.domNodes + ' DOM nodes (Start baseline ' + baseline.domNodes + ' plus a recent-project row when the project had a file), no cue rows');
+    });
+  }
+
   function shot(name, full) {
     return page.waitForTimeout(250).then(function () { return page.screenshot({ path: path.join(OUT, name), fullPage: !!full }); }).then(function () { note('screenshot dev/out/' + name); });
   }
@@ -115,7 +169,7 @@ function main() {
         title: document.title,
         lang: document.documentElement.lang,
         h1: document.querySelector('h1').textContent,
-        line: document.getElementById('vp-engine-line').textContent,
+        line: document.getElementById('vp-start-status').textContent,
         status: document.getElementById('vp-status').textContent,
         kind: window.VP_Bridge.kind(),
         missing: window.VP_I18n.missing()
@@ -124,7 +178,7 @@ function main() {
   }).then(function (r) {
     check(r.kind === 'mock', 'bridge uses the mock engine (' + r.kind + ')');
     check(r.title === 'vetus poeta' && r.lang === 'en-US', 'title and <html lang> (' + r.title + ', ' + r.lang + ')');
-    check(r.h1 === 'Welcome to vetus poeta', 'placeholder start screen mounted');
+    check(r.h1 === 'What would you like to do?', 'start screen mounted (' + r.h1 + ')');
     check(r.line.indexOf('54,199') >= 0, 'engine status line: ' + r.line);
     check(r.status.indexOf('Offline') >= 0, 'status bar shows the offline indicator');
     check(r.missing.length === 0, 'no missing i18n keys at run time');
@@ -138,10 +192,13 @@ function main() {
     var b = r.before;
     var a = r.after;
     check(a.listeners === b.listeners && a.timers === b.timers && a.domNodes === b.domNodes && JSON.stringify(a.caches) === JSON.stringify(b.caches),
-      '50 mount/destroy cycles: listeners ' + b.listeners + '->' + a.listeners + ', timers ' + b.timers + '->' + a.timers + ', DOM nodes ' + b.domNodes + '->' + a.domNodes);
+      '50 mount/destroy cycles of Start: listeners ' + b.listeners + '->' + a.listeners + ', timers ' + b.timers + '->' + a.timers + ', DOM nodes ' + b.domNodes + '->' + a.domNodes);
     check(r.failures.length === 0, 'no VP_Debug failures (router leak checks): ' + JSON.stringify(r.failures));
     check(a.domNodes <= 800, 'DOM nodes ' + a.domNodes + ' <= 800');
     return page.evaluate(function () {
+      // The font sample lives on the B3 placeholder screen, mounted here only for this check.
+      if (!window.VP_Router.has('fonts')) { window.VP_Router.register('fonts', window.VP_App.placeholder); }
+      window.VP_Router.go('fonts');
       return document.fonts.ready.then(function () {
         var s = window.VP_App.fontSample();
         var faces = [];
@@ -170,47 +227,6 @@ function main() {
     return platformFonts('#vp-sample-emoji');
   }).then(function (fonts) {
     note('emoji span rendered with: ' + fonts.map(function (f) { return f.familyName + ' (' + f.glyphCount + ')'; }).join(', '));
-    return page.evaluate(function () { window.VP_App.setTheme('light'); });
-  }).then(function () {
-    return shot('start-light-en.png', true);
-  }).then(function () {
-    return page.evaluate(function () { window.VP_App.setTheme('auto'); });
-  }).then(function () {
-    return page.emulateMedia({ colorScheme: 'dark' });
-  }).then(function () {
-    return page.evaluate(function () { return window.getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(); });
-  }).then(function (bg) {
-    check(bg.toUpperCase() === '#1B1815', 'theme "auto" follows the system dark setting (--bg ' + bg + ')');
-    return page.evaluate(function () { window.VP_App.setTheme('dark'); });
-  }).then(function () {
-    return shot('start-dark-en.png', true);
-  }).then(function () {
-    return page.click('[data-lang="es-MX"]');
-  }).then(function () {
-    return page.evaluate(function () { return { lang: document.documentElement.lang, h1: document.querySelector('h1').textContent }; });
-  }).then(function (r) {
-    check(r.lang === 'es-MX' && r.h1 === 'Te damos la bienvenida a vetus poeta', 'language switch to es-MX by click');
-    return shot('start-dark-es.png', true);
-  }).then(function () {
-    return page.keyboard.press('F1');
-  }).then(function () {
-    return page.evaluate(function () {
-      var d = document.querySelector('[role="dialog"]');
-      return { open: !!d, modal: d && d.getAttribute('aria-modal'), focusInside: !!d && d.contains(document.activeElement) };
-    });
-  }).then(function (r) {
-    check(r.open && r.modal === 'true' && r.focusInside, 'F1 opens the shortcut dialog with focus inside');
-    return shot('keys-dark-es.png');
-  }).then(function () {
-    return page.keyboard.press('Escape');
-  }).then(function () {
-    return page.evaluate(function () {
-      window.VP_App.setTheme('light');
-      window.VP_App.setLang('en-US');
-      return window.VP_Dialog.count();
-    });
-  }).then(function (n) {
-    check(n === 0, 'Escape closes the dialog');
     return page.focus('[data-action="tour"]');
   }).then(function () {
     return page.keyboard.press('Enter');
@@ -233,6 +249,220 @@ function main() {
     check(r.status, 'toast inside the role=status region');
     return shot('toast-light-en.png');
   }).then(function () {
+    return page.evaluate(function () {
+      window.VP_Toast.clearAll();
+      window.VP_Router.go('start');
+      window.VP_App.setTheme('light');
+    });
+  }).then(function () {
+    return shot('start-light-en.png', true);
+  }).then(function () {
+    return page.evaluate(function () { window.VP_App.setTheme('auto'); });
+  }).then(function () {
+    return page.emulateMedia({ colorScheme: 'dark' });
+  }).then(function () {
+    return page.evaluate(function () { return window.getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(); });
+  }).then(function (bg) {
+    check(bg.toUpperCase() === '#1B1815', 'theme "auto" follows the system dark setting (--bg ' + bg + ')');
+    return page.evaluate(function () { window.VP_App.setTheme('dark'); });
+  }).then(function () {
+    return shot('start-dark-en.png', true);
+  }).then(function () {
+    return page.click('[data-lang="es-MX"]');
+  }).then(function () {
+    return page.evaluate(function () { return { lang: document.documentElement.lang, h1: document.querySelector('h1').textContent }; });
+  }).then(function (r) {
+    check(r.lang === 'es-MX' && r.h1 === '¿Qué quieres hacer?', 'language switch to es-MX by click');
+    return shot('start-dark-es.png', true);
+  }).then(function () {
+    return page.evaluate(function () { window.VP_App.setTheme('light'); });
+  }).then(function () {
+    return shot('start-light-es.png', true);
+  }).then(function () {
+    return page.keyboard.press('F1');
+  }).then(function () {
+    return page.evaluate(function () {
+      var d = document.querySelector('[role="dialog"]');
+      return { open: !!d, modal: d && d.getAttribute('aria-modal'), focusInside: !!d && d.contains(document.activeElement) };
+    });
+  }).then(function (r) {
+    check(r.open && r.modal === 'true' && r.focusInside, 'F1 opens the shortcut dialog with focus inside');
+    return shot('keys-light-es.png');
+  }).then(function () {
+    return page.keyboard.press('Escape');
+  }).then(function () {
+    return page.evaluate(function () {
+      window.VP_App.setLang('en-US');
+      return window.VP_Dialog.count();
+    });
+  }).then(function (n) {
+    check(n === 0, 'Escape closes the dialog');
+    return page.evaluate(function () { return window.VP_Debug.stats(); });
+  }).then(function (s0) {
+    baseline = s0;
+    note('Start screen baseline: ' + s0.listeners + ' listeners, ' + s0.timers + ' timers, ' + s0.domNodes + ' DOM nodes');
+    return page.click('[data-start-action="sample"]');
+  }).then(function () {
+    return page.waitForFunction(function () { return window.VP_Router.current() === 'workspace' && window.VP_Store.cueCount() === 12; }, null, { timeout: 10000, polling: 50 });
+  }).then(function () {
+    return page.evaluate(function () {
+      return { name: document.querySelector('.vp-ws-name').textContent, rows: window.VP_Debug.stats().cueRows, src: document.getElementById('vp-src-text').textContent };
+    });
+  }).then(function (r) {
+    check(r.name === 'sample.en.srt' && r.rows === 12, 'sample project opens in the workspace (' + r.name + ', ' + r.rows + ' rows)');
+    check(r.src === 'The girl sees the rose.', 'first cue selected and shown: ' + r.src);
+    return page.click('#vp-translate');
+  }).then(function () {
+    return page.waitForFunction(function () { return !window.VP_Store.get('job') && window.VP_CueList.filter() === 'review'; }, null, { timeout: 15000, polling: 50 });
+  }).then(function () {
+    return page.evaluate(function () {
+      var L = window.VP_CueList;
+      var sel = document.getElementById('vp-cl-filter');
+      return { selected: L.selected(), first: L.firstReview(), label: sel.options[sel.selectedIndex].textContent, review: L.counts().review, counts: document.querySelector('.vp-ws-counts').textContent };
+    });
+  }).then(function (r) {
+    check(r.first >= 0 && r.selected === r.first, 'after translating, the first cue to review is selected (' + r.selected + ')');
+    check(r.label === 'Needs review (' + r.review + ')', 'filter shows "' + r.label + '"');
+    check(r.counts.indexOf('12 / 12 translated') === 0, 'status bar counts: ' + r.counts);
+    return page.evaluate(function () { window.VP_Toast.clearAll(); });
+  }).then(function () {
+    return shot('workspace-light-en.png');
+  }).then(function () {
+    return page.click('.vp-word');
+  }).then(function () {
+    return page.waitForTimeout(150);
+  }).then(function () {
+    return shot('workspace-word-light-en.png');
+  }).then(function () {
+    return page.evaluate(function () { window.VP_App.setTheme('dark'); });
+  }).then(function () {
+    return shot('workspace-dark-en.png');
+  }).then(function () {
+    return page.evaluate(function () { window.VP_App.setLang('es-MX'); });
+  }).then(function () {
+    return shot('workspace-dark-es.png');
+  }).then(function () {
+    return page.evaluate(function () { window.VP_App.setTheme('light'); });
+  }).then(function () {
+    return shot('workspace-light-es.png');
+  }).then(function () {
+    return page.keyboard.press('e');
+  }).then(function () {
+    return page.keyboard.type(' xyzzy');
+  }).then(function () {
+    return page.waitForTimeout(600);
+  }).then(function () {
+    return page.evaluate(function () { return { mode: window.VP_Panes.mode(), marks: document.querySelectorAll('.vp-editor-mirror .vp-unknown').length }; });
+  }).then(function (r) {
+    check(r.mode === 'edit' && r.marks === 1, 'E opens the editor; the unknown word is underlined (' + r.marks + ')');
+    return shot('workspace-editor-light-es.png');
+  }).then(function () {
+    return page.keyboard.press('Escape');
+  }).then(function () {
+    return page.evaluate(function () {
+      window.VP_App.setLang('en-US');
+      window.VP_CueList.setFilter('all');
+      window.VP_CueList.focusList();
+    });
+  }).then(function () {
+    return measureSelect(12, 'sample');
+  }).then(function () {
+    return page.setViewportSize({ width: 1100, height: 760 });
+  }).then(function () {
+    return page.click('.vp-ws-drawer-btn');
+  }).then(function () {
+    return page.evaluate(function () { var r = document.querySelector('.vp-ws-right'); return { open: window.VP_Workspace.drawerOpen(), shown: r.getBoundingClientRect().width > 0 }; });
+  }).then(function (r) {
+    check(r.open && r.shown, 'below 1180 px the right panel is a drawer opened by its button');
+    return shot('workspace-drawer-1100.png');
+  }).then(function () {
+    return page.setViewportSize({ width: 1280, height: 800 });
+  }).then(function () {
+    return page.click('.vp-ws-home');
+  }).then(function () {
+    return page.waitForFunction(function () { return window.VP_Router.current() === 'start'; }, null, { timeout: 5000, polling: 50 });
+  }).then(function () {
+    return compareBaseline('after closing the sample project');
+  }).then(function () {
+    started = Date.now();
+    return page.evaluate(function () { window.VP_Start.openPath('C:\\Users\\Teacher\\demo-50000-cues.vpoeta'); });
+  }).then(function () {
+    return page.waitForFunction(function () { return window.VP_Router.current() === 'workspace' && window.VP_CueList.isMounted() && window.VP_CueList.allLoaded(); }, null, { timeout: 60000, polling: 100 });
+  }).then(function () {
+    note('50,000-cue project open and every cue paged in: ' + (Date.now() - started) + ' ms');
+    return page.evaluate(function () {
+      var v = document.querySelector('.vp-cl-viewport');
+      var worst = { rows: 0, nodes: 0 };
+      var offsets = [0];
+      for (var i = 1; i <= 40; i++) { offsets.push(Math.floor(v.scrollHeight * i / 40)); }
+      offsets.push(v.scrollHeight);
+      for (var k = offsets.length - 1; k >= 0; k--) { offsets.push(offsets[k]); }
+      var i2 = 0;
+      return new Promise(function (resolve) {
+        function next() {
+          if (i2 >= offsets.length) {
+            resolve(worst);
+            return;
+          }
+          v.scrollTop = offsets[i2++];
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+              var s = window.VP_Debug.stats();
+              worst.rows = Math.max(worst.rows, s.cueRows);
+              worst.nodes = Math.max(worst.nodes, s.domNodes);
+              if (i2 === 42) {
+                var rows = document.querySelectorAll('.vp-cue-row');
+                worst.lastIndex = Number(rows[rows.length - 1].getAttribute('data-index'));
+              }
+              next();
+            });
+          });
+        }
+        next();
+      }).then(function (w) {
+        w.backTop = v.scrollTop;
+        w.firstIndex = Number(document.querySelector('.vp-cue-row').getAttribute('data-index'));
+        w.heap = window.performance.memory ? window.performance.memory.usedJSHeapSize : 0;
+        w.total = document.querySelector('.vp-cl-viewport').getAttribute('aria-rowcount');
+        return w;
+      });
+    });
+  }).then(function (w) {
+    check(w.total === '50000', 'listbox aria-rowcount 50000');
+    check(w.rows <= 40, 'scrolling 50,000 cues to the end and back: at most ' + w.rows + ' rendered cue rows (<= 40)');
+    check(w.nodes <= 800, 'DOM nodes at most ' + w.nodes + ' (<= 800)');
+    check(w.lastIndex === 49999, 'the last cue is rendered at the end (' + w.lastIndex + ')');
+    check(w.backTop === 0 && w.firstIndex === 0, 'back at the top');
+    if (w.heap) { note('JS heap with 50,000 cues loaded: ' + (w.heap / 1048576).toFixed(1) + ' MB'); }
+    return shot('workspace-50k-light-en.png');
+  }).then(function () {
+    return measureSelect(30, '50,000 cues');
+  }).then(function () {
+    return page.evaluate(function () {
+      var t0 = performance.now();
+      window.VP_CueList.setFilter('review');
+      var t1 = performance.now();
+      window.VP_CueList.setQuery('insula');
+      var t2 = performance.now();
+      var n = window.VP_CueList.viewIndices().length;
+      window.VP_CueList.setQuery('');
+      window.VP_CueList.setFilter('all');
+      return { filterMs: t1 - t0, searchMs: t2 - t1, n: n };
+    });
+  }).then(function (r) {
+    note('50,000 cues: filter "Needs review" ' + r.filterMs.toFixed(1) + ' ms, search "insula" ' + r.searchMs.toFixed(1) + ' ms (' + r.n + ' matches)');
+    check(r.n > 0, 'macron-insensitive search finds "īnsulā" in 50,000 cues');
+    return page.click('.vp-ws-home');
+  }).then(function () {
+    return page.waitForFunction(function () { return window.VP_Router.current() === 'start'; }, null, { timeout: 10000, polling: 50 });
+  }).then(function () {
+    return compareBaseline('after closing the 50,000-cue project');
+  }).then(function () {
+    return page.evaluate(function () { return { failures: window.VP_Debug.failures(), missing: window.VP_I18n.missing(), cues: window.VP_Store.cueCount() }; });
+  }).then(function (r) {
+    check(r.failures.length === 0, 'no VP_Debug failures (router leak checks) over the whole run: ' + JSON.stringify(r.failures));
+    check(r.missing.length === 0, 'no missing i18n keys: ' + r.missing.join(', '));
+    check(r.cues === 0, 'cue records dropped on close');
     check(errors.length === 0, 'no console errors, CSP violations or failed requests' + (errors.length ? ': ' + errors.join(' | ') : ''));
   }).then(null, function (e) {
     problems.push('smoke crashed: ' + String(e && e.stack));

@@ -13,6 +13,11 @@
     "confidence.": "confidence chip words and tooltips, by CueView.confidence",
     "tier.": "tier badge words, by LemmaView.tier",
     "unit.": "counted units with .one/.other plurals",
-    "tour.demo.": "steps of the placeholder tour, by step id"
+    "tour.demo.": "steps of the placeholder tour, by step id",
+    "grammar.": "grammar terms in the word card, by FeatureView / LemmaView value (VP_Panes; the B7 inspector reuses them)",
+    "target.alt.reason.": "alternative reasons, by AltView.reason code (VP_Panes); unknown codes show the engine text",
+    "start.pair.": "language pair names, by pair code (VP_Start.pairLabelKey)",
+    "cue.filter.": "cue list filter names with counts, by filter id (VP_CueList.FILTERS)",
+    "workspace.view.": "view toggle notices, by settings key and state (VP_Workspace)"
   }
 }

@@ -6,8 +6,16 @@
  * Greek), picked by a seeded generator, so the same seed always gives the same project.
  * Its error hints are English like the real engine's; the UI translates by error code.
  *
- * Hooks for tests: options {latencyMs, cuesPerSecond, batch, seed, sampleCues, failNext},
- * generate(n, {seed, translated, pair}), emit(eventObject), reset(), stats(), sentences().
+ * Hooks for tests: options {latencyMs, cuesPerSecond, batch, seed, sampleCues, failNext,
+ * noLexicon}, generate(n, {seed, translated, pair}), emit(eventObject), reset(), stats(),
+ * sentences().
+ * Paths the mock understands (B6 screens): project.new with a sourcePath inside a
+ * "samples" folder (".../samples/sample.en.srt") gives the built-in 12-cue sample made of
+ * the first 12 sentences in order; project.open of "...-<N>-cues..." gives N translated
+ * cues (smoke test: 50,000); a path containing "recover" or "crash" answers with
+ * recoverable {autosavePath, at}; "missing" -> not_found, "damaged"/"corrupt" ->
+ * project_corrupt. Flags it sets on CueView.flags: "fast" (over cps.adult), "emoji" (a
+ * picturable noun in the target), "unknownName" (a capitalised name it does not know).
  * Release builds leave this file out (tools/pack_ui.py, later).
  */
 (function () {
@@ -60,6 +68,24 @@
     avis: ['avis', 'nominative', 'singular'], 'serēnum': ['serenus', 'nominative', 'singular']
   };
   var MACRON_PLAIN = { 'ā': 'a', 'ē': 'e', 'ī': 'i', 'ō': 'o', 'ū': 'u', 'ȳ': 'y', 'Ā': 'A', 'Ē': 'E', 'Ī': 'I', 'Ō': 'O', 'Ū': 'U', 'Ȳ': 'Y' };
+  var WORD_RE = /[^\s.,;:?!¿¡"“”«»()\[\]{}\-–—]+/g;
+  var known = null;
+
+  // Every word of the sample sentences counts as known (so the editor only underlines
+  // words the mock has never seen); FORMS adds lemma, gloss and features for a few.
+  function knownForms() {
+    if (known) { return known; }
+    known = {};
+    for (var i = 0; i < SENTENCES.length; i++) {
+      var words = (SENTENCES[i].la + ' ' + SENTENCES[i].grc).match(WORD_RE) || [];
+      for (var w = 0; w < words.length; w++) { known[plainKey(words[w])] = words[w]; }
+    }
+    return known;
+  }
+
+  function plainKey(word) {
+    return String(word).toLowerCase().replace(/[āēīōūȳĀĒĪŌŪȲ]/g, function (c) { return MACRON_PLAIN[c].toLowerCase(); });
+  }
 
   var options = {
     latencyMs: 15,
@@ -67,7 +93,9 @@
     batch: 20,
     seed: 7,
     sampleCues: 12,
-    failNext: null
+    failNext: null,
+    noLexicon: false,
+    autosaveMs: 1000
   };
 
   var listener = null;
@@ -132,6 +160,7 @@
 
   function reset() {
     if (state && state.job) { stopJob(); }
+    stopAutosave();
     state = { settings: loadSettings(), project: null, cues: [], undo: [], redo: [], corrections: [], names: [], job: null, nextJob: 1 };
     counts.requests = 0;
     counts.events = 0;
@@ -155,6 +184,18 @@
     return { src: parts[0], dst: parts[1] };
   }
 
+  // Lines as a player shows them: one line up to 42 characters, else two balanced lines
+  // broken at the space nearest the middle (the real engine follows D15 more closely).
+  function breakTwo(text) {
+    if (text.length <= 42) { return [text]; }
+    var mid = Math.floor(text.length / 2);
+    var best = -1;
+    for (var i = 0; i < text.length; i++) {
+      if (text.charAt(i) === ' ' && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) { best = i; }
+    }
+    return best < 0 ? [text] : [text.slice(0, best), text.slice(best + 1)];
+  }
+
   function confidenceOf(r) {
     if (r < 0.7) { return 'ok'; }
     return r < 0.9 ? 'check' : 'fix';
@@ -168,9 +209,19 @@
     cue.state = 'translated';
     cue.confidence = confidenceOf(r);
     cue.score = Math.round((1 - r) * 100) / 100;
-    cue.lines = [cue.target];
-    cue.cps = Math.round(cue.target.length / (cue.durationMs / 1000) * 10) / 10;
-    cue.flags = cue.cps > state.settings.cps.adult ? ['fast'] : [];
+    cue.lines = breakTwo(cue.target);
+    cue.cps = cue.durationMs ? Math.round(cue.target.length / (cue.durationMs / 1000) * 10) / 10 : 0;
+    cue.flags = cue.cps > state.settings.cps.adult ? ['cps'] : [];
+    if (cue.lines.length > 2 || cue.lines.some(function (l) { return l.length > 42; })) { cue.flags.push('overflow'); }
+    var words = cue.target.match(WORD_RE) || [];
+    for (var i = 0; i < words.length; i++) {
+      var f = FORMS[words[i].toLowerCase()];
+      if (f && LEMMAS[f[0]].emoji) {
+        cue.flags.push('emoji');
+        break;
+      }
+    }
+    if (/Marc/.test(cue.source)) { cue.flags.push('unknownName'); }
     return cue;
   }
 
@@ -202,16 +253,20 @@
     var v = clone(cue);
     delete v.sentence;
     delete v.pair;
+    delete v.prevState;
     return v;
   }
 
   function stats() {
-    var p = { cues: state.cues.length, translated: 0, reviewed: 0, needReview: 0 };
+    var p = { cues: state.cues.length, translated: 0, reviewed: 0, needReview: 0, check: 0, fix: 0 };
     for (var i = 0; i < state.cues.length; i++) {
       var c = state.cues[i];
       if (c.state !== 'new') { p.translated++; }
       if (c.state === 'reviewed') { p.reviewed++; }
-      if (c.state !== 'new' && c.state !== 'reviewed' && c.confidence !== 'ok') { p.needReview++; }
+      if ((c.state === 'translated' || c.state === 'stale') && c.confidence !== 'ok') {
+        p.needReview++;
+        p[c.confidence]++;
+      }
     }
     return p;
   }
@@ -219,7 +274,16 @@
   function manifest() {
     var p = state.project;
     var s = stats();
-    return { name: p.name, path: p.path, kind: p.kind, pair: p.pair, cues: s.cues, translated: s.translated, reviewed: s.reviewed, needReview: s.needReview };
+    var news = s.cues - s.translated;
+    // The real engine's shape (engine/cli/README.md: path, autosavePath, manifest, stats,
+    // canUndo, canRedo) plus the flat fields older tests read.
+    return {
+      name: p.name, path: p.path, kind: p.kind, pair: p.pair, cues: s.cues, translated: s.translated, reviewed: s.reviewed, needReview: s.needReview, check: s.check, fix: s.fix,
+      autosavePath: (p.path || 'mock://data/unsaved/untitled.vpoeta') + '.autosave',
+      manifest: { pair: p.pair, kind: p.kind, sourceFileName: p.name },
+      stats: { total: s.cues, 'new': news, translated: s.translated, reviewed: s.reviewed, check: s.check, fix: s.fix },
+      dirty: false, canUndo: state.undo.length > 0, canRedo: state.redo.length > 0
+    };
   }
 
   function needProject() {
@@ -243,6 +307,8 @@
       cues = paras.map(function (text, i) {
         return { index: i, idRaw: String(i + 1), timingRaw: '', start: 0, end: 0, durationMs: 0, source: text.replace(/^\s+|\s+$/g, ''), target: '', state: 'new', confidence: 'check', score: 0, cps: 0, lines: [], flags: [], sentence: i % SENTENCES.length, pair: params.pair };
       });
+    } else if (/[\\\/]samples[\\\/]sample\./i.test(String(params.sourcePath || ''))) {
+      cues = sampleCues(params.pair);
     } else {
       cues = generate(params.count || options.sampleCues, { pair: params.pair, seed: options.seed });
     }
@@ -254,17 +320,47 @@
     return { project: manifest() };
   }
 
+  // The built-in sample: the first 12 sentences in order, 2.5 s apart (our own sentences).
+  function sampleCues(pair) {
+    var src = langsOf(pair).src;
+    var out = [];
+    for (var i = 0; i < 12; i++) {
+      var t = 1000 + i * 3000;
+      out.push({
+        index: i, idRaw: String(i + 1), timingRaw: timing(t) + ' --> ' + timing(t + 2500),
+        start: t, end: t + 2500, durationMs: 2500, source: SENTENCES[i][src], target: '',
+        state: 'new', confidence: 'check', score: 0, cps: 0, lines: [], flags: [],
+        sentence: i, pair: pair
+      });
+    }
+    return out;
+  }
+
   function openProject(params) {
     var path = String(params.path || '');
     if (!path) { throw fail('bad_params', 'path is required', 'Choose a file.'); }
     if (/missing/i.test(path)) { throw fail('not_found', 'file not found', 'The file was moved or deleted.'); }
     if (/damaged|corrupt/i.test(path)) { throw fail('project_corrupt', 'project file is damaged', 'Open the last autosave instead.'); }
-    newProject({ pair: 'en-la', count: 40 });
-    var random = rng(options.seed + 1);
-    for (var i = 0; i < 24; i++) { translateCue(state.cues[i], random); }
+    var big = /(\d+)-cues/i.exec(path);
+    var i;
+    if (big) {
+      var n = Math.max(1, Math.min(200000, Number(big[1])));
+      newProject({ pair: 'en-la', count: n });
+      var r = rng(options.seed + 2);
+      for (i = 0; i < n; i++) { translateCue(state.cues[i], r); }
+    } else {
+      newProject({ pair: 'en-la', count: 40 });
+      var random = rng(options.seed + 1);
+      for (i = 0; i < 24; i++) { translateCue(state.cues[i], random); }
+    }
     state.project.path = path;
     state.project.name = path.split(/[\\\/]/).pop();
-    return { project: manifest(), warnings: [] };
+    addRecent(path);
+    var out = { project: manifest(), warnings: [] };
+    if (/recover|crash/i.test(path)) {
+      out.recoverable = { autosavePath: path + '.autosave', at: new Date(Date.now() - 8 * 60000).toISOString() };
+    }
+    return out;
   }
 
   function alternativesOf(cue) {
@@ -280,7 +376,8 @@
 
   function tokensOf(text) {
     var out = [];
-    var re = /[^\s.,;:?!]+/g;
+    var re = new RegExp(WORD_RE.source, 'g');
+    var forms = knownForms();
     var m;
     while ((m = re.exec(text)) !== null) {
       var form = m[0].toLowerCase();
@@ -291,7 +388,7 @@
         tok.tier = LEMMAS[f[0]].tier;
         if (LEMMAS[f[0]].emoji) { tok.emoji = LEMMAS[f[0]].emoji; }
       } else {
-        tok.unknown = false;
+        tok.unknown = !forms[plainKey(m[0])];
       }
       out.push(tok);
     }
@@ -315,6 +412,51 @@
 
   function job() { return state.job; }
 
+  // Like the engine: the paths of the last 20 projects, newest first, kept on open/save.
+  function addRecent(path) {
+    var list = [path].concat((state.settings.recentProjects || []).filter(function (x) { return typeof x === 'string' && x !== path; }));
+    state.settings.recentProjects = list.slice(0, 20);
+    saveSettings();
+  }
+
+  // Like the engine: project.autosaved {path, at} a moment after the last change.
+  function noteChange() {
+    if (!state.project) { return; }
+    if (state.autosaveTimer) { window.clearTimeout(state.autosaveTimer); }
+    state.autosaveTimer = window.setTimeout(function () {
+      state.autosaveTimer = null;
+      if (state.project) { emit({ event: 'project.autosaved', path: manifest().autosavePath, at: new Date().toISOString() }); }
+    }, options.autosaveMs);
+  }
+
+  function stopAutosave() {
+    if (state && state.autosaveTimer) { window.clearTimeout(state.autosaveTimer); }
+    if (state) { state.autosaveTimer = null; }
+  }
+
+  function snapshot(c) {
+    return { index: c.index, target: c.target, state: c.state, lines: c.lines.slice(), prevState: c.prevState };
+  }
+
+  // One undo step holds the before-snapshots of every cue it touched.
+  function pushUndo(list) {
+    state.undo.push(list.map(snapshot));
+    state.redo = [];
+  }
+
+  function restore(entry) {
+    var back = [];
+    for (var i = 0; i < entry.length; i++) {
+      var c = state.cues[entry[i].index];
+      back.push(snapshot(c));
+      c.target = entry[i].target;
+      c.state = entry[i].state;
+      c.lines = entry[i].lines;
+      c.prevState = entry[i].prevState;
+    }
+    return back;
+  }
+
   function stopJob() {
     if (state.job && state.job.timer !== null) { window.clearTimeout(state.job.timer); }
     state.job = null;
@@ -323,7 +465,9 @@
   function startTranslate(params) {
     needProject();
     if (state.job) { throw fail('busy', 'a job is running', 'Wait for it to finish or cancel it.'); }
-    var indices = params.indices || state.cues.map(function (c) { return c.index; });
+    // Without indices: every cue except the ones the user reviewed or edited (they are
+    // locked from bulk re-translation, PREDESIGN 4.1).
+    var indices = params.indices || state.cues.filter(function (c) { return c.state !== 'reviewed' && c.state !== 'edited'; }).map(function (c) { return c.index; });
     var id = 'job' + (state.nextJob++);
     var random = rng(options.seed + state.nextJob);
     var started = now();
@@ -349,7 +493,8 @@
       emit({ event: 'translate.progress', jobId: id, done: jb.done, total: jb.indices.length, cuesPerSec: Math.round(rate * 10) / 10, etaSec: Math.round((jb.indices.length - jb.done) / Math.max(rate, 0.1)) });
       if (jb.done >= jb.indices.length) {
         state.job = null;
-        emit({ event: 'translate.done', jobId: id, stats: { translated: jb.done, ok: jb.stats.ok, check: jb.stats.check, fix: jb.stats.fix, cancelled: false } });
+        noteChange();
+        emit({ event: 'translate.done', jobId: id, stats: { done: jb.done, translated: jb.done, total: jb.indices.length, ok: jb.stats.ok, check: jb.stats.check, fix: jb.stats.fix, cancelled: false } });
         return;
       }
       jb.timer = window.setTimeout(step, interval);
@@ -370,7 +515,9 @@
     'engine.hello': function () {
       return {
         version: VERSION, mock: true,
-        lexicons: [
+        lexicons: options.noLexicon ? [
+          { lang: 'la', path: 'mock://data/lexicons/latin.vpl', available: false, error: { code: 'lexicon_missing', message: 'file not found' } }
+        ] : [
           { lang: 'la', path: 'mock://la.vpl', version: 'mock-1', lemmas: 54199, notice: 'Mock data for development' },
           { lang: 'grc', path: 'mock://grc.vpl', version: 'mock-1', lemmas: 23169, notice: 'Mock data for development' }
         ],
@@ -397,22 +544,32 @@
       var path = p.path || state.project.path;
       if (!path) { throw fail('bad_params', 'no path', 'Choose where to save the project.'); }
       state.project.path = path;
+      stopAutosave();
+      addRecent(path);
       return { path: path, at: new Date().toISOString() };
     },
     'project.saveAs': function (p) {
       needProject();
       if (!p.path) { throw fail('bad_params', 'no path', 'Choose where to save the project.'); }
       state.project.path = p.path;
+      state.project.name = String(p.path).split(/[\\\/]/).pop();
+      stopAutosave();
+      addRecent(p.path);
       return { path: p.path, at: new Date().toISOString() };
     },
-    'project.recover': function (p) { return openProject({ path: p.path || 'recovered.vpoeta' }); },
+    'project.recover': function (p) {
+      var r = openProject({ path: p.path || 'recovered.vpoeta' });
+      return { path: r.project.path, at: new Date().toISOString(), project: r.project, warnings: [] };
+    },
     'project.close': function () {
+      var path = state.project ? state.project.path : null;
       stopJob();
+      stopAutosave();
       state.project = null;
       state.cues = [];
       state.undo = [];
       state.redo = [];
-      return {};
+      return { path: path, at: new Date().toISOString() };
     },
     'cue.page': function (p) {
       needProject();
@@ -427,10 +584,14 @@
     },
     'cue.set': function (p) {
       var cue = cueAt(p.index);
-      state.undo.push({ index: cue.index, before: cue.target, beforeState: cue.state });
-      state.redo = [];
-      cue.target = String(p.text || '');
-      cue.lines = [cue.target];
+      var text = String(p.text || '');
+      // Same text again with remember set: only the correction is added (no undo step).
+      if (!(p.remember && text === cue.target && cue.state === 'edited')) {
+        pushUndo([cue]);
+      }
+      cue.target = text;
+      noteChange();
+      cue.lines = breakTwo(cue.target);
       cue.state = 'edited';
       var out = { cue: view(cue) };
       if (p.remember) {
@@ -443,23 +604,29 @@
       var cue = cueAt(p.index);
       var alts = alternativesOf(cue);
       if (!alts[p.alternative]) { throw fail('bad_params', 'no such alternative', 'Choose 1, 2 or 3.'); }
-      state.undo.push({ index: cue.index, before: cue.target, beforeState: cue.state });
-      state.redo = [];
+      pushUndo([cue]);
       cue.target = alts[p.alternative].text;
-      cue.lines = [cue.target];
+      noteChange();
+      cue.lines = breakTwo(cue.target);
       cue.state = 'edited';
       return { cue: view(cue) };
     },
     'cue.review': function (p) {
       needProject();
-      var n = 0;
-      (p.indices || []).forEach(function (i) {
-        var c = state.cues[i];
-        if (!c || c.state === 'new') { return; }
-        c.state = p.reviewed === false ? 'translated' : 'reviewed';
-        n++;
+      var touched = (p.indices || []).map(function (i) { return state.cues[i]; }).filter(function (c) { return c && c.state !== 'new'; });
+      if (touched.length) {
+        pushUndo(touched);
+        noteChange();
+      }
+      touched.forEach(function (c) {
+        if (p.reviewed === false) {
+          if (c.state === 'reviewed') { c.state = c.prevState || 'translated'; }
+        } else if (c.state !== 'reviewed') {
+          c.prevState = c.state;
+          c.state = 'reviewed';
+        }
       });
-      return { count: n };
+      return { count: touched.length };
     },
     'translate.start': startTranslate,
     'orbergise.start': startTranslate,
@@ -475,6 +642,10 @@
       var form = String(p.text || '').toLowerCase();
       var f = FORMS[form];
       if (!f) {
+        var seen = knownForms()[plainKey(form)];
+        if (seen) {
+          return { analyses: [{ lemma: { id: plainKey(seen), head: seen, pos: '', gender: '', cls: '', tier: 0, tierSource: 'mock', freqRank: 0, whitFreq: '', glossEn: '', glossEs: '', emoji: '', principal: seen, flags: [] }, features: { pos: '', 'case': '', number: '', gender: '', person: '', tense: '', mood: '', voice: '', degree: '' }, display: seen }], suggestions: [] };
+        }
         var near = Object.keys(FORMS).filter(function (k) { return stripMacrons(k).charAt(0) === stripMacrons(form).charAt(0); }).slice(0, 3);
         return { analyses: [], suggestions: near };
       }
@@ -526,22 +697,16 @@
     'history.undo': function () {
       var e = state.undo.pop();
       if (!e) { return { canUndo: false, canRedo: state.redo.length > 0, changedIndices: [] }; }
-      var cue = state.cues[e.index];
-      state.redo.push({ index: e.index, before: cue.target, beforeState: cue.state });
-      cue.target = e.before;
-      cue.state = e.beforeState;
-      return { canUndo: state.undo.length > 0, canRedo: true, changedIndices: [e.index] };
+      state.redo.push(restore(e));
+      return { canUndo: state.undo.length > 0, canRedo: true, changedIndices: e.map(function (s) { return s.index; }) };
     },
     'history.redo': function () {
       var e = state.redo.pop();
       if (!e) { return { canUndo: state.undo.length > 0, canRedo: false, changedIndices: [] }; }
-      var cue = state.cues[e.index];
-      state.undo.push({ index: e.index, before: cue.target, beforeState: cue.state });
-      cue.target = e.before;
-      cue.state = e.beforeState;
-      return { canUndo: true, canRedo: state.redo.length > 0, changedIndices: [e.index] };
+      state.undo.push(restore(e));
+      return { canUndo: true, canRedo: state.redo.length > 0, changedIndices: e.map(function (s) { return s.index; }) };
     },
-    'dialog.openFile': function () { return { path: 'C:\\Users\\Student\\Videos\\sample.srt', paths: ['C:\\Users\\Student\\Videos\\sample.srt'] }; },
+    'dialog.openFile': function () { return { path: 'C:\\Users\\Student\\Videos\\lesson-3.srt', paths: ['C:\\Users\\Student\\Videos\\lesson-3.srt'] }; },
     'dialog.saveFile': function (p) { return { path: 'C:\\Users\\Student\\Documents\\' + (p.suggestedName || 'project.vpoeta') }; }
   };
 

@@ -1,7 +1,11 @@
 describe('VP_App', function () {
+  // These tests exercise the placeholder start screen, so the B6 screens are left out
+  // (vp_start.test.js and vp_workspace.test.js boot the app with them).
+  var SCREENS = ['vp_start.js', 'vp_workspace.js', 'vp_cuelist.js', 'vp_panes.js'];
   function boot(search, before, opts) {
     opts = opts || {};
     opts.search = search;
+    opts.skip = SCREENS.concat(opts.skip || []);
     var env = load('all', opts);
     var D = env.window.VP_Dom;
     env.main = D.el('main', { id: 'vp-main' });
