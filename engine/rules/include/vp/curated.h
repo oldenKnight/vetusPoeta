@@ -1,0 +1,131 @@
+// Runtime loaders for the hand-written tables in data/curated/ (data/curated/README.md, DESIGN.md §10.2-10.3).
+// Every file is UTF-8, tab-separated, `#` comments and blank lines ignored. CuratedData::load(dir) reads all of them
+// into compact sorted vectors keyed by latin_key (or en_key for English-keyed tables); lookups are binary searches,
+// deterministic, allocation-free. A missing file is an error with a hint; a malformed line is a warning (the line is
+// skipped), never a crash. order_la.txt is parsed into a rule table that the realiser's Orderer consults.
+#pragma once
+#include <cstdint>
+#include <filesystem>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include "vp/result.h"
+
+namespace vp::curated {
+
+// ---- valency_la.tsv ---------------------------------------------------------------------------------------------
+enum class FrameKind : uint8_t {
+  Acc, Dat, Abl, Gen, DatAcc, AccAcc, AccAbl, AccInf, Inf, Ut, Ne, Quod, Impers, Prep, Intr, Copula, Refl, Other
+};
+struct Frame {
+  FrameKind kind = FrameKind::Other;
+  std::string raw;            // "acc", "prep:ad+acc", "impers:dat+inf" ...
+  std::string prep;           // latin_key of the preposition for Prep frames ("ad", "in", "de", "cum", "a", "ex")
+  uint8_t prepCase = 0;       // vp::feat::Case of a Prep frame
+  std::string impers;         // the part after "impers:" ("dat+inf", "acc", "acc+gen", ...)
+};
+struct Valency { std::string key, example, note; std::vector<Frame> frames; };
+
+// ---- names_la.tsv -----------------------------------------------------------------------------------------------
+enum class NamePolicy : uint8_t { Keep, Decline, Translate };
+struct NameEntry {
+  std::string english, latinNom, latinGen, note;
+  uint8_t gender = 0;          // vp::feat::Gender (M, F, N), 0 unknown
+  int declension = 0;          // 1, 2, 3; 0 indeclinable; -1 not given ("-")
+  NamePolicy policy = NamePolicy::Keep;
+};
+
+// ---- tiers_la.tsv / tiers_grc.tsv ---------------------------------------------------------------------------------
+struct TierEntry { std::string key, head, pos, source, note; uint8_t tier = 0; };
+// ---- emoji_la.tsv / emoji_grc.tsv --------------------------------------------------------------------------------
+struct EmojiEntry { std::string key, head, emoji, note; };
+// ---- periphrasis_la.tsv -----------------------------------------------------------------------------------------
+struct PeriphrasisEntry { std::string key, periphrasis, note; uint8_t tier = 0; };
+// ---- preps_en_la.tsv --------------------------------------------------------------------------------------------
+struct PrepEntry {
+  std::string english, context, latin, latinKey, caseRaw, note;   // latin "-" = bare case; latinKey "" then
+  uint8_t case_ = 0;            // vp::feat::Case (0 when the column is "-", "inf" or unknown)
+  bool infinitive = false;      // case column "inf"
+};
+// ---- phrasebook_en_la.tsv, contractions_en.tsv, nonverbal_en_la.tsv, gloss_es_la.tsv ------------------------------
+struct PhraseEntry { std::string pattern, latin, reg, note; uint8_t tier = 0; };
+struct PairEntry { std::string a, b; };                 // contractions (form, expansion), nonverbal (english, latin)
+struct GlossEsEntry { std::string key, head, glossEs; };
+
+// ---- order_la.txt -----------------------------------------------------------------------------------------------
+struct OrderRule {
+  std::string id;                          // "order.decl"
+  std::vector<std::string> condition;      // whitespace tokens of the condition
+  std::vector<std::string> ordering;       // whitespace tokens of the ordering / construction
+  std::string conditionText, orderingText, note;
+  int line = 0;
+};
+
+struct LoadWarning { std::string file; int line = 0; std::string message; };
+
+class CuratedData {
+ public:
+  // Reads every table from `dir` (normally <repo>/data/curated or <dataDir>/curated). Error io/not_found with a
+  // hint naming the missing file; malformed lines become warnings().
+  static Result<CuratedData> load(const std::filesystem::path& dir);
+
+  const std::vector<LoadWarning>& warnings() const { return warnings_; }
+
+  // Lookups by latin_key (valency, tiers, emoji, periphrasis, gloss_es) / exact English (names) / latin_key of the
+  // Latin nominative (names). nullptr when absent. For duplicate keys the first row wins (a warning is recorded).
+  const Valency* valency(std::string_view key) const;
+  const TierEntry* tier(std::string_view key) const;
+  const TierEntry* tier(std::string_view key, std::string_view pos) const;   // pos as in the file ("verb", "adv")
+  const TierEntry* tierGreek(std::string_view key) const;
+  const EmojiEntry* emoji(std::string_view key) const;
+  const EmojiEntry* emojiGreek(std::string_view key) const;
+  const PeriphrasisEntry* periphrasis(std::string_view key) const;
+  const GlossEsEntry* glossEs(std::string_view key) const;
+  const NameEntry* nameByEnglish(std::string_view english) const;   // case-insensitive (en_key)
+  const NameEntry* nameByLatin(std::string_view latinKey) const;    // latin_key of latin_nom
+  // Cases a Latin preposition governs according to preps_en_la.tsv (keys "in", "ad", "cum", "a"/"ab", "e"/"ex" ...),
+  // as a bit set (1 << feat::Case). 0 when the word is not a Latin preposition in the table.
+  uint16_t prepCases(std::string_view latinKey) const;
+  const std::vector<PrepEntry>& preps() const { return preps_; }
+  const std::vector<NameEntry>& names() const { return names_; }
+  const std::vector<PhraseEntry>& phrasebook() const { return phrasebook_; }
+  const std::vector<PairEntry>& contractions() const { return contractions_; }
+  const std::vector<PairEntry>& nonverbal() const { return nonverbal_; }
+  const std::vector<OrderRule>& orderRules() const { return order_; }
+  const OrderRule* rule(std::string_view id) const;
+
+  // Helpers on order rules. Latin words listed inside "{...}" of the condition (connector sets), and the words of
+  // the first "(...)" group that follows `marker` in the ordering text (adjective exceptions, time adverbs, wh
+  // words, enclitic cum forms). Words are returned as latin_key. Empty when the rule or the group is absent.
+  std::vector<std::string> conditionSet(std::string_view ruleId) const;
+  std::vector<std::string> orderingList(std::string_view ruleId, std::string_view marker) const;
+  // Slot template of a rule whose ordering is a slot sequence ("[VOC,] [CONN] S IO O OBL ADV [NEG] V"): the slot
+  // names in order with optional markers stripped ("VOC","CONN","S",...). Tokens that are not slot names end it.
+  std::vector<std::string> slotTemplate(std::string_view ruleId) const;
+
+ private:
+  std::vector<Valency> valency_;
+  std::vector<NameEntry> names_;
+  std::vector<uint32_t> namesByLatin_;   // indices into names_, sorted by latin_key(latinNom)
+  std::vector<std::string> namesLatinKey_;
+  std::vector<TierEntry> tiers_, tiersGrc_;
+  std::vector<EmojiEntry> emoji_, emojiGrc_;
+  std::vector<PeriphrasisEntry> periphrasis_;
+  std::vector<PrepEntry> preps_;
+  std::vector<std::pair<std::string, uint16_t>> prepCases_;   // sorted latin key -> case bits
+  std::vector<PhraseEntry> phrasebook_;
+  std::vector<PairEntry> contractions_, nonverbal_;
+  std::vector<GlossEsEntry> glossEs_;
+  std::vector<OrderRule> order_;
+  std::vector<LoadWarning> warnings_;
+
+  friend struct Loader;
+};
+
+// Parses one frame string of valency_la.tsv ("acc", "prep:in+abl", "impers:dat+inf" ...). Unknown -> Other.
+Frame parseFrame(std::string_view s);
+// Parses the case column of preps_en_la.tsv or a frame case ("acc", "abl", "dat", "gen", "loc", "nom", "voc").
+uint8_t parseCase(std::string_view s);
+
+}  // namespace vp::curated

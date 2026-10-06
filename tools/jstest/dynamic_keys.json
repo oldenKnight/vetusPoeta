@@ -18,6 +18,7 @@
     "target.alt.reason.": "alternative reasons, by AltView.reason code (VP_Panes); unknown codes show the engine text",
     "start.pair.": "language pair names, by pair code (VP_Start.pairLabelKey)",
     "cue.filter.": "cue list filter names with counts, by filter id (VP_CueList.FILTERS)",
-    "workspace.view.": "view toggle notices, by settings key and state (VP_Workspace)"
+    "workspace.view.": "view toggle notices, by settings key and state (VP_Workspace)",
+    "app.shell.": "native messages of the Windows shell (gui/shell/shell_util.cpp reads i18n/<lang>.json, its own fallbacks are the same texts); the shell appends the log path after app.shell.engineCrashLoop.text, so the blank line before it is the shell's job (values may not end in whitespace)"
   }
 }

@@ -93,7 +93,9 @@ describe('VP_MockEngine', function () {
     eq(env.call('project.open', { path: 'damaged.vpoeta' }).error.code, 'project_corrupt');
     eq(env.call('word.inspect', { text: 'rosam', lang: 'la' }).result.analyses[0].lemma.glossEs, 'rosa');
     eq(env.call('word.inspect', { text: 'xyz', lang: 'la' }).result.analyses.length, 0);
-    eq(env.call('names.set', { name: 'Iulia', policy: 'decline' }).result.affectedCues.length, 1);
+    var withName = env.call('cue.page', { from: 0, count: 40 }).result.cues.filter(function (c) { return c.source.indexOf('Marcus') >= 0; }).map(function (c) { return c.index; });
+    deepEq(env.call('names.set', { name: 'Marcus', policy: 'keep' }).result.affectedCues, withName);
+    eq(env.call('names.set', { name: 'Iulia', policy: 'decline' }).result.affectedCues.length, 0);
     ok(env.call('words.list', {}).result.words.length > 5);
     eq(env.call('model.status', {}).result.available, false);
   });

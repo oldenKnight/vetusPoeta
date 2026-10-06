@@ -1,0 +1,292 @@
+{
+  "en": {
+    "parser": {
+      "ancora_fraction": null,
+      "bytes": 5243807,
+      "data_sha256": {
+        "en_ewt-ud-dev.conllu": "39239e0a60db3ae68f4b7036189f11b6692741d10ff8240dd91f74f2760d90f8",
+        "en_ewt-ud-test.conllu": "fa024f43dc5da3c5ac02563bc9bd0e974f46cbb1560823976a8f342a37dc494a",
+        "en_ewt-ud-train.conllu": "d68e06122a702464c613076523d56740f047e5bbe89dd90ec32737e04d952143"
+      },
+      "dev": {
+        "las": 78.82,
+        "tokens": 25148,
+        "uas": 82.33
+      },
+      "dev_first_pass_pruned": {
+        "las": 78.6,
+        "tokens": 25148,
+        "uas": 82.21
+      },
+      "dev_float_unpruned": {
+        "las": 79.15,
+        "tokens": 25148,
+        "uas": 82.65
+      },
+      "dev_gold_upos": {
+        "las": 83.53,
+        "tokens": 25148,
+        "uas": 85.68
+      },
+      "epochs": 10,
+      "explore": 0.9,
+      "file": "english.dep.vpt",
+      "first_pass_pruning": {
+        "features_count_ok": 243954,
+        "features_exported": 52428,
+        "features_nonzero": 243837,
+        "features_trained": 447084,
+        "scale": 256.0
+      },
+      "jackknife_epochs": 5,
+      "jackknife_folds": 4,
+      "labels": 36,
+      "min_count": 2,
+      "pruning": {
+        "features_count_ok": 52417,
+        "features_exported": 52417,
+        "features_nonzero": 52417,
+        "features_trained": 52427,
+        "scale": 256.0
+      },
+      "retrain": 1,
+      "seed": 7,
+      "sha256": "64f2c57aa25ed321090f3fe4c516476a111cc4e4c39843245f21362170aa6acc",
+      "table_size": 65536,
+      "tagger": "english.tag.vpt",
+      "tagger_sha256": "46623c11cd3ca13aa945cc22b07532c2d9d7d0546999c75882f271c80a9c03ab",
+      "test": {
+        "las": 79.65,
+        "tokens": 25094,
+        "uas": 82.93
+      },
+      "total_seconds": 1101.1,
+      "train_seconds": 1082.3,
+      "train_sentences": 12544,
+      "train_tokens": 204578
+    },
+    "tagger": {
+      "ancora_fraction": null,
+      "bytes": 6292551,
+      "data_sha256": {
+        "en_ewt-ud-dev.conllu": "39239e0a60db3ae68f4b7036189f11b6692741d10ff8240dd91f74f2760d90f8",
+        "en_ewt-ud-test.conllu": "fa024f43dc5da3c5ac02563bc9bd0e974f46cbb1560823976a8f342a37dc494a",
+        "en_ewt-ud-train.conllu": "d68e06122a702464c613076523d56740f047e5bbe89dd90ec32737e04d952143"
+      },
+      "dev": {
+        "feats": 95.2,
+        "tokens": 25148,
+        "upos": 94.7
+      },
+      "dev_first_pass_pruned": {
+        "feats": 95.14,
+        "tokens": 25148,
+        "upos": 94.68
+      },
+      "dev_float_unpruned": {
+        "feats": 95.23,
+        "tokens": 25148,
+        "upos": 94.79
+      },
+      "epochs": 10,
+      "file": "english.tag.vpt",
+      "first_pass_pruning": {
+        "features_count_ok": 92260,
+        "features_exported": 52428,
+        "features_nonzero": 92254,
+        "features_trained": 193128,
+        "scale": 256.0
+      },
+      "labels": 44,
+      "min_count": 2,
+      "pruning": {
+        "features_count_ok": 51762,
+        "features_exported": 51762,
+        "features_nonzero": 51762,
+        "features_trained": 52136,
+        "scale": 256.0
+      },
+      "retrain": 1,
+      "seed": 7,
+      "sha256": "46623c11cd3ca13aa945cc22b07532c2d9d7d0546999c75882f271c80a9c03ab",
+      "table_size": 65536,
+      "test": {
+        "feats": 95.45,
+        "tokens": 25094,
+        "upos": 94.62
+      },
+      "total_seconds": 317.4,
+      "train_seconds": 311.9,
+      "train_sentences": 12544,
+      "train_tokens": 204578
+    }
+  },
+  "es": {
+    "parser": {
+      "ancora_fraction": 1.0,
+      "bytes": 4719573,
+      "data_sha256": {
+        "es_ancora-ud-dev.conllu": "1a132068062edf2654fb45b41cd4c59ba7e5c18e7c5f642ed5a9cc351fd9f0fe",
+        "es_ancora-ud-test.conllu": "679f1c05ca654aa26801c80319df45f8f97606718fb534b91755b48f3e67fa6f",
+        "es_ancora-ud-train.conllu": "47b6fc49d6ed48a016e7fa5ad9f5c7ecf3ec21e9db005df3ea14d10f07c6deb6",
+        "es_gsd-ud-dev.conllu": "704fb19afc0a34cff476e1a70351b7026c4364f862e8e8388b02873852567c22",
+        "es_gsd-ud-test.conllu": "ecce253f44bffaa9803ae7ec0c10911c13e4f1fc3cb439dbd1db2cebe0a12741",
+        "es_gsd-ud-train.conllu": "9e527de0e45dca4a8ef00105a3ebd102da941964b35f01916a6baa6288130f7b"
+      },
+      "dev": {
+        "las": 80.16,
+        "tokens": 90627,
+        "uas": 84.7
+      },
+      "dev_UD_Spanish-AnCora": {
+        "las": 80.05,
+        "tokens": 53476,
+        "uas": 84.16
+      },
+      "dev_UD_Spanish-GSD": {
+        "las": 80.32,
+        "tokens": 37151,
+        "uas": 85.47
+      },
+      "dev_first_pass_pruned": {
+        "las": 78.99,
+        "tokens": 90627,
+        "uas": 83.67
+      },
+      "dev_float_unpruned": {
+        "las": 80.45,
+        "tokens": 90627,
+        "uas": 84.9
+      },
+      "dev_gold_upos": {
+        "las": 82.0,
+        "tokens": 90627,
+        "uas": 85.91
+      },
+      "epochs": 10,
+      "explore": 0.9,
+      "file": "spanish.dep.vpt",
+      "first_pass_pruning": {
+        "features_count_ok": 784662,
+        "features_exported": 52428,
+        "features_nonzero": 784273,
+        "features_trained": 1502122,
+        "scale": 256.0
+      },
+      "jackknife_epochs": 5,
+      "jackknife_folds": 4,
+      "labels": 32,
+      "min_count": 2,
+      "pruning": {
+        "features_count_ok": 52428,
+        "features_exported": 52428,
+        "features_nonzero": 52428,
+        "features_trained": 52428,
+        "scale": 256.0
+      },
+      "retrain": 1,
+      "seed": 7,
+      "sha256": "bc64321df665d81ecbc0d907e4516e816009bae3eb09f1242572ede4b61255d4",
+      "table_size": 65536,
+      "tagger": "spanish.tag.vpt",
+      "tagger_sha256": "023946d175c1de398e0d14d89765110bec3a05fb85298ac8a44a173d43f936d5",
+      "test": {
+        "las": 79.39,
+        "tokens": 65622,
+        "uas": 83.96
+      },
+      "test_UD_Spanish-AnCora": {
+        "las": 79.76,
+        "tokens": 53622,
+        "uas": 84.09
+      },
+      "test_UD_Spanish-GSD": {
+        "las": 77.75,
+        "tokens": 12000,
+        "uas": 83.36
+      },
+      "total_seconds": 5681.4,
+      "train_seconds": 5584.9,
+      "train_sentences": 28473,
+      "train_tokens": 835366
+    },
+    "tagger": {
+      "ancora_fraction": 1.0,
+      "bytes": 6816965,
+      "data_sha256": {
+        "es_ancora-ud-dev.conllu": "1a132068062edf2654fb45b41cd4c59ba7e5c18e7c5f642ed5a9cc351fd9f0fe",
+        "es_ancora-ud-test.conllu": "679f1c05ca654aa26801c80319df45f8f97606718fb534b91755b48f3e67fa6f",
+        "es_ancora-ud-train.conllu": "47b6fc49d6ed48a016e7fa5ad9f5c7ecf3ec21e9db005df3ea14d10f07c6deb6",
+        "es_gsd-ud-dev.conllu": "704fb19afc0a34cff476e1a70351b7026c4364f862e8e8388b02873852567c22",
+        "es_gsd-ud-test.conllu": "ecce253f44bffaa9803ae7ec0c10911c13e4f1fc3cb439dbd1db2cebe0a12741",
+        "es_gsd-ud-train.conllu": "9e527de0e45dca4a8ef00105a3ebd102da941964b35f01916a6baa6288130f7b"
+      },
+      "dev": {
+        "feats": 97.24,
+        "tokens": 90627,
+        "upos": 96.49
+      },
+      "dev_UD_Spanish-AnCora": {
+        "feats": 97.67,
+        "tokens": 53476,
+        "upos": 97.41
+      },
+      "dev_UD_Spanish-GSD": {
+        "feats": 96.62,
+        "tokens": 37151,
+        "upos": 95.16
+      },
+      "dev_first_pass_pruned": {
+        "feats": 97.25,
+        "tokens": 90627,
+        "upos": 96.37
+      },
+      "dev_float_unpruned": {
+        "feats": 97.3,
+        "tokens": 90627,
+        "upos": 96.57
+      },
+      "epochs": 10,
+      "file": "spanish.tag.vpt",
+      "first_pass_pruning": {
+        "features_count_ok": 219495,
+        "features_exported": 52428,
+        "features_nonzero": 219456,
+        "features_trained": 463611,
+        "scale": 256.0
+      },
+      "labels": 48,
+      "min_count": 2,
+      "pruning": {
+        "features_count_ok": 52291,
+        "features_exported": 52291,
+        "features_nonzero": 52291,
+        "features_trained": 52407,
+        "scale": 256.0
+      },
+      "retrain": 1,
+      "seed": 7,
+      "sha256": "023946d175c1de398e0d14d89765110bec3a05fb85298ac8a44a173d43f936d5",
+      "table_size": 65536,
+      "test": {
+        "feats": 97.4,
+        "tokens": 65622,
+        "upos": 96.71
+      },
+      "test_UD_Spanish-AnCora": {
+        "feats": 97.76,
+        "tokens": 53622,
+        "upos": 97.27
+      },
+      "test_UD_Spanish-GSD": {
+        "feats": 95.8,
+        "tokens": 12000,
+        "upos": 94.18
+      },
+      "total_seconds": 1485.4,
+      "train_seconds": 1457.7,
+      "train_sentences": 28473,
+      "train_tokens": 835366
+    }
+  }
+}
