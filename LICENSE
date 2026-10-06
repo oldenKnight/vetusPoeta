@@ -1,0 +1,35 @@
+vetus poeta - Proprietary Licence
+
+Copyright (c) 2026 oldenKnight. All rights reserved.
+
+"The Software" means the vetus poeta program and everything written for it in this repository: the source code,
+the user interface, the build and data tools, the original artwork in assets/, the documentation and the
+hand-written tables in data/curated/ (rows taken from the data sources listed below keep those sources' terms).
+The Software is the property of the copyright holder. Except as expressly permitted below, no part of it may be
+copied, modified, merged, published, distributed, sublicensed, sold, or used to create derivative works without
+prior written permission from the copyright holder.
+
+Permitted without further permission:
+  - Reading the source code for evaluation and review.
+  - Building and running the Software for personal, non-commercial evaluation.
+
+Any other use, commercial or not, requires a separate written licence or agreement from the copyright holder.
+
+Material made by others is not covered by this licence and keeps its own terms, listed in third_party/LICENSES.md
+and shipped as THIRD_PARTY_NOTICES.txt. In particular:
+  - the dictionary files (*.vpl) are built from Wiktionary (via Kaikki/Wiktextract, CC BY-SA 4.0), Perseus
+    Lewis & Short and LSJ (CC BY-SA 4.0), the Dickinson College Commentaries core vocabularies (CC BY-SA 3.0) and
+    Whitaker's Words (used with its author's permission); each file states its sources and licences in its
+    NOTE section, and those terms apply to the data in it;
+  - the sentence-analyser models are trained on Universal Dependencies treebanks (UD English-EWT,
+    UD Spanish-GSD, UD Spanish-AnCora) under their CC BY-SA / CC BY licences;
+  - the Gentium Plus fonts are under the SIL Open Font License 1.1;
+  - vendored code (llama.cpp, nlohmann/json, miniz, doctest) is under the MIT licence;
+  - the optional local model file is under the Apache License 2.0;
+  - Microsoft Edge WebView2 files are under Microsoft's licence terms.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OF OR OTHER DEALINGS IN THE SOFTWARE. Translations
+produced by the Software are drafts and must be reviewed before use.
