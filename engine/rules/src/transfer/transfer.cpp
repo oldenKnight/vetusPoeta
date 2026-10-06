@@ -603,6 +603,8 @@ uint32_t Transfer::adverb(const std::string& lemma0, int token, Ctx& c, bool mot
   ch.token = token;
   ch.source = lemma0;
   if (const char* la = tables::adverb(lemma, motion)) {
+    // C19: "badly" with a passive ("was badly hurt / damaged") is graviter, like the participle fragments of C17
+    if (lemma == "badly" && c.frame && c.frame->pred.voice == frame::Voice::Passive) la = "graviter";
     ch.lemma = latin(la, Adv);
     if (ch.lemma == kNone) ch.lemma = latin(la);
     ch.kind = "table";
@@ -1000,6 +1002,17 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
         o.pron.gender = M;
       }
       o.gender = o.pron.gender;
+      // C19: "carry us all", "I saw you all": not the subject: the pronoun stays, omnēs after it ("nōs omnēs")
+      const bool isSubject = c.frame && c.frame->hasSubject && c.frame->subject.token == n.token;
+      if (n.determiner == "all" && !isSubject && n.pron.person < 3 && c.st.lang == frame::SrcLang::En) {
+        LaAdj a;
+        a.lemma = latin("omnis", Adj);
+        a.after = true;
+        if (a.lemma != kNone) { o.adjectives.push_back(a); tableChoice(a.lemma, "all"); }
+        o.number = Pl;
+        o.pron.number = Pl;
+        return;
+      }
       if (n.determiner == "all") {   // "you all": omnēs, verb in the pronoun's person
         LaNP q;
         q.head = latin("omnis", Adj);
@@ -1774,6 +1787,35 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
       ch.kind = "table";
     } else {
       id = select(lemma, Verb, c.context, hasObj, personObj, c.st, ch);
+      // C19: a personal passive needs a transitive Latin verb ("The boy was hurt": laedere, not dolēre; "The ship was
+      // damaged": not nocēre + dative): the best candidate that takes an accusative object, when one scores close
+      bool forced = false;
+      for (const auto& ov : c.st.overrides) forced = forced || ov.first == token;
+      if (id != kNone && !forced && sp.voice == frame::Voice::Passive && ch.kind == "sense" && ch.candidates.size() > 1) {
+        auto transitive = [&](const Candidate& k) {
+          const lex::Lemma l = la_.lemma(k.lemma);
+          if (l.id == kNone || (l.flags & lex::Deponent)) return false;
+          if (const curated::Valency* v = cd_.valency(l.key))
+            if (!v->frames.empty() && v->frames[0].kind != curated::FrameKind::Acc &&
+                v->frames[0].kind != curated::FrameKind::DatAcc && v->frames[0].kind != curated::FrameKind::AccInf &&
+                v->frames[0].kind != curated::FrameKind::AccAbl && v->frames[0].kind != curated::FrameKind::AccAcc)
+              return false;
+          std::vector<lex::Sense> se;
+          la_.senses(k.lemma, se);
+          if (k.sense < se.size() && (se[k.sense].tags & 2u) && !(se[k.sense].tags & 1u)) return false;
+          std::string probe;
+          return morph::generate(la_, k.lemma, morph::verbForm(P3, Pl, Present, Indicative, Passive), probe, false);
+        };
+        if (!transitive(ch.candidates[0]))
+          for (size_t i = 1; i < ch.candidates.size(); ++i)
+            if (ch.candidates[i].score >= ch.candidates[0].score - 0.6 && transitive(ch.candidates[i])) {
+              id = ch.candidates[i].lemma;
+              ch.lemma = id;
+              ch.note = "a passive needs a transitive verb";
+              ch.margin = std::min(ch.margin, 0.14);
+              break;
+            }
+      }
     }
     c.out.choices.push_back(ch);
     if (id == kNone) c.out.unknownWords.push_back(lemma);
@@ -1892,6 +1934,16 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     else if (ph->frame == "acc") c.phrasalCase = Acc;
     else if (ph->frame == "dat") c.phrasalCase = Dat;
     else if (ph->frame == "abl") c.phrasalCase = Abl;
+  } else if (c.st.lang == frame::SrcLang::En && sp.lemma == "bear" && sp.voice == frame::Voice::Passive &&
+             latin("nāscor", Verb) != kNone) {
+    verb = latin("nāscor", Verb);   // C19: "was born" -> nātus est (nāscor), not a passive of ferō / pariō
+    Choice ch;
+    ch.token = sp.token;
+    ch.source = "born";
+    ch.lemma = verb;
+    ch.kind = "table";
+    ch.note = "be born";
+    c.out.choices.push_back(ch);
   } else if (sp.lemma == "tell" && f.hasObject && !f.object.isPronoun &&
              tables::narrativeNoun(text::lower(f.object.head)) && latin("nārrō", Verb) != kNone) {
     verb = latin("nārrō", Verb);   // C15: "tell a story" -> nārrō; otherwise "tell" is dīcō (tiers_la.tsv)
@@ -1972,8 +2024,11 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     }
     case Modality::Let:
       p.mood = Subjunctive;
-      p.person = 1;
-      p.number = Pl;
+      // C19: "let us go" -> eāmus; "let him go" / "let the children play" -> jussive of their own person (eat, lūdant)
+      if (!f.hasSubject || f.subject.pronLemma == "we" || (f.subject.isPronoun && f.subject.pron.person == 1)) {
+        p.person = 1;
+        p.number = f.hasSubject && f.subject.isPronoun && f.subject.pron.number == 1 && f.subject.pronLemma != "we" ? Sg : Pl;
+      }
       break;
     default: break;
   }
@@ -2025,6 +2080,18 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     // ("it is said that ..." stays present: dīcitur)
     if (tense == Present && !agent && sp.particle != "se" && !(sp.lemma == "say" && !f.subordinate.empty()))
       tense = Perfect;
+    // C19: a Latin verb without passive forms (intransitive: liquēscō "melt", nāscor is deponent anyway) says the
+    // English passive actively: "I shall be all melted" -> tōta liquēscam; never a missing form
+    if (p.lemma != kNone && !agent) {
+      const lex::Lemma vl = la_.lemma(p.lemma);
+      std::string probe;
+      if (vl.id != kNone && !(vl.flags & lex::Deponent) &&
+          !morph::generate(la_, p.lemma, morph::verbForm(P3, Pl, Present, Indicative, Passive), probe, false) &&
+          morph::generate(la_, p.lemma, morph::verbForm(P3, Sg, Present, Indicative, Active), probe, false)) {
+        p.voice = Active;
+        if (sp.tense == frame::Tense::Present && sp.aspect == frame::Aspect::Simple) tense = Perfect;
+      }
+    }
   }
   if (sp.deliberative) {
     tense = Present;

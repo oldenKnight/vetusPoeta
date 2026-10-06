@@ -1113,6 +1113,49 @@ class RulesEngine final : public Engine {
     mem = m2;
   }
 
+  // C19 (work item b): a lexicon cell missing for the chosen lemma ("no lexicon cell for these features") is never left
+  // as a bracketed Fix literal while another candidate of the same word has the form: the sentence is translated again
+  // with the next candidate forced (at most three tries; the first result without a missing form wins).
+  void retryMissingForms(const std::string& text, const frame::FrameBuilder& fb, const Options& opt, const Context& ctx,
+                         transfer::Memory& mem, const transfer::Settings& st, SentOut& so) {
+    auto missing = [](const SentOut& x) {
+      return std::find(x.flags.begin(), x.flags.end(), "missing-form") != x.flags.end();
+    };
+    transfer::Settings st2 = st;
+    for (int tries = 0; tries < 3 && missing(so); ++tries) {
+      uint32_t bad = lex::kNoLemma;
+      for (const Reason& r : so.reasons)
+        if (r.kind == "form" && r.text == "no lexicon cell for these features" && r.tokenIndex >= 0 &&
+            (size_t)r.tokenIndex < so.latin.tokens.size() && so.latin.tokens[(size_t)r.tokenIndex].hasLemma) {
+          bad = so.latin.tokens[(size_t)r.tokenIndex].lemmaId;
+          break;
+        }
+      if (bad == lex::kNoLemma) return;
+      const transfer::Choice* ch = nullptr;
+      for (const transfer::Choice& c : so.choices)
+        if (c.lemma == bad && c.token >= 0 && c.candidates.size() > 1) { ch = &c; break; }
+      if (!ch) return;
+      size_t rank = 0;
+      while (rank < ch->candidates.size() && ch->candidates[rank].lemma != bad) ++rank;
+      if (rank + 1 >= ch->candidates.size()) return;
+      const int token = ch->token;
+      bool replaced = false;
+      for (auto& ov : st2.overrides)
+        if (ov.first == token) { ov.second = (int)rank + 1; replaced = true; }
+      if (!replaced) st2.overrides.push_back({token, (int)rank + 1});
+      transfer::Memory m2 = memBefore_;
+      SentOut alt;
+      speech(text, fb, opt, ctx, m2, st2, alt, false);
+      if (missing(alt) && tries + 1 < 3) { so.alternatives = alt.alternatives; so = std::move(alt); mem = m2; continue; }
+      if (!missing(alt)) {
+        alt.reasons.push_back(Reason{-1, "form", "the first word had no form for this use: the next candidate was taken", ""});
+        so = std::move(alt);
+        mem = m2;
+      }
+      return;
+    }
+  }
+
   static bool firstPersonAgreement(const SentOut& so) {
     for (const auto& t : so.latin.tokens)
       if ((t.features.pos == "adj" || t.features.mood == "participle") && !t.features.gender.empty()) return true;
@@ -1323,6 +1366,7 @@ class RulesEngine final : public Engine {
         addFlag(so.flags, "nonverbal");
       } else {
         speech(ss.text, fb, opt, ctx, mem, st, so, true);
+        retryMissingForms(ss.text, fb, opt, ctx, mem, st, so);
         if (opt.useModel && cfg_.advisors.chooseSense) askModel(ss.text, fb, opt, ctx, mem, st, so);
         display(so.latin, opt.macrons);
         if (ss.kind == frame::CueKind::Song) {

@@ -39,6 +39,7 @@ struct LaAdj {
   // feat::Present (active) or feat::Future; 0 = an ordinary adjective
   uint8_t participle = 0;
   bool coord = false;             // C17: joined to the adjective before it by et ("canem magnum et foedum")
+  bool after = false;             // C19: after the head whatever order.adj says ("nōs omnēs")
 };
 
 struct LaNP {

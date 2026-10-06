@@ -30,7 +30,14 @@ bool animateNoun(const std::string& l) {
                 "farmer", "doctor", "sailor", "guard", "lady", "gentleman", "lord", "sir", "madam", "god", "goddess",
                 "cat", "dog", "horse", "rabbit", "bird", "mouse", "wolf", "fish", "animal", "cook", "gardener",
                 "uncle", "aunt", "grandmother", "grandfather", "parent", "neighbour", "neighbor", "guest", "stranger",
-                "enemy", "everyone", "everybody", "hombre", "mujer", "niño", "niña", "chico", "chica", "persona",
+                "enemy", "everyone", "everybody",
+                // C19: more people and animals of children's stories (agent "by" -> ā/ab, "with" -> cum)
+                "hunter", "fisherman", "miller", "shepherd", "woodman", "woodcutter", "witch", "wizard", "giant",
+                "dwarf", "fairy", "knight", "lion", "bear", "fox", "cow", "sheep", "goat", "pig", "frog", "owl",
+                "dragon", "monkey", "crow", "stork", "merchant", "baker", "butcher", "tailor", "smith", "thief",
+                "robber", "beggar", "hero", "priest", "nurse", "emperor", "captain", "pirate", "peasant", "cousin",
+                "nephew", "niece", "grandson", "granddaughter", "maid", "giantess", "scarecrow",
+                "hombre", "mujer", "niño", "niña", "chico", "chica", "persona",
                 "amigo", "amiga", "madre", "padre", "hermano", "hermana", "hijo", "hija", "rey", "reina", "maestro",
                 "maestra", "profesor", "profesora", "gato", "perro", "caballo", "conejo", "pájaro", "ratón", "señor",
                 "señora", "dios"});

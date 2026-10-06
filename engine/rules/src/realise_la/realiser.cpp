@@ -43,6 +43,7 @@ void append(std::vector<Word>& dst, std::vector<Word>& src) {
 }
 
 bool startsWithVowelOrH(std::string_view s) {
+  if (!s.empty() && (s[0] == 'v' || s[0] == 'V' || s[0] == 'j' || s[0] == 'J')) return false;   // C19: "ā vēnātōre"
   const std::string k = text::latin_key(s);
   if (k.empty()) return false;
   const char c = k[0];
@@ -190,7 +191,7 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
       out.push_back(std::move(w));
     }
     for (const LaAdj& ad : n.adjectives) {
-      if (!(order_.adjectiveBefore(ad.lemma) || exclFirst || ad.before)) continue;
+      if (!(order_.adjectiveBefore(ad.lemma) || exclFirst || ad.before) || ad.after) continue;
       for (uint32_t adv : ad.adverbs) { Word w; literal(adv, "?", w, "order.adv"); out.push_back(std::move(w)); }
       out.push_back(modifierWord(ad.lemma, ad.degree, exclFirst ? "order.excl" : "order.adj", ad.participle));
       if (ad.capitalise) Punctuation::capitaliseFirst(out.back().form);
@@ -217,7 +218,8 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
       else { f.pos = l.pos; f.case_ = case_; f.number = a.number; f.gender = a.gender; }
       Word w;
       forms_.select(n.head, f, w);
-      if (o.emoji) w.emoji = std::string(emoji_.forLemma(n.head));
+      // C19: never for a title or a translated name ("Leō Timidus", "Cicōnia"): DESIGN 10.3 "never for names"
+      if (o.emoji && !n.capitalise && !n.nameWords) w.emoji = std::string(emoji_.forLemma(n.head));
       if (n.capitalise) { Punctuation::capitaliseFirst(w.form); w.title = true; }
       w.rule = "order.adj";
       out.push_back(std::move(w));
@@ -225,7 +227,7 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
     // post-head: adjectives, possessive, genitive, relative clause
     bool postAdj = false;
     for (const LaAdj& ad : n.adjectives) {
-      if (order_.adjectiveBefore(ad.lemma) || exclFirst || ad.before) continue;
+      if ((order_.adjectiveBefore(ad.lemma) || exclFirst || ad.before) && !ad.after) continue;
       if (ad.coord && postAdj) { Word et; literal(k_.et, "et", et, "order.adj"); out.push_back(std::move(et)); }
       postAdj = true;
       for (uint32_t adv : ad.adverbs) { Word w; literal(adv, "?", w, "order.adv"); out.push_back(std::move(w)); }

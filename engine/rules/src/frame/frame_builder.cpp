@@ -749,6 +749,14 @@ void FrameBuilder::contractionContext(std::string_view sentence, std::vector<Tok
       t.lower = "has";
     }
   }
+  // "had better" + verb = should ("You'd better go home." -> Domum īre dēbēs)
+  for (size_t i = 0; i + 2 < out.size(); ++i)
+    if (out[i].lower == "had" && out[i + 1].lower == "better" &&
+        !in(out[i + 2].text, {".", ",", "!", "?", ";", "than"})) {
+      out[i].text = "should";
+      out[i].lower = "should";
+      out.erase(out.begin() + (long)i + 1);
+    }
   for (size_t i = 1; i + 1 < out.size(); ++i) {
     if (out[i].lower != "got") continue;
     const bool haveBefore = in(out[i - 1].lower, {"have", "has", "had"}) ||
@@ -1844,11 +1852,19 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
   }
   if (verbal && !ht.text.empty()) {
     const uint32_t vf = fget(ht, nlp::morph::VerbFormShift), tt = fget(ht, nlp::morph::TenseShift);
+    // C19: a form that is past and participle alike, tagged as a finite past or a present participle after "be" ("The
+    // boy was badly hurt", "The rope was cut"): passive
+    bool partLike = false;
+    if (en && beAux && vf != nlp::morph::VfGer && ht.lower.size() > 2 &&
+        ht.lower.compare(ht.lower.size() - 3, 3, "ing") != 0 && !(vf == nlp::morph::VfPart && tt == nlp::morph::TensePast))
+      partLike = in(ht.lower, {"hurt", "cut", "put", "hit", "set", "shut", "burst", "cast", "spread", "split", "shed",
+                               "beaten", "broken", "eaten", "taken", "given", "stolen", "frozen", "chosen", "written"}) ||
+                 (ht.lower.size() > 4 && ht.lower.compare(ht.lower.size() - 2, 2, "ed") == 0);
     if (en && beAux && ht.lower == "gone") {   // C15: "Oz is gone" -> Oz abiit (go away, perfect)
       f.pred.aspect = Aspect::Perfect;
       if (f.pred.particle.empty()) f.pred.particle = "away";
     } else
-    if (beAux && vf == nlp::morph::VfPart && (tt == nlp::morph::TensePast || !en)) f.pred.voice = Voice::Passive;
+    if (beAux && ((vf == nlp::morph::VfPart && (tt == nlp::morph::TensePast || !en)) || partLike)) f.pred.voice = Voice::Passive;
     else if (beAux && (vf == nlp::morph::VfGer || (vf == nlp::morph::VfPart && tt != nlp::morph::TensePast)))
       f.pred.aspect = Aspect::Progressive;
     if (auxes.empty() && (tt == nlp::morph::TensePast || tt == nlp::morph::TenseImp)) f.pred.tense = Tense::Past;
@@ -3260,6 +3276,49 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
 void FrameBuilder::repairTree(SemSentence& s) const {
   std::vector<nlp::Token>& tk = s.tokens;
   const int n = (int)tk.size();
+  // C19: "Where were you?" (where read as the subject of "you") and "Where have you been?" ("been" hung on "where"
+  // as a clause): the wh adverb is the place predicate of "be", the pronoun its subject, as in "Where is the ball?"
+  if (lang_ == SrcLang::En && n >= 3) {
+    const int w = 0;
+    const std::string wl = tk[0].lower;
+    if (wl == "where" && (tk[0].upos == "ADV" || tk[0].upos == "PRON")) {
+      int be = -1, subj = -1;
+      std::vector<int> aux;
+      for (int j = 1; j < n; ++j) {
+        const std::string& l = tk[(size_t)j].lower;
+        if (in(l, {"is", "are", "was", "were", "am", "been", "be", "'s", "'re", "'m"})) { if (be < 0) be = j; continue; }
+        if (in(l, {"have", "has", "had", "will", "would", "'ve", "'d", "'ll", "shall", "can", "could"}) && be < 0) { aux.push_back(j); continue; }
+        if (tk[(size_t)j].upos == "PRON" || tk[(size_t)j].upos == "PROPN" || tk[(size_t)j].upos == "NOUN" ||
+            tk[(size_t)j].upos == "DET") { if (subj < 0) subj = j; continue; }
+        if (tk[(size_t)j].upos == "ADJ") { subj = -2; break; }   // "How old are you?" stays as it is
+        if (tk[(size_t)j].upos == "PUNCT" && j == n - 1) continue;
+        if (tk[(size_t)j].upos == "VERB" || tk[(size_t)j].upos == "ADV" || tk[(size_t)j].upos == "ADP") { subj = -2; break; }
+      }
+      // only the plain shape: wh + (aux) + be-form + subject words ... or wh + aux + subject + been
+      const bool broken = be >= 0 && subj >= 0 &&
+                          (tk[(size_t)w].deprel != "root" || tk[(size_t)be].deprel == "advcl" ||
+                           tk[(size_t)be].deprel == "ccomp" || tk[(size_t)w].deprel == "nsubj");
+      if (broken) {
+        // the subject phrase: the subject word and its determiners / possessives up to the end
+        int sh = -1;
+        for (int j = subj; j < n; ++j)
+          if (tk[(size_t)j].upos == "PRON" || tk[(size_t)j].upos == "NOUN" || tk[(size_t)j].upos == "PROPN") sh = j;
+        if (sh >= 0) {
+          for (int j = 0; j < n; ++j) {
+            nlp::Token& t = tk[(size_t)j];
+            if (j == w) { t.head = 0; t.deprel = "root"; }
+            else if (j == be) { t.head = w + 1; t.deprel = "cop"; }
+            else if (std::find(aux.begin(), aux.end(), j) != aux.end()) { t.head = w + 1; t.deprel = "aux"; }
+            else if (j == sh) { t.head = w + 1; t.deprel = "nsubj"; }
+            else if (j >= subj && j < sh) { t.head = sh + 1; t.deprel = t.upos == "DET" ? "det" : "nmod:poss"; }
+            else if (t.upos == "PUNCT") { t.head = w + 1; t.deprel = "punct"; }
+            else if (j > sh) { t.head = w + 1; t.deprel = "dep"; }
+          }
+          tk[(size_t)w].upos = "ADV";
+        }
+      }
+    }
+  }
   if (lang_ == SrcLang::En) {
     auto stranded = [&](int i) {   // a preposition without its noun ("I told you of.")
       if (tk[(size_t)i].upos != "ADP" && !(tk[(size_t)i].upos == "ADV" && in(tk[(size_t)i].lower, {"of"}))) return false;

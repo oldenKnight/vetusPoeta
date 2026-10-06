@@ -324,7 +324,11 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
     if ((t.upos == "NOUN" || t.upos == "X") && i > 0) {
       const Reading r = readingOf(lx, t.lower);
       // a past tagged as a noun in a sentence without a verb ("The bell rang.", "The witch and the wizard sang.")
-      if (!anyVerb && !r.pastOf.empty() && r.finitePast && !r.presentVerb && !r.nounInflected &&
+      // C19: not after a possessive ("Where is my hat?": hat is no past of "hit") nor beside an auxiliary verb
+      bool aux = false;
+      for (const Token& x : tk) aux = aux || x.upos == "AUX";
+      if (!anyVerb && !aux && !r.pastOf.empty() && r.finitePast && !r.presentVerb && !r.nounInflected &&
+          !isIn(tk[(size_t)i - 1].lower, {"my", "your", "his", "her", "its", "our", "their"}) &&
           (nominal(i - 1) || (i >= 2 && tk[(size_t)i - 1].upos == "ADV" && nominal(i - 2)))) {
         t.upos = "VERB";
         t.feats = nlp::morph::fromString("Tense=Past|VerbForm=Fin|Mood=Ind");
