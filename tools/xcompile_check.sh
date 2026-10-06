@@ -3,6 +3,7 @@
 # portability errors early. Uses the `mingw-release` CMake preset (toolchain: cmake/mingw-w64.cmake).
 #   tools/xcompile_check.sh            # build into build-mingw-release/
 #   VP_WITH_LLM=OFF tools/xcompile_check.sh   # skip llama.cpp (faster)
+#   VP_BUILD_GUI=ON tools/xcompile_check.sh   # also the WebView2 shell VetusPoeta.exe (gui/shell)
 # Prints `SKIPPED (no mingw)` and exits 0 when the cross compiler is not installed.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -20,7 +21,8 @@ start=$(date +%s)
 # The preset sets VP_BUILD_GUI=OFF and VP_BUILD_TESTS=OFF; the check turns tests back on because vp_tests (and, with
 # the local model, vp_llama_smoke, which links llama + ggml statically) are the Windows executables that exist until
 # the CLI module adds vpengine. Set VP_XC_TESTS=OFF to build only the libraries and engine executables.
-cmake --preset mingw-release -DVP_WITH_LLM="$LLM" -DVP_BUILD_TESTS="${VP_XC_TESTS:-ON}" >/dev/null
+cmake --preset mingw-release -DVP_WITH_LLM="$LLM" -DVP_BUILD_TESTS="${VP_XC_TESTS:-ON}" \
+  -DVP_BUILD_GUI="${VP_BUILD_GUI:-OFF}" >/dev/null
 if ! cmake --build "$BUILD_DIR" -j"$JOBS" >"$BUILD_DIR/xcompile.log" 2>&1; then
   tail -40 "$BUILD_DIR/xcompile.log"
   echo "xcompile FAILED (full log: $BUILD_DIR/xcompile.log)"
