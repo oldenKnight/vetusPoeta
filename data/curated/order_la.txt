@@ -1,0 +1,72 @@
+# Latin word-order and construction rules for the realiser (DESIGN §10.3). Readable rules, one per line.
+# Format:  RULE <id> : <condition> => <ordering or construction> ; <note>
+# Slots: VOC vocative, CONN connector (sed, itaque, nam, enim, autem, igitur: autem/enim/igitur go second),
+#        S subject, IO indirect object, O object, OBL prepositional/oblique phrases, ADV adverbs, NEG nōn, V verb,
+#        PRED predicate noun/adjective, INF infinitive complement, WH interrogative word, Q -ne enclitic host.
+RULE order.decl       : clause.type = decl                    => [VOC,] [CONN] S IO O OBL ADV [NEG] V ; verb final, nōn directly before the verb
+RULE order.copula     : predicate.lemma = sum & PRED          => [VOC,] [CONN] S PRED [NEG] V ; "Puer bonus est"; drop S if pronoun and not contrastive
+RULE order.exist      : predicate.lemma = sum & no PRED       => [CONN] [OBL] V S ; "In hortō est fēlēs" / "Est fēlēs in hortō" (existential, verb before subject)
+RULE order.inf        : modal (possum, volō, nōlō, dēbeō, soleō, incipiō) + INF => [...] O OBL INF V ; "venīre nōn potest": object of the infinitive before the infinitive, modal last
+RULE order.yn         : clause.type = yn                      => Q-ne attached to first word: V first if clause has no O ("Esne fessus?", "Venitne?"), else the focused word ("Rosāsne vīdistī?")
+RULE order.yn.nonne   : clause.type = yn & expects yes        => nōnne first, then decl order
+RULE order.yn.num     : clause.type = yn & expects no         => num first, then decl order
+RULE order.wh         : clause.type = wh                      => WH first (quis, quid, ubi, quō, cūr, quōmodo, quandō, quot, quantus), then decl order without the slot WH filled
+RULE order.imp        : clause.type = imp & words <= 3        => V first: "Dā mihi pilam", "Venī hūc", "Aperī iānuam"
+RULE order.imp.long   : clause.type = imp & words > 3         => [VOC,] O OBL V ; "Rosās in hortō nōlī carpere"
+RULE order.prohib     : clause.type = imp & polarity = neg    => nōlī/nōlīte + [O OBL] + INF ; "Nōlī timēre", "Nōlīte clāmāre"
+RULE order.excl       : clause.type = excl                    => quam + ADJ/ADV + rest ("Quam mīrus hortus!"), or ō + acc of exclamation for misery ("Ō mē miseram!")
+RULE order.voc        : vocative present                      => vocative first unless the clause starts with an interjection (then after it); comma after
+RULE order.conn       : connector in {autem, enim, igitur, vērō, quoque, quidem} => second position (after the first word of the clause)
+RULE order.conn.first : connector in {sed, et, nam, itaque, tum, deinde, at, ergō} => first position
+RULE order.adj        : adjective modifies noun               => noun then adjective ("puella parva"), except: demonstratives (hic, ille, iste, is), possessives when contrastive, quantity (multī, omnēs, paucī, nūllus, tōtus), numerals, ordinals, magnus/parvus in exclamations => before the noun
+RULE order.poss       : possessive not contrastive            => after the noun ("māter mea"); contrastive => before ("mea māter, nōn tua")
+RULE order.gen        : genitive modifies noun                => after the noun ("liber puerī"); except partitive quantity words ("multī puerōrum")
+RULE order.num        : cardinal numeral                      => before the noun ("duōs frātrēs")
+RULE order.prep       : prepositional phrase                  => preposition + [adjective] noun; "cum" with personal pronouns becomes enclitic: mēcum, tēcum, sēcum, nōbīscum, vōbīscum, quōcum
+RULE order.adv        : manner adverb                         => directly before the verb ("celeriter currit"); time adverbs (nunc, hodiē, mox, iam, semper, numquam) at clause start or before the verb
+RULE order.rel        : relative clause                       => right after its antecedent; relative pronoun first in the clause; verb final inside
+RULE order.sub.pre    : subordinate of time/condition/cause (cum, sī, nisi, postquam, quod, quia, dum, antequam) => before the main clause when the source puts it first, else after; connective at the start of its clause
+RULE order.sub.purp   : purpose (ut/nē + subjunctive)         => after the main clause
+RULE order.sub.quod   : "that" complement after sciō, videō, audiō in flexible mode => quod + indicative is NOT used (unclassical); use acc + inf ("sciō tē venīre") or direct question
+RULE order.acc.inf    : acc + inf complement                  => accusative subject, then objects, then infinitive: "putat puellam rosās amāre"
+RULE order.dupl       : repeated exclamation/phrase in source => repeat in Latin identically ("Sērō veniō! Sērō veniō!")
+RULE order.name.first : proper name as subject                => may come first even if the source has it later; keep source emphasis otherwise
+RULE pron.drop        : subject pronoun ego/tū/nōs/vōs        => dropped unless (a) contrast with another subject in the same cue or the previous one, (b) source stresses it ("I myself", "you too", "even I"), (c) copula with predicate noun of a person ("Ego sum Alīcia" keeps ego when introducing oneself)
+RULE pron.is          : third-person pronoun subject          => dropped; object is/ea/id kept as eum/eam/id; "it" as subject of weather/impersonal => dropped
+RULE pron.refl        : object refers to the subject          => sē/suus, not eum/eius
+RULE neg.nullus       : "no" + noun                           => nūllus/nūlla/nūllum + noun ("nūllum carmen")
+RULE neg.nemo         : "nobody/no one"                       => nēmō (subject) / nēminem; "nothing" => nihil
+RULE neg.numquam      : "never"                               => numquam (one negation only; no nōn with numquam/nēmō/nihil)
+RULE neg.neque        : "and not", "nor"                      => neque/nec
+RULE q.tag            : source has a tag question ("isn't it?") => nōnne question or "nōn est?" appended; flexible: drop the tag
+RULE tense.prog       : English present progressive           => present
+RULE tense.past.event : past simple, action event             => perfect
+RULE tense.past.state : past simple with state verbs (be, have, know, want, live, sit, stand, lie) or "was ...ing", "used to" => imperfect
+RULE tense.pluperf    : "had done"                            => pluperfect
+RULE tense.future     : will / shall / going to               => future (never present for future)
+RULE tense.futperf    : "will have done", "when he has done (future)" => future perfect
+RULE mood.cond        : "would" in a condition pair           => faithful: imperfect subjunctive in both ("sī venīret, gaudērem"); flexible: present indicative in both ("sī venit, gaudeō") marked Check
+RULE mood.wish        : "let's ..."                           => 1st plural present subjunctive ("eāmus", "videāmus")
+RULE mood.jussive3    : "let him/them ..."                    => 3rd person present subjunctive
+RULE mood.purpose     : "to" + verb after motion/want expressing purpose => ut + subjunctive (faithful) ; flexible: infinitive only after volō/possum/dēbeō, otherwise ut
+RULE modal.can        : can/could                             => possum + INF (imperfect possum for "could" past)
+RULE modal.must       : must / have to / need to              => dēbeō + INF (flexible) ; faithful may use oportet + acc + INF
+RULE modal.may.perm   : may/can (permission)                  => licet + dat + INF ("licet tibi īre"), flexible: possum
+RULE modal.may.poss   : may/might (possibility)               => fortasse + indicative
+RULE modal.want       : want to                               => volō + INF; "don't want" => nōlō + INF
+RULE modal.should     : should / ought to                     => dēbeō + INF
+RULE modal.like       : would like to                         => velim + INF (faithful) ; flexible: volō + INF
+RULE cop.there        : "there is / there are"                => est / sunt, subject after the verb (order.exist)
+RULE cop.it.is        : "it is" + ADJ (weather, judgement)    => ADJ + est ("obscūrum est", "sērum est"); with a person: + dative
+RULE have.poss        : "have" possession                     => habeō + acc (flexible and faithful); "X has Y" may also be "Y est X(dat)" only in faithful
+RULE like.placet      : "like" (enjoy)                        => thing nominative + dative person + placet/placent ("rosae mihi placent"); "love" => amō + acc
+RULE need.opus        : "need"                                => opus est + dat person + abl thing (faithful) ; flexible: dēbeō + INF or volō + acc when the object is wanted
+RULE name.policy      : proper name                           => glossary policy; default keep undeclined + Check; built-in table declines (Alīcia, Alīciae ...)
+RULE title.voc        : "Your Majesty", "Sir", "Madam" address => vocative phrase from phrasebook (Māiestās Tua, domine, domina)
+RULE num.digits       : numerals written as digits in source  => digits kept; written-out numerals => Latin numerals declined where Latin declines (ūnus, duo, trēs, mīlle in plural)
+RULE time.hour        : "it's six o'clock"                    => hōra sexta est; "at six" => hōrā sextā
+RULE time.day         : weekdays                              => diēs Lūnae, Mārtis, Mercuriī, Iovis, Veneris, Sāturnī, Sōlis
+RULE punct            : punctuation                           => copy the source punctuation (., !, ?, ..., quotation marks as straight or curly per the source); Latin uses no inverted marks
+RULE caps             : capitalisation                        => sentence-initial capital; proper names capital; everything else lower-case (no capital after a colon)
+RULE enclitic.que     : "and" joining two single words        => flexible: X Yque allowed ("pater māterque"); faithful: et
+RULE length.fit       : cue would exceed 2 x 42 chars         => prefer shorter synonyms within tier, drop a redundant pronoun, then flag Check (never change timing)
