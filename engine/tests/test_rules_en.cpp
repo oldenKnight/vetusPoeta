@@ -28,6 +28,8 @@
 #include "vp/text.h"
 #include "vp/transfer.h"
 
+#include "../rules/src/frame/english.h"
+
 namespace stdfs = std::filesystem;
 using namespace vp;
 
@@ -1267,7 +1269,7 @@ TEST_CASE("rules-d: end to end on oz_sample.en.srt vs the gold Latin (report; de
   MESSAGE("oz regression: " << matches << " / 100 match the gold; confidence ok " << conf["ok"] << " / check "
                             << conf["check"] << " / fix " << conf["fix"] << "; wrong among OK " << wrongOk);
   CHECK(wrongOk == 0);
-  CHECK(matches >= 48);   // measured 50 / 100 (C15); the target of 70 was not reached (docs/rules_en_notes.md)
+  CHECK(matches >= 68);   // C15 50 / 100; C17 68 / 100 without the gold alternatives it proposes (docs/rules_en_notes.md)
 }
 
 TEST_CASE("rules-d: tests/samples/sample.en.srt, 12 cues with the expected Latin") {
@@ -1434,3 +1436,274 @@ TEST_CASE("rules-d: constructions of quality loop 2 (one sentence each)") {
   }
 }
 
+
+// ================================================================================================================
+// C17 (quality loop 3). Every rule is tested on sentences of our own, written before the tuning sample was run; the
+// oz_sample report is never the only evidence (docs/rules_en_notes.md "Quality loop 3").
+
+TEST_CASE("rules-e: base words of unknown English forms (spelling only)") {
+  using frame::en::baseCandidates;
+  auto has = [](const std::vector<std::string>& v, const char* w) { return std::find(v.begin(), v.end(), w) != v.end(); };
+  CHECK(has(baseCandidates("stopped", "VERB"), "stop"));     // doubled consonant
+  CHECK(has(baseCandidates("hoped", "VERB"), "hope"));       // dropped e
+  CHECK(has(baseCandidates("carried", "VERB"), "carry"));    // y -> ied
+  CHECK(has(baseCandidates("babies", "NOUN"), "baby"));      // y -> ies
+  CHECK(has(baseCandidates("bigger", "ADJ"), "big"));
+  CHECK(has(baseCandidates("braver", "ADJ"), "brave"));
+  CHECK(has(baseCandidates("happiest", "ADJ"), "happy"));
+  CHECK(has(baseCandidates("gently", "ADV"), "gentle"));
+  CHECK(has(baseCandidates("sadly", "ADV"), "sad"));
+  CHECK(baseCandidates("bran-new")[1] == "new");             // hyphenated: joined, then the last part
+  CHECK(baseCandidates("sea-shore")[0] == "seashore");
+  CHECK(!has(baseCandidates("kindness", "NOUN"), "kind"));   // no -ness: a noun is not its adjective
+  CHECK(!has(baseCandidates("glass", "NOUN"), "glas"));
+  NEED_REAL();
+  CHECK(frame::en::verbOfForm(real().en, "sang") == "sing");
+  CHECK(frame::en::verbOfForm(real().en, "lighted") == "light");
+  bool present = false;
+  CHECK(frame::en::verbOfForm(real().en, "sleeping", &present) == "sleep");
+  CHECK(present);
+}
+
+TEST_CASE("rules-e: unknown and misread English forms are derived from known lemmas (work item a)") {
+  NEED_REAL();
+  const std::pair<const char*, const char*> cases[] = {
+      // a participle used as an adjective: the Latin verb's participle
+      {"She carried a lighted candle.", "Candēlam accēnsam portāvit."},
+      {"The lighted candle stood on the table.", "Candēla accēnsa in mēnsā stābat."},
+      {"The boat was broken.", ""},
+      // a comparative the tagger read as a noun
+      {"The boy is braver than his sister.", "Puer fortior est quam soror sua."},
+      {"My sister is braver than my brother.", "Soror mea fortior est quam frāter meus."},
+      // an irregular past the tagger read as a present, or as a noun
+      {"The girl sang a song.", "Puella carmen cecinit."},
+      {"He swam across the river.", "Trāns flūmen nāvit."},
+      // hyphenated compounds: joined, else the head
+      {"We have a brand-new house.", "Domum novam habēmus."},
+      {"We wanted a brand-new coat.", "Pallium novum voluimus."},
+      {"The sea-shore was quiet.", "Lītus tranquillum erat."},
+      // a verb hung under a noun: the flat clause is rebuilt
+      {"The tired horses drank water.", "Equī fessī aquam bibērunt."},
+      {"The farmer's son carried water.", "Fīlius agricolae aquam portāvit."},
+      // an adjective tagged as an adverb between a determiner and a noun
+      {"You are a clever girl.", "Puella callida es."},
+      // plural nouns read as verbs before their own verb
+      {"Only witches wear black hats.", "Modo sāgae capellōs nigrōs portant."},
+      // English plural-only nouns
+      {"She washed the clothes.", "Vestēs lāvit."},
+  };
+  for (const auto& c : cases) {
+    if (!*c.second) continue;
+    const std::vector<Out> o = run({c.first});
+    CHECK_MESSAGE(o[0].text == c.second, c.first << " -> " << o[0].text << " (expected " << c.second << ")");
+    CHECK_MESSAGE(o[0].text.find('[') == std::string::npos, c.first << " -> " << o[0].text);
+  }
+}
+
+TEST_CASE("rules-e: participles and complements (work items d, e)") {
+  NEED_REAL();
+  const std::pair<const char*, const char*> cases[] = {
+      // object complements of factitive verbs
+      {"They made him king.", "Eum rēgem fēcērunt."},
+      {"The queen made the girl her friend.", "Rēgīna puellam amīcam suam fēcit."},
+      {"The rain made the road wet.", "Pluvia viam ūmidam fēcit."},
+      // participle / adjective phrases after a comma
+      {"The box was old, covered with dust.", "Arca vetus erat, pulvere tēcta."},
+      {"She is a brave girl, afraid of nothing.", "Puella fortis est, nihil timēns."},
+      // participle fragments (a clause cut from its sentence)
+      {"and the little boat broken by the waves.", "Et nāvis parva undīs frācta."},
+      {"and the queen loved by everyone.", "Et rēgīna ab omnibus amāta."},
+      {"and the letter written by the queen.", "Et epistula ā rēgīnā scrīpta."},
+      {"or the old cart badly broken on the stones below.", "Aut plaustrum vetus in saxīs īnfrā graviter frāctum."},
+      // "would" in reported speech: future infinitive agreeing with its subject
+      {"He said he would come tomorrow.", "Dīxit sē crās ventūrum esse."},
+      {"The girls said they would come.", "Puellae dīxērunt sē ventūrās esse."},
+      {"The queen said she would help us.", "Rēgīna dīxit sē nōs adiūtūram esse."},
+      // wh + to-infinitive: indirect question in the subjunctive, person of the one told
+      {"Show me how to make bread.", "Mōnstrā mihi quōmodo pānem faciam."},
+      {"Tell him where to go.", "Dīc eī quō eat."},
+      {"He asked me what to do.", "Mē rogāvit quid facerem."},
+      {"She taught us how to swim.", "Nōs docuit nāre."},
+      // what ... looks like -> quālis
+      {"What did the house look like?", "Quālis erat domus?"},
+      {"I don't know what he looks like.", "Nesciō quālis sit."},
+      // so that -> ut + subjunctive; "as" after the main clause -> ut + indicative
+      {"We ran so that we could see the king.", "Cucurrimus ut rēgem vidēre possēmus."},
+      {"so that the children could sleep.", "Ut puerī dormīre possent."},
+      {"I will help you, as I promised.", "Tē adiuvābō ut prōmīsī."},
+      // become + predicate
+      {"The frog became a prince.", "Rāna princeps facta est."},
+      // relative "where"
+      {"The house where I live is small.", "Domus in quā habitō parva est."},
+      // as + noun (role)
+      {"He worked as a cook.", "Ut coquus labōrāvit."},
+      {"She worked as a cook.", "Ut coqua labōrāvit."},
+  };
+  for (const auto& c : cases) {
+    const std::vector<Out> o = run({c.first});
+    CHECK_MESSAGE(o[0].text == c.second, c.first << " -> " << o[0].text << " (expected " << c.second << ")");
+  }
+  CHECK(hasFlag(run({"and the queen loved by everyone."})[0], "participle-phrase"));
+}
+
+TEST_CASE("rules-e: idioms, light verbs, quantities, places and order (work item c)") {
+  NEED_REAL();
+  const std::pair<const char*, const char*> cases[] = {
+      {"Let's take a walk.", "Ambulēmus."},
+      {"You made a mistake.", "Errāvistī."},                     // a light verb is an event (perfect)
+      {"We had a rest under the tree.", "Sub arbore quiēvimus."},
+      {"The cruel king starved the prisoners.", "Rēx saevus captīvōs famē cōnfēcit."},
+      {"We have no right to take the apples.", "Nōn licet nōbīs māla sūmere."},
+      {"It is no trouble to carry the box.", "Nūllus labor est arcam portāre."},
+      {"We could not find our way in the forest.", "Viam in silvā invenīre nōn poterāmus."},
+      {"I feel like a new man.", "Novus homō mihi videor."},
+      {"They took the ball from me.", "Pilam mihi abstulērunt."},  // take from a person: dative
+      {"He took the apple from the table.", "Mālum ā mēnsā abstulit."},
+      {"He admitted me to his presence.", "Mē ad sē admīsit."},
+      {"Do not speak in my presence.", "Cōram mē nōlī loquī."},
+      {"I want to go home.", "Domum īre volō."},
+      {"She stayed at home.", "Domī mānsit."},
+      {"We have lots of apples.", "Multa māla habēmus."},
+      {"There is a lot of water in the well.", "In puteō est multum aquae."},
+      {"I saw the sea for the first time.", "Prīmum mare vīdī."},
+      {"I saw a big and ugly dog.", "Canem magnum et foedum vīdī."},
+      {"She laughed a little.", "Paulum rīsit."},
+      {"We rested a little and then we walked on.", "Paulum requiēvimus et tum perrēximus."},
+      {"I will of course help you.", "Certē tē adiuvābō."},
+      {"She was in fact very kind.", "Rē vērā valdē benigna erat."},
+      {"We found the house at last.", "Domum tandem invēnimus."},
+      {"He sang so badly that we laughed.", "Tam male cecinit ut rīserīmus."},
+      {"She walked very slowly.", "Valdē lentē ambulāvit."},
+      {"How was it that you found me?", "Quōmodo mē invēnistī?"},
+      {"Why is it that the sky is blue?", "Cūr caelum caeruleum est?"},
+      {"Men are often foolish.", "Hominēs saepe stultī sunt."},
+      {"I like red.", "Rubrum amō."},
+      // agreement: two-gender nouns, persons
+      {"The sky is blue.", "Caelum caeruleum est."},
+      {"She is only a child.", "Puella tantum est."},
+      {"My sister is a teacher.", "Soror mea magistra est."},
+      {"The boy and the girl were tired.", "Puer et puella fessī erant."},
+      // epithets and exclamations
+      {"Then the brave Queen opened the gate.", "Tum fortis Rēgīna portam aperuit."},
+      {"I saw the little Dorothy.", "Parvam Dorothēam vīdī."},
+      {"You are a clever girl!", "Callida puella es!"},
+      {"You are a wicked queen!", "Mala rēgīna es!"},
+  };
+  for (const auto& c : cases) {
+    const std::vector<Out> o = run({c.first});
+    CHECK_MESSAGE(o[0].text == c.second, c.first << " -> " << o[0].text << " (expected " << c.second << ")");
+  }
+  // A3 accepts the agreement the realiser makes (no Fix on these)
+  for (const char* s : {"The boy and the girl were tired.", "The queen said she would help us.", "I feel like a new man.",
+                        "There is a lot of water in the well.", "The house where I live is small.", "I know how to swim."})
+    CHECK_MESSAGE(run({s})[0].conf != rules::Confidence::Fix, s);
+}
+
+TEST_CASE("rules-e: names, brackets, fragments (work items f, g, h)") {
+  NEED_REAL();
+  // a capitalised unknown word before a verb is a name: kept as written, Check (never Fix)
+  for (const std::pair<const char*, const char*>& c :
+       {std::pair<const char*, const char*>{"Grimbly ate the cake.", "Grimbly placentam ēdit."},
+        {"Old Grumbo laughed.", "Vetus Grumbo rīsit."},
+        {"We saw Flimsy and Grub.", "Flimsy et Grub vīdimus."},
+        {"The Scarecrow and the Lion were happy.", "Terriculum et Leō laetī erant."}}) {
+    const Out o = run({c.first})[0];
+    CHECK_MESSAGE(o.text == c.second, c.first << " -> " << o.text);
+    CHECK(o.conf != rules::Confidence::Fix);
+  }
+  // editorial text in square brackets inside a sentence: translated, brackets kept; a sound after a finished sentence
+  // stays a nonverbal piece
+  const auto ed = frame::mapSentences({"They are rusted [so badly] that I cannot move them.", "Wait! [door opens] Come in."});
+  REQUIRE(ed.size() == 4);
+  CHECK(ed[0].text == "They are rusted [so badly] that I cannot move them.");
+  CHECK(ed[2].kind == frame::CueKind::Nonverbal);
+  const Out b = run({"They are rusted [so badly] that I cannot move them at all;"})[0];
+  CHECK(b.text == "[Tam male] rōbīginātī sunt ut eōs omnīnō movēre nōn possim;");
+  CHECK(hasFlag(b, "editorial"));
+  const Out b2 = run({"The queen was [very, very] angry."})[0];
+  CHECK(b2.conf != rules::Confidence::Ok);
+  // a fragment is still grammatical Latin and never OK
+  const Out f = run({"so that the children could sleep."})[0];
+  CHECK(f.text == "Ut puerī dormīre possent.");
+  CHECK(hasFlag(f, "fragment"));
+}
+
+TEST_CASE("rules-e: noun consistency, same-headword lemmas (work item b; coordinator add-on)") {
+  NEED_REAL();
+  transfer::Transfer tr(real().la, cur());
+  // two lemmas with the same cleaned head, part of speech and principal parts (genitive / infinitive / perfect) are one
+  // candidate: they never compete with each other for the margin
+  transfer::Settings st;
+  transfer::Choice ch;
+  const uint32_t sky = tr.select("sky", feat::Noun, {}, false, false, st, ch);
+  REQUIRE(sky != lex::kNoLemma);
+  std::vector<std::string> sigs;
+  for (const auto& k : ch.candidates) {
+    const lex::Lemma l = real().la.lemma(k.lemma);
+    const morph::Principal pp = morph::parsePrincipal(morph::cleanHead(l.head), l.principal);
+    sigs.push_back(text::nfc(morph::cleanHead(l.head)) + "|" + std::to_string((int)l.pos) + "|" + pp.infinitive + "|" +
+                   pp.genitive + "|" + pp.perfect);
+  }
+  for (size_t i = 0; i < sigs.size(); ++i)
+    for (size_t j = i + 1; j < sigs.size(); ++j) CHECK_MESSAGE(sigs[i] != sigs[j], sigs[i]);
+  // homographs that inflect differently stay apart: volō "want" is not volō "fly"
+  CHECK(run({"I want water."})[0].text == "Aquam volō.");
+  // the Spanish regression cue that the duplicate "caelum" had made Check is OK again
+  if (real().esOk) {
+    auto e = engine();
+    rules::CueInput c;
+    c.sourceText = "¡Mira el cielo!";
+    c.startMs = 0;
+    c.endMs = 3000;
+    rules::Options o;
+    o.source = rules::Lang::Es;
+    o.speakerGender = 'f';
+    auto r = e->translate({c}, o, rules::Context{}, nullptr, nullptr);
+    REQUIRE(r.ok());
+    CHECK(flat(r.value()[0].target) == "Spectā caelum!");
+    CHECK(r.value()[0].confidence == rules::Confidence::Ok);
+  }
+  // consistency: a noun keeps the Latin word it had earlier in the batch when that word is a candidate here too
+  frame::FrameBuilder fb(frame::SrcLang::En, &real().pen, &real().en, cur());
+  frame::SemSentence s;
+  fb.analyse("The witch saw the sorceress.", s);
+  REQUIRE(!s.units.empty());
+  transfer::Choice probe;
+  tr.select("sorceress", feat::Noun, {}, false, false, st, probe);
+  REQUIRE(probe.candidates.size() > 1);
+  const uint32_t second = probe.candidates[1].lemma;
+  for (uint32_t want : {probe.candidates[0].lemma, second}) {
+    transfer::Memory mem;
+    mem.nounSense.emplace_back("sorceress", want);
+    transfer::ClauseOut co;
+    tr.clause(s.units[0].frame, s, st, mem, co);
+    CHECK(co.clause.hasObject);
+    CHECK(co.clause.object.head == want);
+  }
+}
+
+TEST_CASE("rules-e: fixes after the blind check (own sentences of children's dialogue)") {
+  NEED_REAL();
+  const std::pair<const char*, const char*> cases[] = {
+      {"I am going to the market to buy some apples.", "Ad forum eō ut māla emam."},   // a goal: motion, not future
+      {"She went to the river to wash the clothes.", "Ad flūmen iit ut vestēs lavet."},
+      {"and nobody could help me look for it.", "Et nēmō mē adiuvāre poterat ut id quaererem."},   // sequence
+      {"Please don't tell my brother about the secret door.", "Quaesō frātrī meō dē iānuā arcānā nōlī dīcere."},
+      {"Tell the queen the truth.", "Dīc rēgīnae vēritātem."},
+      {"I was tired, but I could not sleep.", "Fessa eram sed dormīre nōn poteram."},
+      {"The rabbit hopped quickly into its hole.", "Cunīculus in foveam suam celeriter saluit."},
+      {"The bird built its nest.", "Avis nīdum suum aedificāvit."},
+      {"Hush, the baby is sleeping.", "Tacē, īnfāns dormit."},
+      {"The fox was too clever for the hungry wolf.", "Vulpēs lupō ieiūnō nimis callida erat."},
+      {"The children laughed when the clown fell down.", "Puerī rīsērunt cum scurra cecidit."},
+      {"The old dog barked at the stranger all night.", "Canis vetus advenam tōtam noctem lātrāvit."},
+      {"The babies cried all night.", "Īnfantēs tōtam noctem flēvērunt."},
+      {"All the children laughed.", "Omnēs puerī rīsērunt."},
+      {"Every morning I walk to school.", "Omnī māne ad lūdum ambulō."},
+  };
+  for (const auto& c : cases) {
+    const std::vector<Out> o = run({c.first});
+    CHECK_MESSAGE(o[0].text == c.second, c.first << " -> " << o[0].text << " (expected " << c.second << ")");
+  }
+  CHECK(run({"The children laughed when the clown fell down."})[0].conf != rules::Confidence::Fix);   // cum + nominative
+}

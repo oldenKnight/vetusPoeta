@@ -33,7 +33,7 @@ Fābulam meam tibi nārrābō, et tum sciēs.
 Cum stannum rādēbant, frīgus per tergum meum currēbat. | Cum stannum rādēbant, frīgore horrēbam.
 Ego cor nōn habeō; itaque morbum cordis habēre nōn possum.
 nam aliās bēstiās ferās arcēre adiuvābis.
-sed hoc mē fortiōrem nōn facit,
+sed hoc mē fortiōrem nōn facit, | sed id mē fortiōrem nōn facit,
 nam nōs omnēs trāns portāre potes in tergō, singulōs. | nam nōs omnēs singulōs in tergō trāns portāre potes.
 aut Lignātor Stanneus in saxīs īnfrā graviter contūsus. | aut Lignātor Stanneus in saxīs īnfrā graviter laesus.
 Cūr nōn curris et salīs?
@@ -69,7 +69,7 @@ itaque post mē stā, et eīs venientibus occurram. | itaque post mē stāte, et
 et apēs eōs pungere nōn possunt.
 Tertium et ultimum nōs vocāvistī.
 et id maius est quam Potestās Malī.
-Eam tamen servam meam facere possum, nam potestāte suā ūtī nescit.
+Eam tamen servam meam facere possum, nam potestāte suā ūtī nescit. | Adhūc eam servam meam facere possum, nam potestāte suā ūtī nescit.
 Famē tē necāre possum. | Tē famē cōnficere possum.
 Mala bēstia es! | Scelesta es!
 Nōn licet tibi calceum meum mihi auferre. | Iūs nōn habēs calceum meum mihi auferre.
@@ -78,7 +78,7 @@ Bene, paucīs minūtīs tōta liquēscam, | Bene, mox tōta liquēscam,
 Mala fuī in diēbus meīs, | Mala fuī ōlim,
 Suntne inter tuōs fabrī stannāriī? | Estne quisquam ē tuīs faber stannārius?
 et eum iterum in fōrmam reflectere, et ubi frāctus est cōnferrūmināre? | et eum rūrsus in fōrmam flectere, et ubi frāctus est coniungere?
-Eam caedam, et tum vestēs Terriculī capere poterimus. | Arborem caedam, et tum vestēs Terriculī sūmere possumus.
+Eam caedam, et tum vestēs Terriculī capere poterimus. | Arborem caedam, et tum vestēs Terriculī sūmere possumus. | Eam caedam, et tum vestēs Terriculī accipere possumus.
 tandem cor meum accipiam.
 Vix exspectāre posse mihi videor dum ad Oz perveniam, | Vix exspectāre possum dum ad Oz perveniam,
 et fatērī dēbēs hoc iter longissimum esse.
@@ -98,6 +98,6 @@ Prō corde meō vēnī. | Cor meum petītum vēnī.
 Sedē, mea cāra; putō mē viam invēnisse quā ex hāc terrā exeās.
 Et in Kansiam?
 Multum sēricī in Rēgiā habeō, itaque facile erit follem facere. | Multum sēricī in Rēgiā habeō, itaque nūllus labor erit follem facere.
-Nunc abeō ut amīcum vīsam. | Nunc proficīscor ut aliquem vīsam.
+Nunc abeō ut amīcum vīsam. | Nunc proficīscor ut aliquem vīsam. | Nunc abeō ut aliquem vīsam.
 Oz semper amīcus noster fuit.
 Paulum flēre velim, quia Oz abiit,

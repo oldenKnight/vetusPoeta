@@ -311,21 +311,63 @@ bool flatClause(std::vector<Token>& tk, int v) {
     if (tk[(size_t)i].upos == "PART" && (tk[(size_t)i].lower == "'s" || tk[(size_t)i].lower == "'") && i > 0 &&
         in(tk[(size_t)i - 1].upos, {"NOUN", "PROPN"}))
       continue;
+    // C17: prepositions after the verb ("barked at the stranger all night")
+    if (tk[(size_t)i].upos == "ADP" && i > v) continue;
     if (!in(tk[(size_t)i].upos, {"DET", "ADJ", "NOUN", "PROPN", "PRON", "NUM", "PUNCT", "ADV"})) return false;
   }
   auto possTok = [&](int i) { return i >= 0 && i < n && tk[(size_t)i].upos == "PART"; };
   auto nominal = [&](int i) { return in(tk[(size_t)i].upos, {"NOUN", "PROPN", "PRON"}) && !possTok(i + 1); };
-  int subj = -1, obj = -1;
+  int subj = -1;
   for (int i = 0; i < v; ++i)
     if (nominal(i)) subj = i;
-  for (int i = v + 1; i < n; ++i)
-    if (nominal(i)) obj = i;
   if (subj < 0) return false;
+  // before the verb: an earlier noun group ("Every morning I walk ...") is an oblique of time, not part of the subject
+  int subjStart = subj;
+  while (subjStart > 0 && !(tk[(size_t)subjStart].upos == "PRON" && nominal(subjStart - 1)) &&
+         in(tk[(size_t)subjStart - 1].upos, {"DET", "ADJ", "NUM", "NOUN", "PROPN", "PART"}) &&
+         !(tk[(size_t)subjStart - 1].upos == "DET" && subjStart - 2 >= 0 && nominal(subjStart - 2)))
+    --subjStart;
+  int preHead = -1;   // the head of an earlier group
+  for (int i = 0; i < subjStart; ++i)
+    if (nominal(i)) preHead = i;
+  // after the verb: noun groups, a new one at a preposition or at a determiner after a noun; the first group without a
+  // preposition is the object, the others obliques
+  std::vector<std::pair<int, int>> groups;
+  {
+    int a = v + 1;
+    for (int i = v + 1; i <= n; ++i) {
+      const bool cut = i == n || tk[(size_t)i].upos == "PUNCT" ||
+                       (i > a && (tk[(size_t)i].upos == "ADP" || (tk[(size_t)i].upos == "DET" && nominal(i - 1))));
+      if (!cut) continue;
+      if (i > a) groups.emplace_back(a, i - 1);
+      a = tk[(size_t)std::min(i, n - 1)].upos == "PUNCT" || i == n ? i + 1 : i;
+    }
+  }
+  std::vector<int> role(n, 0);   // 1 subject, 2 object, 3 oblique
+  std::vector<int> headOf(n, -1);
+  bool objTaken = false;
+  for (const auto& g : groups) {
+    int h = -1;
+    for (int i = g.first; i <= g.second; ++i)
+      if (nominal(i)) h = i;
+    if (h < 0) continue;
+    const bool prep = tk[(size_t)g.first].upos == "ADP";
+    role[(size_t)h] = !prep && !objTaken ? 2 : 3;
+    objTaken = true;   // only the group right after the verb can be its object ("barked at X all night")
+    for (int i = g.first; i <= g.second; ++i) headOf[(size_t)i] = h;
+  }
   for (int i = 0; i < n; ++i) {
     Token& t = tk[(size_t)i];
     if (i == v) { t.head = 0; t.deprel = "root"; continue; }
     if (i == subj) { t.head = v + 1; t.deprel = "nsubj"; continue; }
-    if (i == obj) { t.head = v + 1; t.deprel = "obj"; continue; }
+    if (i == preHead) { t.head = v + 1; t.deprel = "obl"; continue; }
+    if (i < subjStart && preHead >= 0 && t.upos != "PUNCT" && t.upos != "ADV") {
+      t.head = preHead + 1;
+      t.deprel = t.upos == "DET" ? "det" : t.upos == "NUM" ? "nummod" : nominal(i) ? "compound" : "amod";
+      continue;
+    }
+    if (role[(size_t)i] == 2) { t.head = v + 1; t.deprel = "obj"; continue; }
+    if (role[(size_t)i] == 3) { t.head = v + 1; t.deprel = "obl"; continue; }
     if (t.upos == "PUNCT" || t.upos == "ADV") { t.head = v + 1; t.deprel = t.upos == "PUNCT" ? "punct" : "advmod"; continue; }
     if (possTok(i)) { t.head = i; t.deprel = "case"; continue; }            // C17: 's on its possessor
     if (possTok(i + 1)) {                                                   // the possessor on the next noun
@@ -334,10 +376,11 @@ bool flatClause(std::vector<Token>& tk, int v) {
         if (in(tk[(size_t)j].upos, {"NOUN", "PROPN"})) owner = j;
       if (owner >= 0) { t.head = owner + 1; t.deprel = "nmod"; continue; }
     }
-    const int noun = i < v ? subj : obj;
-    if (noun < 0 || (i < v && i > subj) || (i > v && i > obj)) { t.head = v + 1; t.deprel = "dep"; continue; }
+    const int noun = i < v ? subj : headOf[(size_t)i];
+    if (noun < 0 || (i < v && i > subj)) { t.head = v + 1; t.deprel = "dep"; continue; }
     t.head = noun + 1;
-    t.deprel = t.upos == "DET" ? "det" : t.upos == "NUM" ? "nummod" : nominal(i) ? "compound" : "amod";
+    t.deprel = t.upos == "ADP" ? "case" : t.upos == "DET" ? "det" : t.upos == "NUM" ? "nummod"
+             : nominal(i) ? "compound" : "amod";
   }
   return true;
 }
@@ -1760,6 +1803,10 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     bool goParticle = false;   // C15: "I am now going away to make a visit": motion + purpose, not the future
     for (int k : c.kids[(size_t)h])
       if (c.ok(k) && particleWord(c.t(k).lower) && k > h && k < xcomp) goParticle = true;
+    // C17: "I am going to the market to buy apples": a place between "going" and "to + verb" is motion + purpose
+    if (en && hl == "go")
+      for (int k = h + 1; k < xcomp; ++k)
+        if (in(c.t(k).upos, {"NOUN", "PROPN", "ADP", "ADV"}) && c.t(k).lower != "to") goParticle = true;
     if (en && hl == "go" && f.pred.aspect == Aspect::Progressive && !goParticle) {   // "going to rain"
       f.pred.tense = Tense::Future;
       f.pred.aspect = Aspect::Simple;
@@ -3154,6 +3201,29 @@ void FrameBuilder::repairTree(SemSentence& s) const {
       }
     }
   }
+  // C17: "She went to the river to wash the clothes": a to-infinitive hung on the goal of a verb of motion is the
+  // purpose of the motion, not a property of the place
+  if (lang_ == SrcLang::En)
+    for (int v = 0; v < n; ++v) {
+      if (tk[(size_t)v].upos != "VERB" || !in(tk[(size_t)v].lemma.empty() ? tk[(size_t)v].lower : tk[(size_t)v].lower,
+                                              {"go", "goes", "went", "gone", "going", "come", "comes", "came", "coming",
+                                               "run", "ran", "runs", "running", "walk", "walked", "walks", "hurry",
+                                               "hurried", "return", "returned", "ride", "rode", "fly", "flew", "sail",
+                                               "sailed", "travel", "travelled", "traveled"}))
+        continue;
+      for (int o = v + 1; o < n; ++o) {
+        if (tk[(size_t)o].head != v + 1 || tk[(size_t)o].deprel != "obl") continue;
+        for (int a = o + 1; a < n; ++a) {
+          if (tk[(size_t)a].head != o + 1 || tk[(size_t)a].deprel != "acl" || tk[(size_t)a].upos != "VERB") continue;
+          bool to = false;
+          for (int g = 0; g < n; ++g)
+            if (tk[(size_t)g].head == a + 1 && tk[(size_t)g].lower == "to" && g < a) to = true;
+          if (!to) continue;
+          tk[(size_t)a].head = v + 1;
+          tk[(size_t)a].deprel = "advcl";
+        }
+      }
+    }
   // C17: two subjects of one verb joined by "and" ("The Scarecrow and the Lion were happy."): the second is a
   // conjunct of the first
   if (lang_ == SrcLang::En)

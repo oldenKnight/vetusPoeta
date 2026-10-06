@@ -721,6 +721,12 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
     append(clauseWords, s[kVOC]);
   }
   append(clauseWords, s[kCONN]);
+  // C17: a verbless clause with a participle predicate ("Lignātor Stanneus in saxīs graviter contūsus"): the
+  // participle closes it, as a verb would
+  bool partLast = c.type == ClauseType::Frag && c.pred.lemma == kNone && !c.predAdj.empty();
+  for (const LaAdj& pa : c.predAdj) partLast = partLast && pa.participle != 0;
+  if (partLast)
+    std::stable_partition(content.begin(), content.end(), [](const Word& w) { return std::string(w.rule) != "order.copula"; });
   append(clauseWords, content);
   if (!clauseWords.empty() && !clauseWords.back().rule[0]) clauseWords.back().rule = orderRule;
   if (!c.politeness.empty() && !clauseWords.empty()) {

@@ -442,7 +442,7 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
       x.score -= 0.05;   // a pivot reading is one step less certain
       x.why += ", via English \"" + pivotVia + "\"";
     }
-  // C17 (coordinator add-on): two lemmas with the same cleaned headword, part of speech, gender and principal parts
+  // C17 (coordinator add-on): two lemmas with the same cleaned headword, part of speech, genitive / infinitive / perfect
   // inflect alike (the rebuilt latin.vpl lists "caelum" heaven and "caelum" chisel): they give the same Latin words,
   // so they are one candidate. The best score represents the group (its sense is the one that fits); on equal scores
   // the lower tier, then more paradigm cells, then the lower id. The others are dropped and never count as a
@@ -450,8 +450,10 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
   if (sc.size() > 1) {
     auto sig = [&](uint32_t id) {
       const lex::Lemma l = la_.lemma(id);
-      return text::nfc(morph::cleanHead(l.head)) + "|" + std::to_string((int)l.pos) + "|" +
-             std::to_string((int)l.gender) + "|" + text::nfc(std::string(l.principal));
+      const std::string head = morph::cleanHead(l.head);
+      const morph::Principal pp = morph::parsePrincipal(head, l.principal);
+      return text::nfc(head) + "|" + std::to_string((int)l.pos) + "|" + text::nfc(pp.infinitive) + "|" +
+             text::nfc(pp.genitive) + "|" + text::nfc(pp.perfect);
     };
     auto cellCount = [&](uint32_t id) {
       std::vector<std::pair<uint32_t, std::string_view>> cl;
@@ -1255,6 +1257,7 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
     if (c.negative) { addAdj("nūllus", d); nullusSingular(); }
     else if (c.question) addAdj("ūllus", d);
   } else if (d == "every") addAdj("omnis", d);
+  else if (d == "all" && n.number == 1 && c.st.lang == frame::SrcLang::En && latin("tōtus", Adj) != kNone) addAdj("tōtus", d);   // C17: "all night" -> tōtam noctem
   else if (d == "all") { addAdj("omnis", d); o.number = Pl; }
   else if (d == "many") { addAdj("multus", d); o.number = Pl; }
   else if (d == "few") { addAdj("paucus", d); o.number = Pl; }
@@ -1285,7 +1288,7 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
       uint8_t num = p.pron.number == 2 ? Pl : p.pron.number == 1 ? Sg : (c.mem.addresseePlural ? Pl : Sg);
       if (p.pron.person == 3) {
         // reflexive suus when the clause subject is the same 3rd person, else eius / eōrum
-        const uint8_t pg = p.pron.gender;
+        const uint8_t pg = p.pronLemma == "its" ? (uint8_t)0 : p.pron.gender;   // C17: "its" fits any Latin gender
         if (c.frame && c.frame->hasSubject && c.subjPerson == 3 && c.frame->subject.token != n.token &&
             c.subjNumber == (num == Pl ? 2 : 1) && (pg == 0 || c.subjGender == 0 || pg == c.subjGender ||
                                                     num == Pl)) {
@@ -1452,6 +1455,7 @@ bool Transfer::obliqueInto(const frame::SemOblique& ob, Ctx& c, LaClause& cl) co
       o.case_ = Nom;
       npInto(n, c, o.np);
       o.np.case_ = Nom;
+      if (c.subjGender == F && animate(n) && o.np.head != kNone && !o.np.isName) o.np.head = feminineOf(o.np.head);
       o.front = ob.front;
       cl.obliques.push_back(o);
       return true;
@@ -2330,6 +2334,75 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
       cl.indirect = LaNP{};
     }
   }
+  std::vector<int> agentDone;   // C17: agent phrases already placed by the participle-phrase rule below
+  // C17: a fragment "or the Tin Woodman badly dented on the rocks" is a noun with a participle phrase: a transitive
+  // verb in the past without object, auxiliary or modal, in a clause cut from its sentence (lower-case start) ->
+  // the perfect participle agreeing with the subject, no finite verb (... graviter contūsus)
+  if (c.st.lang == frame::SrcLang::En && f.hasPred && !f.copula && f.hasSubject && !f.subject.isPronoun && !f.hasObject &&
+      !cl.hasObject && f.pred.tense == frame::Tense::Past && f.pred.aspect == frame::Aspect::Simple &&
+      f.pred.modality == Modality::None && f.pred.voice == frame::Voice::Active && f.pred.auxTokens.empty() &&
+      f.subordinate.empty() && cl.pred.lemma != kNone && cl.pred.modal == kNone && f.type == Kind::Decl &&
+      !c.s.text.empty() && c.s.text[0] >= 'a' && c.s.text[0] <= 'z' && f.pred.token >= 0 &&
+      (size_t)f.pred.token < c.s.tokens.size()) {
+    const std::string& vw = c.s.tokens[(size_t)f.pred.token].lower;
+    bool transitive = false;
+    if (const curated::Valency* v = cd_.valency(la_.lemma(cl.pred.lemma).key))
+      for (const curated::Frame& fr : v->frames) transitive = transitive || fr.kind == curated::FrameKind::Acc;
+    std::vector<lex::Sense> ss;
+    la_.senses(cl.pred.lemma, ss);
+    if (!ss.empty() && (ss[0].tags & 1u) && !(ss[0].tags & 2u)) transitive = true;
+    bool agent = false;
+    for (const frame::SemOblique& o : f.obliques) agent = agent || o.prep == "by";
+    const bool deponent = (la_.lemma(cl.pred.lemma).flags & lex::Deponent) != 0;
+    const bool edForm = vw.size() > 3 && (vw.compare(vw.size() - 2, 2, "ed") == 0 || vw.compare(vw.size() - 2, 2, "en") == 0);
+    // an English form that is only a past participle ("broken", "written", not "broke") is one
+    bool partOnly = false;
+    if (c.st.srcLex) {
+      std::vector<lex::Analysis> an;
+      c.st.srcLex->lookup(text::en_key(vw), an);
+      bool part = false, fin = false;
+      for (const lex::Analysis& a : an) {
+        if (c.st.srcLex->lemma(a.lemma).pos != Verb) continue;
+        const Features ff = unpack(c.st.srcLex->feature(a.feat));
+        if (ff.mood == ParticipleMood) part = true;
+        else if (ff.tense == Perfect) fin = true;
+      }
+      partOnly = part && !fin;
+    }
+    if (!deponent && ((transitive && edForm) || agent || partOnly)) {
+      LaAdj pa;
+      pa.lemma = cl.pred.lemma;
+      pa.participle = Perfect;
+      cl.predAdj.push_back(pa);
+      cl.pred = realise::LaPredicate{};
+      cl.type = realise::ClauseType::Frag;
+      if (std::find(c.out.flags.begin(), c.out.flags.end(), "participle-phrase") == c.out.flags.end())
+        c.out.flags.push_back("participle-phrase");
+      // the agent: ā/ab + ablative for persons, the bare ablative for things ("undīs frācta", "ab omnibus amāta")
+      for (const frame::SemOblique& o : f.obliques) {
+        if (o.prep != "by") continue;
+        LaOblique lo;
+        const bool person = animate(o.np) || o.np.pronLemma == "everyone" || o.np.pronLemma == "everybody";
+        if (person) lo.prep = latin("ab", Prep);   // ā / ab by the next sound (order.prep)
+        if (person && lo.prep == kNone) lo.prep = latin("ā", Prep);
+        lo.case_ = Abl;
+        npInto(o.np, c, lo.np);
+        lo.np.case_ = Abl;
+        c.cover(o.token);
+        cl.obliques.push_back(lo);
+        agentDone.push_back(o.token);
+      }
+    }
+  }
+  // C17: "tell my brother about the door" -> frātrī meō dē iānuā dīcere: the person told is a dative
+  if (c.st.lang == frame::SrcLang::En && cl.hasObject && !cl.hasIndirect && f.hasObject && animate(f.object) &&
+      f.pred.lemma == "tell" && (cl.pred.lemma == latin("dīcō", Verb) || cl.pred.lemma == latin("nārrō", Verb))) {
+    cl.hasIndirect = true;
+    cl.indirect = cl.object;
+    cl.indirect.case_ = Dat;
+    cl.hasObject = false;
+    cl.object = LaNP{};
+  }
   // C15: "I have no heart" -> cor nōn habeō (possession denied: the verb's negation, not nūllus)
   if (cl.hasObject && cl.pred.lemma == latin("habeō", Verb) && cl.pred.modal == kNone && f.hasObject &&
       f.object.determiner == "no" && cl.object.adjectives.size() == 1 && cl.object.adjectives[0].lemma == latin("nūllus", Adj)) {
@@ -2338,6 +2411,7 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
   }
   // obliques
   for (const frame::SemOblique& o : f.obliques) {
+    if (std::find(agentDone.begin(), agentDone.end(), o.token) != agentDone.end()) continue;
     if ((stateVerb || c.objectInVerb) && (o.prep == "of" || o.prep == "about") && !cl.hasObject) {
       cl.hasObject = true;
       npInto(o.np, c, cl.object);
@@ -2607,6 +2681,38 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
     if ((a.lemma == "never" || a.lemma == "nunca") && cl.polarity == realise::Polarity::Neg) {}
     cl.adverbs.push_back(la);
   }
+  // C17: an adverb that belongs to a noun of the clause ("on the rocks below") stays next to the obliques, before
+  // the clause's own adverbs ("in saxīs īnfrā graviter contūsus")
+  if (c.st.lang == frame::SrcLang::En && cl.adverbs.size() > 1) {
+    std::vector<int> nounAdv;
+    for (const frame::SemAdverb& a : f.adverbs)
+      if (a.token >= 0 && (size_t)a.token < c.s.tokens.size()) {
+        const int hd = c.s.tokens[(size_t)a.token].head - 1;
+        if (hd >= 0 && (size_t)hd < c.s.tokens.size() && (c.s.tokens[(size_t)hd].upos == "NOUN" || c.s.tokens[(size_t)hd].upos == "PROPN"))
+          nounAdv.push_back(a.token);
+      }
+    if (!nounAdv.empty()) {
+      std::vector<uint32_t> first;
+      for (int t : nounAdv) {
+        const std::string lw = c.s.tokens[(size_t)t].lower;
+        const char* la0 = tables::adverb(lw, false);
+        uint32_t id = la0 ? latin(la0, Adv) : kNone;
+        if (id == kNone)
+          for (const Choice& ch : c.out.choices)
+            if (ch.token == t) id = ch.lemma;
+        if (id != kNone) first.push_back(id);
+      }
+      std::stable_partition(cl.adverbs.begin(), cl.adverbs.end(), [&](const realise::LaAdverb& a) {
+        return std::find(first.begin(), first.end(), a.lemma) != first.end();
+      });
+    }
+  }
+  // C17: "badly" with a participle of damage is graviter ("graviter contūsus"; male contūsus is "clumsily dented")
+  if (cl.type == realise::ClauseType::Frag && !cl.predAdj.empty() && cl.predAdj.back().participle == Perfect) {
+    const uint32_t male = latin("male", Adv), graviter = latin("graviter", Adv);
+    for (realise::LaAdverb& a : cl.adverbs)
+      if (a.lemma == male && graviter != kNone) a.lemma = graviter;
+  }
   for (const std::string& d : f.discourse)
     if (d == "please") {
       const uint32_t q = latin("quaesō", Verb);
@@ -2738,6 +2844,12 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
         if (sb.marker == "unless") ls.conj = latin("nisi", Conj);
         break;
       case Relation::Purpose:
+        // C17: sequence of tenses: after an imperfect or pluperfect main verb the purpose clause is in the imperfect
+        // subjunctive ("nēmō mē adiuvāre poterat ut id quaererem"); after a perfect both sequences occur (vēnī ut
+        // videam, as before)
+        if (c.st.lang == frame::SrcLang::En && sc.pred.tense == Present &&
+            (cl.pred.tense == Imperfect || cl.pred.tense == Pluperfect))
+          sc.pred.tense = Imperfect;
         // C17: "so that I may see" -> ut videam: the subjunctive carries "may" (no fortasse)
         if (sf.pred.modality == Modality::May) {
           const uint32_t fort = latin("fortasse", Adv);
@@ -2769,7 +2881,9 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
           }
         }
         break;
-      case Relation::Result: ls.rel = realise::SubRel::Result; break;
+      case Relation::Result:
+        ls.rel = realise::SubRel::Result;
+        break;
       case Relation::Concession: ls.rel = realise::SubRel::Concession; break;
       case Relation::Complement:
         ls.rel = sb.frame[0].type == Kind::Wh || whatLike(sb.frame[0]) >= 0 ? realise::SubRel::IndirectQ : realise::SubRel::AccInf;
@@ -2871,6 +2985,15 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
         }
         if (sb.marker == "nor") sc.polarity = realise::Polarity::Pos;
         ls.conj = latin(k, Conj);
+        // C17: ", so we walked ..." / ", but she ...": the clause's own connector joins it (itaque, not "et itaque")
+        if (sb.marker.empty() && !sc.connectors.empty() && c.st.lang == frame::SrcLang::En) {
+          const uint32_t first = sc.connectors[0];
+          const std::string fk = text::latin_key(std::string(la_.lemma(first).head));
+          if (fk == "itaque" || fk == "sed" || fk == "nam" || fk == "tamen" || fk == "aut" || fk == "et") {
+            ls.conj = first;
+            sc.connectors.erase(sc.connectors.begin());
+          }
+        }
         // ", or you would not ..." = otherwise: "; aliter ..." with the conditional's subjunctive
         if (sb.marker == "or" && sf.pred.mood == frame::SrcMood::Conditional) {
           const uint32_t aliter = latin("aliter", Adv);

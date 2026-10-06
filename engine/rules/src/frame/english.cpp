@@ -110,7 +110,7 @@ std::vector<std::string> baseCandidates(const std::string& w, const std::string&
       add(b.substr(0, b.size() - 1));
     add(b);
     if (suf == "ed" || suf == "ing" || suf == "er" || suf == "est") add(b + "e");   // "hoped" -> hope, "braver" -> brave
-    if (suf == "ly" && endsWith(b, "l")) add(b + "e");                             // "gently" -> gentle
+    if (suf == "ly") add(b + "le");                                                // "gently" -> gentle
   }
   return out;
 }
@@ -193,6 +193,17 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
   for (int i = 0; i < n; ++i) {
     Token& t = tk[(size_t)i];
     if (t.lower.empty() || t.text.empty()) continue;
+    // a noun tagged as a verb right after a determiner and before the verb ("when the clown fell down")
+    if (t.upos == "VERB" && i > 0 && i + 1 < n && tk[(size_t)i - 1].upos == "DET" &&
+        isIn(tk[(size_t)i + 1].upos, {"VERB", "AUX"}) && !isIn(tk[(size_t)i - 1].lower, {"that", "this"})) {
+      const Reading r = readingOf(lx, t.lower);
+      if (r.noun) {
+        t.upos = "NOUN";
+        t.feats = nlp::morph::fromString("Number=Sing");
+        changed = true;
+        continue;
+      }
+    }
     if (t.upos == "VERB") {
       // an irregular past read as a present ("She sang loudly.")
       const uint32_t tt = fget(t, nlp::morph::TenseShift), vf = fget(t, nlp::morph::VerbFormShift);
@@ -218,8 +229,11 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
       changed = true;
       continue;
     }
-    // an adjective tagged as an adverb between a determiner and a noun ("a clever girl")
-    if (t.upos == "ADV" && i > 0 && i + 1 < n && tk[(size_t)i - 1].upos == "DET" && tk[(size_t)i + 1].upos == "NOUN") {
+    // an adjective tagged as an adverb: between a determiner and a noun ("a clever girl"), or after "too" / "so" /
+    // "very" ("The fox was too clever"), when the lexicon has no adverb reading
+    const bool degreeBefore = i > 0 && isIn(tk[(size_t)i - 1].lower, {"too", "so", "very", "quite", "rather"});
+    if (t.upos == "ADV" && i > 0 && ((i + 1 < n && tk[(size_t)i - 1].upos == "DET" && tk[(size_t)i + 1].upos == "NOUN") ||
+                                     degreeBefore)) {
       std::vector<lex::Analysis> an;
       lx.lookup(text::en_key(t.lower), an);
       bool adj = false, adv = false;

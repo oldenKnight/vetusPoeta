@@ -299,6 +299,13 @@ struct LatinChecker::Impl {
         if (conj && keyIs(i, {"quod", "quia", "si", "nisi", "ut", "ne", "antequam", "postquam", "dum", "quamquam"}))
           cut = true;
         if (conj && keyIs(i, {"cum"}) && boundaryBefore[i]) cut = true;   // mid-clause cum is the preposition
+        // C17: cum right after a finite verb with another finite verb later ("Puerī rīsērunt cum scurra cecidit"): the
+        // conjunction
+        if (conj && keyIs(i, {"cum"}) && any(i - 1, isFinite) && !any(i - 1, isNominal)) {
+          bool later = false;
+          for (size_t j = i + 2; j < n && !later; ++j) later = any(j, isFinite) && !any(j, isNominal);
+          if (later) cut = true;
+        }
         // C17: an indirect question after its verb ("Nesciō quālis sit", "Rogāvit quid vellem")
         if (keyIs(i, {"qualis", "quantus", "quis", "quid", "quot", "ubi", "unde", "quo", "cur", "quomodo", "num", "quando"}) &&
             any(i - 1, isFinite))
@@ -372,6 +379,7 @@ struct LatinChecker::Impl {
     governed.assign(n, 0);
     for (size_t i = 0; i + 1 < n; ++i) {
       if (!any(i, [](const Reading& r) { return r.lpos == Prep; })) continue;
+      if (i < advHint.size() && advHint[i]) continue;   // C17: the generator used it as an adverb ("in saxīs īnfrā")
       const uint16_t cases = cd.prepCases(rep.tokens[i].analysis.key);
       const size_t x = i + 1;
       if (!cases) continue;

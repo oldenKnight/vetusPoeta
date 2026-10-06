@@ -7,6 +7,9 @@
 #include "vp/fs.h"
 #include "vp/online.h"
 #include "vp/text.h"
+#if defined(VP_HAVE_RULES)
+#include "vp/morph.h"   // C17: words.list prints cleaned headwords
+#endif
 
 namespace vpcli {
 
@@ -661,6 +664,9 @@ json Server::cmdWordsList(const json& p) {
     if (static_cast<int64_t>(words.size()) < limit) {
       json lemma = lemmaJson(*lx, kv.first);
       lemma["tier"] = tier;   // the tier the engine used (curated tiers override the lexicon's)
+#if defined(VP_HAVE_RULES)
+      lemma["head"] = vp::morph::cleanHead(l.head);   // C17 (C8b hand-off): no editorial marks ("((caelum")
+#endif
       words.push_back(json{{"lemma", lemma}, {"count", kv.second.first}, {"tier", tier}});
     }
   }

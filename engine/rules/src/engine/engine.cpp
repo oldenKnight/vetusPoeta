@@ -1473,7 +1473,7 @@ class RulesEngine final : public Engine {
                  a.minMargin < 0.15 || a.song || a.nonverbal || onlineDisagree;
       for (const char* f : {"name-guessed", "from-rule", "addressee-guess", "missing-form", "merged", "frame-fallback",
                             "fragment", "contact-relative", "noun-infinitive", "purpose-guess", "light-verb",
-                            "phrase-order", "participle-phrase", "ellipsis", "could-not-parse"})
+                            "phrase-order", "participle-phrase", "ellipsis", "could-not-parse", "editorial"})   // C17
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       // a tier 3 word chosen while a tier 1/2 word of the same sense existed (fidelity 1, a correction aside)
       for (const transfer::Choice& c : a.choices)
