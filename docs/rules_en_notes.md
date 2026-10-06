@@ -396,3 +396,13 @@ The OK share fell (36 -> 21 during the loop) because the fragment signal is stri
    oz gold; DESIGN §10.3 says "don't you ..." -> nōnne. nōnne stays for tag questions.
 2. "Then" in a statement is tum (oz #6, #54), in an imperative / question igitur (own_dialogue).
 3. The fragment signal makes every cue that starts in lower case or ends with a comma Check.
+
+### Review of quality loop 2 (main agent)
+- Gold alternatives accepted into oz_sample.la.gold.txt: #1 (habēmus; the lexicon has sāga, -ae with a long ā, so
+  "sāgās" is right and the gold's "sagae" was corrected to "sāgae"), #41 (grātiās tibi agō), #82 (cōgitāre dē).
+  The other proposals (#4, #37, #71, #81) are correct Latin but their cues are Check, so the gold is left as it is.
+- Decisions confirmed: (1) negated yes/no questions are rendered with nōn first ("Nōn potes dēscendere?"); nōnne is
+  kept for tag questions only; DESIGN §10.3 is read that way. (2) "then" = tum in statements, igitur in imperatives
+  and questions. (3) Every cue that starts in lower case or ends with a comma is Check (fragment signal).
+- Remaining 50 mismatches go to quality loop 3 (C17); unknown words (lighted, braver, dented), witch singular/plural
+  inconsistency, idioms, passives, bracketed stage text.

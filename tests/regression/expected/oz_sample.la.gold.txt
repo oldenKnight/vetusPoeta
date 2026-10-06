@@ -1,7 +1,7 @@
 # Gold Latin for tests/regression/oz_sample.en.txt (100 cues burned from the held-out public-domain dialogue), written
 # by the main agent. Fragments stay fragments (a cue that begins mid-sentence is rendered as that clause). Speaker is
 # usually Dorothy (feminine) where the sentence is hers; the Scarecrow and the Lion are masculine.
-Itaque adhuc sagae et magī inter nōs sunt.
+Itaque adhūc sāgae et magī inter nōs sunt. | Itaque adhūc sāgās et magōs inter nōs habēmus.
 Potentior est quam nōs omnēs ūnā. | Potentior est omnibus nōbīs ūnā.
 Cupiō ad amitam et avunculum meum redīre, | Cupiō ad amitam avunculumque redīre,
 Potesne mē adiuvāre ut viam inveniam?
@@ -41,7 +41,7 @@ sed benigna Cicōnia mē servāvit,
 Semper eōs quī in perīculō sunt adiuvāre libet. | Semper libenter adiuvō eōs quī in perīculō sunt.
 et ex hōc flōrum lētālī agrō quam prīmum exī. | et ex hōc papāverum agrō mortiferō quam prīmum exī.
 Puellam parvam nōbīscum feremus,
-Ō, grātiās tibi!
+Ō, grātiās tibi! | Ō, grātiās tibi agō!
 Ō Māiestās Tua, putābāmus tē necātum esse! | Ō Māiestās Tua, putābāmus tē necātum īrī!
 Ō ita; amīcum nostrum servāre potes, Leōnem Timidum, quī in agrō papāverum dormit.
 Sed, sociī, quid nunc faciēmus?
@@ -82,7 +82,7 @@ Eam caedam, et tum vestēs Terriculī capere poterimus. | Arborem caedam, et tum
 tandem cor meum accipiam.
 Vix exspectāre posse mihi videor dum ad Oz perveniam, | Vix exspectāre possum dum ad Oz perveniam,
 et fatērī dēbēs hoc iter longissimum esse.
-Cūr id anteā nōn cōgitāvimus?
+Cūr id anteā nōn cōgitāvimus? | Cūr nōn anteā dē eō cōgitāvimus?
 Nunc Pilleus Aureus tuus est,
 Cūr mē quaeris?
 Bene, crās ad mē venī, nam tempus mihi est ut dē hōc cōgitem. | Bene, crās ad mē venī, nam tempus ad cōgitandum mihi opus est.
