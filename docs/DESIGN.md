@@ -153,6 +153,21 @@ REVX  u32 n_kw; then n_kw x u32 kw_off (sorted en_key / es_key); then n_kw+1 x u
 Section order in the file: header, table, NOTE, STRS, KEYS, ANAL, LEMM, SENS, FEAT, GENX, REVX. English and
 Spanish files have only NOTE, STRS, KEYS, ANAL, LEMM, FEAT (inflected form -> lemma + features for the NLP module).
 
+Byte conventions settled by the reference encoder (`engine/tests/lex_fixture_writer.cpp`, offsets listed in
+`tests/fixtures/lex/SPEC_CHECK.md`); the Python packer reproduces them exactly:
+* Header fields are packed in the order above without padding: magic @0, major u16 @4, minor u16 @6, lang char[8]
+  @8 (NUL padded), section_count u32 @16, file_size u64 @20 (unaligned, read with memcpy), sha256 @28 (of bytes
+  [256, file_size)), zeros to 256. Section table @256: 24-byte entries {char[4] tag, u32 reserved=0, u64 offset,
+  u64 length} in file order. Each section starts 8-byte aligned (zero gap before it); `length` is unpadded; the
+  file ends at the end of the last section.
+* STRS: a NUL at offset 0 (the empty string, so every "none" `*_off` is 0), then every distinct non-empty string
+  sorted bytewise, each NUL-terminated.
+* FEAT: every packed feature word used by ANAL or GENX, ascending (feat_id = index; the reader binary-searches).
+* KEYS keys and REVX keywords sorted bytewise; ANAL grouped by key in KEYS order; GENX sorted by feat_id inside
+  each lemma; CAND sorted by score desc, lemma id asc, sense asc; the CAND count is `cand_start[n_kw]`.
+* Required sections: NOTE, STRS, KEYS, ANAL, LEMM, FEAT. Optional: SENS, GENX, REVX. Unknown tags are skipped.
+* A lemma's own headword/canonical analysis never carries ANAL flag bit3 (alternative) or bit4 (non-Attic).
+
 ### 5.1 Reader API (`engine/lex/include/vp/lex.h`)
 ```cpp
 namespace vp::lex {
