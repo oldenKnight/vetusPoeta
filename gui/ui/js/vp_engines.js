@@ -13,6 +13,15 @@
  * selected cue or all cues. Changing fidelity or an engine marks translated cues stale
  * through VP_Workspace.cmd.markStale (grey dot); edited and reviewed cues are never touched.
  *
+ * B8: engine.hello.model.rerankEnabled false -> "helps with understanding English/Spanish
+ * only" under the model switch (the model never picks Latin or Greek words then); reason
+ * "not_built" -> this version has no local model (no Install / Find buttons). The online
+ * section states whether the check can run: the engine runs it only when engines.online
+ * and online.wiktionary are both on (hello.online.allowed at start, the settings after),
+ * with a button to the Settings page when the switch is on but Wiktionary is off. The
+ * warnings of the last translation (VP_Store 'warnings', from VP_Workspace) are listed
+ * under their engine with the engine's hint.
+ *
  * VP_Engines.mount(el) / destroy(); setFidelity(1..3); sliderToFidelity(pos) /
  * fidelityToSlider(f); setModel(bool) / setOnline(bool) -> Promise; findModel() -> Promise;
  * testOnline() -> Promise; translateAgain('selected'|'all'); stats()
@@ -103,16 +112,45 @@
     }
   }
 
+  function helloModel() {
+    var engine = window.VP_Store.get('engine') || {};
+    return (engine.hello && engine.hello.model) || {};
+  }
+
+  // The engine runs the online check only with both switches on (engines.online and the
+  // Wiktionary source); hello.online.allowed says the same for the settings at start.
+  function onlineState() {
+    var st = settings();
+    var on = !!(st.engines && st.engines.online);
+    var wik = !!(st.online && st.online.wiktionary);
+    return { on: on, allowed: on && wik };
+  }
+
+  function warningLines(engine) {
+    var list = (window.VP_Store.get('warnings') || []).filter(function (x) { return x.engine === engine; });
+    return list.map(function (wn) {
+      var what = window.VP_Workspace && typeof window.VP_Workspace.warningText === 'function' ? window.VP_Workspace.warningText(wn) : wn.code;
+      return el('div', { className: 'vp-eng-warn-box', role: 'status' }, [
+        i18nEl('p', 'vp-eng-warn', 'engines.warning.label', { what: what }),
+        wn.hint ? el('p', { className: 'vp-hint', text: wn.hint }) : null
+      ]);
+    });
+  }
+
   function renderModel() {
     if (!s) { return; }
     var D = window.VP_Dom;
     var m = s.model || {};
+    var hm = helloModel();
     var on = !!(settings().engines && settings().engines.model);
     s.modelSw.setAttribute('aria-checked', on && m.available ? 'true' : 'false');
     s.modelSw.disabled = !m.available;
     D.clear(s.modelStatus);
+    var notBuilt = m.reason === 'not_built' || hm.reason === 'not_built';
     if (!s.modelLoaded) {
       s.modelStatus.appendChild(i18nEl('p', 'vp-hint', 'engines.model.checking.label'));
+    } else if (notBuilt && !m.available) {
+      s.modelStatus.appendChild(i18nEl('p', 'vp-eng-state', 'engines.model.notBuilt.label'));
     } else if (m.available) {
       var name = String(m.path || '').split(/[\\\/]/).pop();
       var mib = Math.round((m.sizeBytes || 0) / 1048576);
@@ -125,6 +163,21 @@
         i18nEl('button', 'vp-btn vp-btn-tertiary', 'engines.model.find.cta', null, { type: 'button', 'data-eng-action': 'find' })
       ]));
     }
+    var rerank = m.rerankEnabled !== undefined ? m.rerankEnabled : hm.rerankEnabled;
+    if (rerank === false && !notBuilt) { s.modelStatus.appendChild(i18nEl('p', 'vp-hint vp-eng-scope', 'engines.model.rerankOff.label')); }
+    D.append(s.modelStatus, warningLines('model'));
+  }
+
+  function renderOnline() {
+    if (!s) { return; }
+    var D = window.VP_Dom;
+    var o = onlineState();
+    D.clear(s.onlineStatus);
+    if (o.on) {
+      s.onlineStatus.appendChild(i18nEl('p', 'vp-eng-state', o.allowed ? 'engines.online.allowed.label' : 'engines.online.notAllowed.label'));
+      if (!o.allowed) { s.onlineStatus.appendChild(i18nEl('button', 'vp-btn vp-btn-tertiary', 'engines.online.settings.cta', null, { type: 'button', 'data-eng-action': 'onlineSettings' })); }
+    }
+    D.append(s.onlineStatus, warningLines('online'));
   }
 
   function render() {
@@ -142,6 +195,7 @@
     s.staleEl.hidden = !s.stale;
     if (s.stale) { setText(s.staleEl, 'engines.stale.label', { n: s.stale }); }
     renderModel();
+    renderOnline();
     renderFidelity();
   }
 
@@ -289,6 +343,8 @@
       translateAgain('selected');
     } else if (a === 'againAll') {
       translateAgain('all');
+    } else if (a === 'onlineSettings') {
+      if (window.VP_Settings) { window.VP_Settings.open(); }
     }
   }
 
@@ -312,6 +368,7 @@
     s.emojiSw = sw('vp-eng-emoji', st.showEmoji !== false, 'emoji');
     s.macronSw = sw('vp-eng-macrons', false, 'macrons');
     s.modelStatus = el('div', { className: 'vp-eng-status', 'aria-live': 'polite' });
+    s.onlineStatus = el('div', { className: 'vp-eng-status vp-eng-online-status', 'aria-live': 'polite' });
     s.testBtn = i18nEl('button', 'vp-btn vp-btn-secondary', 'engines.online.test.cta', null, { type: 'button', 'data-eng-action': 'test' });
     s.slider = el('input', { id: 'vp-fidelity', type: 'range', className: 'vp-slider', min: '1', max: '3', step: '1', 'aria-describedby': 'vp-fidelity-effect' });
     s.stopEl = el('p', { className: 'vp-fid-stop', 'aria-hidden': 'true' });
@@ -335,6 +392,7 @@
       el('section', { className: 'vp-eng' }, [
         row('vp-eng-online', 'engines.online.label', s.onlineSw),
         i18nEl('p', 'vp-hint', 'engines.online.hint', null, { id: 'vp-eng-online-hint' }),
+        s.onlineStatus,
         el('div', { className: 'vp-row' }, [s.testBtn])
       ]),
       el('section', { className: 'vp-eng vp-fid' }, [
@@ -385,6 +443,8 @@
     s.removers.push(S.subscribe('settings', render));
     s.removers.push(S.subscribe('selection', render));
     s.removers.push(S.subscribe('job', render));
+    s.removers.push(S.subscribe('warnings', render));
+    s.removers.push(S.subscribe('engine', render));
     s.removers.push(window.VP_I18n.onLanguageChanged(render));
     render();
     loadModel();

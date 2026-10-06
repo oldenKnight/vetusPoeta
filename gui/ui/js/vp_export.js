@@ -9,6 +9,9 @@
  * the options as set, and Export -> export.write (overwrite:true only after a confirm when the
  * engine answered io "file exists"), then a success toast with "Reveal file" (shell.revealFile).
  * Options start from the settings export.* defaults and change only this export.
+ * B8: the Greek polytonic | monotonic choice is always shown but enabled only when the
+ * target is Ancient Greek (else disabled with a note); a Greek dialog carries pair-grc.
+ * For the reading pairs (la-en ...) the engine writes the readable sentences (cue targets).
  *
  * VP_Export.open() -> handle; close(); isOpen(); checks(cues, total, limit) (pure);
  * fileName(name, pair, format) (pure); options(); setOption(key, value); run() -> Promise
@@ -223,11 +226,12 @@
         i18nEl('legend', null, 'export.options.title'),
         check('vp-exp-emoji', 'export.options.emoji.label', 'emoji', 'export.options.emoji.hint'),
         check('vp-exp-macrons', 'export.options.macrons.label', 'macrons', null),
-        greek ? el('div', { className: 'vp-exp-greek', role: 'group', 'aria-label': T('export.options.greek.label') }, [
+        el('div', { className: 'vp-exp-greek' + (greek ? '' : ' vp-exp-off'), role: 'group', 'aria-label': T('export.options.greek.label'), 'aria-disabled': greek ? null : 'true', 'aria-describedby': greek ? null : 'vp-exp-greek-off' }, [
           i18nEl('span', 'vp-exp-label', 'export.options.greek.label'),
-          radio('vp-exp-greek', 'polytonic', 'export.options.greek.polytonic.label', d.opts.greek === 'polytonic', 'greek'),
-          radio('vp-exp-greek', 'monotonic', 'export.options.greek.monotonic.label', d.opts.greek === 'monotonic', 'greek')
-        ]) : null,
+          radio('vp-exp-greek', 'polytonic', 'export.options.greek.polytonic.label', d.opts.greek === 'polytonic', 'greek', { disabled: !greek }),
+          radio('vp-exp-greek', 'monotonic', 'export.options.greek.monotonic.label', d.opts.greek === 'monotonic', 'greek', { disabled: !greek }),
+          greek ? null : i18nEl('span', 'vp-hint', 'export.options.greek.only.hint', null, { id: 'vp-exp-greek-off' })
+        ]),
         el('div', { className: 'vp-row vp-exp-encrow' }, [
           el('div', { className: 'vp-field' }, [
             el('label', { htmlFor: 'vp-exp-enc', 'data-i18n': 'export.options.encoding.label', text: T('export.options.encoding.label') }),
@@ -386,7 +390,7 @@
     renderName();
     renderChecks();
     d.handle = window.VP_Dialog.open({
-      titleKey: 'export.dialog.title', body: body, className: 'vp-dialog-wide vp-dialog-export',
+      titleKey: 'export.dialog.title', body: body, className: 'vp-dialog-wide vp-dialog-export' + (pairLangs().dst === 'grc' ? ' pair-grc' : ''),
       actions: [{ labelKey: 'dialog.cancel.cta', value: false, kind: 'secondary' }],
       initialFocus: '#vp-exp-name',
       onClose: function () { teardown(); }

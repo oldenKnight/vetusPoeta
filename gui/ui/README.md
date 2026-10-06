@@ -21,11 +21,11 @@ EN/ES and theme switches, font sample, every shared component) stays in `vp_app.
 Routing: `VP_App` follows `VP_Store 'project'`: a project routes to `workspace`, `null` back
 to `start` (one tick later, and open toasts are dismissed with the screen that showed them).
 - `vp_start.js` (`VP_Start`, PREDESIGN 1.1): subtitle-file card (drop zone, "Choose file..."
-  through `dialog.openFile`), text card (`project.new {kind:"text"}`), pair picker (Greek
-  pairs disabled, "coming later"), "Orbergise a Latin file" (`la-la`), recent projects
+  through `dialog.openFile`), text card (`project.new {kind:"text"}`), pair picker (from
+  `engine.hello.pairs` since B8, see below), "Orbergise a Latin file" (`la-la`), recent projects
   (engine-kept `settings.recentProjects` paths, max 20; display details in the extra settings
   key `recentInfo` {path: {name, pair, kind, cues, translated, needReview, at}}), "Try the
-  sample" (`project.new` with `<dataDir>/samples/sample.<src>.srt`), status line, recovery
+  sample" (`project.new` with the `hello.samples` file of the source language), status line, recovery
   banner when `project.open` returns `recoverable` (Recover focused by default /
   Keep the saved version), red card when the Latin dictionary is missing (its path shown).
   Files dropped anywhere on the window (DOM `drop` in a browser, `dialog.droppedFiles` from
@@ -120,6 +120,58 @@ mounts `VP_Orberg` in the centre. The top bar and the start screen show the SVG 
 - Tour (`VP_App.startTour`, 1.6): six steps on real controls; the last offers the sample.
   It starts by itself once per `TOUR_VERSION` (mock mode only with `?tour=1`).
 
+## Against the real engine (B8)
+The engine's shapes (engine/cli/README.md) are the truth; the mock follows them.
+- Boot order: `VP_App` initialises the bridge before the router mounts the first screen, so
+  the WebView2 `message` listener belongs to the app and the debug router's leak check is
+  clean under the real transport (unit test with a WebView2 stub; `smoke_real.js` checks
+  `VP_Debug.failures()`).
+- Start screen: the pair picker comes from `engine.hello.pairs` (enabled) and
+  `pairsUnavailable [{pair, code, message, hint}]` (disabled; the reason as the option's
+  tooltip and, grouped by reason, in a note under the picker: "not available yet" for the
+  probe's `bad_params`, else the engine's hint, which names the missing files). Before the
+  engine answers, or with an engine without `pairs`, the B6 table applies. The Orbergise
+  option follows `la-la`. "Try the sample" opens the `hello.samples` entry of the source
+  language (disabled with a tooltip when there is none). The status line names the engine
+  (`engineKind` rules | stub, version) and "This version has no local model" for
+  `model.reason:"not_built"`. Helpers: `VP_Start.pairInfo(pair)`, `pairReason(info)`,
+  `sampleFor(lang)`.
+- Warnings: the `translate.start` result's `warnings` codes, the `translate.warning
+  {jobId, engine, code, message, hint}` events and any `translate.done` `warnings` fill
+  `VP_Store 'warnings'` (one entry per engine, replaced by the next job). A new one shows a
+  toast once per job ("Model unavailable: not installed", "Show engines"); the status bar
+  carries a chip per engine (engine hint as tooltip) that opens the Engines tab, where the
+  warning is listed under its engine with the hint. The Engines tab also says "helps with
+  understanding English or Spanish only" when `model.rerankEnabled` is false, "built without
+  the local model" for `not_built`, and whether the online check can run (`engines.online`
+  and `online.wiktionary`, as the engine's `online.allowed`), with Open Settings.
+- Reading pairs (la-en, la-es, grc-en, grc-es; cues flagged `source-tokens`): the source
+  pane shows the `cue.get` tokens (the Latin/Greek words) as chips; hover or focus shows a
+  card under the text (lemma head, form in words, gloss in the UI language from
+  `word.inspect`, else the analysis gloss, tier, emoji, role); click / Enter publishes
+  `inspect {side:"analysis"}` and the Word tab shows the entry, the form, the paradigm and
+  "Why this reading?" from the `analysis` reason (chosen reading with role and confidence,
+  other readings, evidence, checks; no "Use another word"). The target pane shows the
+  readable sentence plainly. The interlinear lines (word / lemma / form abbreviations /
+  gloss) are a teacher toggle in the source pane head and `Ctrl+I` (settings key
+  `interlinear`, off by default). Alternative reasons are looked up as camel-case keys
+  ("word by word" -> `target.alt.reason.wordByWord.label`). Export writes the cue targets,
+  i.e. the readable text (smoke_real compares the preview with the cue lines).
+- Greek: Greek spans carry `lang="grc"` (target, preview, cue list, editor, inspector,
+  paradigm); a Greek pair puts `pair-grc` on the workspace root and the app element (Aegean
+  accent, PREDESIGN 2.3) and on the Export dialog; the `;` question mark is text as sent.
+  The Export dialog always shows polytonic | monotonic, enabled only for a Greek target.
+  Paradigm tables for Greek: cases nominative, genitive, dative, accusative, vocative; the
+  dual is left out; of several spellings of a cell the Attic (and contracted) ones are shown
+  (`extra` of greek.vpl cells; "alternative" last); an empty voice is the middle-passive.
+- `cue.set` answers `correctionAdded {id, key, target, scope, count}`: published as
+  `VP_Store 'correctionAdded'`, the Corrections tab reloads.
+- Names: `names.list` has no detection (only names set through `names.set`, no count): the
+  list shows only when the engine returns names; the "Add a name" form (name, what to do,
+  Latin form) is always there.
+- Orbergise: the tab works only for a Latin project with `la-la` in `hello.pairs`; else it
+  says why (not a Latin file / the engine's reason) and sends nothing.
+
 ## The mock engine for the screens
 `?mock=1` paths: `.../samples/sample.<lang>.srt` = the 12-cue sample (our own sentences);
 `...-<N>-cues....vpoeta` = N translated cues (try `VP_Start.openPath('C:\\x\\demo-50000-cues.vpoeta')`
@@ -131,6 +183,16 @@ for its small lexicon, detects the name Marcus, counts the words of the file, pr
 "writes" exports (a path containing `exists` needs `overwrite`), accepts a `.gguf` path in
 `model.locate`, rewrites Latin with simpler words in `orbergise.start`, and records
 `shell.*` calls (`VP_MockEngine.shellCalls()`).
+B8: the real engine's shapes: `engine.hello` with `engine`, `engineKind`, `pairs` (by default
+en-la, es-la, la-en, la-es, en-grc, grc-en, la-la; `options.pairs` replaces the list),
+`pairsUnavailable`, `modes`, `model.rerankEnabled:false`, `online {allowed, mock,
+mockCalls}`, `samples`; numeric `jobId`; `translate.start` refuses an unavailable pair and
+answers `warnings` + `translate.warning` events for a requested model or online check that
+cannot run; `correctionAdded` objects; `names.list` without detection
+(`options.detectNames` brings "Marcus" back); la-en / grc-en cues with `source-tokens`,
+`analysis` reasons and the word-by-word alternative; Greek lemmas (κόρη, ῥόδον, ὁράω,
+φίλος) with lemma.get cells incl. the dual and alternative spellings; the Greek sample ends
+with a question (`;`).
 
 ## Run it in a browser (mock engine)
     node gui/ui/dev/serve.js          # then open the printed URL:
@@ -164,8 +226,22 @@ opens a 50,000-cue project, waits until every cue is paged in, scrolls to the en
 Then (B7) every right-panel tab with the inspector on a word, the Export, Settings and About
 dialogs, Orbergise mode on a Latin file, and the six-step tour to its end; listeners and
 timers back to the baseline after each. About 25 s.
+Then (B8) a reading pair (la-en: source chips, hover card, "Why this reading?", Ctrl+I) and a
+Greek target (en-grc: lang="grc", Greek accent, `;`, Gentium Plus in the preview strip and
+the cue list by `document.fonts.check` and Chromium's platform-font report, the warning chip
+of a requested but missing model opening the Engines tab).
 Screenshots in `dev/out/` (gitignored): `start-*`, `workspace-*`, `panel-*`, `dialog-*`,
-`orberg-*`, `tour-*` in light/dark, en/es.
+`orberg-*`, `tour-*` in light/dark, en/es, `reading-la-en-*`, `greek-*`.
+
+    cmake -S . -B build-ui -DVP_BUILD_GUI=OFF -DVP_WITH_LLM=OFF && cmake --build build-ui -j4 --target vpengine
+    node gui/ui/dev/smoke_real.js --engine build-ui/engine/cli/vpengine   # Playwright + the real engine on data/work
+The real-engine smoke (through `dev/engine_bridge_shim.js`): pair picker = `hello.pairs`, en-la
+sample to the end with the Word / Words tabs and the Export preview, la-en with the model and
+the online check asked for (warning toast and chips, source chips, card, reading, Ctrl+I,
+export preview = readable sentences, chip -> Engines tab), then grc-en, en-grc and la-la when
+`hello.pairs` lists them (else "SKIP <pair>" with the engine's reason); no router.leak, no
+console errors, listeners back to the Start baseline after each project. Screenshots
+`dev/out/real-*.png` (`real-la-en-*`, `real-greek-*`, `real-orberg-*` when available).
 
 ## Budgets (PREDESIGN 6.2), reported by tools/jstest
 CSS <= 60 KB; JS <= 300 KB gzip in total; fonts <= 2.6 MB; DOM <= 800 nodes; idle heap

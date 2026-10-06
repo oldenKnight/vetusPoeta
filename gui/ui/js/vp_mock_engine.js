@@ -25,6 +25,20 @@
  * exists" unless overwrite, model.locate accepts a ".gguf" path, orbergise.start rewrites
  * with simpler words (cue.get then adds meaning {percent, missing} and, after an
  * originalPath, original), shell.revealFile/openExternal are recorded (shellCalls()).
+ * B8 (the real engine's shapes, engine/cli/README.md): engine.hello carries engine,
+ * engineKind, pairs + pairsUnavailable [{pair, code, message, hint}] (options.pairs replaces
+ * the available list; options.noLexicon makes every Latin pair lexicon_missing), modes, model
+ * {..., rerankEnabled:false, reason}, online {allowed, mock, mockCalls}, samples [{lang, path}];
+ * translate.start / orbergise.start refuse an unavailable pair with its code and hint, answer
+ * {jobId (a number), total, warnings:[code]} and send translate.warning {jobId, engine, code,
+ * message, hint} for a requested model or online check that cannot run; cue.set {remember}
+ * answers correctionAdded {id, key, target, scope, count}; names.list lists only the names
+ * set through names.set (options.detectNames brings back the detection of "Marcus"); la-en /
+ * la-es / grc-en / grc-es cues carry the flag "source-tokens", their cue.get tokens describe
+ * the SOURCE words with reasons of kind "analysis" {lemmaId, head, gloss, glossLang, pivot,
+ * form, role, confidence, alternatives, why} and the word-by-word alternative; Greek lemmas
+ * (κόρη, ῥόδον, ὁράω, φίλος) have lemma.get cells with the dual and alternative spellings
+ * (extra: attic, contracted) like greek.vpl; the Greek sample ends with a question (";").
  * Release builds leave this file out (tools/pack_ui.py, later).
  */
 (function () {
@@ -43,6 +57,9 @@
     'LSJ (Perseus), CC BY-SA 4.0.\n' +
     'DCC Greek Core Vocabulary, Dickinson College Commentaries, CC BY-SA 3.0.';
   var PAIRS = ['en-la', 'es-la', 'la-en', 'la-es', 'en-grc', 'es-grc', 'grc-en', 'grc-es', 'la-la'];
+  // What the mock offers by default; the rest answer like the real engine's probe.
+  var DEFAULT_PAIRS = ['en-la', 'es-la', 'la-en', 'la-es', 'en-grc', 'grc-en', 'la-la'];
+  var SAMPLE_LANGS = ['en', 'es', 'la', 'grc'];
 
   // Our own sentences (not from any book or film).
   var SENTENCES = [
@@ -83,8 +100,34 @@
     cerno: { head: 'cernō, cernere, crēvī, crētum', pos: 'verb', cls: '3', tier: 3, glossEn: 'perceive, discern', glossEs: 'distinguir', emoji: '', stem: 'cern', perf: 'crēv' },
     clarus: { head: 'clārus, clāra, clārum', pos: 'adj', cls: '1-2', tier: 1, glossEn: 'bright, clear', glossEs: 'claro', emoji: '', stem: 'clār' },
     vivo: { head: 'vīvō, vīvere, vīxī, vīctum', pos: 'verb', cls: '3', tier: 1, glossEn: 'live', glossEs: 'vivir', emoji: '', stem: 'vīv', perf: 'vīx' },
-    habito: { head: 'habitō, habitāre, habitāvī, habitātum', pos: 'verb', cls: '1', tier: 2, glossEn: 'live, dwell', glossEs: 'habitar', emoji: '', stem: 'habit', perf: 'habitāv' }
+    habito: { head: 'habitō, habitāre, habitāvī, habitātum', pos: 'verb', cls: '1', tier: 2, glossEn: 'live, dwell', glossEs: 'habitar', emoji: '', stem: 'habit', perf: 'habitāv' },
+    // Attic Greek (lang grc): the paradigm cells are listed in full in GREEK_CELLS.
+    kore: { lang: 'grc', head: 'κόρη', pos: 'noun', gender: 'feminine', cls: '1', tier: 1, glossEn: 'girl, young woman', glossEs: 'muchacha, doncella', emoji: '👧', principal: 'κόρη, κόρης, ἡ' },
+    rhodon: { lang: 'grc', head: 'ῥόδον', pos: 'noun', gender: 'neuter', cls: '2', tier: 2, glossEn: 'rose', glossEs: 'rosa', emoji: '🌹', principal: 'ῥόδον, ῥόδου, τό' },
+    horao: { lang: 'grc', head: 'ὁράω', pos: 'verb', cls: '', tier: 1, glossEn: 'see, look', glossEs: 'ver, mirar', emoji: '', principal: 'ὁράω, ὄψομαι, εἶδον' },
+    philos: { lang: 'grc', head: 'φίλος', pos: 'noun', gender: 'masculine', cls: '2', tier: 1, glossEn: 'friend', glossEs: 'amigo', emoji: '', principal: 'φίλος, φίλου, ὁ' }
   };
+  // Greek forms -> [lemma id, case, number, person, tense, gender] (like FORMS).
+  var GFORMS = {
+    'κόρη': ['kore', 'nominative', 'singular'], 'ῥόδον': ['rhodon', 'accusative', 'singular'], 'ὁρᾷ': ['horao', '', 'singular', 'third', 'present'],
+    'φίλε': ['philos', 'vocative', 'singular'], 'κόρῃ': ['kore', 'dative', 'singular']
+  };
+  var GREEK_CASES = ['nominative', 'genitive', 'dative', 'accusative', 'vocative'];
+  // sg (5 cases), pl (5), du (nom-acc-voc, gen-dat)
+  var GREEK_NOUNS = {
+    kore: [['κόρη', 'κόρης', 'κόρῃ', 'κόρην', 'κόρη'], ['κόραι', 'κορῶν', 'κόραις', 'κόρας', 'κόραι'], ['κόρα', 'κόραιν']],
+    rhodon: [['ῥόδον', 'ῥόδου', 'ῥόδῳ', 'ῥόδον', 'ῥόδον'], ['ῥόδα', 'ῥόδων', 'ῥόδοις', 'ῥόδα', 'ῥόδα'], ['ῥόδω', 'ῥόδοιν']],
+    philos: [['φίλος', 'φίλου', 'φίλῳ', 'φίλον', 'φίλε'], ['φίλοι', 'φίλων', 'φίλοις', 'φίλους', 'φίλοι'], ['φίλω', 'φίλοιν']]
+  };
+  // ὁράω: persons 1s 2s 3s 1p 2p 3p, then the dual 2d 3d; uncontracted forms are listed too
+  // (no "attic" mark), as greek.vpl does, so the table has to pick the Attic contracted one.
+  var GREEK_VERB = [
+    ['present', 'indicative', 'active', ['ὁρῶ', 'ὁρᾷς', 'ὁρᾷ', 'ὁρῶμεν', 'ὁρᾶτε', 'ὁρῶσι(ν)', 'ὁρᾶτον', 'ὁρᾶτον'], ['attic', 'contracted']],
+    ['present', 'indicative', 'active', ['ὁράω', 'ὁράεις', 'ὁράει', 'ὁράομεν', 'ὁράετε', 'ὁράουσι(ν)', 'ὁράετον', 'ὁράετον'], []],
+    ['present', 'indicative', 'middle', ['ὁρῶμαι', 'ὁρᾷ', 'ὁρᾶται', 'ὁρώμεθα', 'ὁρᾶσθε', 'ὁρῶνται', 'ὁρᾶσθον', 'ὁρᾶσθον'], ['attic', 'contracted']],
+    ['imperfect', 'indicative', 'active', ['ἑώρων', 'ἑώρας', 'ἑώρα', 'ἑωρῶμεν', 'ἑωρᾶτε', 'ἑώρων', 'ἑωρᾶτον', 'ἑωράτην'], ['attic', 'contracted']]
+  ];
+  var GREEK_PERSONS = [['first', 'singular'], ['second', 'singular'], ['third', 'singular'], ['first', 'plural'], ['second', 'plural'], ['third', 'plural'], ['second', 'dual'], ['third', 'dual']];
   // Other lemmas the mock offers as candidates for "Use another word" (the first one is chosen).
   var ALTS = { puella: ['virgo'], video: ['specto', 'cerno'], serenus: ['clarus'], habito: ['vivo'] };
   // Orbergise swaps: form -> [new form, lemma id, why, loose (meaning not fully kept)].
@@ -146,7 +189,9 @@
     sampleCues: 12,
     failNext: null,
     noLexicon: false,
-    autosaveMs: 1000
+    autosaveMs: 1000,
+    pairs: null,
+    detectNames: false
   };
 
   var listener = null;
@@ -236,6 +281,36 @@
     return { src: parts[0], dst: parts[1] };
   }
 
+  // Latin or Greek read into English or Spanish: the cue's tokens are the source words.
+  function sourceTokens(pair) {
+    var l = langsOf(pair);
+    return (l.src === 'la' || l.src === 'grc') && (l.dst === 'en' || l.dst === 'es');
+  }
+
+  function formInfo(word) {
+    var w = String(word).toLowerCase();
+    return FORMS[w] || GFORMS[w] || null;
+  }
+
+  // Like engine.hello: every pair with available, code, message, hint.
+  function pairStates() {
+    var avail = options.pairs || DEFAULT_PAIRS;
+    return PAIRS.map(function (p) {
+      if (options.noLexicon && p.indexOf('la') >= 0 && /(^|-)la($|-)/.test(p)) {
+        return { pair: p, available: false, code: 'lexicon_missing', message: 'latin.vpl not found', hint: 'Reinstall vetus poeta, or choose the dictionary folder in Settings.' };
+      }
+      if (avail.indexOf(p) >= 0) { return { pair: p, available: true }; }
+      return { pair: p, available: false, code: 'bad_params', message: 'not implemented in the mock', hint: 'This language pair is not available yet.' };
+    });
+  }
+
+  function requirePair(pair) {
+    var list = pairStates();
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].pair === pair && !list[i].available) { throw fail(list[i].code, list[i].message, list[i].hint); }
+    }
+  }
+
   // Lines as a player shows them: one line up to 42 characters, else two balanced lines
   // broken at the space nearest the middle (the real engine follows D15 more closely).
   function breakTwo(text) {
@@ -265,9 +340,10 @@
     cue.cps = cue.durationMs ? Math.round(cue.target.length / (cue.durationMs / 1000) * 10) / 10 : 0;
     cue.flags = cue.cps > state.settings.cps.adult ? ['cps'] : [];
     if (cue.lines.length > 2 || cue.lines.some(function (l) { return l.length > 42; })) { cue.flags.push('overflow'); }
+    if (sourceTokens(cue.pair)) { cue.flags.push('source-tokens'); }
     var words = cue.target.match(WORD_RE) || [];
     for (var i = 0; i < words.length; i++) {
-      var f = FORMS[words[i].toLowerCase()];
+      var f = formInfo(words[i]);
       if (f && LEMMAS[f[0]].emoji) {
         cue.flags.push('emoji');
         break;
@@ -377,17 +453,20 @@
     return { project: manifest() };
   }
 
-  // The built-in sample: the first 12 sentences in order, 2.5 s apart (our own sentences).
+  // The built-in sample: the first 12 sentences in order, 2.5 s apart (our own sentences);
+  // a Greek pair ends with the question of sentence 13 (Greek ";" question mark).
   function sampleCues(pair) {
     var src = langsOf(pair).src;
+    var greek = String(pair).indexOf('grc') >= 0;
     var out = [];
     for (var i = 0; i < 12; i++) {
       var t = 1000 + i * 3000;
+      var n = greek && i === 11 ? 12 : i;
       out.push({
         index: i, idRaw: String(i + 1), timingRaw: timing(t) + ' --> ' + timing(t + 2500),
-        start: t, end: t + 2500, durationMs: 2500, source: SENTENCES[i][src], target: '',
+        start: t, end: t + 2500, durationMs: 2500, source: SENTENCES[n][src], target: '',
         state: 'new', confidence: 'check', score: 0, cps: 0, lines: [], flags: [],
-        sentence: i, pair: pair
+        sentence: n, pair: pair
       });
     }
     return out;
@@ -422,6 +501,11 @@
 
   function alternativesOf(cue) {
     if (!cue.target) { return []; }
+    if (sourceTokens(cue.pair)) {
+      // like la2x: alternatives[0] is the word-by-word gloss line of the source
+      var gl = tokensOf(cue.source).map(function (t) { return t.lemmaId ? glossFor(LEMMAS[t.lemmaId], langsOf(cue.pair).dst).split(/,\s*/)[0] : t.text; });
+      return [{ text: gl.join(' '), reason: 'word by word', score: 0.5 }];
+    }
     var words = cue.target.split(' ');
     var swapped = words.length > 2 ? [words[1], words[0]].concat(words.slice(2)).join(' ') : cue.target;
     return [
@@ -437,8 +521,7 @@
     var forms = knownForms();
     var m;
     while ((m = re.exec(text)) !== null) {
-      var form = m[0].toLowerCase();
-      var f = FORMS[form];
+      var f = formInfo(m[0]);
       var tok = { text: m[0], display: m[0], start: m.index, end: m.index + m[0].length };
       if (f) {
         tok.lemmaId = f[0];
@@ -457,7 +540,34 @@
     var l = LEMMAS[id];
     var flags = l.pos === 'noun' || l.pos === 'adj' || l.pos === 'verb' ? ['has-table'] : [];
     if (l.pivot) { flags.push('gloss-es-pivot'); }
-    return { id: id, head: l.head, pos: l.pos, gender: l.gender || '', cls: l.cls, tier: l.tier, tierSource: 'mock', freqRank: 0, whitFreq: '', glossEn: l.glossEn, glossEs: l.glossEs, emoji: l.emoji, principal: l.head, flags: flags };
+    return { id: id, head: l.head, pos: l.pos, gender: l.gender || '', cls: l.cls, tier: l.tier, tierSource: 'mock', freqRank: 0, whitFreq: '', glossEn: l.glossEn, glossEs: l.glossEs, emoji: l.emoji, principal: l.principal || l.head, flags: flags };
+  }
+
+  function glossFor(l, lang) { return lang === 'es' ? l.glossEs : l.glossEn; }
+
+  // Greek cells the way greek.vpl lists them: every number incl. the dual, alternative
+  // spellings marked by `extra`.
+  function greekCells(id) {
+    var out = [];
+    var l = LEMMAS[id];
+    if (l.pos === 'noun') {
+      var t = GREEK_NOUNS[id];
+      for (var n = 0; n < 2; n++) {
+        for (var c = 0; c < 5; c++) { out.push({ features: feats({ pos: 'noun', 'case': GREEK_CASES[c], number: n ? 'plural' : 'singular' }), form: t[n][c], extra: ['attic'] }); }
+      }
+      ['nominative', 'genitive', 'dative', 'accusative', 'vocative'].forEach(function (cs) {
+        out.push({ features: feats({ pos: 'noun', 'case': cs, number: 'dual' }), form: cs === 'genitive' || cs === 'dative' ? t[2][1] : t[2][0], extra: ['attic'] });
+      });
+      return out;
+    }
+    GREEK_VERB.forEach(function (set) {
+      for (var k = 0; k < GREEK_PERSONS.length; k++) {
+        out.push({ features: feats({ pos: 'verb', person: GREEK_PERSONS[k][0], number: GREEK_PERSONS[k][1], tense: set[0], mood: set[1], voice: set[2] }), form: set[3][k], extra: set[4].slice() });
+      }
+    });
+    out.push({ features: feats({ pos: 'verb', tense: 'present', mood: 'infinitive', voice: 'active' }), form: 'ὁρᾶν', extra: ['attic', 'contracted'] });
+    out.push({ features: feats({ pos: 'verb', tense: 'present', mood: 'infinitive', voice: '' }), form: 'ὁρᾶσθαι', extra: ['attic', 'contracted'] });
+    return out;
   }
 
   function featureView(f) {
@@ -484,6 +594,7 @@
   // adjectives in three genders, verbs by conjugation (finite active and passive, infinitives).
   function cellsOf(id) {
     var l = LEMMAS[id];
+    if (l.lang === 'grc') { return greekCells(id); }
     if (l.pos === 'noun') { return nounCells(l, 'noun', l.gender, l.cls === '1' ? '1' : (l.cls === '2' ? '2' : '3')); }
     if (l.pos === 'adj') {
       return nounCells(l, 'adj', 'masculine', '2').concat(nounCells(l, 'adj', 'feminine', '1'), nounCells(l, 'adj', 'neuter', '2n'));
@@ -523,9 +634,47 @@
     return cands[0];
   }
 
+  function evidenceRows(k, l) {
+    var st = state.settings.engines || {};
+    return [
+      { tokenIndex: k, kind: 'evidence', text: '', data: { source: 'wiktionary', state: 'yes' } },
+      { tokenIndex: k, kind: 'evidence', text: '', data: { source: 'whitaker', state: l.lang === 'grc' ? 'none' : (l.tier === 3 ? 'no' : 'yes') } },
+      { tokenIndex: k, kind: 'evidence', text: '', data: { source: 'model', state: st.model ? 'yes' : 'off' } },
+      { tokenIndex: k, kind: 'evidence', text: '', data: { source: 'online', state: st.online ? 'yes' : 'off' } }
+    ];
+  }
+
+  var ROLES = { nominative: 'subject', accusative: 'object', dative: 'indirect object', ablative: 'place', vocative: 'vocative', genitive: 'genitive' };
+
+  // Latin/Greek read into English/Spanish (la2x): one "analysis" reason per source word,
+  // then its evidence rows; a form with two readings lists the other one as an alternative.
+  function analysisReasons(cue) {
+    var out = [];
+    var dst = langsOf(cue.pair).dst;
+    var toks = tokensOf(cue.source || '');
+    var verb = null;
+    toks.forEach(function (t) { if (t.features && t.features.pos === 'verb') { verb = t.text; } });
+    toks.forEach(function (t, k) {
+      if (!t.lemmaId) { return; }
+      var l = LEMMAS[t.lemmaId];
+      var f = t.features;
+      var form = [f.pos, f.person ? f.person + ' person' : '', f['case'], f.number, f.tense, f.mood, f.voice].filter(function (x) { return x; }).join(' ').replace(/^(\w+) /, '$1, ');
+      var alts = [];
+      if (t.lemmaId === 'puella' || t.lemmaId === 'nauta') { alts.push(t.text + ' (' + l.head.split(',')[0] + ', noun, vocative singular)'); }
+      var role = f.pos === 'verb' ? 'verb' : (ROLES[f['case']] || '');
+      out.push({ tokenIndex: k, kind: 'analysis', text: l.head.split(',')[0] + ' (' + form + '): ' + glossFor(l, dst).split(/,\s*/)[0], data: {
+        lemmaId: t.lemmaId, head: l.head.split(',')[0], gloss: glossFor(l, dst).split(/,\s*/)[0], glossLang: dst, pivot: dst === 'es' && !!l.pivot, form: form, role: role,
+        confidence: alts.length ? 0.66 : 1, alternatives: alts, why: f.pos === 'verb' || !verb || f['case'] !== 'nominative' ? [] : ['subject of ' + verb]
+      } });
+    });
+    toks.forEach(function (t, k) { if (t.lemmaId) { out = out.concat(evidenceRows(k, LEMMAS[t.lemmaId])); } });
+    return out;
+  }
+
   // "Why this word" for every known target token: sense, ranked candidates (the chosen one
   // first), form, and evidence per source (model and online "off" unless switched on).
   function reasonsOf(cue) {
+    if (sourceTokens(cue.pair)) { return analysisReasons(cue); }
     var out = [];
     var toks = tokensOf(cue.target || '');
     var words = toks.map(function (t) { return t.text; });
@@ -548,17 +697,14 @@
           data: { lemmaId: ids[a], head: al.head, form: a === 0 ? t.text : formFor(ids[a], t.features), tier: al.tier, band: band, chosen: a === 0, gloss: al.glossEn } });
       }
       out.push({ tokenIndex: k, kind: 'form', text: 'form chosen by the grammar rules', data: { features: t.features } });
-      var st = state.settings.engines || {};
-      out.push({ tokenIndex: k, kind: 'evidence', text: '', data: { source: 'wiktionary', state: 'yes' } });
-      out.push({ tokenIndex: k, kind: 'evidence', text: '', data: { source: 'whitaker', state: l.tier === 3 ? 'no' : 'yes' } });
-      out.push({ tokenIndex: k, kind: 'evidence', text: '', data: { source: 'model', state: st.model ? 'yes' : 'off' } });
-      out.push({ tokenIndex: k, kind: 'evidence', text: '', data: { source: 'online', state: st.online ? 'yes' : 'off' } });
+      out = out.concat(evidenceRows(k, l));
     }
     return out;
   }
 
   function checksOf(cue) {
     var out = [];
+    if (sourceTokens(cue.pair)) { return [{ id: 'A1', ok: true, detail: '' }, { id: 'ambiguity', ok: cue.confidence === 'ok', detail: '' }]; }
     for (var i = 1; i <= 9; i++) { out.push({ id: 'A' + i, ok: cue.confidence === 'ok' || i !== 3, detail: '' }); }
     return out;
   }
@@ -596,7 +742,9 @@
 
   function modelStatus() {
     var m = state.model;
-    return { available: m.available, path: m.path, sizeBytes: m.sizeBytes, sha256ok: m.available, loaded: m.loaded, cpuOk: true, lastLoadMs: m.lastLoadMs };
+    var out = { available: m.available, path: m.path, sizeBytes: m.sizeBytes, sha256ok: m.available, loaded: m.loaded, cpuOk: true, lastLoadMs: m.lastLoadMs, rerankEnabled: false };
+    if (!m.available) { out.reason = 'no_file'; }
+    return out;
   }
 
   // Detected names (capitalised words of a small table) merged with the policies set so far.
@@ -611,17 +759,18 @@
     }
     state.cues.forEach(function (c) {
       Object.keys(KNOWN_NAMES).forEach(function (name) {
-        if (!seen[name] && String(c.source).indexOf(name) >= 0) {
+        if (options.detectNames && !seen[name] && String(c.source).indexOf(name) >= 0) {
           seen[name] = true;
           out.push({ name: name, policy: 'decline', form: KNOWN_NAMES[name][0], forms: [], gender: KNOWN_NAMES[name][1], declension: KNOWN_NAMES[name][2] });
         }
       });
     });
+    out.forEach(function (n) { n.count = count(n.name); });
+    // Names set by the user carry no count (the real engine's names.list has none).
     state.names.forEach(function (e) {
       out = out.filter(function (n) { return n.name !== e.name; });
       out.push({ name: e.name, policy: e.policy, form: e.form, forms: [], gender: e.gender, declension: e.declension });
     });
-    out.forEach(function (n) { n.count = count(n.name); });
     return out;
   }
 
@@ -632,7 +781,9 @@
     var unknown = 0;
     var tiers = { t1: 0, t2: 0, t3: 0, names: 0 };
     state.cues.forEach(function (c) {
-      tokensOf(c.target || '').forEach(function (t) {
+      // la-en / grc-en: the words of the Latin/Greek side, as the real engine counts them
+      var text = sourceTokens(c.pair) ? (c.target ? c.source : '') : (c.target || '');
+      tokensOf(text).forEach(function (t) {
         if (/^M[āa]rc/.test(t.text)) {
           known++;
           tiers.names++;
@@ -704,13 +855,39 @@
     state.job = null;
   }
 
+  function onlineAllowed() {
+    var s = state.settings;
+    return !!(s.engines && s.engines.online && s.online && s.online.wiktionary);
+  }
+
+  // Like the engine: a requested engine that cannot run gives a warning code in the result
+  // and one translate.warning event when the job starts.
+  function jobWarnings(params) {
+    var e = params.engines || {};
+    var out = [];
+    if (e.model && !state.model.available) {
+      out.push({ engine: 'model', code: 'model_missing', message: 'local model not usable: model_missing', hint: 'The local model is not installed. The rule engine translates on its own.' });
+    }
+    if (e.online && !onlineAllowed()) {
+      out.push({ engine: 'online', code: 'online_disabled', message: 'online check is turned off in the settings', hint: 'Turn on the online check in Settings to use it.' });
+    }
+    return out;
+  }
+
   function startTranslate(params, orberg) {
     needProject();
     if (state.job) { throw fail('busy', 'a job is running', 'Wait for it to finish or cancel it.'); }
+    if (orberg) {
+      if (langsOf(state.project.pair).src !== 'la') { throw fail('bad_params', 'Orbergise needs a Latin project (pair la-la)', 'Open a Latin file to orbergise it.'); }
+      requirePair('la-la');
+    } else {
+      requirePair(state.project.pair);
+    }
+    var warns = orberg ? [] : jobWarnings(params);
     // Without indices: every cue except the ones the user reviewed or edited (they are
     // locked from bulk re-translation, PREDESIGN 4.1).
     var indices = params.indices || state.cues.filter(function (c) { return c.state !== 'reviewed' && c.state !== 'edited'; }).map(function (c) { return c.index; });
-    var id = 'job' + (state.nextJob++);
+    var id = state.nextJob++;
     var random = rng(options.seed + state.nextJob);
     var started = now();
     var jb = { id: id, indices: indices.slice(), done: 0, timer: null, random: random, stats: { ok: 0, check: 0, fix: 0 }, orberg: orberg ? { tier: params.tier === 1 ? 1 : 2, simplify: params.simplify !== false } : null };
@@ -743,7 +920,12 @@
       jb.timer = window.setTimeout(step, interval);
     }
     jb.timer = window.setTimeout(step, interval);
-    return { jobId: id };
+    if (warns.length) {
+      window.setTimeout(function () {
+        warns.forEach(function (w) { emit({ event: 'translate.warning', jobId: id, engine: w.engine, code: w.code, message: w.message, hint: w.hint }); });
+      }, 0);
+    }
+    return { jobId: id, total: indices.length, warnings: warns.map(function (w) { return w.code; }) };
   }
 
   function now() {
@@ -756,16 +938,24 @@
 
   var COMMANDS = {
     'engine.hello': function () {
+      var ps = pairStates();
+      var m = state.model;
       return {
-        version: VERSION, mock: true,
+        version: VERSION, engine: 'mock-1', engineKind: 'rules', mock: true,
         lexicons: options.noLexicon ? [
           { lang: 'la', path: 'mock://data/lexicons/latin.vpl', available: false, error: { code: 'lexicon_missing', message: 'file not found' } }
         ] : [
-          { lang: 'la', path: 'mock://la.vpl', version: 'mock-1', lemmas: 54199, tiers: { t1: 492, t2: 3247, t3: 59340 }, notice: NOTICE_LA },
-          { lang: 'grc', path: 'mock://grc.vpl', version: 'mock-1', lemmas: 23169, tiers: { t1: 260, t2: 292, t3: 23025 }, notice: NOTICE_GRC }
+          { lang: 'la', path: 'mock://la.vpl', available: true, version: 'mock-1', lemmas: 54199, tiers: { t1: 492, t2: 3247, t3: 59340 }, notice: NOTICE_LA },
+          { lang: 'grc', path: 'mock://grc.vpl', available: true, version: 'mock-1', lemmas: 23169, tiers: { t1: 260, t2: 292, t3: 23025 }, notice: NOTICE_GRC }
         ],
-        model: { available: state.model.available, path: state.model.path, sizeBytes: state.model.sizeBytes, cpuOk: true },
-        threads: 4, dataDir: 'mock://data'
+        model: { available: m.available, path: m.path, sizeBytes: m.sizeBytes, sha256ok: m.available, loaded: m.loaded, cpuOk: true, lastLoadMs: m.lastLoadMs, rerankEnabled: false, reason: m.available ? '' : 'no_file' },
+        modes: m.available ? ['R', 'M', 'O'] : ['R', 'O'],
+        online: { allowed: onlineAllowed(), mock: true, mockCalls: 0 },
+        nlp: { dir: 'mock://data/nlp', en: true, es: true },
+        pairs: ps.filter(function (x) { return x.available; }).map(function (x) { return x.pair; }),
+        pairsUnavailable: ps.filter(function (x) { return !x.available; }).map(function (x) { return { pair: x.pair, code: x.code, message: x.message, hint: x.hint }; }),
+        samples: SAMPLE_LANGS.map(function (l) { return { lang: l, path: 'mock://data/samples/sample.' + l + '.srt' }; }),
+        settingsWarnings: [], threads: 4, dataDir: 'mock://data', lexiconDir: 'mock://data', curatedDir: 'mock://data/curated'
       };
     },
     'engine.ping': function () { return {}; },
@@ -823,7 +1013,8 @@
     },
     'cue.get': function (p) {
       var cue = cueAt(p.index);
-      var out = { cue: view(cue), alternatives: alternativesOf(cue), tokens: tokensOf(cue.target), checks: checksOf(cue), reasons: reasonsOf(cue) };
+      var toks = sourceTokens(cue.pair) ? (cue.target ? tokensOf(cue.source) : []) : tokensOf(cue.target);
+      var out = { cue: view(cue), alternatives: alternativesOf(cue), tokens: toks, checks: checksOf(cue), reasons: cue.target ? reasonsOf(cue) : [] };
       if (cue.meaning) { out.meaning = clone(cue.meaning); }
       if (state.originalPath && cue.sentence !== undefined) { out.original = SENTENCES[cue.sentence].en; }
       return out;
@@ -850,7 +1041,7 @@
           hit = { id: 'c' + (state.nextCorrection++), key: key, target: cue.target, scope: p.remember, count: 1 };
           state.corrections.push(hit);
         }
-        out.correctionAdded = hit.id;
+        out.correctionAdded = clone(hit);
       }
       return out;
     },
@@ -894,7 +1085,8 @@
     },
     'word.inspect': function (p) {
       var form = String(p.text || '').toLowerCase();
-      var f = FORMS[form];
+      var f = formInfo(form);
+      if (f && (LEMMAS[f[0]].lang || 'la') !== (p.lang === 'grc' ? 'grc' : 'la')) { f = null; }
       if (!f) {
         var seen = knownForms()[plainKey(form)];
         if (seen) {

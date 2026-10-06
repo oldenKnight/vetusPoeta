@@ -17,7 +17,14 @@
  * toggleForms(open?) -> bool; useCandidate(n) -> Promise; addCorrection() -> Promise;
  * openHelp(feature, value); state(); helpers shared with the other panels: tierBadge(tier,
  * compact), formWords(features) -> {words, abbr, terms}, glossOf(lemma), grid(cells,
- * features) (pure, tests), replaceToken(text, tokens, k, word), stats()
+ * features, lang) (pure, tests), replaceToken(text, tokens, k, word), stats()
+ * B8: a source word of a reading pair (la-en, la-es, grc-en, grc-es; inspect side
+ * "analysis") shows its lexicon entry, the form it was read as, the paradigm, and "Why this
+ * reading?" from its `analysis` reason {head, gloss, form, role, confidence, alternatives,
+ * why} (chosen reading, other readings, evidence, checks); it has no "Use another word".
+ * Greek paradigms (lang grc): cases nominative, genitive, dative, accusative, vocative; the
+ * dual is left out; of the spellings greek.vpl lists for one cell, the Attic (and contracted)
+ * ones are shown; a verb voice left empty in the data is the middle-passive.
  */
 (function () {
   'use strict';
@@ -34,7 +41,11 @@
   var PERSONS = ['first', 'second', 'third'];
   var TENSES = ['present', 'imperfect', 'future', 'perfect', 'pluperfect', 'future-perfect', 'aorist'];
   var MOODS = ['indicative', 'subjunctive', 'optative', 'imperative', 'infinitive', 'participle', 'gerund', 'gerundive', 'supine'];
-  var VOICES = ['active', 'middle', 'passive'];
+  var VOICES = ['active', 'middle', 'mediopassive', 'passive'];
+  var GREEK_CASES = ['nominative', 'genitive', 'dative', 'accusative', 'vocative'];
+  var GREEK_TENSES = ['present', 'imperfect', 'future', 'aorist', 'perfect', 'pluperfect', 'future-perfect'];
+  var CLASSICAL = { la: true, grc: true };
+  var MODERN = { en: true, es: true };
   var NOMINAL = ['case', 'number', 'gender', 'degree'];
   var VERBAL = ['person', 'number', 'tense', 'mood', 'voice'];
   var NORMAL = { '1': 'first', '2': 'second', '3': 'third', m: 'masculine', f: 'feminine', n: 'neuter', sg: 'singular', pl: 'plural', du: 'dual',
@@ -119,6 +130,12 @@
     return { src: parts[0], dst: parts[1] || parts[0] };
   }
 
+  // Latin or Greek read into English or Spanish: the words to explain are the source words.
+  function readingPair() {
+    var l = pairLangs();
+    return CLASSICAL[l.src] === true && MODERN[l.dst] === true;
+  }
+
   function showError(err) {
     if (window.VP_App && typeof window.VP_App.showError === 'function') { window.VP_App.showError(err); }
   }
@@ -199,20 +216,40 @@
   // The paradigm grid of lemma.get cells. Nouns, adjectives, pronouns: cases x number (and
   // gender when the cells carry it). Verbs: one table per mood and voice, person/number x
   // tense; forms without a person (infinitives, participles) go to `other`.
-  function grid(cells, used) {
+  function grid(cells, used, lang) {
     used = used || {};
+    var greek = lang === 'grc';
+    var list = [];
     var verbal = false;
     var i;
-    for (i = 0; i < (cells || []).length; i++) { if (cells[i].features && (cells[i].features.person || cells[i].features.tense)) { verbal = true; break; } }
-    return verbal ? verbalGrid(cells, used) : nominalGrid(cells, used);
+    for (i = 0; i < (cells || []).length; i++) {
+      var f = cells[i].features || {};
+      if (greek && norm(f.number) === 'dual') { continue; }
+      list.push(cells[i]);
+      if (f.person || f.tense) { verbal = true; }
+    }
+    var scores = {};
+    return verbal ? verbalGrid(list, used, greek, scores) : nominalGrid(list, used, greek, scores);
   }
 
-  function addForm(map, key, form) {
-    if (!map[key]) { map[key] = []; }
-    if (map[key].indexOf(form) < 0) { map[key].push(form); }
+  // Of several spellings of one cell the best scored are kept: Attic and contracted first,
+  // "alternative" last (greek.vpl marks them in `extra`; Latin cells score alike).
+  function cellScore(cell) {
+    var ex = (cell && cell.extra) || [];
+    return (ex.indexOf('attic') >= 0 ? 2 : 0) + (ex.indexOf('contracted') >= 0 ? 1 : 0) - (ex.indexOf('alternative') >= 0 ? 4 : 0);
   }
 
-  function nominalGrid(cells, used) {
+  function addForm(map, key, form, score, scores) {
+    score = score || 0;
+    if (!scores || scores[key] === undefined || score > scores[key]) {
+      map[key] = [form];
+      if (scores) { scores[key] = score; }
+      return;
+    }
+    if (score === scores[key] && map[key].indexOf(form) < 0) { map[key].push(form); }
+  }
+
+  function nominalGrid(cells, used, greek, scores) {
     var rows = [];
     var cols = [];
     var colKeys = {};
@@ -239,31 +276,44 @@
         colKeys[ck] = true;
         cols.push({ key: ck, number: n, gender: gk });
       }
-      addForm(forms, c + '#' + ck, cells[i].form);
+      addForm(forms, c + '#' + ck, cells[i].form, cellScore(cells[i]), scores);
       if (same(c, used['case']) && same(n, used.number) && (!gk || !used.gender || same(gk, used.gender))) { usedKey = c + '#' + ck; }
     }
-    rows.sort(function (a, b) { return rank(CASES, a) - rank(CASES, b); });
+    var caseOrder = greek ? GREEK_CASES : CASES;
+    rows.sort(function (a, b) { return rank(caseOrder, a) - rank(caseOrder, b); });
     cols.sort(function (a, b) { return rank(NUMBERS, a.number) - rank(NUMBERS, b.number) || rank(GENDERS, a.gender) - rank(GENDERS, b.gender); });
     return { kind: 'nominal', rows: rows, cols: cols, forms: forms, used: usedKey };
   }
 
-  function verbalGrid(cells, used) {
+  function verbalGrid(cells, used, greek, scores) {
     var groups = {};
     var order = [];
     var other = [];
+    var otherAt = {};
     var usedGroup = null;
     var usedKey = null;
+    var noVoice = greek ? 'mediopassive' : 'active';
+    var tenseOrder = greek ? GREEK_TENSES : TENSES;
     for (var i = 0; i < cells.length; i++) {
       var f = cells[i].features || {};
       var mood = norm(f.mood) || 'indicative';
-      var voice = norm(f.voice) || 'active';
+      var voice = norm(f.voice) || noVoice;
+      var score = cellScore(cells[i]);
       if (!f.person) {
-        other.push({ tense: norm(f.tense), mood: mood, voice: voice, form: cells[i].form, used: !used.person && same(f.tense, used.tense) && same(mood, used.mood || 'indicative') && same(voice, used.voice || 'active') });
+        var ok = [norm(f.tense), mood, voice, norm(f.gender)].join('|');
+        var isUsed = !used.person && same(f.tense, used.tense) && same(mood, used.mood || 'indicative') && same(voice, used.voice || noVoice);
+        if (otherAt[ok] === undefined) {
+          otherAt[ok] = other.length;
+          other.push({ tense: norm(f.tense), mood: mood, voice: voice, gender: norm(f.gender), form: cells[i].form, used: isUsed, score: score });
+        } else if (score > other[otherAt[ok]].score) {
+          other[otherAt[ok]].form = cells[i].form;
+          other[otherAt[ok]].score = score;
+        }
         continue;
       }
       var gk = mood + '|' + voice;
       if (!groups[gk]) {
-        groups[gk] = { key: gk, mood: mood, voice: voice, rows: [], cols: [], forms: {} };
+        groups[gk] = { key: gk, mood: mood, voice: voice, rows: [], cols: [], forms: {}, scores: {} };
         order.push(gk);
       }
       var g = groups[gk];
@@ -271,8 +321,8 @@
       var t = norm(f.tense);
       if (g.rows.indexOf(rk) < 0) { g.rows.push(rk); }
       if (g.cols.indexOf(t) < 0) { g.cols.push(t); }
-      addForm(g.forms, rk + '#' + t, cells[i].form);
-      if (same(f.person, used.person) && same(f.number, used.number) && same(t, used.tense) && same(mood, used.mood || 'indicative') && same(voice, used.voice || 'active')) {
+      addForm(g.forms, rk + '#' + t, cells[i].form, score, g.scores);
+      if (same(f.person, used.person) && same(f.number, used.number) && same(t, used.tense) && same(mood, used.mood || 'indicative') && same(voice, used.voice || noVoice)) {
         usedGroup = gk;
         usedKey = rk + '#' + t;
       }
@@ -284,7 +334,7 @@
         var y = b.split('|');
         return rank(NUMBERS, x[1]) - rank(NUMBERS, y[1]) || rank(PERSONS, x[0]) - rank(PERSONS, y[0]);
       });
-      g.cols.sort(function (a, b) { return rank(TENSES, a) - rank(TENSES, b); });
+      g.cols.sort(function (a, b) { return rank(tenseOrder, a) - rank(tenseOrder, b); });
       return g;
     });
     list.sort(function (a, b) { return rank(MOODS, a.mood) - rank(MOODS, b.mood) || rank(VOICES, a.voice) - rank(VOICES, b.voice); });
@@ -377,7 +427,7 @@
     if (c && words.length) {
       var langs = pairLangs();
       kids.push(i18nEl('h3', 'vp-insp-sub', 'inspector.source.title'));
-      kids.push(i18nEl('p', 'vp-hint', 'inspector.source.hint'));
+      kids.push(i18nEl('p', 'vp-hint', readingPair() ? 'inspector.source.reading.hint' : 'inspector.source.hint'));
       kids.push(el('div', { className: 'vp-insp-srcwords' }, words.map(function (w) {
         return el('button', { type: 'button', className: 'vp-btn vp-btn-tertiary vp-insp-srcword', lang: langs.src, 'data-insp-src': w, text: w });
       })));
@@ -536,6 +586,35 @@
     ]);
   }
 
+  // "Why this reading?" for a source word of a reading pair, from its analysis reason.
+  function analysisWhy(reasons, a, checks, features, lang) {
+    var fw = formWords(features);
+    var conf = typeof a.confidence === 'number' ? Math.round(Math.max(0, Math.min(1, a.confidence)) * 100) : null;
+    var role = window.VP_Panes && typeof window.VP_Panes.roleText === 'function' ? window.VP_Panes.roleText(a.role) : (a.role || '');
+    var chosen = [
+      el('p', { className: 'vp-why-line' }, [
+        txt('b', 'vp-text', display(a.head || ''), { lang: lang }),
+        txt('span', null, ' ' + T('why.reading.form.label', { form: fw.words || a.form || '' })),
+        a.gloss ? txt('span', 'vp-why-gloss', ' ' + T('why.reading.gloss.label', { gloss: a.gloss })) : null
+      ]),
+      role ? txt('p', 'vp-why-line', T('source.word.role.label', { role: role })) : null,
+      conf !== null ? txt('p', 'vp-hint', T(conf >= 100 ? 'why.reading.sure.label' : 'why.reading.confidence.label', { pct: conf })) : null
+    ].concat((a.why || []).map(function (w) { return txt('p', 'vp-hint vp-why-engine', String(w)); }));
+    var alts = a.alternatives || [];
+    return el('div', { id: 'vp-why', className: 'vp-why', hidden: !whyOpen }, [
+      el('section', { className: 'vp-why-block vp-why-reading' }, [i18nEl('h3', null, 'why.reading.title')].concat(chosen)),
+      el('section', { className: 'vp-why-block vp-why-others' }, [i18nEl('h3', null, 'why.reading.others.title')].concat(alts.length ?
+        [el('ul', { className: 'vp-why-alts' }, alts.map(function (x) { return txt('li', 'vp-why-alt', String(x && x.text !== undefined ? x.text : x)); }))] :
+        [i18nEl('p', 'vp-hint', 'why.reading.others.none.label')])),
+      el('section', { className: 'vp-why-block' }, [i18nEl('h3', null, 'why.evidence.title'), evidenceRow(reasons), checksRow(checks)])
+    ]);
+  }
+
+  function analysisReason(reasons) {
+    for (var i = 0; i < reasons.length; i++) { if (reasons[i].kind === 'analysis') { return reasons[i].data || {}; } }
+    return null;
+  }
+
   function expander(id, key, open, action) {
     return el('button', { type: 'button', className: 'vp-btn vp-btn-tertiary vp-expander', 'aria-expanded': open ? 'true' : 'false', 'aria-controls': id, 'data-insp-action': action, 'data-i18n': key, text: T(key) });
   }
@@ -548,6 +627,12 @@
     var lemma = a ? a.lemma : null;
     var features = tok.features || (a && a.features) || {};
     var reasons = reasonsFor(detail, found.k);
+    var reading = analysisReason(reasons);
+    if (!lemma && reading && reading.head) {
+      // the dictionary did not answer for this spelling: the engine's reading stands in
+      lemma = { id: reading.lemmaId === undefined ? null : reading.lemmaId, head: reading.head, tier: tok.tier || 0, glossEn: reading.glossLang === 'es' ? '' : reading.gloss, glossEs: reading.glossLang === 'es' ? reading.gloss : '', flags: [] };
+      a = { lemma: lemma, features: features };
+    }
     s.view = { x: x, k: found.k, tok: tok, lemma: lemma, features: features, reasons: reasons, lang: lang };
     var kids = header(word, lemma, lang, tok);
     if (!a) {
@@ -564,6 +649,14 @@
     if (tableOk) {
       kids.push(expander('vp-insp-forms', 'inspector.forms.cta', s.formsOpen, 'forms'));
       kids.push(el('div', { id: 'vp-insp-forms', className: 'vp-insp-forms', hidden: true }));
+    }
+    if (reading || x.side === 'analysis') {
+      kids.push(expander('vp-why', 'inspector.whyReading.cta', whyOpen, 'why'));
+      kids.push(analysisWhy(reasons, reading || {}, detail && detail.checks, features, lang));
+      s.others = [];
+      setBody([el('div', { className: 'vp-insp-card vp-insp-reading' }, kids)]);
+      if (s.formsOpen && tableOk) { toggleForms(true); }
+      return;
     }
     kids.push(expander('vp-why', 'inspector.why.cta', whyOpen, 'why'));
     kids.push(whyBlock(reasons, detail && detail.checks, features, lang));
@@ -704,7 +797,7 @@
       kids.push(i18nEl('h4', 'vp-insp-sub', 'inspector.forms.nonfinite.title'));
       kids.push(el('ul', { className: 'vp-par-other' }, g.other.map(function (o) {
         return el('li', { className: o.used ? 'vp-par-used' : null }, [
-          txt('span', 'vp-hint', [term('tense', o.tense, 'label'), term('mood', o.mood, 'label'), term('voice', o.voice, 'label')].join(' ') + ': '),
+          txt('span', 'vp-hint', [term('tense', o.tense, 'label'), term('mood', o.mood, 'label'), term('voice', o.voice, 'label'), o.gender ? term('gender', o.gender, 'label') : ''].filter(function (x) { return x; }).join(' ') + ': '),
           txt('span', 'vp-text', display(o.form), { lang: lang })
         ]);
       })));
@@ -721,7 +814,7 @@
       s.formsEl.appendChild(i18nEl('p', 'vp-hint', 'inspector.forms.none.label'));
       return;
     }
-    var g = grid(cells, s.view.features);
+    var g = grid(cells, s.view.features, s.view.lang);
     var head = String((r.lemma && r.lemma.head) || (s.view.lemma && s.view.lemma.head) || '').split(/,\s*/)[0];
     if (g.kind === 'verbal' && !s.verbGroup) { s.verbGroup = g.usedGroup; }
     s.grid = g;
@@ -773,7 +866,7 @@
 
   function formFromCells(lemmaId, lang, features) {
     return fetchLemma(lang, lemmaId).then(function (r) {
-      var g = grid((r && r.cells) || [], features);
+      var g = grid((r && r.cells) || [], features, lang);
       var forms = g.kind === 'nominal' ? g.forms[g.used] : null;
       if (g.kind === 'verbal') {
         for (var i = 0; i < g.groups.length; i++) { if (g.groups[i].key === g.usedGroup) { forms = g.groups[i].forms[g.used]; } }
@@ -896,7 +989,7 @@
       var fv = help.split(':');
       openHelp(fv[0], fv[1]);
     } else if (src !== null) {
-      if (sel) { window.VP_Store.set('inspect', { index: sel.index, token: -1, text: src, lang: pairLangs().src, side: 'source' }); }
+      if (sel) { window.VP_Store.set('inspect', { index: sel.index, token: -1, text: src, lang: pairLangs().src, side: readingPair() ? 'analysis' : 'source' }); }
     } else if (choice !== null) {
       useCandidate(Number(choice));
     } else if (tgt !== null && s.data && s.data.detail) {
@@ -976,7 +1069,8 @@
     var keys = ['inspector.empty.title', 'inspector.loading.label', 'inspector.unknown.label', 'inspector.suggest.label', 'inspector.gloss.label', 'inspector.gloss.viaEnglish.label',
       'inspector.gloss.english.label', 'inspector.form.label', 'inspector.form.none.label', 'inspector.help.aria', 'inspector.help.abbr.label', 'inspector.help.none.label',
       'inspector.forms.caption', 'inspector.forms.used.label', 'inspector.emoji.aria', 'inspector.another.noForm.label', 'inspector.another.done.label',
-      'inspector.correction.done.label', 'why.meaning.sense.label', 'why.meaning.context.label', 'why.model.label', 'why.correction.label', 'why.phrasebook.label', 'why.name.label'];
+      'inspector.correction.done.label', 'why.meaning.sense.label', 'why.meaning.context.label', 'why.model.label', 'why.correction.label', 'why.phrasebook.label', 'why.name.label',
+      'why.reading.form.label', 'why.reading.gloss.label', 'why.reading.sure.label', 'why.reading.confidence.label', 'source.word.role.label'];
     SOURCES.forEach(function (x) { keys.push('why.evidence.source.' + x + '.label'); });
     ['yes', 'no', 'off', 'none'].forEach(function (x) { keys.push('why.evidence.state.' + x + '.label'); });
     CHECKS.forEach(function (x) { keys.push('why.check.' + x.toLowerCase() + '.label'); });

@@ -37,7 +37,7 @@ describe('VP_Start', function () {
     };
   }
 
-  it('lays out PREDESIGN 1.1: two cards, pair picker with Greek pairs disabled, Orbergise option, sample, status line', function () {
+  it('lays out PREDESIGN 1.1: two cards, pair picker from engine.hello (unavailable pairs disabled with the reason), Orbergise option, sample, status line', function () {
     var env = boot();
     var W = env.window;
     eq(W.VP_Router.current(), 'start');
@@ -48,9 +48,16 @@ describe('VP_Start', function () {
     eq(env.q('#vp-start-text-title').textContent, 'Type or paste text');
     var options = env.document.querySelectorAll('#vp-start-pair option');
     deepEq(options.map(function (o) { return o.value; }), ['en-la', 'es-la', 'la-en', 'la-es', 'en-grc', 'es-grc', 'grc-en', 'grc-es']);
-    deepEq(options.map(function (o) { return o.disabled; }), [false, false, false, false, true, true, true, true]);
-    eq(options[4].textContent, 'English → Ancient Greek (coming later)');
+    deepEq(options.map(function (o) { return o.disabled; }), [false, false, false, false, false, true, false, true], 'the mock offers en-grc and grc-en');
+    eq(options[5].textContent, 'Spanish → Ancient Greek (not available)');
+    eq(options[5].getAttribute('title'), 'This language pair is not available yet.');
+    eq(options[4].textContent, 'English → Ancient Greek');
     eq(options[1].textContent, 'Spanish → Latin');
+    var note = env.document.querySelectorAll('#vp-start-pair-note li');
+    eq(note.length, 1);
+    eq(note[0].textContent, 'Spanish → Ancient Greek, Ancient Greek → Spanish: This language pair is not available yet.');
+    eq(env.q('#vp-start-pair').getAttribute('aria-describedby'), 'vp-start-pair-note');
+    eq(env.q('#vp-start-orberg').disabled, false);
     var line = env.q('#vp-start-status').textContent;
     ok(line.indexOf('Latin dictionary mock-1: 54,199 entries') >= 0, line);
     ok(line.indexOf('Local model not installed (optional)') >= 0, line);
@@ -65,7 +72,8 @@ describe('VP_Start', function () {
     });
     env.q('[data-lang="es-MX"]').click();
     eq(env.q('h1').textContent, '¿Qué quieres hacer?');
-    eq(env.document.querySelectorAll('#vp-start-pair option')[4].textContent, 'Inglés → griego antiguo (próximamente)');
+    eq(env.document.querySelectorAll('#vp-start-pair option')[5].textContent, 'Español → griego antiguo (no disponible)');
+    eq(env.document.querySelectorAll('#vp-start-pair-note li')[0].textContent, 'Español → griego antiguo, Griego antiguo → español: Este par de idiomas todavía no está disponible.');
     ok(env.q('#vp-start-status').textContent.indexOf('Diccionario de latín') >= 0);
     deepEq(W.VP_I18n.missing(), []);
   });
@@ -212,5 +220,90 @@ describe('VP_Start', function () {
     env.fire(env.document.documentElement, 'drop', { dataTransfer: { types: ['Files'], files: [{ name: 'x.srt' }] } });
     env.clock.tick(100);
     eq(env.cmds('project.new').length, 0, 'no drop handler after destroy');
+  });
+
+  // B8: the real engine's hello (engine/cli/README.md), as captured from vpengine serve.
+  function realHello(extra) {
+    var h = {
+      version: '0.1.0', engine: 'rules-1', engineKind: 'rules', dataDir: '/data', threads: 4,
+      lexicons: [{ lang: 'la', available: true, version: '1.0', lemmas: 65315, path: '/data/latin.vpl', tiers: { t1: 511, t2: 3256, t3: 59312 } }],
+      model: { available: false, reason: 'not_built', rerankEnabled: false, cpuOk: false },
+      modes: ['R', 'O'], online: { allowed: false, mock: false, mockCalls: 0 },
+      pairs: ['en-la', 'es-la', 'la-en', 'la-es'],
+      pairsUnavailable: [
+        { pair: 'en-grc', code: 'bad_params', message: 'only translation into Latin is implemented', hint: 'This language pair is not available yet.' },
+        { pair: 'es-grc', code: 'bad_params', message: 'only translation into Latin is implemented', hint: 'This language pair is not available yet.' },
+        { pair: 'grc-en', code: 'bad_params', message: 'only translation into Latin is implemented', hint: 'This language pair is not available yet.' },
+        { pair: 'grc-es', code: 'bad_params', message: 'only translation into Latin is implemented', hint: 'This language pair is not available yet.' },
+        { pair: 'la-la', code: 'bad_params', message: 'source must be English or Spanish', hint: 'This language pair is not available yet.' }
+      ],
+      samples: [{ lang: 'en', path: '/data/samples/sample.en.srt' }, { lang: 'la', path: '/data/samples/sample.la.srt' }]
+    };
+    for (var k in extra || {}) { if (Object.prototype.hasOwnProperty.call(extra, k)) { h[k] = extra[k]; } }
+    return h;
+  }
+
+  it('B8 pair picker from hello.pairs / pairsUnavailable: reasons grouped in the note, Orbergise off with the reason, a missing NLP model names its files', function () {
+    var env = boot();
+    var W = env.window;
+    var S = W.VP_Start;
+    var vals = function () { return env.document.querySelectorAll('#vp-start-pair option').map(function (o) { return o.disabled; }); };
+    // before the engine answers (or an engine without `pairs`): the B6 table
+    W.VP_Store.set('engine', { state: 'connecting' });
+    deepEq(vals(), [false, false, false, false, true, true, true, true]);
+    eq(env.document.querySelectorAll('#vp-start-pair option')[4].textContent, 'English → Ancient Greek (coming later)');
+    eq(env.q('#vp-start-pair-note').hidden, true, 'no note before the engine said why');
+    W.VP_Store.set('engine', { state: 'ready', kind: 'webview', hello: realHello() });
+    deepEq(vals(), [false, false, false, false, true, true, true, true]);
+    eq(env.q('#vp-start-orberg').disabled, true, 'la-la is not offered');
+    eq(env.q('.vp-start-check').getAttribute('title'), 'This language pair is not available yet.');
+    var note = env.document.querySelectorAll('#vp-start-pair-note li');
+    eq(note.length, 1, 'one reason, one line');
+    eq(note[0].textContent, 'English → Ancient Greek, Spanish → Ancient Greek, Ancient Greek → English, Ancient Greek → Spanish, Latin → simpler Latin: This language pair is not available yet.');
+    deepEq(S.pairInfo('en-grc'), { pair: 'en-grc', available: false, known: true, code: 'bad_params', hint: 'This language pair is not available yet.', message: 'only translation into Latin is implemented' });
+    eq(S.pairInfo('la-en').available, true);
+    // no English NLP models: en-la goes, its hint names the files; the selection moves on
+    var h = realHello({ pairs: ['la-en', 'la-es'] });
+    h.pairsUnavailable = h.pairsUnavailable.concat([
+      { pair: 'en-la', code: 'not_found', message: 'nlp', hint: 'Install english.tag.vpt and english.dep.vpt in data/nlp.' },
+      { pair: 'es-la', code: 'not_found', message: 'nlp', hint: 'Install spanish.tag.vpt and spanish.dep.vpt in data/nlp.' }
+    ]);
+    W.VP_Store.set('engine', { state: 'ready', kind: 'webview', hello: h });
+    deepEq(vals(), [true, true, false, false, true, true, true, true]);
+    eq(env.q('#vp-start-pair').value, 'la-en', 'the first pair the engine offers');
+    var lines = env.document.querySelectorAll('#vp-start-pair-note li').map(function (li) { return li.textContent; });
+    eq(lines.length, 3);
+    eq(lines[0], 'English → Latin: Install english.tag.vpt and english.dep.vpt in data/nlp.');
+    eq(env.document.querySelectorAll('#vp-start-pair option')[0].getAttribute('title'), 'Install english.tag.vpt and english.dep.vpt in data/nlp.');
+    // the language switch rebuilds the labels
+    env.q('[data-lang="es-MX"]').click();
+    eq(env.document.querySelectorAll('#vp-start-pair option')[0].textContent, 'Inglés → latín (no disponible)');
+    deepEq(W.VP_I18n.missing(), []);
+  });
+
+  it('B8 samples from hello.samples per source language, the button off without one; the status line names the engine', function () {
+    var env = boot();
+    var W = env.window;
+    W.VP_Store.set('engine', { state: 'ready', kind: 'webview', hello: realHello() });
+    W.VP_Store.set('engine', { state: 'ready', kind: 'webview', hello: realHello({ engineKind: 'stub' }) });
+    ok(env.q('#vp-start-status').textContent.indexOf('Test engine 0.1.0: it copies the text instead of translating') >= 0, env.q('#vp-start-status').textContent);
+    W.VP_Store.set('engine', { state: 'ready', kind: 'webview', hello: realHello() });
+    var line = env.q('#vp-start-status').textContent;
+    ok(line.indexOf('Translation engine 0.1.0') >= 0, line);
+    ok(line.indexOf('This version has no local model') >= 0, line);
+    var btn = env.q('[data-start-action="sample"]');
+    eq(btn.disabled, false);
+    eq(W.VP_Start.samplePath('la-en'), '/data/samples/sample.la.srt');
+    eq(W.VP_Start.samplePath('es-la'), null, 'the engine lists no Spanish sample');
+    env.q('#vp-start-pair').value = 'es-la';
+    env.fire(env.q('#vp-start-pair'), 'change');
+    eq(btn.disabled, true);
+    eq(btn.getAttribute('title'), 'There is no sample file in Spanish.');
+    env.q('#vp-start-pair').value = 'la-en';
+    env.fire(env.q('#vp-start-pair'), 'change');
+    eq(btn.disabled, false);
+    btn.click();
+    env.clock.tick(100);
+    deepEq(env.cmds('project.new')[0].params, { kind: 'subs', pair: 'la-en', sourcePath: '/data/samples/sample.la.srt' });
   });
 });

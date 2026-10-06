@@ -26,6 +26,16 @@
  * VP_Export, the Orbergise mode tab mounts VP_Orberg in its tab panel.
  * Store keys it writes: selection {index}, job, saveState {kind, at}, inspect (VP_Panes),
  * cueCounts (VP_CueList).
+ * B8: engine warnings (VP_Store 'warnings', one entry {engine, code, message, hint, jobId}
+ * per engine): the translate.start result's `warnings` codes replace the list, then the
+ * job's translate.warning events (start, or a load/network failure mid-job) and any
+ * translate.done `warnings` refine it. A new warning shows a toast once per job and engine
+ * with "Show engines"; while the list is not empty the status bar carries a chip per engine
+ * ("Model unavailable: not installed") that opens the Engines tab. cmd.edit publishes the
+ * engine's correctionAdded object {id, key, target, scope, count} as VP_Store
+ * 'correctionAdded' (the Corrections tab reloads). Ctrl+I toggles the interlinear lines of a
+ * Latin/Greek source (VP_Panes.toggleInterlinear). The root carries data-pair and, for Greek
+ * pairs, the class pair-grc (Aegean accent, PREDESIGN 2.3), also on the app element.
  */
 (function () {
   'use strict';
@@ -33,7 +43,8 @@
   var OWNER = 'workspace';
   var PAGE = 200;
   var KEY_ACTIONS = ['nextCue', 'prevCue', 'nextReview', 'prevReview', 'accept', 'acceptNext', 'edit', 'cancelEdit', 'acceptEdit',
-    'alt1', 'alt2', 'alt3', 'search', 'macrons', 'emoji', 'undo', 'redo', 'save', 'export', 'settings'];
+    'alt1', 'alt2', 'alt3', 'search', 'macrons', 'emoji', 'interlinear', 'undo', 'redo', 'save', 'export', 'settings'];
+  var WARN_ENGINES = ['model', 'online'];
   var INTERACTIVE = 'button, a, input, select, textarea, [role="button"], [role="tab"], [role="option"]';
   var PANEL_TABS = [
     { id: 'word', module: 'VP_Inspector', key: 'workspace.tab.word.label' },
@@ -173,6 +184,13 @@
     });
   }
 
+  // The engine answers {id, key, target, scope, count} (an older engine: the id alone).
+  function correctionOf(x) {
+    if (!x) { return null; }
+    if (typeof x === 'object') { return { id: x.id, key: x.key || '', target: x.target || '', scope: x.scope || '', count: typeof x.count === 'number' ? x.count : 0 }; }
+    return { id: String(x), key: '', target: '', scope: '', count: 0 };
+  }
+
   function edit(index, text, remember) {
     var c = window.VP_Store.getCue(index);
     if (!c) { return P().reject(new Error('no cue ' + index)); }
@@ -186,6 +204,8 @@
         window.VP_History.push({ kind: 'edit', labelKey: 'workspace.history.edit.label', indices: [index], before: [before], after: [snap(r.cue, ['target', 'state', 'lines'])] });
       }
       markChanged();
+      var added = correctionOf(r.correctionAdded);
+      if (added) { window.VP_Store.set('correctionAdded', added); }
       return r;
     });
   }
@@ -256,6 +276,7 @@
     return window.VP_Bridge.call('translate.start', params).then(function (r) {
       var job = window.VP_Store.get('job');
       if (job && job.starting) { window.VP_Store.set('job', copy(job, { jobId: r.jobId, starting: false })); }
+      startWarnings(r);
       return r.jobId;
     }, function (err) {
       window.VP_Store.set('job', null);
@@ -297,6 +318,59 @@
     return out.length;
   }
 
+  // ---------------------------------------------------------------- engine warnings
+  function engineOfCode(code) { return /^online/.test(String(code || '')) ? 'online' : 'model'; }
+
+  function warnings() { return window.VP_Store.get('warnings') || []; }
+
+  // What the chip and the toast say: "Model unavailable: not installed".
+  function warningText(wn) {
+    var T = window.VP_I18n;
+    var rk = 'warning.reason.' + String(wn.code || '').replace(/_([a-z])/g, function (m, ch) { return ch.toUpperCase(); }) + '.label';
+    var engineState = window.VP_Store.get('engine') || {};
+    var hm = (engineState.hello && engineState.hello.model) || {};
+    // model_missing from a build without engine ii: "not part of this version", not "not installed"
+    if (wn.code === 'model_missing' && hm.reason === 'not_built') { rk = 'warning.reason.modelNotBuilt.label'; }
+    var reason = T.has(rk) ? T.t(rk) : window.VP_App.errorText(wn.code, wn.hint).title;
+    var engine = WARN_ENGINES.indexOf(wn.engine) >= 0 ? wn.engine : engineOfCode(wn.code);
+    return T.t('workspace.warning.' + engine + '.label', { reason: reason });
+  }
+
+  function openEngines() {
+    if (!w) { return; }
+    setTab('engines', true);
+    if (w.root.getAttribute('data-drawer') !== 'open' && window.innerWidth && window.innerWidth < 1180) { toggleDrawer(true); }
+  }
+
+  // One entry per engine; a new engine/code pair of a job is announced once.
+  function addWarning(wn, announce) {
+    var engine = WARN_ENGINES.indexOf(wn.engine) >= 0 ? wn.engine : engineOfCode(wn.code);
+    var entry = { engine: engine, code: wn.code || '', message: wn.message || '', hint: wn.hint || '', jobId: wn.jobId === undefined ? null : wn.jobId };
+    var list = warnings().filter(function (x) { return x.engine !== engine; });
+    list.push(entry);
+    list.sort(function (a, b) { return WARN_ENGINES.indexOf(a.engine) - WARN_ENGINES.indexOf(b.engine); });
+    window.VP_Store.set('warnings', list);
+    var key = engine + '|' + entry.code + '|' + entry.jobId;
+    if (announce !== false && w && !w.announced[key]) {
+      w.announced[key] = true;
+      window.VP_Toast.show({ text: warningText(entry), kind: 'error', actionKey: 'workspace.warning.open.cta', onAction: openEngines, timeoutMs: 8000 });
+    }
+    return entry;
+  }
+
+  // translate.start answered: its warning codes are the state of this job (the events that
+  // follow add the hint); a job without warnings clears the chips of the previous one.
+  function startWarnings(r) {
+    var codes = (r && r.warnings) || [];
+    window.VP_Store.set('warnings', []);
+    for (var i = 0; i < codes.length; i++) { addWarning({ code: codes[i], jobId: r.jobId }, true); }
+  }
+
+  function onWarning(e) {
+    if (!e) { return; }
+    addWarning(e, true);
+  }
+
   function cancel() {
     var job = window.VP_Store.get('job');
     if (!job || !job.jobId) { return P().resolve(false); }
@@ -327,6 +401,8 @@
     if (!ours(e)) { return; }
     window.VP_Store.set('job', null);
     markChanged();
+    var later = e.warnings || (e.stats && e.stats.warnings) || [];
+    for (var i = 0; i < later.length; i++) { addWarning(typeof later[i] === 'string' ? { code: later[i], jobId: e.jobId } : later[i], true); }
     var stats = e.stats || {};
     window.VP_Toast.show({
       key: stats.cancelled ? 'workspace.job.cancelled.label' : 'workspace.job.done.label',
@@ -391,6 +467,20 @@
     w.netEl.className = 'vp-net ' + (online ? 'vp-net-online' : 'vp-net-offline');
     D.append(w.netEl, [useIcon(online ? '#vp-i-online' : '#vp-i-offline'), D.el('span', { 'data-i18n': online ? 'app.network.online.label' : 'app.network.offline.label' })]);
     window.VP_I18n.bind(w.netEl);
+  }
+
+  function renderWarnings() {
+    if (!w) { return; }
+    var D = window.VP_Dom;
+    var list = warnings();
+    D.clear(w.warnEl);
+    w.warnEl.hidden = !list.length;
+    list.forEach(function (wn) {
+      var text = warningText(wn);
+      w.warnEl.appendChild(D.el('button', { type: 'button', className: 'vp-warn-chip vp-ws-warning', title: wn.hint || text, dataset: { wsAction: 'warnings', warnEngine: wn.engine } }, [
+        D.el('span', { text: text })
+      ]));
+    });
   }
 
   function renderHistory() {
@@ -664,6 +754,7 @@
       search: function () { L.focusSearch(); },
       macrons: function () { toggleView('showMacrons'); },
       emoji: function () { toggleView('showEmoji'); },
+      interlinear: function () { return Pn.toggleInterlinear && Pn.toggleInterlinear() !== null ? undefined : false; },
       undo: function (e) {
         if (typing(e)) { return false; }
         undo();
@@ -691,6 +782,7 @@
     w.countEls = [D.el('span'), D.el('span'), D.el('span')];
     w.engineEls = [D.el('span'), D.el('span'), D.el('span')];
     w.netEl = D.el('span', { className: 'vp-net' });
+    w.warnEl = D.el('span', { className: 'vp-ws-warnings', 'aria-live': 'polite', hidden: true });
     w.undoBtn = D.el('button', { type: 'button', className: 'vp-btn vp-btn-tertiary vp-ws-undo', dataset: { wsAction: 'undo' } }, [svgIcon('M6 4L2.5 7.5L6 11M3 7.5h6.5a4 4 0 0 1 0 8H8'), D.el('span', { 'data-i18n': 'workspace.undo.cta' })]);
     w.redoBtn = D.el('button', { type: 'button', className: 'vp-btn vp-btn-tertiary vp-ws-redo', dataset: { wsAction: 'redo' } }, [svgIcon('M10 4l3.5 3.5L10 11M13 7.5H6.5a4 4 0 0 0 0 8H8'), D.el('span', { 'data-i18n': 'workspace.redo.cta' })]);
     w.drawerBtn = D.el('button', { type: 'button', className: 'vp-btn vp-btn-icon vp-ws-drawer-btn', 'aria-expanded': 'false', 'aria-controls': 'vp-ws-panel', 'data-i18n-aria': 'workspace.drawer.aria', 'data-i18n-title': 'workspace.drawer.aria', dataset: { wsAction: 'drawer' } }, [svgIcon('M2.5 3h11v10h-11zM10 3v10')]);
@@ -725,7 +817,8 @@
     ]);
     w.right = D.el('section', { id: 'vp-ws-panel', className: 'vp-ws-right', tabIndex: -1, 'data-i18n-aria': 'workspace.panel.aria' }, [w.host]);
     var lang = String(project.pair || '').indexOf('grc') >= 0;
-    w.root = D.el('div', { className: 'vp-ws' + (lang ? ' pair-grc' : ''), 'data-drawer': 'closed', 'data-kind': project.kind || 'subs' }, [
+    w.greek = lang;
+    w.root = D.el('div', { className: 'vp-ws' + (lang ? ' pair-grc' : ''), 'data-drawer': 'closed', 'data-kind': project.kind || 'subs', 'data-pair': project.pair || '' }, [
       D.el('header', { className: 'vp-ws-top' }, [
         D.el('button', { type: 'button', className: 'vp-ws-home', 'data-i18n-aria': 'workspace.home.aria', 'data-i18n-title': 'workspace.home.aria', dataset: { wsAction: 'home' } }, [
           window.VP_App && typeof window.VP_App.lockup === 'function' ? window.VP_App.lockup() : D.el('span', { className: 'vp-wordmark', 'data-i18n': 'app.name' })
@@ -757,6 +850,7 @@
         w.autosaveEl,
         D.el('span', { className: 'vp-ws-counts vp-status-line' }, w.countEls),
         D.el('span', { className: 'vp-spacer' }),
+        w.warnEl,
         D.el('span', { className: 'vp-ws-engines vp-status-line' }, w.engineEls),
         w.netEl
       ])
@@ -782,6 +876,8 @@
       if (i !== null) { translate([i]); }
     } else if (a === 'cancel') {
       cancel();
+    } else if (a === 'warnings') {
+      openEngines();
     }
   }
 
@@ -802,7 +898,7 @@
     params = params || {};
     var D = window.VP_Dom;
     var project = window.VP_Store.get('project');
-    w = { mode: 'translate', removers: [], historyBusy: false, closing: false, appEl: null };
+    w = { mode: 'translate', removers: [], historyBusy: false, closing: false, appEl: null, announced: {}, greek: false };
     if (!project) {
       w.root = D.el('section', { className: 'vp-ws-none vp-card' }, [
         D.el('h1', { 'data-i18n': 'workspace.none.title' }),
@@ -814,7 +910,10 @@
     }
     build(root, project);
     w.appEl = root.parentNode && root.parentNode.classList && root.parentNode.classList.contains('vp-app') ? root.parentNode : null;
-    if (w.appEl) { w.appEl.classList.add('vp-app-ws'); }
+    if (w.appEl) {
+      w.appEl.classList.add('vp-app-ws');
+      if (w.greek) { w.appEl.classList.add('pair-grc'); }
+    }
     D.delegate(w.root, '[data-ws-action]', 'click', onAction, { owner: OWNER });
     D.delegate(w.root, '[role="tab"]', 'click', function (e, tab) {
       var pt = tab.getAttribute('data-panel-tab');
@@ -830,12 +929,15 @@
     w.removers.push(S.subscribe('job', renderJob));
     w.removers.push(S.subscribe('selection', renderJob));
     w.removers.push(S.subscribe('inspect', onInspect));
+    w.removers.push(S.subscribe('warnings', renderWarnings));
     w.removers.push(window.VP_History.onChange(renderHistory));
     w.removers.push(window.VP_I18n.onLanguageChanged(function () {
       renderHistory();
       renderJob();
+      renderWarnings();
     }));
     var B = window.VP_Bridge;
+    w.removers.push(B.on('translate.warning', onWarning));
     w.removers.push(B.on('translate.progress', onProgress));
     w.removers.push(B.on('translate.cue', onCues));
     w.removers.push(B.on('translate.done', onDone));
@@ -845,6 +947,7 @@
     KEY_ACTIONS.forEach(function (action) { w.removers.push(window.VP_Keys.handle(action, handlers[action], OWNER)); });
 
     S.setCueTotal(project.cues || 0);
+    if (S.get('warnings')) { S.set('warnings', null); }
     window.VP_CueList.mount(w.left, { total: project.cues || 0, kind: project.kind, pair: project.pair });
     window.VP_Panes.mount(w.panes, { kind: project.kind, pair: project.pair });
     w.tab = null;
@@ -853,6 +956,7 @@
     renderSave();
     renderCounts();
     renderEngines();
+    renderWarnings();
     renderHistory();
     renderJob();
     window.VP_I18n.bind(w.root);
@@ -868,7 +972,10 @@
     window.VP_Dom.offOwner(OWNER);
     window.VP_Timers.clearAll(OWNER);
     while (w.removers.length) { w.removers.pop()(); }
-    if (w.appEl) { w.appEl.classList.remove('vp-app-ws'); }
+    if (w.appEl) {
+      w.appEl.classList.remove('vp-app-ws');
+      w.appEl.classList.remove('pair-grc');
+    }
     if (w.root && w.root.parentNode) { w.root.parentNode.removeChild(w.root); }
     w = null;
   }
@@ -877,7 +984,8 @@
     var keys = ['workspace.view.showMacrons.on.label', 'workspace.view.showMacrons.off.label', 'workspace.view.showEmoji.on.label', 'workspace.view.showEmoji.off.label',
       'workspace.save.saved.label', 'workspace.save.autosaved.label', 'workspace.save.never.label', 'workspace.save.pending.label', 'workspace.save.pendingOff.label', 'workspace.undo.tooltip', 'workspace.redo.tooltip',
       'workspace.job.progress.label', 'workspace.job.done.label', 'workspace.job.cancelled.label', 'workspace.translate.all.cta', 'workspace.translate.rest.cta',
-      'unit.minutes', 'unit.seconds'];
+      'unit.minutes', 'unit.seconds', 'workspace.warning.model.label', 'workspace.warning.online.label'];
+    ['modelMissing', 'modelNotBuilt', 'modelUnsupportedCpu', 'modelLoadFailed', 'onlineDisabled', 'onlineFailed'].forEach(function (c) { keys.push('warning.reason.' + c + '.label'); });
     return keys;
   }
 
@@ -895,6 +1003,9 @@
     cmd: { review: review, edit: edit, choose: choose, undo: undo, redo: redo, translate: translate, orbergise: orbergise, cancel: cancel, refetch: refetch, markStale: markStale },
     setTab: setTab,
     tab: function () { return w ? w.tab : null; },
+    warnings: warnings,
+    warningText: warningText,
+    openEngines: openEngines,
     PANEL_TABS: PANEL_TABS.slice(),
     keyActions: function () { return KEY_ACTIONS.slice(); },
     i18nKeys: i18nKeys

@@ -7,8 +7,13 @@
  * glossary on the clipboard (name, policy, form, gender, declension, count): the engine has
  * no names.export/import command, so the UI offers the clipboard instead of a file.
  *
+ * B8: the real names.list has no detection, it lists the names set through names.set (and
+ * no count, so the count is shown only when the engine sends one). The detected-names list
+ * appears only when the engine returns names; the "Add a name" form (name, what to do with
+ * it, Latin form) is always there and sends names.set.
+ *
  * VP_Names.mount(el) / destroy(); reload() -> Promise; apply(name) -> Promise; csv(names)
- * (pure); copyCsv() -> Promise(bool); names(); stats()
+ * (pure); copyCsv() -> Promise(bool); names(); add({name, policy, form}) -> Promise; stats()
  */
 (function () {
   'use strict';
@@ -79,17 +84,16 @@
       s.list.appendChild(i18nEl('p', 'vp-hint', 'names.loading.label'));
       return;
     }
-    if (!s.names.length) {
-      s.list.appendChild(i18nEl('p', 'vp-hint', 'names.panel.empty'));
-      return;
-    }
+    s.list.hidden = !s.names.length;
+    s.emptyEl.hidden = !!s.names.length;
+    if (!s.names.length) { return; }
     s.names.forEach(function (n) {
       var id = 'vp-name-' + slug(n.name);
       var policy = POLICIES.indexOf(n.policy) >= 0 ? n.policy : 'keep';
       s.list.appendChild(el('li', { className: 'vp-name', dataset: { name: n.name } }, [
         el('div', { className: 'vp-name-head' }, [
           el('span', { className: 'vp-name-text vp-text', text: n.name }),
-          el('span', { className: 'vp-name-count', text: T('names.count', { n: n.count || 0 }) })
+          typeof n.count === 'number' ? el('span', { className: 'vp-name-count', text: T('names.count', { n: n.count }) }) : null
         ]),
         el('fieldset', { className: 'vp-name-policy' }, [
           i18nEl('legend', 'vp-visually-hidden', 'names.policy.label', { name: n.name })
@@ -201,6 +205,38 @@
     });
   }
 
+  // "Add a name": names.set with the typed name; the engine marks the cues that contain it.
+  function add(v) {
+    if (!s) { return P().resolve(null); }
+    v = v || { name: s.addName.value, policy: s.addPolicy.value, form: s.addForm.value };
+    var name = String(v.name || '').replace(/^\s+|\s+$/g, '');
+    if (!name) {
+      s.addError.hidden = false;
+      s.addName.setAttribute('aria-invalid', 'true');
+      s.addName.focus();
+      return P().resolve(null);
+    }
+    s.addError.hidden = true;
+    s.addName.removeAttribute('aria-invalid');
+    var params = { name: name, policy: POLICIES.indexOf(v.policy) >= 0 ? v.policy : 'decline' };
+    var form = String(v.form || '').replace(/^\s+|\s+$/g, '');
+    if (form) { params.form = form; }
+    return window.VP_Bridge.call('names.set', params).then(function (r) {
+      var affected = (r && r.affectedCues) || [];
+      var W = window.VP_Workspace;
+      if (affected.length && W && W.isMounted()) { W.cmd.refetch(affected); }
+      if (s) {
+        s.addName.value = '';
+        s.addForm.value = '';
+      }
+      window.VP_Toast.show({ key: 'names.add.done.label', vars: { name: name, n: affected.length }, kind: 'success' });
+      return reload().then(function () { return affected; });
+    }, function (err) {
+      showError(err);
+      return null;
+    });
+  }
+
   function copyCsv() {
     var text = csv(s ? s.names : []);
     return copyText(text).then(function (ok) {
@@ -218,6 +254,8 @@
       copyCsv();
     } else if (a === 'reload') {
       reload();
+    } else if (a === 'add') {
+      add();
     }
   }
 
@@ -225,10 +263,29 @@
     if (s) { destroy(); }
     s = { gen: (mount.gen = (mount.gen || 0) + 1), names: [], loaded: false, busy: false, removers: [] };
     s.list = el('ul', { className: 'vp-name-list' });
+    s.emptyEl = i18nEl('p', 'vp-hint vp-name-empty', 'names.panel.empty', null, { hidden: true });
+    s.addName = el('input', { id: 'vp-name-add-name', type: 'text', className: 'vp-input', spellcheck: 'false', 'aria-describedby': 'vp-name-add-error' });
+    s.addForm = el('input', { id: 'vp-name-add-form', type: 'text', className: 'vp-input vp-text', lang: 'la', spellcheck: 'false' });
+    s.addPolicy = el('select', { id: 'vp-name-add-policy', className: 'vp-input' }, POLICIES.map(function (pol) {
+      return el('option', { value: pol, selected: pol === 'decline', 'data-i18n': 'names.policy.' + pol + '.label', text: T('names.policy.' + pol + '.label') });
+    }));
+    s.addError = i18nEl('p', 'vp-field-error', 'names.add.empty.label', null, { id: 'vp-name-add-error', role: 'alert', hidden: true });
+    s.addEl = el('section', { className: 'vp-name-add', 'aria-labelledby': 'vp-name-add-title' }, [
+      i18nEl('h3', null, 'names.add.title', null, { id: 'vp-name-add-title' }),
+      el('div', { className: 'vp-name-fields' }, [
+        el('div', { className: 'vp-field' }, [el('label', { htmlFor: 'vp-name-add-name', 'data-i18n': 'names.add.name.label', text: T('names.add.name.label') }), s.addName]),
+        el('div', { className: 'vp-field' }, [el('label', { htmlFor: 'vp-name-add-policy', 'data-i18n': 'names.add.policy.label', text: T('names.add.policy.label') }), s.addPolicy]),
+        el('div', { className: 'vp-field' }, [el('label', { htmlFor: 'vp-name-add-form', 'data-i18n': 'names.form.label', text: T('names.form.label') }), s.addForm])
+      ]),
+      s.addError,
+      el('div', { className: 'vp-row' }, [i18nEl('button', 'vp-btn vp-btn-secondary', 'names.add.cta', null, { type: 'button', dataset: { namesAction: 'add' } })])
+    ]);
     s.root = el('div', { className: 'vp-panel vp-panel-names' }, [
       i18nEl('h2', 'vp-panel-title', 'names.panel.title'),
       i18nEl('p', 'vp-hint', 'names.panel.hint'),
       s.list,
+      s.emptyEl,
+      s.addEl,
       el('div', { className: 'vp-row' }, [
         i18nEl('button', 'vp-btn vp-btn-tertiary', 'names.csv.cta', null, { type: 'button', dataset: { namesAction: 'csv' } }),
         i18nEl('button', 'vp-btn vp-btn-tertiary', 'names.reload.cta', null, { type: 'button', dataset: { namesAction: 'reload' } })
@@ -237,6 +294,12 @@
     ]);
     root.appendChild(s.root);
     window.VP_Dom.delegate(s.root, '[data-names-action]', 'click', onClick, { owner: OWNER });
+    window.VP_Dom.on(s.addName, 'keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        add();
+      }
+    }, { owner: OWNER });
     s.removers.push(window.VP_I18n.onLanguageChanged(render));
     render();
     reload();
@@ -252,7 +315,7 @@
   }
 
   function i18nKeys() {
-    var keys = ['names.count', 'names.applied.label', 'names.policy.label', 'names.gender.unknown.label', 'names.declension.unknown.label', 'names.csv.done.label', 'names.csv.fail.label'];
+    var keys = ['names.count', 'names.applied.label', 'names.policy.label', 'names.gender.unknown.label', 'names.declension.unknown.label', 'names.csv.done.label', 'names.csv.fail.label', 'names.add.done.label'];
     POLICIES.forEach(function (p) { keys.push('names.policy.' + p + '.label'); });
     DECLENSIONS.forEach(function (d) { if (d) { keys.push('names.declension.' + d + '.label'); } });
     return keys;
@@ -267,6 +330,7 @@
     csv: csv,
     copyCsv: copyCsv,
     copyText: copyText,
+    add: add,
     names: function () { return s ? s.names.slice() : []; },
     stats: function () { return s ? { names: s.names.length, loaded: s.loaded } : null; },
     i18nKeys: i18nKeys

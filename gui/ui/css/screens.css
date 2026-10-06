@@ -456,6 +456,25 @@
 .vp-helpmenu { display: flex; flex-direction: column; gap: var(--space-1); }
 .vp-helpmenu .vp-btn { justify-content: flex-start; }
 
+/* B8: pairs from the engine, reading pairs (source chips, card, interlinear), warnings */
+.vp-start-pair-note { margin: calc(-1 * var(--space-2)) 0 var(--space-2); padding: 0; list-style: none; font-size: var(--fs-ui); }
+.vp-start-check-off { color: var(--muted); }
+.vp-src-card { max-width: 480px; margin-top: var(--space-1); padding: var(--space-1) var(--space-2); border: 1px solid var(--border-strong); border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-1); font-size: var(--fs-ui); }
+.vp-il-btn[aria-pressed="true"] { background: var(--accent-soft); }
+.vp-pane-text.vp-il { line-height: 1.25; }
+.vp-il .vp-src-word { display: inline-flex; flex-direction: column; vertical-align: top; margin: 0 var(--space-1) var(--space-1) 0; padding: 2px 4px; }
+.vp-il-lemma, .vp-il-form, .vp-il-gloss { font-family: var(--font-ui); font-size: var(--fs-ui); color: var(--muted); }
+.vp-il-lemma { font-family: var(--font-text); font-style: italic; }
+.vp-ws-status > .vp-ws-warnings { display: inline-flex; flex: 0 1 auto; gap: var(--space-1); min-width: 0; overflow: hidden; }
+.vp-ws-warning { flex: 0 1 auto; min-width: 48px; min-height: 24px; background: none; cursor: pointer; font-family: inherit; }
+.vp-ws-warning > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.vp-ws-warning:hover { background: var(--accent-soft); }
+.vp-eng-warn-box { margin-top: var(--space-1); padding-left: var(--space-1); border-left: 3px solid var(--warn); }
+.vp-eng-warn { color: var(--warn); font-weight: 600; }
+.vp-name-add { margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--border); }
+.vp-exp-off { color: var(--muted); }
+.vp-why-alts { margin: 0; padding-left: var(--space-3); }
+.vp-why-engine { font-style: italic; }
 @media (max-width: 1179px) {
   .vp-set { grid-template-columns: 1fr; }
   .vp-set-nav { position: static; }

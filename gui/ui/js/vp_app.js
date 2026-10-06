@@ -503,9 +503,11 @@
       if (!window.VP_Router.has('start')) { window.VP_Router.register('start', window.VP_Start || placeholder); }
       if (!window.VP_Router.has('workspace') && window.VP_Workspace) { window.VP_Router.register('workspace', window.VP_Workspace); }
       window.VP_Store.subscribe('project', route);
+      // The bridge first: its WebView2 'message' listener belongs to the app, not to the first
+      // screen, so it must exist before the router takes that screen's baseline (B8).
+      var kind = window.VP_Bridge.init({ mock: flagSet.mock });
       window.VP_Router.start(root, window.VP_Store.get('project') && window.VP_Router.has('workspace') ? 'workspace' : 'start');
       renderStatus();
-      var kind = window.VP_Bridge.init({ mock: flagSet.mock });
       if (kind === 'none') {
         window.VP_Store.set('engine', { state: 'none' });
         return null;

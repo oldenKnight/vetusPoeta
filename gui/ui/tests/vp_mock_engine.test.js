@@ -106,4 +106,113 @@ describe('VP_MockEngine', function () {
     ok(s.some(function (x) { return /[āēīōū]/.test(x.la); }));
     ok(s.every(function (x) { return x.en && x.es && x.la && x.grc; }));
   });
+
+  it('B8 real shapes: hello (engine, engineKind, pairs, pairsUnavailable, modes, model.rerankEnabled, online, samples)', function () {
+    var env = setup();
+    var M = env.window.VP_MockEngine;
+    var h = env.call('engine.hello').result;
+    eq(h.engineKind, 'rules');
+    deepEq(h.pairs, ['en-la', 'es-la', 'la-en', 'la-es', 'en-grc', 'grc-en', 'la-la']);
+    deepEq(h.pairsUnavailable.map(function (u) { return u.pair + ':' + u.code; }), ['es-grc:bad_params', 'grc-es:bad_params']);
+    eq(h.pairsUnavailable[0].hint, 'This language pair is not available yet.');
+    deepEq(h.modes, ['R', 'O']);
+    eq(h.model.rerankEnabled, false);
+    deepEq(h.online, { allowed: false, mock: true, mockCalls: 0 });
+    deepEq(h.samples.map(function (x) { return x.lang; }), ['en', 'es', 'la', 'grc']);
+    eq(h.samples[2].path, 'mock://data/samples/sample.la.srt');
+    M.options.pairs = ['la-en'];
+    h = env.call('engine.hello').result;
+    deepEq(h.pairs, ['la-en']);
+    eq(h.pairsUnavailable.length, 8);
+    M.options.pairs = null;
+    M.options.noLexicon = true;
+    h = env.call('engine.hello').result;
+    deepEq(h.pairs, ['en-grc', 'grc-en']);
+    eq(h.pairsUnavailable[0].code, 'lexicon_missing');
+    M.options.noLexicon = false;
+  });
+
+  it('B8 translate.start: an unavailable pair is refused with its hint; a missing model / online check gives warnings and translate.warning events; jobId is a number', function () {
+    var env = setup();
+    var W = env.window;
+    var events = [];
+    W.VP_Bridge.on('translate.warning', function (e) { events.push(e); });
+    env.call('project.new', { kind: 'subs', pair: 'es-grc', sourcePath: 'mock://data/samples/sample.es.srt' });
+    var r = env.call('translate.start', {});
+    eq(r.error.code, 'bad_params');
+    eq(r.error.hint, 'This language pair is not available yet.');
+    env.call('project.new', { kind: 'subs', pair: 'en-la', sourcePath: 'mock://data/samples/sample.en.srt' });
+    r = env.call('translate.start', { engines: { rules: true, model: true, online: true } }).result;
+    eq(typeof r.jobId, 'number');
+    eq(r.total, 12);
+    deepEq(r.warnings, ['model_missing', 'online_disabled']);
+    env.clock.tick(500);
+    deepEq(events.map(function (e) { return e.engine + ':' + e.code; }), ['model:model_missing', 'online:online_disabled']);
+    eq(events[0].jobId, r.jobId);
+    eq(events[0].hint, 'The local model is not installed. The rule engine translates on its own.');
+    var o = env.call('orbergise.start', { tier: 1 });
+    eq(o.error.code, 'bad_params', 'Orbergise needs a Latin project');
+    eq(o.error.hint, 'Open a Latin file to orbergise it.');
+  });
+
+  it('B8 cue.set {remember} answers correctionAdded as an object; names.list lists only the names set', function () {
+    var env = setup();
+    env.call('project.new', { kind: 'subs', pair: 'en-la', sourcePath: 'mock://data/samples/sample.en.srt' });
+    env.call('translate.start', {});
+    env.clock.tick(500);
+    var r = env.call('cue.set', { index: 0, text: 'Puella rosam spectat.', remember: 'phrase' }).result;
+    deepEq(r.correctionAdded, { id: 'c1', key: 'the girl sees the rose.', target: 'Puella rosam spectat.', scope: 'phrase', count: 1 });
+    deepEq(env.call('names.list').result.names, [], 'no detection: Marcus is in the file but not listed');
+    env.call('names.set', { name: 'Marcus', policy: 'decline', form: 'Mārcus' });
+    var names = env.call('names.list').result.names;
+    eq(names.length, 1);
+    eq(names[0].count, undefined, 'like the real engine: no count');
+  });
+
+  it('B8 la-en: cues flagged source-tokens, cue.get tokens are the Latin source words with analysis reasons and the word-by-word alternative', function () {
+    var env = setup();
+    env.call('project.new', { kind: 'subs', pair: 'la-en', sourcePath: 'mock://data/samples/sample.la.srt' });
+    env.call('translate.start', {});
+    env.clock.tick(500);
+    var g = env.call('cue.get', { index: 0 }).result;
+    eq(g.cue.source, 'Puella rosam videt.');
+    eq(g.cue.target, 'The girl sees the rose.');
+    ok(g.cue.flags.indexOf('source-tokens') >= 0);
+    deepEq(g.tokens.map(function (t) { return t.text; }), ['Puella', 'rosam', 'videt']);
+    var an = g.reasons.filter(function (x) { return x.kind === 'analysis'; });
+    eq(an.length, 3);
+    deepEq(Object.keys(an[1].data).sort(), ['alternatives', 'confidence', 'form', 'gloss', 'glossLang', 'head', 'lemmaId', 'pivot', 'role', 'why']);
+    eq(an[1].data.head, 'rosa');
+    eq(an[1].data.form, 'noun, accusative singular');
+    eq(an[2].data.form, 'verb, third person singular present indicative active');
+    eq(an[1].data.role, 'object');
+    eq(an[0].data.alternatives.length, 1);
+    eq(g.reasons.filter(function (x) { return x.kind === 'evidence'; }).length, 12);
+    deepEq(g.alternatives, [{ text: 'girl rose see', reason: 'word by word', score: 0.5 }]);
+    deepEq(g.checks.map(function (c) { return c.id; }), ['A1', 'ambiguity']);
+    var wl = env.call('words.list').result;
+    ok(wl.words.some(function (x) { return x.lemma.id === 'puella'; }), 'words.list counts the Latin side');
+  });
+
+  it('B8 Greek: en-grc sample ends with a Greek question, Greek tokens, lemma.get cells with the dual and alternative spellings', function () {
+    var env = setup();
+    env.call('project.new', { kind: 'subs', pair: 'en-grc', sourcePath: 'mock://data/samples/sample.en.srt' });
+    env.call('translate.start', {});
+    env.clock.tick(500);
+    var page = env.call('cue.page', { from: 0, count: 12 }).result.cues;
+    eq(page[0].target, 'ἡ κόρη τὸ ῥόδον ὁρᾷ.');
+    eq(page[11].target, 'πῶς ἔχεις, ὦ φίλε;', 'the Greek question mark is ";"');
+    var g = env.call('cue.get', { index: 0 }).result;
+    var kore = g.tokens.filter(function (t) { return t.text === 'κόρη'; })[0];
+    eq(kore.lemmaId, 'kore');
+    var cells = env.call('lemma.get', { lang: 'grc', id: 'kore' }).result.cells;
+    eq(cells.length, 15);
+    eq(cells.filter(function (c) { return c.features.number === 'dual'; }).length, 5);
+    var verb = env.call('lemma.get', { lang: 'grc', id: 'horao' }).result.cells;
+    var third = verb.filter(function (c) { return c.features.person === 'third' && c.features.number === 'singular' && c.features.tense === 'present' && c.features.voice === 'active'; });
+    deepEq(third.map(function (c) { return c.form; }), ['ὁρᾷ', 'ὁράει']);
+    deepEq(third[0].extra, ['attic', 'contracted']);
+    var wi = env.call('word.inspect', { text: 'ὁρᾷ', lang: 'grc' }).result;
+    eq(wi.analyses[0].lemma.head, 'ὁράω');
+  });
 });

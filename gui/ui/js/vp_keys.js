@@ -37,6 +37,7 @@
     { id: 'why', keys: ['W'], group: 'review' },
     { id: 'macrons', keys: ['Ctrl+M'], group: 'view' },
     { id: 'emoji', keys: ['Ctrl+E'], group: 'view' },
+    { id: 'interlinear', keys: ['Ctrl+I'], group: 'view' },
     { id: 'help', keys: ['F1', '?'], group: 'help' },
     { id: 'settings', keys: ['Ctrl+,'], group: 'help' }
   ];

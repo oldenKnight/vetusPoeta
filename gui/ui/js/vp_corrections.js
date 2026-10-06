@@ -6,6 +6,9 @@
  * toast; the engine has no corrections.add, so Undo re-creates the entry by sending cue.set
  * with remember on the cue it came from when that is known, else it says it cannot.
  *
+ * B8: the engine's cue.set answer carries correctionAdded {id, key, target, scope, count};
+ * VP_Workspace publishes it as VP_Store 'correctionAdded' and this tab reloads at once.
+ *
  * VP_Corrections.mount(el) / destroy(); reload() -> Promise; remove(id) -> Promise;
  * corrections(); stats()
  */
@@ -149,6 +152,7 @@
     root.appendChild(s.root);
     window.VP_Dom.delegate(s.root, '[data-corr-action]', 'click', onClick, { owner: OWNER });
     s.removers.push(window.VP_I18n.onLanguageChanged(render));
+    s.removers.push(window.VP_Store.subscribe('correctionAdded', function (x) { if (x) { reload(); } }));
     // A new correction (cue.set with remember) shows up on the next cue change.
     s.removers.push(window.VP_Store.subscribe('cues', function () {
       if (!s || s.timer !== null) { return; }

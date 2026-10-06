@@ -10,7 +10,13 @@
  * are kept in the UI settings key `orberg` and sent with orbergise.start; "Orbergise (all |
  * selected)" runs through VP_Workspace.cmd.orbergise so the job bar and events are shared.
  *
- * VP_Orberg.mount(el) / destroy(); options(); setOption(key, value); chooseOriginal() ->
+ * B8: the tab works only where the engine can orbergise: a Latin project (pair la-la or a
+ * Latin source) and la-la in engine.hello.pairs. Otherwise it says why (not a Latin file, or
+ * the engine's reason from pairsUnavailable, e.g. "not available yet") instead of the panes,
+ * so nothing is sent that the engine would refuse. orbergise.start carries {tier, keepNames,
+ * simplify, originalPath?, indices?} as before.
+ *
+ * VP_Orberg.mount(el) / destroy(); available() -> {ok, key, why}; options(); setOption(key, value); chooseOriginal() ->
  * Promise; run(indices?) -> Promise; startEdit() / cancelEdit() / acceptEdit(); changes();
  * meaningChip(meaning) (pure -> {kind, percent, missing}); stats()
  */
@@ -86,6 +92,29 @@
   }
 
   function cue() { return s && s.index !== null ? window.VP_Store.getCue(s.index) : null; }
+
+  // Whether the engine can orbergise this project, and if not, why (shown in place of the panes).
+  function available() {
+    var p = window.VP_Store.get('project') || {};
+    var src = String(p.pair || 'la-la').split('-')[0];
+    if (src !== 'la') { return { ok: false, key: 'orbergise.unavailable.notLatin.label', why: '' }; }
+    var S = window.VP_Start;
+    var info = S && typeof S.pairInfo === 'function' ? S.pairInfo('la-la') : { available: true };
+    if (!info.available) { return { ok: false, key: 'orbergise.unavailable.engine.label', why: S.pairReason(info) }; }
+    return { ok: true, key: '', why: '' };
+  }
+
+  function mountUnavailable(root, av) {
+    s.unavailable = true;
+    s.root = el('div', { className: 'vp-orb vp-orb-unavailable' }, [
+      el('section', { className: 'vp-card vp-orb-off', role: 'status', 'aria-labelledby': 'vp-orb-off-title' }, [
+        i18nEl('h2', null, 'orbergise.unavailable.title', null, { id: 'vp-orb-off-title' }),
+        i18nEl('p', null, av.key),
+        av.why ? el('p', { className: 'vp-hint vp-orb-why', text: av.why }) : null
+      ])
+    ]);
+    root.appendChild(s.root);
+  }
 
   // Changed words of the rewrite: {k, was, now, why} from cue.get reasons (data.was/now).
   function changes() {
@@ -300,6 +329,7 @@
   }
 
   function run(indices) {
+    if (s && s.unavailable) { return P().resolve(null); }
     var o = options();
     var params = { tier: o.tier, keepNames: o.keepNames, simplify: o.simplify };
     if (o.originalPath) { params.originalPath = o.originalPath; }
@@ -418,7 +448,12 @@
 
   function mount(root) {
     if (s) { destroy(); }
-    s = { gen: (mount.gen = (mount.gen || 0) + 1), index: null, detail: null, shown: null, tokens: [], mode: 'view', editOrig: '', details: lru(DETAIL_CAP), removers: [] };
+    s = { gen: (mount.gen = (mount.gen || 0) + 1), index: null, detail: null, shown: null, tokens: [], mode: 'view', editOrig: '', details: lru(DETAIL_CAP), removers: [], unavailable: false };
+    var av = available();
+    if (!av.ok) {
+      mountUnavailable(root, av);
+      return;
+    }
     build(root);
     var D = window.VP_Dom;
     D.delegate(s.root, '[data-orb-action], [data-orb-tier]', 'click', onClick, { owner: OWNER });
@@ -473,6 +508,7 @@
     mount: mount,
     destroy: destroy,
     isMounted: function () { return s !== null; },
+    available: available,
     options: options,
     setOption: setOption,
     chooseOriginal: chooseOriginal,

@@ -17,10 +17,24 @@
  * Alternatives: up to 3 (keys 1-3) with their reason. Macron and emoji toggles (settings
  * showMacrons / showEmoji) change only the rendering.
  *
+ * B8, reading pairs (la-en, la-es, grc-en, grc-es; the engine flags their cues
+ * "source-tokens"): cue.get tokens describe the SOURCE words, so the source pane shows them as
+ * word chips (hover or focus -> a small card under the text: lemma head, form in words, gloss
+ * in the UI language, tier, emoji, from the token, its "analysis" reason and word.inspect;
+ * click / Enter -> VP_Store 'inspect' {side:"analysis"} for the Word tab) and the target pane
+ * shows the readable English/Spanish text plainly (no chips). Teachers can turn on the
+ * interlinear lines under each source word (lemma | form | gloss; Ctrl+I or the button in the
+ * pane head; settings key `interlinear`, off by default). Greek text keeps its ";" question
+ * mark and carries lang="grc" wherever it is shown. Alternative reasons are looked up as
+ * camel-case keys ("word by word" -> target.alt.reason.wordByWord.label), else shown as sent.
+ *
  * VP_Panes.mount(el, {kind, pair}) / destroy(); mode() -> 'empty'|'view'|'edit'|'saving'|
  * 'remember'; startEdit() -> bool; cancelEdit() -> bool; acceptEdit() -> Promise(bool);
  * remember('phrase'|'cue'); chooseAlt(1..3) -> bool; openWord(k); dismiss() -> bool;
- * index(); tokens(); alternatives(); setEditorText(text) (tests); stats()
+ * index(); tokens(); alternatives(); setEditorText(text) (tests); stats();
+ * reading() -> bool; sourceTokens(); openSourceWord(k); showCard(k) / hideCard();
+ * toggleInterlinear(on?) -> bool | null (null: not a reading pair); interlinear();
+ * reasonKey(reason)
  */
 (function () {
   'use strict';
@@ -34,6 +48,8 @@
   var EMOJI_RE = /[☀-➿]️?|[\ud83c-\ud83e][\udc00-\udfff]️?/g;
   var MARKUP_RE = /(<\/?[a-zA-Z][^>]*>|\{\\[^}]*\})/g;
   var CHECK_LANGS = { la: true, grc: true };
+  var CLASSICAL = { la: true, grc: true };
+  var MODERN = { en: true, es: true };
 
   var p = null;
 
@@ -118,6 +134,28 @@
 
   function cue() { return p && p.index !== null ? window.VP_Store.getCue(p.index) : null; }
 
+  // "word by word" -> target.alt.reason.wordByWord.label
+  function reasonKey(reason) {
+    var c = String(reason || '').replace(/[^A-Za-z0-9]+([A-Za-z0-9])/g, function (m, ch) { return ch.toUpperCase(); }).replace(/[^A-Za-z0-9]/g, '');
+    return 'target.alt.reason.' + c + '.label';
+  }
+
+  // The engine's role of a source word in the UI language ("place (to)" -> placeTo), the
+  // engine's words when there is no key, nothing for "other".
+  function roleText(role) {
+    if (!role || role === 'other') { return ''; }
+    var k = 'source.word.role.' + String(role).replace(/[^A-Za-z0-9]+([A-Za-z0-9])/g, function (m, ch) { return ch.toUpperCase(); }).replace(/[^A-Za-z0-9]/g, '') + '.label';
+    return window.VP_I18n.has(k) ? window.VP_I18n.t(k) : String(role);
+  }
+
+  function isReading(c) {
+    if (!p) { return false; }
+    if (c && (c.flags || []).indexOf('source-tokens') >= 0) { return true; }
+    return p.reading;
+  }
+
+  function interlinearOn() { return settings().interlinear === true; }
+
   // ---------------------------------------------------------------- tokens
   function localTokens(text) {
     var out = [];
@@ -150,10 +188,110 @@
     return localTokens(c.target || '');
   }
 
+  // ---------------------------------------------------------------- source words (reading pairs)
+  function analysisOf(k) {
+    var rs = (p.detail && p.detail.reasons) || [];
+    for (var i = 0; i < rs.length; i++) { if (rs[i] && rs[i].kind === 'analysis' && rs[i].tokenIndex === k) { return rs[i].data || {}; } }
+    return null;
+  }
+
+  function srcWordKey(word) { return p.langs.src + '|' + String(word).toLowerCase(); }
+
+  // The lexicon entry of a source word (word.inspect, LRU shared with the target words),
+  // matched to the lemma the engine chose.
+  function srcLemma(k) {
+    var t = p.srcToks[k];
+    if (!t) { return null; }
+    var r = p.words.get(srcWordKey(t.text));
+    var list = (r && r.analyses) || [];
+    for (var i = 0; i < list.length; i++) { if (list[i].lemma && t.lemmaId !== undefined && String(list[i].lemma.id) === String(t.lemmaId)) { return list[i].lemma; } }
+    return list[0] ? list[0].lemma : null;
+  }
+
+  function fetchSrcWord(k) {
+    var t = p.srcToks[k];
+    if (!t || p.words.get(srcWordKey(t.text)) !== undefined || p.asked[srcWordKey(t.text)]) { return; }
+    var gen = p.gen;
+    var key = srcWordKey(t.text);
+    p.asked[key] = true;
+    window.VP_Bridge.call('word.inspect', { text: t.text, lang: p.langs.src }).then(function (r) {
+      if (!p || p.gen !== gen) { return; }
+      delete p.asked[key];
+      p.words.put(key, r);
+      if (p.cardTok !== null) { renderCard(p.cardTok); }
+      if (interlinearOn()) { renderIlLine(); }
+    }, function () {
+      if (p && p.gen === gen) { delete p.asked[key]; }
+    });
+  }
+
+  // Gloss in the UI language: the lexicon entry when known (glossEn / glossEs, "via English"
+  // handled by the inspector's helper), else what the engine wrote in the analysis.
+  function srcGloss(k, short) {
+    var l = srcLemma(k);
+    var g = l && window.VP_Inspector ? window.VP_Inspector.glossOf(l).text : '';
+    if (!g) {
+      var a = analysisOf(k);
+      g = a ? (a.gloss || '') : '';
+    }
+    return short ? String(g).split(/[,;]\s*/)[0] : g;
+  }
+
+  function srcInfo(k) {
+    var t = p.srcToks[k] || {};
+    var a = analysisOf(k) || {};
+    var l = srcLemma(k) || {};
+    var fw = window.VP_Inspector ? window.VP_Inspector.formWords(t.features || {}) : { words: '', abbr: '' };
+    return {
+      text: t.text || '', head: a.head || String(l.head || '').split(/,\s*/)[0] || t.text || '', words: fw.words, abbr: fw.abbr,
+      gloss: srcGloss(k, false), glossShort: srcGloss(k, true), tier: t.tier || l.tier || 0, emoji: t.emoji || l.emoji || '', unknown: !!t.unknown || (!t.lemmaId && t.lemmaId !== 0)
+    };
+  }
+
+  function srcChip(k, t, extraCls) {
+    var D = window.VP_Dom;
+    var attrs = { className: 'vp-word vp-src-word' + (extraCls ? ' ' + extraCls : '') + (t.unknown ? ' vp-word-unknown' : ''), tabIndex: 0, role: 'button', 'data-src-tok': String(k), 'aria-describedby': 'vp-src-card' };
+    if (!interlinearOn()) {
+      attrs.text = display(t.display || t.text);
+      return D.el('span', attrs);
+    }
+    var info = srcInfo(k);
+    return D.el('span', attrs, [
+      D.el('span', { className: 'vp-il-word', text: display(t.display || t.text) }),
+      D.el('span', { className: 'vp-il-lemma', text: info.unknown ? '–' : display(info.head) }),
+      D.el('span', { className: 'vp-il-form', title: info.words || null, text: info.abbr || '–' }),
+      D.el('span', { className: 'vp-il-gloss', lang: window.VP_I18n.lang().slice(0, 2), text: info.glossShort || '–' })
+    ]);
+  }
+
+  // Text of one markup run: plain, or the next source tokens as chips (placed by search, the
+  // engine's offsets being UTF-8 bytes of the cue source).
+  function appendRun(container, line, cls, chips) {
+    var D = window.VP_Dom;
+    var target = cls ? D.el('span', { className: cls }) : container;
+    if (cls) { container.appendChild(target); }
+    if (!chips) {
+      target.appendChild(document.createTextNode(line));
+      return;
+    }
+    var pos = 0;
+    while (chips.k < chips.list.length) {
+      var t = chips.list[chips.k];
+      var at = line.indexOf(t.text, pos);
+      if (at < 0) { break; }
+      if (at > pos) { target.appendChild(document.createTextNode(line.slice(pos, at))); }
+      target.appendChild(srcChip(chips.k, t, null));
+      chips.k++;
+      pos = at + t.text.length;
+    }
+    if (pos < line.length) { target.appendChild(document.createTextNode(line.slice(pos))); }
+  }
+
   // ---------------------------------------------------------------- source pane
-  function renderMarkup(container, text) {
+  function renderMarkup(container, text, tokens) {
     var D = window.VP_Dom;
     D.clear(container);
+    var chips = tokens && tokens.length ? { list: tokens, k: 0 } : null;
     var italic = 0;
     var bold = 0;
     var parts = String(text || '').replace(/\\[Nn]/g, '\n').split(MARKUP_RE);
@@ -180,18 +318,37 @@
       for (var l = 0; l < lines.length; l++) {
         if (l > 0) { container.appendChild(D.el('br')); }
         if (!lines[l]) { continue; }
-        if (italic > 0 || bold > 0) {
-          container.appendChild(D.el('span', { className: (italic > 0 ? 'vp-i' : '') + (bold > 0 ? ' vp-b' : ''), text: lines[l] }));
-        } else {
-          container.appendChild(document.createTextNode(lines[l]));
-        }
+        appendRun(container, lines[l], italic > 0 || bold > 0 ? (italic > 0 ? 'vp-i' : '') + (bold > 0 ? ' vp-b' : '') : '', chips);
       }
     }
+    return chips ? chips.k : 0;
+  }
+
+  // Source tokens of a reading pair when cue.get has them for the cue as shown.
+  function sourceTokensOf(c) {
+    var d = p.detail;
+    if (!isReading(c) || !d || !d.cue || d.cue.source !== c.source || !d.tokens || !d.tokens.length) { return []; }
+    return d.tokens;
   }
 
   function renderSource(c) {
     var T = window.VP_I18n;
-    renderMarkup(p.srcText, c.source);
+    var focused = document.activeElement;
+    var focusTok = focused && p.srcText.contains(focused) ? focused.getAttribute('data-src-tok') : null;
+    p.srcToks = sourceTokensOf(c);
+    var placed = renderMarkup(p.srcText, c.source, p.srcToks);
+    if (placed < p.srcToks.length) { p.srcToks = p.srcToks.slice(0, placed); }
+    p.srcText.className = 'vp-pane-text vp-text' + (p.srcToks.length && interlinearOn() ? ' vp-il' : '');
+    var reading = isReading(c);
+    p.ilBtn.hidden = !reading;
+    p.ilBtn.setAttribute('aria-pressed', interlinearOn() ? 'true' : 'false');
+    p.ilBtn.disabled = !p.srcToks.length;
+    if (p.cardTok !== null && !p.srcToks[p.cardTok]) { hideCard(); }
+    if (p.srcToks.length && interlinearOn()) { for (var k = 0; k < p.srcToks.length; k++) { fetchSrcWord(k); } }
+    if (focusTok !== null && focusTok !== undefined) {
+      var again = window.VP_Dom.qs('[data-src-tok="' + focusTok + '"]', p.srcText);
+      if (again) { again.focus(); }
+    }
     if (p.kind === 'text') { return; }
     p.timing.textContent = String(c.timingRaw || '').replace('-->', '→');
     var secs = Math.round((c.durationMs || 0) / 100) / 10;
@@ -225,6 +382,11 @@
     p.tokens = [];
     if (!c.target) {
       p.view.appendChild(D.el('span', { className: 'vp-target-empty', 'data-i18n': 'target.empty.label', text: T.t('target.empty.label') }));
+      return;
+    }
+    if (isReading(c)) {
+      // The readable English/Spanish sentence: plain text, the words are explained in the source pane.
+      p.view.appendChild(document.createTextNode(display(c.target)));
       return;
     }
     var text = c.target;
@@ -301,7 +463,7 @@
     setText(p.altEmpty, d ? 'target.alt.none.label' : 'target.alt.loading.label');
     for (var n = 0; n < p.alts.length; n++) {
       var alt = p.alts[n];
-      var rk = 'target.alt.reason.' + camel(alt.reason) + '.label';
+      var rk = reasonKey(alt.reason);
       p.altList.appendChild(D.el('li', null, [D.el('button', { type: 'button', className: 'vp-alt', 'data-alt': String(n + 1), 'aria-keyshortcuts': String(n + 1) }, [
         D.el('kbd', { className: 'vp-alt-num', text: String(n + 1) }),
         D.el('span', { className: 'vp-alt-text vp-text', lang: p.langs.dst, text: display(alt.text) }),
@@ -343,6 +505,7 @@
       if (p.index === index) {
         p.detail = r;
         var c = cue();
+        if (c && isReading(c)) { renderSource(c); }
         if (c && p.mode !== 'edit' && p.mode !== 'saving') { renderTarget(c); }
         if (c) { renderAlts(c); }
       }
@@ -358,6 +521,7 @@
     if (p.mode === 'edit') { leaveEditor(); }
     if (p.mode === 'remember') { hideRemember(); }
     closePop();
+    hideCard();
     p.index = typeof index === 'number' ? index : null;
     p.detail = p.index === null ? null : (p.details.get(p.index) || null);
     if (p.index === null) { p.mode = 'empty'; } else if (p.mode !== 'saving') { p.mode = 'view'; }
@@ -612,6 +776,97 @@
     return true;
   }
 
+  // ---------------------------------------------------------------- source word card and interlinear
+  function renderCard(k) {
+    var D = window.VP_Dom;
+    var T = window.VP_I18n;
+    var t = p.srcToks[k];
+    if (!t) { return; }
+    var info = srcInfo(k);
+    var a = analysisOf(k);
+    D.clear(p.srcCard);
+    var showEmoji = settings().showEmoji !== false;
+    p.srcCard.appendChild(D.el('p', { className: 'vp-pop-head' }, [
+      D.el('span', { className: 'vp-text vp-pop-lemma', lang: p.langs.src, text: display(info.unknown ? t.text : info.head) }),
+      info.tier && window.VP_Inspector ? window.VP_Inspector.tierBadge(info.tier, true) : null,
+      info.emoji && showEmoji ? D.el('span', { className: 'vp-emoji', role: 'img', 'aria-label': info.head, text: info.emoji }) : null
+    ]));
+    if (info.unknown) {
+      p.srcCard.appendChild(D.el('p', { className: 'vp-hint', text: T.t('source.word.unknown.label') }));
+      return;
+    }
+    if (info.words) { p.srcCard.appendChild(D.el('p', { className: 'vp-src-card-form', text: T.t('target.word.form.label', { form: info.words }) })); }
+    if (info.gloss) { p.srcCard.appendChild(D.el('p', { className: 'vp-pop-gloss', text: T.t('target.word.gloss.label', { gloss: info.gloss }) })); }
+    var role = roleText(a && a.role);
+    if (role) { p.srcCard.appendChild(D.el('p', { className: 'vp-hint', text: T.t('source.word.role.label', { role: role }) })); }
+  }
+
+  function showCard(k) {
+    if (!p || !p.srcToks[k]) { return false; }
+    p.cardTok = k;
+    fetchSrcWord(k);
+    renderCard(k);
+    p.srcCard.hidden = false;
+    return true;
+  }
+
+  function hideCard() {
+    if (!p || p.cardTok === null) { return false; }
+    p.cardTok = null;
+    p.srcCard.hidden = true;
+    window.VP_Dom.clear(p.srcCard);
+    return true;
+  }
+
+  function renderIlLine() {
+    var c = cue();
+    if (c && p.mode !== 'empty') { renderSource(c); }
+  }
+
+  // Ctrl+I: null when the pair is not read from Latin/Greek (the key goes on), else the state.
+  function toggleInterlinear(on) {
+    if (!p || p.index === null || !isReading(cue())) { return null; }
+    var want = on === undefined ? !interlinearOn() : !!on;
+    window.VP_Store.patch('settings', { interlinear: want });
+    if (window.VP_App && typeof window.VP_App.saveSettings === 'function') { window.VP_App.saveSettings({ interlinear: want }); }
+    window.VP_Toast.show({ key: want ? 'source.interlinear.on.label' : 'source.interlinear.off.label' });
+    return want;
+  }
+
+  // A source word of a reading pair: the Word tab explains how the engine read it.
+  function openSourceWord(k) {
+    if (!p || !p.srcToks[k]) { return false; }
+    var t = p.srcToks[k];
+    window.VP_Store.set('inspect', { index: p.index, token: k, text: t.text, lang: p.langs.src, lemmaId: t.lemmaId === undefined ? null : t.lemmaId, side: 'analysis' });
+    return true;
+  }
+
+  function onSrcOver(e) {
+    var chip = window.VP_Dom.closest(e.target, '.vp-src-word', p.srcText);
+    if (chip) { showCard(Number(chip.getAttribute('data-src-tok'))); }
+  }
+
+  function onSrcOut(e) {
+    var chip = window.VP_Dom.closest(e.target, '.vp-src-word', p.srcText);
+    var to = e.relatedTarget && e.relatedTarget.nodeType === 1 ? window.VP_Dom.closest(e.relatedTarget, '.vp-src-word', p.srcText) : null;
+    if (chip && to !== chip) { hideCard(); }
+  }
+
+  function onSrcClick(e) {
+    var chip = window.VP_Dom.closest(e.target, '.vp-src-word', p.srcText);
+    if (chip) { openSourceWord(Number(chip.getAttribute('data-src-tok'))); }
+  }
+
+  function onSrcKey(e) {
+    var chip = window.VP_Dom.closest(e.target, '.vp-src-word', p.srcText);
+    if (!chip || e.ctrlKey || e.altKey || e.metaKey) { return; }
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault();
+      e.stopPropagation();
+      openSourceWord(Number(chip.getAttribute('data-src-tok')));
+    }
+  }
+
   function chooseAlt(n) {
     if (!p || p.mode !== 'view' || p.index === null || !p.alts[n - 1]) { return false; }
     var index = p.index;
@@ -655,6 +910,8 @@
     } else if (a === 'closePop') {
       closePop();
       p.view.focus();
+    } else if (a === 'interlinear') {
+      toggleInterlinear();
     }
   }
 
@@ -662,6 +919,8 @@
     var D = window.VP_Dom;
     var T = window.VP_I18n;
     p.srcText = D.el('div', { id: 'vp-src-text', className: 'vp-pane-text vp-text', lang: p.langs.src });
+    p.srcCard = D.el('div', { id: 'vp-src-card', className: 'vp-src-card', role: 'tooltip', hidden: true });
+    p.ilBtn = D.el('button', { type: 'button', className: 'vp-btn vp-btn-tertiary vp-il-btn', 'data-pane-action': 'interlinear', 'aria-pressed': 'false', 'aria-keyshortcuts': 'Control+I', hidden: true, 'data-i18n': 'source.interlinear.cta', 'data-i18n-title': 'source.interlinear.tooltip' });
     p.timing = D.el('span', { className: 'vp-timing vp-mono' });
     p.dur = D.el('span', { className: 'vp-dur vp-mono' });
     p.cps = D.el('span', { className: 'vp-cps' });
@@ -703,9 +962,10 @@
       D.el('section', { className: 'vp-pane vp-pane-source', 'aria-labelledby': 'vp-src-title' }, [
         D.el('div', { className: 'vp-pane-head' }, [
           D.el('h2', { id: 'vp-src-title', className: 'vp-pane-title', 'data-i18n': 'source.pane.title', 'data-i18n-vars': { lang: langName(p.langs.src) } }),
-          subs ? p.timing : null, subs ? p.dur : null, subs ? p.cps : null
+          subs ? p.timing : null, subs ? p.dur : null, subs ? p.cps : null, p.ilBtn
         ]),
-        p.srcText
+        p.srcText,
+        p.srcCard
       ]),
       D.el('section', { className: 'vp-pane vp-pane-target', 'aria-labelledby': 'vp-tgt-title' }, [
         D.el('div', { className: 'vp-pane-head' }, [
@@ -739,12 +999,19 @@
     p = {
       gen: (mount.gen = (mount.gen || 0) + 1), kind: opts.kind || 'subs', langs: { src: pair[0], dst: pair[1] || pair[0] },
       mode: 'empty', index: null, detail: null, shown: null, tokens: [], alts: [], details: lru(DETAIL_CAP), words: lru(WORD_CAP),
-      editOrig: '', remembered: null, checkTimer: null, popTok: null, removers: []
+      editOrig: '', remembered: null, checkTimer: null, popTok: null, removers: [], srcToks: [], cardTok: null, asked: {}, reading: false
     };
+    p.reading = CLASSICAL[p.langs.src] === true && MODERN[p.langs.dst] === true;
     build(el);
     var D = window.VP_Dom;
     D.on(p.view, 'click', onViewClick, { owner: OWNER });
     D.on(p.view, 'keydown', onViewKey, { owner: OWNER });
+    D.on(p.srcText, 'mouseover', onSrcOver, { owner: OWNER });
+    D.on(p.srcText, 'mouseout', onSrcOut, { owner: OWNER });
+    D.on(p.srcText, 'focusin', onSrcOver, { owner: OWNER });
+    D.on(p.srcText, 'focusout', onSrcOut, { owner: OWNER });
+    D.on(p.srcText, 'click', onSrcClick, { owner: OWNER });
+    D.on(p.srcText, 'keydown', onSrcKey, { owner: OWNER });
     D.delegate(p.root, '[data-pane-action]', 'click', onAction, { owner: OWNER });
     D.delegate(p.altList, '[data-alt]', 'click', function (e, b) { chooseAlt(Number(b.getAttribute('data-alt'))); }, { owner: OWNER });
     D.delegate(p.rememberEl, '[data-remember]', 'click', function (e, b) { remember(b.getAttribute('data-remember')); }, { owner: OWNER });
@@ -769,6 +1036,7 @@
       p.shown = null;
       render();
       if (p.popTok !== null && p.tokens[p.popTok]) { renderPop(p.tokens[p.popTok], p.words.get(wordKey(p.tokens[p.popTok].text)) || null); }
+      if (p.cardTok !== null) { renderCard(p.cardTok); }
     }));
     p.removers.push(window.VP_Debug.registerCache('panesCueGet', function () { return p ? p.details.size() : 0; }));
     p.removers.push(window.VP_Debug.registerCache('panesWords', function () { return p ? p.words.size() : 0; }));
@@ -783,6 +1051,7 @@
     while (p.removers.length) { p.removers.pop()(); }
     p.details.clear();
     p.words.clear();
+    p.srcToks = [];
     if (p.root && p.root.parentNode) { p.root.parentNode.removeChild(p.root); }
     p = null;
   }
@@ -791,7 +1060,10 @@
     var keys = ['source.cps.label', 'source.cps.fast.label', 'source.cps.tooltip', 'unit.secondsShort', 'target.editor.unknown.label',
       'target.editor.unknown.suggest.label', 'target.word.gloss.label', 'target.word.form.label', 'target.word.suggest.label', 'target.word.loading.label',
       'target.preview.overflow.label', 'target.preview.fast.label', 'target.alt.none.label', 'target.alt.loading.label', 'target.state.reviewed.label',
-      'target.state.edited.label', 'target.state.stale.label', 'target.state.new.label'];
+      'target.state.edited.label', 'target.state.stale.label', 'target.state.new.label', 'source.word.unknown.label', 'source.word.role.label',
+      'source.interlinear.on.label', 'source.interlinear.off.label'];
+    ['subject', 'object', 'verb', 'indirectObject', 'predicate', 'vocative', 'genitive', 'ablative', 'ablativeAbsolute', 'place', 'placeTo', 'prepositionalPhrase',
+      'preposition', 'adverb', 'connector', 'negation', 'questionWord', 'comparison', 'infinitive', 'numeral', 'interjection'].forEach(function (r) { keys.push('source.word.role.' + r + '.label'); });
     return keys;
   }
 
@@ -807,7 +1079,7 @@
     remember: remember,
     chooseAlt: chooseAlt,
     openWord: openWord,
-    dismiss: function () { return hideRemember() || closePop(); },
+    dismiss: function () { return hideRemember() || closePop() || hideCard(); },
     tokens: function () { return p ? p.tokens.slice() : []; },
     alternatives: function () { return p ? p.alts.slice() : []; },
     setEditorText: function (text) {
@@ -818,7 +1090,16 @@
       return true;
     },
     renderMarkup: renderMarkup,
-    stats: function () { return p ? { mode: p.mode, index: p.index, details: p.details.size(), words: p.words.size(), tokens: p.tokens.length } : null; },
+    reading: function () { return !!p && isReading(cue()); },
+    sourceTokens: function () { return p ? p.srcToks.slice() : []; },
+    openSourceWord: openSourceWord,
+    showCard: showCard,
+    hideCard: hideCard,
+    toggleInterlinear: toggleInterlinear,
+    interlinear: interlinearOn,
+    reasonKey: reasonKey,
+    roleText: roleText,
+    stats: function () { return p ? { mode: p.mode, index: p.index, details: p.details.size(), words: p.words.size(), tokens: p.tokens.length, sourceTokens: p.srcToks.length } : null; },
     i18nKeys: i18nKeys
   };
 }());

@@ -19,6 +19,11 @@
  * About dialogs open and close, Orbergise mode runs on a Latin file, the six-step tour runs
  * to its end on the start screen and its last step opens the sample; screenshots of each
  * tab and dialog in light/dark and en/es; listeners and timers return to the baseline.
+ * B8: a reading pair (la-en: Latin source words as chips with the hover card, the reading in
+ * the Word tab, Ctrl+I interlinear lines, plain English target) and a Greek target (en-grc:
+ * lang="grc", Aegean accent, the ";" question mark, Gentium Plus in the preview strip and the
+ * cue list, the engine warning chip of a requested model that is missing); screenshots
+ * reading-la-en-light-en.png, greek-light-en.png.
  */
 'use strict';
 
@@ -127,6 +132,29 @@ function main() {
 
   function shot(name, full) {
     return page.waitForTimeout(250).then(function () { return page.screenshot({ path: path.join(OUT, name), fullPage: !!full }); }).then(function () { note('screenshot dev/out/' + name); });
+  }
+
+  // B8 helpers: open the sample of a pair from the start screen and translate it; close.
+  function openPairSample(pair) {
+    return page.evaluate(function (p) {
+      var sel = document.getElementById('vp-start-pair');
+      sel.value = p;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }, pair).then(function () {
+      return page.click('[data-start-action="sample"]');
+    }).then(function () {
+      return page.waitForFunction(function () { return window.VP_Router.current() === 'workspace' && window.VP_Store.cueCount() === 12; }, null, { timeout: 10000, polling: 50 });
+    }).then(function () {
+      return page.click('#vp-translate');
+    }).then(function () {
+      return page.waitForFunction(function () { return !window.VP_Store.get('job') && (window.VP_Store.get('cueCounts') || {}).translated === 12; }, null, { timeout: 15000, polling: 50 });
+    });
+  }
+
+  function closeProject() {
+    return page.click('.vp-ws-home').then(function () {
+      return page.waitForFunction(function () { return window.VP_Router.current() === 'start'; }, null, { timeout: 5000, polling: 50 });
+    });
   }
 
   function platformFonts(selector) {
@@ -519,6 +547,100 @@ function main() {
     return page.evaluate(function () { document.getElementById('vp-start-orberg').checked = false; });
   }).then(function () {
     return compareBaseline('after closing the Orbergise project');
+  }).then(function () {
+    // B8: a reading pair, la-en
+    return openPairSample('la-en');
+  }).then(function () {
+    return page.evaluate(function () {
+      window.VP_CueList.setFilter('all');
+      window.VP_CueList.select(0);
+      return new Promise(function (resolve) { setTimeout(resolve, 400); }).then(function () {
+        return { chips: document.querySelectorAll('#vp-src-text .vp-src-word').length, tgtChips: document.querySelectorAll('#vp-target-view .vp-word').length, tgt: document.getElementById('vp-target-view').textContent };
+      });
+    });
+  }).then(function (r) {
+    check(r.chips === 3 && r.tgtChips === 0 && r.tgt === 'The girl sees the rose.', 'la-en: 3 Latin word chips in the source pane, plain English target "' + r.tgt + '"');
+    return page.hover('#vp-src-text .vp-src-word >> nth=1');
+  }).then(function () {
+    return page.waitForTimeout(300);
+  }).then(function () {
+    return page.evaluate(function () { var c = document.getElementById('vp-src-card'); return { shown: !c.hidden, text: c.textContent }; });
+  }).then(function (r) {
+    check(r.shown && r.text.indexOf('rosa') === 0 && r.text.indexOf('rose') > 0, 'hovering a Latin word shows its card: ' + r.text);
+    return page.click('#vp-src-text .vp-src-word >> nth=1');
+  }).then(function () {
+    return page.keyboard.press('Control+i');
+  }).then(function () {
+    return page.waitForTimeout(400);
+  }).then(function () {
+    return page.evaluate(function () {
+      window.VP_Inspector.toggleWhy(true);
+      window.VP_Toast.clearAll();
+      return { tab: window.VP_Workspace.tab(), side: window.VP_Inspector.state().side, blocks: document.querySelectorAll('#vp-panel-body .vp-why-block').length, il: document.querySelectorAll('#vp-src-text .vp-il-gloss').length, nodes: document.getElementsByTagName('*').length };
+    });
+  }).then(function (r) {
+    check(r.tab === 'word' && r.side === 'analysis' && r.blocks === 3, 'clicking a Latin word shows "Why this reading?" in the Word tab (' + r.blocks + ' blocks)');
+    check(r.il === 3, 'Ctrl+I shows the interlinear lines under the 3 source words; ' + r.nodes + ' DOM nodes');
+    return shot('reading-la-en-light-en.png');
+  }).then(function () {
+    return page.keyboard.press('Control+i');
+  }).then(function () {
+    return closeProject();
+  }).then(function () {
+    return compareBaseline('after closing the la-en project');
+  }).then(function () {
+    // B8: a Greek target, en-grc, with the local model asked for but missing
+    return page.evaluate(function () { return window.VP_App.saveSettings({ engines: { model: true, online: false } }); });
+  }).then(function () {
+    return openPairSample('en-grc');
+  }).then(function () {
+    return page.evaluate(function () {
+      window.VP_CueList.setFilter('all');
+      window.VP_CueList.select(11);
+      return new Promise(function (resolve) { setTimeout(resolve, 400); }).then(function () {
+        var line = document.querySelector('.vp-preview-line');
+        var row = document.querySelector('.vp-cue-row [lang="grc"]');
+        var accent = getComputedStyle(document.querySelector('.vp-ws')).getPropertyValue('--accent').trim();
+        return {
+          tgt: document.getElementById('vp-target-view').textContent, lang: document.getElementById('vp-target-view').getAttribute('lang'), pairGrc: document.querySelector('.vp-ws').classList.contains('pair-grc'), accent: accent,
+          lineLang: line && line.getAttribute('lang'), lineFont: line ? getComputedStyle(line).fontFamily : '', rowFont: row ? getComputedStyle(row).fontFamily : '',
+          check: document.fonts.check('16px "Gentium Plus"', (line ? line.textContent : '') + (row ? row.textContent : '')),
+          chip: Array.prototype.map.call(document.querySelectorAll('.vp-ws-warning'), function (c) { return c.textContent; }).join(' | ')
+        };
+      });
+    });
+  }).then(function (r) {
+    check(r.tgt === 'πῶς ἔχεις, ὦ φίλε;' && r.lang === 'grc', 'Greek target with lang="grc" and its ";" question mark: ' + r.tgt);
+    check(r.pairGrc && r.accent.toUpperCase() !== '#B3452A', 'Greek pair: the workspace root carries pair-grc, accent ' + r.accent);
+    check(r.lineLang === 'grc' && /Gentium Plus/.test(r.lineFont) && /Gentium Plus/.test(r.rowFont) && r.check, 'preview strip and cue list render Greek with Gentium Plus (document.fonts.check ' + r.check + ')');
+    check(r.chip === 'Model unavailable: not installed', 'status chip for the missing local model: ' + r.chip);
+    return platformFonts('.vp-preview-line');
+  }).then(function (fonts) {
+    check(fonts.length >= 1 && fonts.every(function (f) { return f.familyName === 'Gentium Plus'; }), 'Greek preview line rendered only with Gentium Plus: ' + JSON.stringify(fonts));
+    return page.evaluate(function () { window.VP_Toast.clearAll(); });
+  }).then(function () {
+    return shot('greek-light-en.png');
+  }).then(function () {
+    return page.click('.vp-ws-warning');
+  }).then(function () {
+    return page.waitForTimeout(300);
+  }).then(function () {
+    return page.evaluate(function () { return { tab: window.VP_Workspace.tab(), text: document.getElementById('vp-panel-body').textContent }; });
+  }).then(function (r) {
+    check(r.tab === 'engines' && r.text.indexOf('Last translation: Model unavailable: not installed') >= 0, 'the warning chip opens the Engines tab with the warning');
+    return shot('greek-engines-light-en.png');
+  }).then(function () {
+    return page.evaluate(function () { return window.VP_App.saveSettings({ engines: { model: false, online: false } }); });
+  }).then(function () {
+    return closeProject();
+  }).then(function () {
+    return page.evaluate(function () {
+      var sel = document.getElementById('vp-start-pair');
+      sel.value = 'en-la';
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }).then(function () {
+    return compareBaseline('after closing the Greek project');
   }).then(function () {
     // The six-step tour on the start screen, to the end, then the sample from its last step
     return page.evaluate(function () { window.VP_App.startTour(); return { active: window.VP_Tour.isActive(), spot: !document.querySelector('.vp-tour-spot').hidden, title: document.querySelector('.vp-tour-title').textContent }; });

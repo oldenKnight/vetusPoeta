@@ -12,9 +12,20 @@
  * the engine). Opening a project normalises the engine's project object and sets VP_Store
  * 'project'; VP_App then routes to the workspace.
  *
+ * B8 (real engine): the pair picker is built from engine.hello `pairs` (enabled) and
+ * `pairsUnavailable` [{pair, code, message, hint}] (disabled, the reason as tooltip and in a
+ * small note under the picker; "not available yet" for the probe's bad_params, else the
+ * engine's hint, which names the missing files); before the engine answers, or with an engine
+ * without `pairs`, the B6 table applies (Greek "coming later"). The Orbergise option follows
+ * the pair la-la the same way. "Try the sample" opens the hello.samples entry of the source
+ * language (else <dataDir>/samples/sample.<lang>.srt) and is disabled when the engine lists
+ * no sample for it. The status line names the engine (engineKind rules | stub, version).
+ *
  * VP_Start.mount(root) / destroy(); openPath(path) -> Promise; openSample(); startText(text);
  * recover() / keepSaved(); pairLabelKey(pair); normalizeProject(raw, extra);
- * remember(project, counts) -> Promise; recentRows(settings); PAIRS; RECENT_MAX
+ * remember(project, counts) -> Promise; recentRows(settings); PAIRS; RECENT_MAX;
+ * pairInfo(pair, hello?) -> {pair, available, known, code, hint, message}; pairReason(info);
+ * sampleFor(lang) -> path | null
  */
 (function () {
   'use strict';
@@ -37,6 +48,54 @@
   }
 
   function pairLabelKey(pair) { return 'start.pair.' + camelPair(pair || 'en-la') + '.label'; }
+
+  function isArray(x) { return Object.prototype.toString.call(x) === '[object Array]'; }
+
+  function hello() {
+    var engine = window.VP_Store.get('engine') || {};
+    return engine.state === 'ready' ? (engine.hello || null) : null;
+  }
+
+  // Availability of one pair from engine.hello (pairs + pairsUnavailable). `known` is false
+  // when the engine has not said (not connected yet, or an engine without the list): then the
+  // B6 table decides (Latin pairs and Orbergise ready, Greek later).
+  function pairInfo(pair, h) {
+    h = h === undefined ? hello() : h;
+    if (!h || !isArray(h.pairs)) {
+      var ready = pair === 'la-la';
+      for (var i = 0; i < PAIRS.length; i++) { if (PAIRS[i].code === pair) { ready = PAIRS[i].ready; } }
+      return { pair: pair, available: ready, known: false, code: ready ? '' : 'later', hint: '', message: '' };
+    }
+    if (h.pairs.indexOf(pair) >= 0) { return { pair: pair, available: true, known: true, code: '', hint: '', message: '' }; }
+    var list = isArray(h.pairsUnavailable) ? h.pairsUnavailable : [];
+    for (var k = 0; k < list.length; k++) {
+      if (list[k] && list[k].pair === pair) { return { pair: pair, available: false, known: true, code: list[k].code || 'bad_params', hint: list[k].hint || '', message: list[k].message || '' }; }
+    }
+    return { pair: pair, available: false, known: true, code: 'bad_params', hint: '', message: '' };
+  }
+
+  // Why a pair cannot be used, in the UI language where the engine's code says enough (the
+  // probe's bad_params = "not available yet"); otherwise the engine's hint, which names the
+  // missing files (dictionary, NLP models) and is engine data like the lexicon notices.
+  function pairReason(info) {
+    var T = window.VP_I18n;
+    if (!info || info.available) { return ''; }
+    if (info.code === 'later' || info.code === 'bad_params' || !info.code) { return T.t('start.pair.reason.soon.label'); }
+    if (info.hint) { return info.hint; }
+    return window.VP_App.errorText(info.code, '').hint;
+  }
+
+  function sampleFor(lang) {
+    var h = hello();
+    if (h && isArray(h.samples)) {
+      for (var i = 0; i < h.samples.length; i++) { if (h.samples[i] && h.samples[i].lang === lang && h.samples[i].path) { return h.samples[i].path; } }
+      return null;
+    }
+    var engine = window.VP_Store.get('engine') || {};
+    var dir = (engine.hello && engine.hello.dataDir) || '';
+    var sep = dir.indexOf('\\') >= 0 ? '\\' : '/';
+    return (dir ? dir.replace(/[\\\/]+$/, '') + sep : '') + 'samples' + sep + 'sample.' + lang + '.srt';
+  }
 
   function baseName(path) { return String(path || '').split(/[\\\/]/).pop(); }
 
@@ -134,11 +193,12 @@
     st.busy = on;
     st.root.setAttribute('aria-busy', on ? 'true' : 'false');
     window.VP_Dom.qsa('[data-start-action]', st.root).forEach(function (b) { b.disabled = on; });
+    if (!on) { renderSample(); }
   }
 
   function currentPair() {
     if (!st) { return settings().defaultPair || 'en-la'; }
-    return st.orberg.checked ? 'la-la' : (st.pair.value || 'en-la');
+    return st.orberg.checked && !st.orberg.disabled ? 'la-la' : (st.pair.value || 'en-la');
   }
 
   function enter(result, extra) {
@@ -199,17 +259,15 @@
     });
   }
 
-  function samplePath(pair) {
-    var engine = window.VP_Store.get('engine') || {};
-    var dir = (engine.hello && engine.hello.dataDir) || '';
-    var src = String(pair).split('-')[0];
-    var sep = dir.indexOf('\\') >= 0 ? '\\' : '/';
-    return (dir ? dir.replace(/[\\\/]+$/, '') + sep : '') + 'samples' + sep + 'sample.' + src + '.srt';
-  }
+  function samplePath(pair) { return sampleFor(String(pair || 'en-la').split('-')[0]); }
 
   function openSample() {
     var pair = currentPair();
     var path = samplePath(pair);
+    if (!path) {
+      window.VP_Toast.show({ key: 'start.sample.none.label', vars: { lang: langName(String(pair).split('-')[0]) }, kind: 'error' });
+      return P().resolve(null);
+    }
     return run(window.VP_Bridge.call('project.new', { kind: 'subs', pair: pair, sourcePath: path }), function (r) {
       return enter(r, { sourcePath: path, sample: true });
     });
@@ -304,6 +362,11 @@
     return { code: 'lexicon_missing', path: '' };
   }
 
+  function langName(code) {
+    var key = 'app.lexicon.lang.' + code;
+    return window.VP_I18n.has(key) ? window.VP_I18n.t(key) : code;
+  }
+
   function renderStatus() {
     if (!st) { return; }
     var D = window.VP_Dom;
@@ -313,7 +376,11 @@
     var parts = [];
     if (engine.state === 'ready') {
       var hello = engine.hello || {};
-      if (engine.kind === 'mock') { parts.push(D.el('span', { 'data-i18n': 'app.engine.mock.label', 'data-i18n-vars': { version: hello.version || '?' } })); }
+      if (engine.kind === 'mock') {
+        parts.push(D.el('span', { 'data-i18n': 'app.engine.mock.label', 'data-i18n-vars': { version: hello.version || '?' } }));
+      } else if (hello.engineKind === 'rules' || hello.engineKind === 'stub') {
+        parts.push(D.el('span', { className: 'vp-start-engine vp-start-engine-' + hello.engineKind, 'data-i18n': 'start.status.engine.' + hello.engineKind + '.label', 'data-i18n-vars': { version: hello.version || hello.engine || '?' } }));
+      }
       var any = false;
       (hello.lexicons || []).forEach(function (lx) {
         if (lx.available === false) { return; }
@@ -322,7 +389,8 @@
         parts.push(D.el('span', { 'data-i18n': 'app.lexicon', 'data-i18n-vars': { lang: name, version: lx.version || '?', n: lx.lemmas || 0 } }));
       });
       if (!any) { parts.push(D.el('span', { 'data-i18n': 'app.lexicon.none.label' })); }
-      parts.push(D.el('span', { 'data-i18n': hello.model && hello.model.available ? 'app.model.ready.label' : 'app.model.missing.label' }));
+      var m = hello.model || {};
+      parts.push(D.el('span', { 'data-i18n': m.available ? 'app.model.ready.label' : (m.reason === 'not_built' ? 'start.status.model.notBuilt.label' : 'app.model.missing.label') }));
       parts.push(D.el('span', { 'data-i18n': s.engines && s.engines.online ? 'start.status.online.on.label' : 'start.status.online.off.label' }));
     } else if (engine.state === 'failed') {
       parts.push(D.el('span', { 'data-i18n': 'app.engine.failed.label' }));
@@ -351,12 +419,63 @@
     }
   }
 
+  // The picker's options, the Orbergise option and the note, from engine.hello (pairInfo).
+  function renderPairs() {
+    if (!st) { return; }
+    var D = window.VP_Dom;
+    var T = window.VP_I18n;
+    var h = hello();
+    var keep = st.pair.value;
+    var infos = PAIRS.map(function (x) { return pairInfo(x.code, h); });
+    D.clear(st.pair);
+    infos.forEach(function (info) {
+      var name = T.t(pairLabelKey(info.pair));
+      var label = info.available ? name : T.t(info.code === 'later' ? 'start.pair.later.label' : 'start.pair.unavailable.label', { pair: name });
+      st.pair.appendChild(D.el('option', { value: info.pair, disabled: !info.available, title: info.available ? null : pairReason(info), text: label }));
+    });
+    var want = !st.pairTouched && settings().defaultPair ? settings().defaultPair : keep;
+    var pick = null;
+    infos.forEach(function (info) { if (info.available && info.pair === want) { pick = want; } });
+    if (!pick && infos.some(function (i) { return i.available && i.pair === keep; })) { pick = keep; }
+    if (!pick) { infos.forEach(function (info) { if (!pick && info.available) { pick = info.pair; } }); }
+    st.pair.value = pick || 'en-la';
+    var orb = pairInfo('la-la', h);
+    st.orberg.disabled = !orb.available;
+    if (!orb.available) { st.orberg.checked = false; }
+    st.orbergWrap.className = 'vp-start-check' + (orb.available ? '' : ' vp-start-check-off');
+    st.orbergWrap.setAttribute('title', orb.available ? '' : pairReason(orb));
+    // The note: one line per reason, naming its pairs (only when the engine told us).
+    D.clear(st.pairNote);
+    var groups = [];
+    var byReason = {};
+    infos.concat([orb]).forEach(function (info) {
+      if (info.available || !info.known) { return; }
+      var why = pairReason(info);
+      if (byReason[why] === undefined) {
+        byReason[why] = groups.length;
+        groups.push({ why: why, names: [] });
+      }
+      groups[byReason[why]].names.push(T.t(pairLabelKey(info.pair)));
+    });
+    st.pairNote.hidden = !groups.length;
+    groups.forEach(function (g) {
+      st.pairNote.appendChild(D.el('li', { className: 'vp-hint', text: T.t('start.pair.note.item', { pairs: g.names.join(', '), why: g.why }) }));
+    });
+    renderPair();
+    renderSample();
+  }
+
   function renderPair() {
     if (!st) { return; }
-    var want = settings().defaultPair;
-    var ok = PAIRS.some(function (x) { return x.ready && x.code === want; });
-    if (ok && !st.pairTouched) { st.pair.value = want; }
     st.pair.disabled = st.orberg.checked;
+  }
+
+  function renderSample() {
+    if (!st || !st.sampleBtn || st.busy) { return; }
+    var lang = currentPair().split('-')[0];
+    var path = samplePath(currentPair());
+    st.sampleBtn.disabled = !path;
+    st.sampleBtn.setAttribute('title', path ? '' : window.VP_I18n.t('start.sample.none.label', { lang: langName(lang) }));
   }
 
   function langButtons() {
@@ -438,10 +557,11 @@
 
   function build(root) {
     var D = window.VP_Dom;
-    st.pair = D.el('select', { id: 'vp-start-pair', className: 'vp-input' }, PAIRS.map(function (x) {
-      return D.el('option', { value: x.code, disabled: !x.ready, 'data-i18n': x.ready ? pairLabelKey(x.code) : 'start.pair.later.label', 'data-i18n-vars': x.ready ? null : { pair: window.VP_I18n.t(pairLabelKey(x.code)) } });
-    }));
-    st.orberg = D.el('input', { id: 'vp-start-orberg', type: 'checkbox' });
+    st.pair = D.el('select', { id: 'vp-start-pair', className: 'vp-input', 'aria-describedby': 'vp-start-pair-note' });
+    st.pairNote = D.el('ul', { id: 'vp-start-pair-note', className: 'vp-start-pair-note', hidden: true });
+    st.orberg = D.el('input', { id: 'vp-start-orberg', type: 'checkbox', 'aria-describedby': 'vp-start-pair-note' });
+    st.orbergWrap = D.el('span', { className: 'vp-start-check' }, [st.orberg, D.el('label', { htmlFor: 'vp-start-orberg', 'data-i18n': 'start.orberg.label' })]);
+    st.sampleBtn = D.el('button', { type: 'button', className: 'vp-btn vp-btn-secondary', 'data-start-action': 'sample', 'data-i18n': 'start.sample.cta' });
     st.text = D.el('textarea', { id: 'vp-start-text', className: 'vp-input vp-start-text', rows: '4', 'aria-describedby': 'vp-start-text-hint', 'data-i18n-placeholder': 'start.text.placeholder' });
     st.textError = D.el('p', { id: 'vp-start-text-error', className: 'vp-field-error', role: 'alert', hidden: true, 'data-i18n': 'start.text.empty' });
     st.recentList = D.el('ul', { className: 'vp-recent-list', 'aria-labelledby': 'vp-start-recent-title' });
@@ -504,11 +624,12 @@
       D.el('div', { className: 'vp-start-pairs' }, [
         D.el('label', { htmlFor: 'vp-start-pair', 'data-i18n': 'start.pair.label' }),
         st.pair,
-        D.el('span', { className: 'vp-start-check' }, [st.orberg, D.el('label', { htmlFor: 'vp-start-orberg', 'data-i18n': 'start.orberg.label' })])
+        st.orbergWrap
       ]),
+      st.pairNote,
       D.el('div', { className: 'vp-start-recent-head' }, [
         D.el('h2', { id: 'vp-start-recent-title', 'data-i18n': 'start.recent.title' }),
-        D.el('button', { type: 'button', className: 'vp-btn vp-btn-secondary', 'data-start-action': 'sample', 'data-i18n': 'start.sample.cta' })
+        st.sampleBtn
       ]),
       st.recentList,
       st.recentEmpty,
@@ -526,9 +647,13 @@
     D.delegate(st.root, 'button', 'click', onClick, { owner: OWNER });
     D.on(st.pair, 'change', function () {
       st.pairTouched = true;
+      renderSample();
       if (window.VP_App && typeof window.VP_App.saveSettings === 'function') { window.VP_App.saveSettings({ defaultPair: st.pair.value }); }
     }, { owner: OWNER });
-    D.on(st.orberg, 'change', renderPair, { owner: OWNER });
+    D.on(st.orberg, 'change', function () {
+      renderPair();
+      renderSample();
+    }, { owner: OWNER });
     D.on(st.text, 'input', function () {
       if (!st.textError.hidden) {
         st.textError.hidden = true;
@@ -544,25 +669,24 @@
       var path = e && e.paths && e.paths[0];
       if (path && st && !st.busy) { openPath(path); }
     }));
-    st.removers.push(window.VP_Store.subscribe('engine', renderStatus));
+    st.removers.push(window.VP_Store.subscribe('engine', function () {
+      renderStatus();
+      renderPairs();
+    }));
     st.removers.push(window.VP_Store.subscribe('settings', function () {
       renderStatus();
       renderRecent();
-      renderPair();
+      if (!st.pairTouched) { renderPairs(); }
     }));
     st.removers.push(window.VP_I18n.onLanguageChanged(function () {
       langButtons();
       renderRecent();
       renderStatus();
-      window.VP_Dom.qsa('option[data-i18n-vars]', st.pair).forEach(function (o) {
-        o.setAttribute('data-i18n-vars', JSON.stringify({ pair: window.VP_I18n.t(pairLabelKey(o.value)) }));
-      });
-      window.VP_I18n.bind(st.pair);
+      renderPairs();
     }));
     st.removers.push(window.VP_Keys.handle('open', function () { chooseFile(); }, OWNER));
     st.removers.push(window.VP_Keys.handle('new', function () { st.text.focus(); }, OWNER));
-    st.pair.value = 'en-la';
-    renderPair();
+    renderPairs();
     renderRecent();
     renderStatus();
     langButtons();
@@ -580,7 +704,8 @@
 
   function i18nKeys() {
     var keys = ['start.recent.when.now', 'start.recent.when.minutes', 'start.recent.when.hours', 'start.recent.when.days', 'start.recent.when.date',
-      'start.recent.progress', 'start.recent.paragraphs', 'start.recent.review', 'start.pair.later.label'];
+      'start.recent.progress', 'start.recent.paragraphs', 'start.recent.review', 'start.pair.later.label', 'start.pair.unavailable.label', 'start.pair.reason.soon.label',
+      'start.pair.note.item', 'start.sample.none.label', 'start.status.engine.rules.label', 'start.status.engine.stub.label', 'start.status.model.notBuilt.label'];
     for (var i = 0; i < PAIRS.length; i++) { keys.push(pairLabelKey(PAIRS[i].code)); }
     keys.push(pairLabelKey('la-la'));
     return keys;
@@ -601,6 +726,9 @@
     keepSaved: keepSaved,
     recoveryShown: function () { return !!(st && st.recovery); },
     pairLabelKey: pairLabelKey,
+    pairInfo: pairInfo,
+    pairReason: pairReason,
+    sampleFor: sampleFor,
     normalizeProject: normalizeProject,
     remember: remember,
     recentRows: recentRows,

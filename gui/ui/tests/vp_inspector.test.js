@@ -225,3 +225,170 @@ describe('VP_Inspector', function () {
     ok(W.VP_Router.counts().listeners < before.listeners);
   });
 });
+
+describe('Reading pairs and Greek (B8)', function () {
+  // The whole app over the mock, the sample of `pair` open and translated, cue 0 selected.
+  function bootPair(pair) {
+    var env = load('all', { search: '?mock=1&debug=1' });
+    var W = env.window;
+    var D = W.VP_Dom;
+    env.app = D.el('div', { id: 'app', className: 'vp-app' });
+    env.main = D.el('main', { id: 'vp-main' });
+    env.app.appendChild(env.main);
+    env.document.body.appendChild(env.app);
+    W.VP_MockEngine.options.latencyMs = 1;
+    W.VP_App.boot({ root: env.main, status: D.el('div') });
+    env.clock.tick(500);
+    env.sent = [];
+    var call = W.VP_Bridge.call;
+    W.VP_Bridge.call = function (cmd, params) {
+      env.sent.push({ cmd: cmd, params: params });
+      return call(cmd, params);
+    };
+    env.cmds = function (name) { return env.sent.filter(function (s) { return s.cmd === name; }); };
+    env.q = function (sel) { return env.document.querySelector(sel); };
+    env.qa = function (sel) { return env.document.querySelectorAll(sel); };
+    env.q('#vp-start-pair').value = pair;
+    env.fire(env.q('#vp-start-pair'), 'change');
+    W.VP_Start.openSample();
+    env.clock.tick(300);
+    env.q('#vp-translate').click();
+    env.clock.tick(3000);
+    W.VP_Toast.clearAll();
+    W.VP_CueList.setFilter('all');
+    W.VP_CueList.select(0);
+    env.clock.tick(200);
+    return env;
+  }
+
+  it('la-en: source words are chips with a hover card, the target is plain readable text, a click shows the reading in the Word tab, Ctrl+I adds the interlinear lines', function () {
+    var env = bootPair('la-en');
+    var W = env.window;
+    eq(W.VP_Store.get('project').pair, 'la-en');
+    eq(env.q('#vp-src-text').textContent, 'Puella rosam videt.');
+    var chips = env.qa('#vp-src-text .vp-src-word');
+    deepEq(chips.map(function (c) { return c.textContent; }), ['Puella', 'rosam', 'videt']);
+    eq(env.q('#vp-src-text').getAttribute('lang'), 'la');
+    eq(env.qa('#vp-target-view .vp-word').length, 0, 'no chips on the English side');
+    eq(env.q('#vp-target-view').textContent, 'The girl sees the rose.');
+    ok(W.VP_Panes.reading());
+    eq(env.q('.vp-il-btn').hidden, false, 'the interlinear toggle is offered');
+    eq(env.q('.vp-il-btn').getAttribute('aria-pressed'), 'false', 'off by default');
+    // hover card
+    env.fire(chips[1], 'mouseover', { bubbles: true });
+    env.clock.tick(50);
+    var card = env.q('#vp-src-card');
+    eq(card.hidden, false);
+    ok(card.textContent.indexOf('rosa') === 0, card.textContent);
+    ok(card.textContent.indexOf('Form: accusative singular') >= 0, card.textContent);
+    ok(card.textContent.indexOf('“rose”') >= 0, card.textContent);
+    ok(card.textContent.indexOf('Role in the sentence: direct object') >= 0, card.textContent);
+    ok(card.querySelector('.vp-tier'), 'tier badge');
+    ok(card.querySelector('.vp-emoji') && card.querySelector('.vp-emoji').textContent === '🌹', 'emoji');
+    W.VP_I18n.setLang('es-MX');
+    ok(card.textContent.indexOf('“rosa”') >= 0 && card.textContent.indexOf('acusativo') >= 0, 'the card follows the UI language: ' + card.textContent);
+    W.VP_I18n.setLang('en-US');
+    env.fire(env.qa('#vp-src-text .vp-src-word')[1], 'mouseout', { bubbles: true });
+    eq(card.hidden, true, 'the card goes when the pointer leaves the word');
+    // click -> Word tab with the reading
+    var seen = null;
+    W.VP_Store.subscribe('inspect', function (v) { seen = v; });
+    env.qa('#vp-src-text .vp-src-word')[1].click();
+    env.clock.tick(100);
+    deepEq(seen, { index: 0, token: 1, text: 'rosam', lang: 'la', lemmaId: 'rosa', side: 'analysis' });
+    eq(W.VP_Workspace.tab(), 'word');
+    var body = env.q('#vp-panel-body');
+    eq(body.querySelector('.vp-insp-word').textContent, 'rosa');
+    eq(body.querySelector('.vp-insp-word').getAttribute('lang'), 'la');
+    eq(body.querySelector('[data-insp-action="why"]').textContent, 'Why this reading?');
+    W.VP_Inspector.toggleWhy(true);
+    var blocks = body.querySelectorAll('.vp-why-block');
+    eq(blocks.length, 3, 'reading, other readings, evidence');
+    ok(blocks[0].textContent.indexOf('rosa as accusative singular') >= 0, blocks[0].textContent);
+    ok(blocks[0].textContent.indexOf('The only reading that fits (100 %).') >= 0, blocks[0].textContent);
+    ok(blocks[1].textContent.indexOf('No other reading fits this form.') >= 0);
+    eq(body.querySelectorAll('[data-insp-action="another"]').length, 0, 'no "Use another word" for a source word');
+    W.VP_Inspector.toggleForms(true);
+    env.clock.tick(100);
+    ok(body.querySelector('.vp-paradigm .vp-par-used'), 'the paradigm of the Latin word, used cell marked');
+    // a word with two readings lists the other one
+    env.qa('#vp-src-text .vp-src-word')[0].click();
+    env.clock.tick(100);
+    W.VP_Inspector.toggleWhy(true);
+    ok(env.q('.vp-why-alts').textContent.indexOf('Puella (puella, noun, vocative singular)') >= 0);
+    ok(env.q('.vp-why-reading').textContent.indexOf('Confidence: 66 %') >= 0, env.q('.vp-why-reading').textContent);
+    // Ctrl+I: interlinear lines
+    env.key(env.document.body, 'i', { ctrl: true });
+    env.clock.tick(100);
+    eq(W.VP_Store.get('settings').interlinear, true);
+    eq(env.q('.vp-il-btn').getAttribute('aria-pressed'), 'true');
+    var il = env.qa('#vp-src-text .vp-src-word')[1];
+    eq(il.querySelector('.vp-il-word').textContent, 'rosam');
+    eq(il.querySelector('.vp-il-lemma').textContent, 'rosa');
+    eq(il.querySelector('.vp-il-form').textContent, 'acc. sg. f.');
+    eq(il.querySelector('.vp-il-gloss').textContent, 'rose');
+    env.key(env.document.body, 'i', { ctrl: true });
+    env.clock.tick(100);
+    eq(env.qa('#vp-src-text .vp-il-word').length, 0, 'Ctrl+I again hides them');
+    // alternatives: the word-by-word line with its reason in words
+    ok(env.q('.vp-alt-reason') && env.q('.vp-alt-reason').textContent === 'word by word', 'reason "word by word" translated by key');
+    W.VP_Toast.clearAll();
+    deepEq(W.VP_I18n.missing(), []);
+    eq(env.errors().length, 0, JSON.stringify(env.errors()));
+  });
+
+  it('en-grc: Greek spans carry lang="grc", the root swaps to the Greek accent, the ";" question mark stays; the paradigm keeps Attic forms and drops the dual', function () {
+    var env = bootPair('en-grc');
+    var W = env.window;
+    ok(env.q('.vp-ws').classList.contains('pair-grc'));
+    ok(env.app.classList.contains('pair-grc'), 'dialogs and toasts under the app get the accent too');
+    eq(env.q('#vp-target-view').getAttribute('lang'), 'grc');
+    eq(env.q('.vp-preview-line').getAttribute('lang'), 'grc');
+    W.VP_CueList.select(11);
+    env.clock.tick(200);
+    eq(env.q('#vp-target-view').textContent, 'πῶς ἔχεις, ὦ φίλε;');
+    ok(env.qa('.vp-cue-row [lang="grc"]').length > 0, 'cue list rows show Greek with lang="grc"');
+    W.VP_CueList.select(0);
+    env.clock.tick(200);
+    var words = env.qa('#vp-target-view .vp-word');
+    var kore = words.filter(function (x) { return x.textContent === 'κόρη'; })[0];
+    kore.click();
+    env.clock.tick(100);
+    W.VP_Inspector.toggleForms(true);
+    env.clock.tick(100);
+    var table = env.q('.vp-paradigm');
+    var rows = table.querySelectorAll('tbody tr').map(function (r) { return r.querySelector('th').getAttribute('title'); });
+    deepEq(rows, ['nominative', 'genitive', 'dative', 'accusative', 'vocative']);
+    var cols = table.querySelectorAll('thead th').map(function (h) { return h.getAttribute('title'); });
+    deepEq(cols, ['singular', 'plural'], 'the dual is left out');
+    eq(table.querySelector('.vp-par-used').textContent.indexOf('κόρη'), 0);
+    eq(table.querySelector('.vp-par-used span').getAttribute('lang'), 'grc');
+    W.VP_Toast.clearAll();
+    eq(env.errors().length, 0, JSON.stringify(env.errors()));
+  });
+
+  it('grid(cells, used, "grc"): Attic contracted spelling chosen, dual dropped, empty voice = middle-passive; Latin unchanged', function () {
+    var env = load(['vp_dom.js', 'vp_timers.js', 'vp_i18n.js', 'vp_inspector.js']);
+    var I = env.window.VP_Inspector;
+    var f = function (o) { return { pos: 'verb', 'case': '', number: o.n || '', gender: '', person: o.p || '', tense: o.t || '', mood: o.m || '', voice: o.v === undefined ? 'active' : o.v, degree: '' }; };
+    var cells = [
+      { features: f({ p: 'third', n: 'singular', t: 'present', m: 'indicative' }), form: 'ὁράει', extra: [] },
+      { features: f({ p: 'third', n: 'singular', t: 'present', m: 'indicative' }), form: 'ὁρᾷ', extra: ['attic', 'contracted'] },
+      { features: f({ p: 'third', n: 'singular', t: 'present', m: 'indicative' }), form: 'ὁρᾰ́ει', extra: ['attic'] },
+      { features: f({ p: 'third', n: 'dual', t: 'present', m: 'indicative' }), form: 'ὁρᾶτον', extra: ['attic', 'contracted'] },
+      { features: f({ p: 'third', n: 'singular', t: 'aorist', m: 'indicative' }), form: 'εἶδε', extra: ['attic'] },
+      { features: f({ t: 'present', m: 'infinitive', v: '' }), form: 'ὁρᾶσθαι', extra: ['attic', 'contracted'] }
+    ];
+    var g = I.grid(cells, { person: 'third', number: 'singular', tense: 'present', mood: 'indicative', voice: 'active' }, 'grc');
+    eq(g.kind, 'verbal');
+    var grp = g.groups[0];
+    deepEq(grp.rows, ['third|singular'], 'no dual row');
+    deepEq(grp.cols, ['present', 'aorist']);
+    deepEq(grp.forms['third|singular#present'], ['ὁρᾷ']);
+    eq(g.used, 'third|singular#present');
+    eq(g.other[0].voice, 'mediopassive');
+    var plain = cells.slice(0, 3).map(function (c) { return { features: c.features, form: c.form }; });
+    var lat = I.grid(plain, {}, 'la');
+    deepEq(lat.groups[0].forms['third|singular#present'], ['ὁράει', 'ὁρᾷ', 'ὁρᾰ́ει'], 'cells without marks: every spelling as before');
+  });
+});

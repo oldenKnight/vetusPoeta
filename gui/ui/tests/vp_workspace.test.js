@@ -204,7 +204,7 @@ describe('VP_Workspace', function () {
     ok(env.q('#vp-tab-translate-panel').hidden);
     ok(!env.q('#vp-tab-orberg-panel').hidden);
     ok(W.VP_Orberg.isMounted(), 'Orbergise mode mounts VP_Orberg');
-    ok(env.q('#vp-tab-orberg-panel').textContent.indexOf('Orberg version') > 0);
+    ok(env.q('#vp-tab-orberg-panel').textContent.indexOf('Orbergise rewrites a Latin file') > 0, 'an English file cannot be orbergised: the tab says why');
     env.key(env.q('#vp-tab-orberg'), 'ArrowLeft');
     eq(W.VP_Workspace.mode(), 'translate');
     eq(env.document.activeElement, env.q('#vp-tab-translate'));
@@ -294,5 +294,93 @@ describe('VP_Workspace', function () {
     env.clock.tick(300);
     eq(W.VP_Corrections.isMounted(), false);
     deepEq(W.VP_Debug.failures(), []);
+  });
+
+  it('B8 warnings: a requested model and online check that cannot run give a toast (first), status chips that open the Engines tab, and lines with the hint there', function () {
+    var env = boot(function (e) {
+      e.window.localStorage.setItem('vp.mock.settings', JSON.stringify({ engines: { model: true, online: true }, online: { wiktionary: false } }));
+    });
+    var W = env.window;
+    openSample(env);
+    eq(env.q('.vp-ws-warnings').hidden, true, 'no chip before a job');
+    env.q('#vp-translate').click();
+    env.clock.tick(40);
+    eq(env.cmds('translate.start')[0].params.engines.model, true);
+    var toasts = env.document.querySelectorAll('.vp-toast-text').map(function (t) { return t.textContent; });
+    eq(toasts[0], 'Model unavailable: not installed', 'the first toast of the job is the warning');
+    eq(toasts[1], 'Online check unavailable: turned off in Settings');
+    eq(env.document.querySelectorAll('.vp-toast-action')[0].textContent, 'Show engines');
+    env.clock.tick(3000);
+    var chips = env.document.querySelectorAll('.vp-ws-warning');
+    deepEq(chips.map(function (c) { return c.textContent; }), ['Model unavailable: not installed', 'Online check unavailable: turned off in Settings']);
+    eq(chips[0].getAttribute('title'), 'The local model is not installed. The rule engine translates on its own.', 'the engine hint as tooltip');
+    eq(W.VP_Workspace.warnings().length, 2);
+    eq(env.document.querySelectorAll('.vp-toast-text').filter(function (t) { return /unavailable/.test(t.textContent); }).length, 2, 'each warning announced once per job');
+    W.VP_Workspace.setTab('word');
+    chips[1].click();
+    env.clock.tick(100);
+    eq(W.VP_Workspace.tab(), 'engines');
+    var panel = env.q('#vp-panel-body').textContent;
+    ok(panel.indexOf('Last translation: Model unavailable: not installed') >= 0, panel);
+    ok(panel.indexOf('Last translation: Online check unavailable: turned off in Settings') >= 0);
+    ok(panel.indexOf('Turn on the online check in Settings to use it.') >= 0, 'engine hint shown');
+    ok(panel.indexOf('In this version it helps with understanding English or Spanish only; it does not choose Latin or Greek words.') >= 0, 'rerankEnabled:false copy');
+    ok(panel.indexOf('Nothing is checked online yet: wiktionary.org is turned off in Settings.') >= 0, 'online allowed state');
+    env.q('[data-eng-action="onlineSettings"]').click();
+    env.clock.tick(100);
+    ok(W.VP_Settings.isOpen(), 'Open Settings');
+    W.VP_Settings.close();
+    env.clock.tick(100);
+    // the next job without the engines clears the chips
+    W.VP_App.saveSettings({ engines: { model: false, online: false } });
+    env.clock.tick(50);
+    W.VP_Workspace.cmd.translate(null);
+    env.clock.tick(3000);
+    eq(env.q('.vp-ws-warnings').hidden, true);
+    deepEq(W.VP_I18n.missing(), []);
+    W.VP_Toast.clearAll();
+    W.VP_Workspace.close();
+    env.clock.tick(200);
+    eq(W.VP_Router.current(), 'start');
+    deepEq(W.VP_Debug.failures(), [], 'no router.leak after the workspace with warnings');
+    eq(env.errors().length, 0, JSON.stringify(env.errors()));
+  });
+
+  it('B8 correctionAdded is the engine object: published in the store, the Corrections tab reloads at once', function () {
+    var env = boot();
+    var W = env.window;
+    openSample(env);
+    translateAll(env);
+    W.VP_Workspace.setTab('corrections');
+    env.clock.tick(100);
+    var lists = env.cmds('corrections.list').length;
+    var c0 = W.VP_Store.getCue(0);
+    W.VP_Workspace.cmd.edit(0, c0.target + ' x', 'phrase');
+    env.clock.tick(30);
+    deepEq(W.VP_Store.get('correctionAdded'), { id: 'c1', key: 'the girl sees the rose.', target: c0.target + ' x', scope: 'phrase', count: 1 });
+    ok(env.cmds('corrections.list').length > lists, 'reloaded right after the answer');
+    env.clock.tick(500);
+    ok(env.q('#vp-panel-body').textContent.indexOf('the girl sees the rose.') >= 0);
+  });
+
+  it('B8 Orbergise without la-la in hello.pairs: the tab says why instead of the panes; a Latin file with it works', function () {
+    var env = boot(function (e) { e.window.VP_MockEngine.options.pairs = ['en-la', 'la-en']; });
+    var W = env.window;
+    eq(env.q('#vp-start-orberg').disabled, true);
+    env.q('#vp-start-pair').value = 'la-en';
+    env.fire(env.q('#vp-start-pair'), 'change');
+    openSample(env);
+    env.q('#vp-tab-orberg').click();
+    env.clock.tick(50);
+    var t = env.q('#vp-tab-orberg-panel').textContent;
+    ok(t.indexOf('Orbergise is not available here') >= 0, t);
+    ok(t.indexOf('The translation engine of this version cannot orbergise yet.') >= 0, t);
+    ok(t.indexOf('This language pair is not available yet.') >= 0, t);
+    eq(env.q('#vp-orb-run'), null, 'no run button');
+    eq(W.VP_Orberg.available().ok, false);
+    W.VP_Orberg.run(null);
+    env.clock.tick(50);
+    eq(env.cmds('orbergise.start').length, 0);
+    eq(env.errors().length, 0, JSON.stringify(env.errors()));
   });
 });

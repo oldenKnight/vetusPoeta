@@ -164,4 +164,40 @@ describe('VP_App', function () {
     eq(bare.result, null);
     eq(bare.document.documentElement.getAttribute('data-boot-error'), 'promise');
   });
+
+  it('B8 bridge init order: under the WebView2 transport the bridge listener exists before the Start screen mounts, so the router leak check stays clean', function () {
+    var env = load('all', { search: '?debug=1', webview: true });
+    var W = env.window;
+    var D = W.VP_Dom;
+    var app = D.el('div', { id: 'app', className: 'vp-app' });
+    var main = D.el('main', { id: 'vp-main' });
+    app.appendChild(main);
+    env.document.body.appendChild(app);
+    var mountedWith = null;
+    var mount = W.VP_Start.mount;
+    W.VP_Start.mount = function (root, params) {
+      mountedWith = { bridge: W.VP_Bridge.kind(), listeners: D.count('bridge') };
+      return mount(root, params);
+    };
+    W.VP_App.boot({ root: main, status: D.el('div') });
+    env.clock.tick(200);
+    deepEq(mountedWith, { bridge: 'webview', listeners: 1 }, 'the WebView2 listener is registered before the first screen');
+    // the shell answers like the engine
+    var answer = function (cmd, result) {
+      env.webviewSent.forEach(function (raw) {
+        var m = JSON.parse(raw);
+        if (m.cmd === cmd && !m.answered) { env.webviewReply({ id: m.id, ok: true, result: result }); }
+      });
+      env.clock.tick(200);
+    };
+    answer('engine.hello', { version: '0.1.0', engine: 'rules-1', engineKind: 'rules', lexicons: [], pairs: ['en-la'], pairsUnavailable: [], samples: [], model: { available: false, rerankEnabled: false } });
+    answer('settings.get', { lang: 'en-US', theme: 'light', tourSeenVersion: W.VP_App.TOUR_VERSION });
+    ok(W.VP_App.ready());
+    eq(W.VP_Store.get('engine').state, 'ready');
+    W.VP_Router.go('start');
+    env.clock.tick(50);
+    var leaks = W.VP_Debug.failures().filter(function (f) { return f.code === 'router.leak'; });
+    deepEq(leaks, [], 'no router.leak when the Start screen is left');
+    eq(D.count('bridge'), 1, 'the bridge listener stays for the app');
+  });
 });
