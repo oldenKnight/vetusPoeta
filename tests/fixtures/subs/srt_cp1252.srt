@@ -1,0 +1,11 @@
+1
+00:00:01,000 --> 00:00:03,500
+El café está frío, pero la señora sonríe.
+
+2
+00:00:03,800 --> 00:00:06,200
+“¿Dónde está el niño?” — preguntó.
+
+3
+00:00:06,500 --> 00:00:08,000
+It’s raining… again.

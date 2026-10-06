@@ -1,0 +1,16 @@
+1
+00:00:01,000 --> 00:00:03,000
+<i>Somewhere a radio is playing.</i>
+
+2
+00:00:03,300 --> 00:00:05,900
+She says the river <b>always</b>
+remembers its old path.
+
+3
+00:00:06,100 --> 00:00:08,700
+<font color="#ffcc00">The kettle whistles twice.</font>
+
+4
+00:00:09,000 --> 00:00:11,000
+<i>Wait,</i> I said, <u>not yet</u>.

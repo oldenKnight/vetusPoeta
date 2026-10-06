@@ -1,0 +1,15 @@
+1
+00:00:01,000 --> 00:00:02,000
+The first line is fine.
+
+3
+00:00:02,500 --> 00:00:04,000
+Number two went missing.
+
+3
+00:00:04,500 --> 00:00:06,000
+Number three appears twice.
+
+2
+00:00:06,500 --> 00:00:08,000
+And now we go backwards.

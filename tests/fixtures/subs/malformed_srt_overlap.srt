@@ -1,0 +1,11 @@
+1
+00:00:01,000 --> 00:00:05,000
+This cue lasts too long.
+
+2
+00:00:04,000 --> 00:00:06,000
+This one starts too early.
+
+3
+00:00:09,000 --> 00:00:07,000
+This one ends before it starts.

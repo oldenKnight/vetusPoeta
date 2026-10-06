@@ -1,0 +1,24 @@
+WEBVTT
+Kind: captions
+Language: en
+
+STYLE
+::cue {
+  color: lightyellow;
+}
+
+REGION
+id:top
+width:40%
+lines:3
+
+NOTE This file was written for the tests.
+It has a note before the first cue.
+
+00:01.000 --> 00:04.000 region:top
+The boat rocks gently by the pier.
+
+NOTE a note between cues
+
+00:04.500 --> 00:07.000
+The fisherman mends his net.
