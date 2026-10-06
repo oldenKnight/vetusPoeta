@@ -18,9 +18,14 @@ Last updated: 2026-10-05 (session 1, step 1 of the production process).
   missing, check `data/raw/dl-*.log` and rerun the curl commands (they resume with `-C -`).
 
 ## Next step (updated 2026-10-06, evening)
-- 35 modules DONE (waves A-C, D1, B4c, C17). No implementer running. The main agent is in R1 (release packaging
-  pass on the quiet tree: clean rebuild, sanitizers, model tests, xcompile with GUI+LLM, tools/make_dist.py,
-  CHANGELOG); see the R1 row in STATUS for what is already checked.
+- 36 tasks DONE (waves A-C, D1, B4c, C17, R1). No implementer running. Engineering is complete for 0.1.0; the tree
+  is quiet and every commit is pushed to claude/fervent-cannon-6qif8i.
+- Waiting on the owner: the Alice .srt (acceptance run: `tools/eval/run_eval.py --tuned`, then a tuning loop C18 on
+  its first-run mismatches, then the true held-out file), a `main` branch for the draft pull request, the Google
+  Translate side-by-side on his machine (docs/EVAL.md §5), the Windows smoke checklist (docs/BUILD.md).
+- Next engineering candidates if time remains before the files arrive: Greek loop 3 (docs/rules_grc2_notes.md "After
+  B4c"), LIB-5 (duplicate caelum lemmas 1599/1600 in latin.vpl, tier review sheets), the 27 remaining oz_sample
+  mismatches (docs/rules_en_notes.md "Quality loop 3").
 - Review protocol: `git archive HEAD | tar -x -C <scratch>` then build + ctest + xcompile there, so other
   implementers' uncommitted files do not pollute the verification. Commit the ledger with pathspecs
   (`git commit docs/STATUS.md -m ...`) so staged files of implementers are not swept in.
