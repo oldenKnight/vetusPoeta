@@ -336,6 +336,12 @@ terms are confirmed), `modelPath`, `eco` (bool: 2 threads, unload after each job
 `LemmaView {id, head, pos, gender, cls, tier, tierSource, freqRank, whitFreq, glossEn, glossEs, emoji, principal,
 flags:[...]}`; `CheckView {id:"A1".."A9", ok:bool, detail}`; `ReasonView {tokenIndex, kind:"sense"|"candidate"|"form"|
 "evidence"|"correction"|"phrasebook"|"name", text, data}`; `AltView {text, reason, score}`.
+Consumed by the UI (B7) and therefore delivered by the engine: `engine.hello.lexicons[].tiers {t1,t2,t3}`;
+`LemmaView.flags` includes `gloss-es-pivot`; `ReasonView.data` shapes: sense `{source, sense, context[]}`, candidate
+`{lemmaId, head, form, tier, band, chosen, gloss}`, form `{features}`, evidence `{source: wiktionary|whitaker|model|
+online, state: yes|no|off}`, orbergise change `{was, now, why}`; `cue.get` adds `meaning {percent, missing[]}` and
+`original` in Orbergise mode; `orbergise.start {indices?}`; settings keys `panelTab`, `onlineExplained`, `orberg{...}`,
+`speakerGender` ("m"|"f"|"u"); samples at `<dataDir>/samples/sample.<lang>.srt` (own sentences, installed by make_dist).
 
 ## 10. Rule engine (engine i) — design
 Directory `engine/rules/src/` with sub-directories `morph/`, `frame/`, `transfer/`, `realise_la/`, `realise_grc/`,
