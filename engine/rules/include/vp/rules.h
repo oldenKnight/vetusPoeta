@@ -26,6 +26,7 @@ struct Options {
   bool macrons = true;           // display forms with length marks
   bool orbergise = false;        // rewrite Latin input with tier ceiling
   int orbergTier = 1;
+  char speakerGender = 'm';     // 'm' | 'f' | 'u' (unknown): gender of first-person predicate forms (rules_la_notes.md decision 1)
 };
 
 struct Features { std::string pos, case_, number, gender, person, tense, mood, voice, degree; };

@@ -7,12 +7,15 @@ RULE order.decl       : clause.type = decl                    => [VOC,] [CONN] S
 RULE order.copula     : predicate.lemma = sum & PRED          => [VOC,] [CONN] S PRED [NEG] V ; "Puer bonus est"; drop S if pronoun and not contrastive
 RULE order.exist      : predicate.lemma = sum & no PRED       => [CONN] [OBL] V S ; "In hortō est fēlēs" / "Est fēlēs in hortō" (existential, verb before subject)
 RULE order.inf        : modal (possum, volō, nōlō, dēbeō, soleō, incipiō) + INF => [...] O OBL INF V ; "venīre nōn potest": object of the infinitive before the infinitive, modal last
-RULE order.yn         : clause.type = yn                      => Q-ne attached to first word: V first if clause has no O ("Esne fessus?", "Venitne?"), else the focused word ("Rosāsne vīdistī?")
+RULE order.yn         : clause.type = yn                      => Q-ne attached to the verb, which comes first ("Esne fessus?", "Venitne?", "Vīdistīne fēlem meam?"); only an NP the source marks as contrastive focus takes -ne instead ("Rosāsne vīdistī?")
 RULE order.yn.nonne   : clause.type = yn & expects yes        => nōnne first, then decl order
 RULE order.yn.num     : clause.type = yn & expects no         => num first, then decl order
 RULE order.wh         : clause.type = wh                      => WH first (quis, quid, ubi, quō, cūr, quōmodo, quandō, quot, quantus), then decl order without the slot WH filled
-RULE order.imp        : clause.type = imp & words <= 3        => V first: "Dā mihi pilam", "Venī hūc", "Aperī iānuam"
-RULE order.imp.long   : clause.type = imp & words > 3         => [VOC,] O OBL V ; "Rosās in hortō nōlī carpere"
+RULE order.imp        : clause.type = imp & complements <= 3 (verb not counted) => V first: "Dā mihi pilam", "Venī hūc", "Aperī iānuam"; a fronted adverb (prīmum, deinde, nunc, tum) keeps the verb last: "Prīmum nōmen tuum scrībe"
+RULE order.imp.long   : clause.type = imp & complements > 3    => [VOC,] O OBL V ; "Rosās in hortō nōlī carpere"
+RULE imp.number       : imperative addressee count            => singular by default; plural when the addressee NP is plural (everyone, you all, boys, ladies and gentlemen), when a plural vocative appears in the same or the previous cue, or when the previous cue's speaker addressed a group; a guess from the previous cue is marked Check
+RULE speaker.gender   : first-person predicate adjective/participle (fessus/fessa sum) => gender from Options.speakerGender (project setting; default masculine); when unknown, masculine with the feminine form as alternative 1 and Check
+RULE cum.pos          : "cum" at clause start                  => preposition when followed by an ablative NP ("Cum amīcō ambulat"); conjunction when the sentence has two finite verbs
 RULE order.prohib     : clause.type = imp & polarity = neg    => nōlī/nōlīte + [O OBL] + INF ; "Nōlī timēre", "Nōlīte clāmāre"
 RULE order.excl       : clause.type = excl                    => quam + ADJ/ADV + rest ("Quam mīrus hortus!"), or ō + acc of exclamation for misery ("Ō mē miseram!")
 RULE order.voc        : vocative present                      => vocative first unless the clause starts with an interjection (then after it); comma after

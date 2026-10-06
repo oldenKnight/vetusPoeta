@@ -62,3 +62,19 @@ flag), cop.there (`existential`), cop.it.is (`predGender` = neuter: "Hīc obscū
 
 ## Curated rows added
 None. Duplicates found (loader warnings): tiers_la.tsv `aqua` (twice), emoji_la.tsv `hortus` and `pons`.
+
+
+## Decisions by the main agent (2026-10-06), binding for C1/C2
+1. Speaker gender: `Options.speakerGender` ("m" | "f" | "unknown", project setting, default "m"). Unknown -> masculine
+   form, feminine as alternative 1, confidence Check. (rules.h updated.)
+2. Imperative number: singular by default; plural from an addressee NP (everyone, you all, boys, ladies and gentlemen),
+   a plural vocative in this or the previous cue, or the previous cue addressing a group; a guess from the previous cue
+   is Check. "let's" -> 1st plural subjunctive. (order_la.txt RULE imp.number.)
+3. -ne host: the verb, verb first, unless the source marks an NP as contrastive focus. (order.yn amended.)
+4. order.imp counts complements, not the verb; a fronted adverb keeps the verb last. (Amended.)
+5. Vowel quantities: the reader tradition wins over the lexicon where they differ; `data/curated/macron_overrides.tsv`
+   (key, stem_from, stem_to) is applied to display forms; first row narro -> nārr-. Apply in the Macrons primitive
+   or in the engine's display step (C2).
+6. names_la.tsv "translate" rows stay there (they are name/title policies); they are ordinary nouns for the checker.
+7. cum: preposition when followed by an ablative NP, else conjunction when two finite verbs. (RULE cum.pos.)
+8. A2 stays a warning; LIB-3 (B4b) may add Whitaker-only ANAL rows later.
