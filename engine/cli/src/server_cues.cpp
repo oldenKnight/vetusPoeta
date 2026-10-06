@@ -164,7 +164,8 @@ json Server::cmdCueGet(const json& p) {
   if (orberg) {
     // Orbergise mode: the engine's meaning check (CueOutput.meaningPercent/meaningMissing, stored with the cue) when
     // it computed one; after a user edit (or with the stub) the CLI's content-lemma overlap with the input Latin.
-    // `original`: the aligned original-language cue the job used, else the one of the loaded original file.
+    // `original`: the cue of the loaded original file (the current one, aligned), else the one the job used (kept
+    // with the cue, e.g. when the file has gone missing since).
     OrbergFacts of;
     const vp::CueReason* oh = hiddenReason(r, kOrbergKind);
     const bool haveFacts = oh && decodeOrberg(oh->data, of);
@@ -174,8 +175,8 @@ json Server::cmdCueGet(const json& p) {
       const Meaning m = meaningCheck(*lexFor(vp::rules::Lang::La), sources_[pos], r.target);
       out["meaning"] = json{{"percent", m.percent}, {"missing", m.missing}};
     }
-    if (haveFacts && !of.original.empty()) out["original"] = of.original;
-    else if (pos < originals_.size()) out["original"] = originals_[pos];
+    if (!originalPath_.empty() && pos < originals_.size()) out["original"] = originals_[pos];
+    else if (haveFacts && !of.original.empty()) out["original"] = of.original;
   }
   return out;
 }

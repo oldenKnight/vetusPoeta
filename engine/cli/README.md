@@ -33,9 +33,10 @@ copied there from `VP_SAMPLES_DIR`, `<exe>/samples` or `tests/samples` above the
 ## engine.hello (additions to DESIGN 9)
 `engine` (version string), `engineKind` "rules" | "stub", `lexicons[].tiers {t1,t2,t3}` (lemma counts of latin.vpl
 and greek.vpl), `pairs` (the pairs translate.start accepts now), `pairsUnavailable [{pair, code, message, hint}]`
-(en-la/es-la: `lexicon_missing` without latin.vpl, `not_found` without the curated tables or without
-`<base>.tag.vpt/.dep.vpt` - the hint names the files; other pairs: what the rules engine answered to a one-cue
-probe, e.g. `bad_params` "This language pair is not available yet." for la-la and the Greek pairs), `modes` ("R" when a pair is available, "M"
+(all nine pairs of DESIGN 9 are listed in one of the two: en-la es-la la-en la-es en-grc es-grc grc-en grc-es la-la;
+`lexicon_missing` without latin.vpl / greek.vpl (Greek pairs: "The Greek dictionary (greek.vpl) is not installed.");
+en/es -> la/grc: `not_found` without the curated tables or without `<base>.tag.vpt/.dep.vpt` - the hint names the
+files; every other case: what the rules engine answered to a one-cue probe), `modes` ("R" when a pair is available, "M"
 when the model file is found and the CPU is supported, "O" always: engine iii is built in and runs only when the
 settings turn it on), `model {..., rerankEnabled, reason}`, `online {allowed, mock, mockCalls}`,
 `nlp {dir, en, es}`, `curatedDir`, `samples [{lang, path}]`, `dataDir`, `lexiconDir`, `threads`.
@@ -65,11 +66,10 @@ reason per candidate `{lemmaId, head, form, tier, band:"common"|"rarer"|"rare", 
 evidence rows `{source:"wiktionary"|"whitaker"|"model"|"online", state:"yes"|"no"|"off"|"none"}` (wiktionary = the
 lexicon has a gloss, whitaker = a Whitaker frequency letter, model/online from the job facts); the engine's
 sentence-level evidence (`model: ...`, `online: ...`) as `{source, state, preferred?}`; name `{form}`; correction
-`{target}`; Orbergise change `{was, now, why:"vocabulary", lemmaId, head, tier, chosen}` (derived by aligning the
-input Latin with the output when the engine gives none). In Orbergise mode (pair la-la or an orbergise job)
-`cue.get` adds `meaning {percent, missing[]}` (content lemmas of the input kept in the output) and `original`
-(the line of `orbergise.start {originalPath}` aligned by index, else by time overlap; the path is kept in the
-manifest). CueView `flags`: the engine's (`emoji`, `unknownName`, `song`, `nonverbal`, `name-guessed`,
+`{target}`; Orbergise: the engine's reasons of kind `orbergise` pass through (`data {was, now, why}` for a change,
+no data for a note); only the stub's output gets changes derived by aligning the input Latin with the output. In
+Orbergise mode (pair la-la or an orbergise job) `cue.get` adds `meaning {percent, missing[]}` and `original` (see
+"Orbergise" below). CueView `flags`: the engine's (`emoji`, `unknownName`, `song`, `nonverbal`, `name-guessed`,
 `frame-fallback`, `tags`, ...) plus `cps`, `overflow`, `alternative` recomputed from the current target.
 For la-en / la-es (C11) the tokens describe the Latin source words (flag `source-tokens`) and the reasons of kind
 `analysis` pass through unchanged; the evidence rows and `words.list` use the Latin/Greek side's lexicon.
@@ -79,7 +79,31 @@ effective tiers; capitalised unknown words as names). `settings.speakerGender` "
 `cue.set {text, remember}` with the text the cue already has and state `edited` only adds the correction (no
 history step, no re-check); any other edit re-checks the cue, stores the new tokens and re-attaches the reasons
 to the words that are still there. `cue.choose` does the same with the alternative's text.
-`orbergise.start {indices?, tier, keepNames, simplify, originalPath?}`: keepNames/simplify have no engine switch yet.
+
+## Orbergise (`orbergise.start`, pair la-la; C8b)
+`orbergise.start {indices?, tier:1|2, keepNames?:true, simplify?:true, originalPath?, originalLang?:"en"|"es"}` ->
+`{jobId, total, warnings, originalPath|null, originalLang|null}`; the same `translate.*` events as a translation.
+Options: `orbergTier = tier`, `orbergKeepNames = keepNames`, `orbergSimplify = simplify` (both default true).
+`originalPath` loads the original-language file (srt/vtt/ass/ssa/txt through vp::subs); it stays loaded for later
+runs; `originalPath: ""` forgets it; absent/null keeps what is loaded. Alignment (`alignOriginal`, views.h):
+1. the same number of cues, or either file untimed (.txt): by cue index (position);
+2. else by time: every original cue overlapping the cue for at least half of the shorter of the two, in order,
+   joined with a space; a cue no original covers that well gets the original cue with the largest overlap; no
+   overlap at all -> "" (that cue is rewritten from the Latin alone).
+`originalLang` absent: detected (`detectOriginalLang`: ¿ ¡ ñ and accented vowels plus common Spanish function words
+against common English function words; ties -> "en"). Each cue's `CueInput.originalText/originalLang` come from it.
+The path and language are kept in the manifest settings snapshot (`orbergOriginalPath`, `orbergOriginalLang`) and
+restored by `project.open` (a missing file -> a `warnings[]` entry); `project.orberg {originalPath, originalLang}`
+reports them. Per cue the engine's `CueOutput.meaningPercent/meaningMissing/original` are stored as the hidden
+reason `_orberg`; `cue.get.meaning {percent, missing}` is the engine's when percent >= 0, else (after a user edit,
+or the stub) the CLI's content-lemma overlap with the input Latin; `cue.get.original` is the loaded file's aligned
+cue, else the one the job used.
+
+## Export of Greek
+`export.write` / `export.preview {greek:"monotonic"}` run each Greek target through `vp::grc::toMonotonic` (C12:
+one tonos per word, breathings, iota subscript and length marks dropped, diaeresis kept, monosyllables unaccented
+except ή and the interrogatives ποῦ ποῖ πῶς πῇ τίς τί); only for a Greek target pair, polytonic by default. Numbering,
+timing and tags are untouched like every same-format export. (Without the rules engine, a local approximation.)
 
 ## Threads and framing (`src/server.h`)
 Reader thread: parses each line; answers `engine.ping`, `engine.shutdown` and `*.cancel` itself; queues the rest
@@ -101,7 +125,7 @@ removed. One `Output` writes every line under a mutex. Every command catches at 
   Same format = source document with text spans replaced (numbering, timing, header, layout byte for byte);
   tags before/after the text kept, inner tags dropped (warning `tags_dropped`), `<i>` etc. closed again.
   Other format: new document, timing converted. Untranslated cues keep their source text (`untranslated`).
-  `emoji:false` drops pictographs absent from the source (music notes stay); `greek:"monotonic"` is approximate.
+  `emoji:false` drops pictographs absent from the source (music notes stay); `greek:"monotonic"` see below.
 - `translate.start` without `indices` skips edited and reviewed cues; `engines.model/online` yield `warnings` and
   `translate.warning` events (above).
 - `model.*` answer `available:false` / `model_missing`; `online.test` gives `online_disabled` or `online_failed`.
@@ -124,7 +148,10 @@ EOF2
 10,000-ping burst, ping during a 5,000-cue job, cancel, kill -9 + recover, EOF, no network symbols; with the rules
 engine on `data/work` (skipped with a message when the lexicons or NLP models are absent) the sample session
 (Latin for 12 cues, reason shapes, word.inspect, words.list, export byte for byte with `{\an8}` and italics,
-names.set, corrections, speaker gender, unavailable pairs), missing NLP models, the online check through
+names.set, corrections, speaker gender, unavailable pairs), missing NLP models, Orbergise on sample.la.srt
+without and with sample.en.srt/sample.es.srt (detection, a 5-cue mismatched original aligned by time, edit, reopen
+with the original restored, `originalPath: ""`), en-grc / grc-en on the samples, monotonic export (timing bytes
+untouched), the pair report without greek.vpl, the online check through
 `VP_ONLINE_MOCK`, and a three-cue local-model run (skipped without a model file, under sanitizers, or with
 `VP_LLM_SKIP_MODEL=1`). `--stub-only` / `VP_TEST_STUB_ONLY=1` runs the stub parts only.
 `engine/tests/test_cli.cpp` (`vp_tests -tc='cli*'`). UI against the real engine: `node gui/ui/dev/smoke_real.js

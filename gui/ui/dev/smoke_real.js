@@ -10,7 +10,8 @@
  * asked for (the engine answers translate.warning: toast + status chips that open the Engines tab), Latin source
  * words as chips with the hover card, "Why this reading?" in the Word tab, Ctrl+I interlinear lines, the plain
  * English target, the export preview = the readable sentences. grc-en / en-grc / la-la run when hello.pairs lists
- * them (Greek: lang="grc", pair-grc, Gentium Plus in the preview strip and cue list; la-la: the Orbergise panes),
+ * them (Greek: lang="grc", pair-grc, Gentium Plus in the preview strip and cue list, the monotonic export preview;
+ * la-la: the Orbergise panes),
  * else they are skipped with the engine's reason. Screenshots: gui/ui/dev/out/real-*.png (gitignored).
  */
 'use strict';
@@ -270,6 +271,20 @@ function main() {
       return page.evaluate(function () { var m = document.querySelector('input[data-exp-greek="monotonic"]'); return !!m && !m.disabled; });
     }).then(function (on) {
       check(on, 'en-grc: the monotonic export option is enabled for a Greek target');
+      return page.click('input[data-exp-greek="monotonic"]');
+    }).then(function () {
+      return wait(1200);
+    }).then(function () {
+      // C8b: export.preview {greek:"monotonic"} through vp::grc::toMonotonic (no breathing, circumflex, grave, iota subscript)
+      return page.evaluate(function () {
+        return Array.prototype.map.call(document.querySelectorAll('.vp-exp-preview .vp-preview-line'), function (l) { return l.textContent; });
+      });
+    }).then(function (lines) {
+      var text = lines.join(' ');
+      var poly = /[\u1F00-\u1FFF]/.test(text) || /[\u0300\u0313\u0314\u0342\u0345]/.test(text.normalize('NFD'));
+      check(lines.length > 0 && /[\u0370-\u03FF]/.test(text) && !poly, 'en-grc: monotonic export preview (' + lines.slice(0, 3).join(' | ') + ')');
+      return shot('real-greek-export-monotonic-light-en.png');
+    }).then(function () {
       return page.keyboard.press('Escape');
     }).then(function () {
       return closeProject('en-grc');

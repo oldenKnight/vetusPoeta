@@ -225,6 +225,13 @@ def main():
             shutil.copyfile(os.path.join(curated, n), os.path.join(out, 'data', 'curated', n))
         if 'order_la.txt' not in tables:
             warnings.append('data/curated/order_la.txt missing: the rule engine cannot start')
+        # the pairs engine.hello offers depend on these (engine/cli/README.md "engine.hello")
+        if vpls and 'greek.vpl' not in [os.path.basename(v) for v in vpls]:
+            warnings.append('greek.vpl not copied: en-grc, es-grc, grc-en, grc-es are unavailable (lexicon_missing)')
+        if 'simplify_la.tsv' not in tables:
+            warnings.append('data/curated/simplify_la.tsv missing: Orbergise (la-la) is unavailable')
+        if 'order_grc.txt' not in tables:
+            warnings.append('data/curated/order_grc.txt missing: the Greek pairs are unavailable')
     samples = os.path.join(REPO, 'tests', 'samples')
     srts = sorted(n for n in os.listdir(samples) if n.startswith('sample.') and n.endswith('.srt')) if os.path.isdir(samples) else []
     if srts:
