@@ -222,6 +222,7 @@ void LatinRealiser::verbGroup(const LaClause& c, const AgreeInfo& subj, std::vec
   const LaPredicate& p = c.pred;
   const bool accInf = ctx.accInf;
   const uint8_t mood = ctx.forceMood ? ctx.forceMood : p.mood;
+  if (p.lemma == kNone && p.modal == kNone && !(c.type == ClauseType::Imp && c.polarity == Polarity::Neg)) return;   // verbless
   auto push = [&](std::vector<Word>& dst, uint32_t lemma, const Features& f, const char* rule) {
     Word w;
     if (lemma == kNone) { w.form = "[verb]"; w.missing = true; w.rule = rule; dst.push_back(std::move(w)); return; }
@@ -507,12 +508,14 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
     for (int sl : {kFRONT, kWH, kS, kPRED, kIO, kO, kOBL, kADV, kNEG, kV, kINF, kEND}) append(content, s[sl]);
     orderRule = "order.decl";
   } else if (c.type == ClauseType::Imp) {
+    // order.imp: verb first when the clause is short. "words" counts the complements (the verb itself and the
+    // vocative excluded): "Dā mihi colōrem rubrum" is short, "Rosās in hortō nōlī carpere" is long.
     size_t words = 0;
-    for (int sl : {kFRONT, kIO, kO, kOBL, kADV, kV, kINF, kPRED}) words += s[sl].size();
-    const bool shortImp = words <= 3;
+    for (int sl : {kFRONT, kIO, kO, kOBL, kADV, kPRED}) words += s[sl].size();
+    const bool shortImp = words <= 3 && s[kFRONT].empty();   // "Prīmum nōmen tuum scrībe": a fronted adverb keeps V last
     if (prohib) {
       orderRule = "order.prohib";
-      if (shortImp) seq = {kFRONT, kV, kIO, kO, kOBL, kADV, kINF};
+      if (words <= 1) seq = {kFRONT, kV, kIO, kO, kOBL, kADV, kINF};
       else seq = {kFRONT, kIO, kO, kOBL, kADV, kV, kINF};
     } else if (shortImp) {
       orderRule = "order.imp";

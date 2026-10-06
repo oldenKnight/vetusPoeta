@@ -70,9 +70,14 @@ void paradigmAnalyse(const lex::Lexicon& lx, const std::string& key, Token& out)
   for (const Guess& g : kGuesses) {
     std::string_view fe(g.formEnd);
     if (key.size() <= fe.size() + 1 || key.compare(key.size() - fe.size(), fe.size(), fe) != 0) continue;
-    const std::string cite = key.substr(0, key.size() - fe.size()) + g.citeEnd;
+    const std::string stem = key.substr(0, key.size() - fe.size());
+    std::string cite = stem + g.citeEnd;
     an.clear();
     lx.lookup(cite, an);
+    if (an.empty() && std::string_view(g.citeEnd) == "us" && !stem.empty() && stem.back() == 'r') {
+      cite = stem.substr(0, stem.size() - 1) + "er";   // pulchr-ās -> pulcher, agr-ī -> ager
+      lx.lookup(cite, an);
+    }
     for (const lex::Analysis& a : an) {
       if (std::find(tried.begin(), tried.end(), a.lemma) != tried.end()) continue;
       tried.push_back(a.lemma);

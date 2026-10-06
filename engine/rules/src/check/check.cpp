@@ -89,6 +89,14 @@ struct LatinChecker::Impl {
     return false;
   }
   static bool isNominal(const Reading& r) { return isHead(r) || isModifier(r); }
+  // A citation-only entry (an adjective / noun / participle headword carried without a case) never decides anything.
+  static bool citationOnly(const Reading& r) {
+    if (r.f.case_ != 0) return false;
+    if (r.lpos == Adj || r.lpos == Noun || r.lpos == Name || r.lpos == Participle || r.lpos == Num || r.lpos == feat::Det ||
+        r.lpos == Pron)
+      return true;
+    return r.lpos == Verb && r.f.mood == ParticipleMood;
+  }
   static bool isRelative(const Reading& r) { return r.lpos == Pron && r.key == "qui"; }
   uint8_t headGender(const Reading& r) const { return r.f.gender ? r.f.gender : r.lgender; }
   uint8_t personOf(const Reading& r) const {
@@ -105,10 +113,13 @@ struct LatinChecker::Impl {
     return false;
   }
   bool allNominal(size_t i) const {
-    if (rd[i].empty()) return false;
-    for (const Reading& r : rd[i])
+    bool seen = false;
+    for (const Reading& r : rd[i]) {
+      if (citationOnly(r)) continue;
       if (!isNominal(r)) return false;
-    return true;
+      seen = true;
+    }
+    return seen;
   }
   bool hasCase(size_t i, uint8_t c) const {
     for (const Reading& r : rd[i])
@@ -119,6 +130,7 @@ struct LatinChecker::Impl {
     if (!allNominal(i)) return false;
     bool seen = false;
     for (const Reading& r : rd[i]) {
+      if (citationOnly(r)) continue;
       if (r.f.case_ == c) seen = true;
       else if (!(c == Nom && r.f.case_ == Voc)) return false;
     }
@@ -170,7 +182,8 @@ struct LatinChecker::Impl {
     }
   }
 
-  void analyse(bool macronMode) {
+  void analyse(bool macrons) {
+    macronMode = macrons;
     rd.resize(rep.tokens.size());
     std::string tokCanon, dispCanon;
     for (size_t i = 0; i < rep.tokens.size(); ++i) {
@@ -186,7 +199,7 @@ struct LatinChecker::Impl {
       }
       tokCanon = text::lower(morph::displayForm(base, true));
       auto add = [&](uint32_t lemma, uint32_t packed, std::string_view display, uint16_t aflags) {
-        if (macronMode) {
+        if (strict) {
           dispCanon = text::lower(morph::displayForm(display, true));
           if (dispCanon != tokCanon) return false;
         }
@@ -205,20 +218,24 @@ struct LatinChecker::Impl {
         return true;
       };
       for (int pass = 0; pass < 2 && v.empty(); ++pass) {
-        const bool mm = macronMode && pass == 0;
-        const bool saved = macronMode;
-        macronMode = mm;
+        strict = macrons && pass == 0;
         for (const lex::Analysis& a : t.analysis.analyses) add(a.lemma, lx.feature(a.feat), a.display, a.flags);
         for (const morph::RuleAnalysis& a : t.analysis.ruleAnalyses) add(a.lemma, a.packed, a.display, 0);
-        macronMode = saved;
       }
       // alternative spellings, abbreviations and symbol/affix lemmas only when nothing else reads the word
+      // (ā/ab, ē/ex are regular variants of closed-class words and stay)
       auto weak = [](const Reading& r) {
-        return (r.aflags & lex::AltSpelling) || r.lpos == Symbol || r.lpos == Suffix || r.lpos == Prefix ||
-               r.lpos == Phrase;
+        return ((r.aflags & lex::AltSpelling) && r.lpos != Prep && r.lpos != Conj) || r.lpos == Symbol ||
+               r.lpos == Suffix || r.lpos == Prefix || r.lpos == Phrase;
       };
       if (std::any_of(v.begin(), v.end(), [&](const Reading& r) { return !weak(r); }))
         v.erase(std::remove_if(v.begin(), v.end(), weak), v.end());
+      // a closed-class word (preposition, conjunction, particle) outranks letter names, interjections and
+      // uninflected noun entries spelled the same ("ā", "in", "et")
+      if (std::any_of(v.begin(), v.end(), [](const Reading& r) { return r.lpos == Prep || r.lpos == Conj || r.lpos == Particle; }))
+        v.erase(std::remove_if(v.begin(), v.end(), [](const Reading& r) {
+                  return r.lpos == Intj || ((r.lpos == Noun || r.lpos == Name) && (r.f.case_ == 0 || (r.lflags & lex::Indeclinable)));
+                }), v.end());
       if (t.analysis.fromRule) { t.fromRule = true; rep.fromRule = true; }
     }
   }
@@ -227,13 +244,14 @@ struct LatinChecker::Impl {
     for (size_t i = 0; i < rep.tokens.size(); ++i) {
       CheckedToken& t = rep.tokens[i];
       const std::string& k = t.analysis.key;
-      if (std::binary_search(nameKeys.begin(), nameKeys.end(), k)) t.name = true;
-      if (opt.glossary)
+      if (rd[i].empty() && std::binary_search(nameKeys.begin(), nameKeys.end(), k)) t.name = true;
+      if (rd[i].empty() && opt.glossary)
         for (const rules::GlossaryEntry& g : *opt.glossary)
           if (text::latin_key(g.form.empty() ? g.name : g.form) == k || text::latin_key(g.name) == k) t.name = true;
       if (t.analysis.capitalised && !t.sentenceInitial && rd[i].empty()) t.name = true;
-      for (const Reading& r : rd[i])
-        if ((r.lflags & lex::ProperName) && t.analysis.capitalised) t.name = true;
+      if (t.analysis.capitalised && !rd[i].empty() &&
+          std::all_of(rd[i].begin(), rd[i].end(), [](const Reading& r) { return (r.lflags & lex::ProperName) || r.lpos == Name; }))
+        t.name = true;
     }
     if (opt.hints)
       for (const TokenHint& h : *opt.hints)
@@ -250,13 +268,14 @@ struct LatinChecker::Impl {
     int seg = 0;
     for (size_t i = 0; i < n; ++i) {
       bool cut = boundaryBefore[i] && i > 0;
+      if (i == 0 && keyIs(i, {"cum"}) && any(i, [](const Reading& r) { return r.lpos == Conj; })) relStart[i] = 0;
       if (i > 0 && !cut) {
         bool conj = false;
         for (const Reading& r : rd[i])
           if (r.lpos == Conj) conj = true;
         if (conj && keyIs(i, {"quod", "quia", "si", "nisi", "ut", "ne", "antequam", "postquam", "dum", "quamquam"}))
           cut = true;
-        if (conj && keyIs(i, {"cum"}) && !(i + 1 < n && hasCase(i + 1, Abl))) cut = true;
+        if (conj && keyIs(i, {"cum"}) && boundaryBefore[i]) cut = true;   // mid-clause cum is the preposition
         bool rel = false;
         for (const Reading& r : rd[i])
           if (isRelative(r)) rel = true;
@@ -270,12 +289,27 @@ struct LatinChecker::Impl {
     for (size_t i = 0; i < n; ++i) {
       if (!any(i, isFinite)) continue;
       const bool last = i + 1 == n || rep.tokens[i + 1].segment != rep.tokens[i].segment;
-      bool nominal = false, adv = false;
+      const bool first = i == 0 || rep.tokens[i - 1].segment != rep.tokens[i].segment;
+      bool nominal = false, adv = false, imperative = false;
       for (const Reading& r : rd[i]) {
         nominal = nominal || isNominal(r);
         adv = adv || r.lpos == Adv || r.lpos == Conj || r.lpos == Prep;
+        imperative = imperative || (isFinite(r) && r.f.mood == Imperative);
       }
-      if ((!nominal && !adv) || last) isVerb[i] = 1;
+      const bool ne = rep.tokens[i].analysis.enclitic && rep.tokens[i].analysis.encliticText == "ne";
+      if ((!nominal && !adv) || last || ne || (imperative && first && !strongHead(i))) isVerb[i] = 1;
+    }
+    // a segment without a verb takes its only finite candidate
+    for (size_t b = 0; b < n;) {
+      const size_t e = segEnd(b);
+      size_t cands = 0, which = n;
+      bool has = false;
+      for (size_t j = b; j < e; ++j) {
+        has = has || isVerb[j];
+        if (any(j, isFinite)) { ++cands; which = j; }
+      }
+      if (!has && cands == 1) isVerb[which] = 1;
+      b = e;
     }
     // coordinated clauses: split a segment with two verbs at et / sed / neque / atque between them
     for (size_t i = 0; i < n; ++i) {
@@ -318,7 +352,12 @@ struct LatinChecker::Impl {
       for (const Reading& r : rd[x])
         if (isNominal(r) && (cases & (1u << r.f.case_))) ok = true;
       if (!ok) {
-        if (otherUse && any(x, isFinite)) continue;
+        // cum / post / ante as conjunction or adverb: at the start of a clause ("Cum māter vēnit")
+        if (otherUse && (boundaryBefore[i] || i == segBegin(i))) {
+          size_t verbs = 0;
+          for (size_t j = 0; j < n; ++j) verbs += isVerb[j];
+          if (verbs >= 2) continue;   // "Cum māter vēnit, puer dormiēbat"; one verb: it is the preposition
+        }
         issue("A4", (int)x, "preposition '" + T(i) + "' does not govern the case of '" + T(x) + "'");
         continue;
       }
@@ -348,7 +387,6 @@ struct LatinChecker::Impl {
     }
     return false;
   }
-  bool pureModifier(size_t i) const { return any(i, isModifier) && !any(i, isHead); }
 
   // Predicate agreement in a copula segment: nominative (accusative with "esse"), number of the copula, gender of
   // the subject when there is a definite nominative noun.
@@ -363,61 +401,122 @@ struct LatinChecker::Impl {
         if (isInfinitive(r) && r.key == "sum") esse = true;
     }
     if (numbers.empty() && !esse) return false;
-    uint8_t subjGender = 0;
-    for (size_t j = b; j < e; ++j)
-      if (j != m && !governed[j] && any(j, isHead) && !any(j, isModifier) && definiteCase(j, Nom))
-        for (const Reading& r : rd[j])
-          if (isHead(r)) { subjGender = headGender(r); break; }
+    // (number, gender) of every nominative reading of every possible subject
+    std::vector<std::pair<uint8_t, uint8_t>> subjects;
+    for (size_t j = b; j < e; ++j) {
+      if (j == m || governed[j] || attached[j] || isVerb[j] || !strongHead(j)) continue;
+      for (const Reading& r : rd[j])
+        if (isHead(r) && (r.f.case_ == Nom || (esse && r.f.case_ == Acc))) subjects.emplace_back(r.f.number, headGender(r));
+    }
     for (const Reading& r : rd[m]) {
       if (!isModifier(r)) continue;
       if (!(r.f.case_ == Nom || (esse && r.f.case_ == Acc))) continue;
       bool num = esse;
       for (uint8_t nn : numbers) num = num || numberCompat(r.f.number, nn);
       if (!num) continue;
-      if (subjGender && !genderCompat(r.f.gender, subjGender)) continue;
-      return true;
+      if (subjects.empty()) return true;
+      for (const auto& sj : subjects)
+        if (numberCompat(r.f.number, sj.first) && genderCompat(r.f.gender, sj.second)) return true;
     }
     return false;
+  }
+
+  // A pure modifier m and a head h "partially agree" when some reading pair shares the case and either the number
+  // or the gender: the sign of an agreement slip rather than of two different phrases.
+  bool partialPair(size_t m, size_t h) const {
+    for (const Reading& a : rd[m]) {
+      if (!isModifier(a)) continue;
+      for (const Reading& b : rd[h])
+        if (isHead(b) && a.f.case_ == b.f.case_) return true;   // same case next to each other: an agreement slip
+    }
+    return false;
+  }
+  bool verbish(size_t i) const { return isVerb[i] || any(i, isInfinitive); }
+  uint16_t argMask(size_t i) const {
+    uint16_t m = 0;
+    for (const Reading& r : rd[i])
+      if (isNominal(r) && r.f.case_ != Voc) m |= (uint16_t)(1u << r.f.case_);
+    return m;
+  }
+  // A token is a head when it has a noun / pronoun reading that is not just the substantive twin of one of its
+  // adjective readings (parvus "a small one", tier 3, next to parvus adj, tier 1).
+  bool strongHead(size_t i) const {
+    for (const Reading& r : rd[i]) {
+      if (!isHead(r)) continue;
+      if (r.lpos == Pron) return true;
+      const uint8_t nounTier = r.tier ? r.tier : 3;
+      bool twin = false;
+      for (const Reading& a : rd[i]) {
+        if (!isModifier(a) || a.lemma == r.lemma) continue;
+        const uint8_t adjTier = a.tier ? a.tier : 3;
+        std::string_view ak = a.key;
+        if (ak == r.key && adjTier <= nounTier) { twin = true; continue; }   // bonus adj / bonus "a good man"
+        if (nounTier >= 3 && adjTier <= 1) { twin = true; continue; }   // magnās "magnate" next to magnus
+        if (adjTier >= nounTier) continue;   // a derived key needs the adjective to be clearly the core word
+        std::string stem;
+        if (ak.size() > 2 && ak.substr(ak.size() - 2) == "us") stem = std::string(ak.substr(0, ak.size() - 2));
+        else if (ak.size() > 2 && ak.substr(ak.size() - 2) == "er") stem = std::string(ak.substr(0, ak.size() - 2)) + "r";
+        if (!stem.empty() && (r.key == stem + "um" || r.key == stem + "a" || r.key == stem + "us")) twin = true;
+      }
+      if (!twin) return true;
+    }
+    return false;
+  }
+  bool macronMode = false, strict = false;
+  // Subject candidate: nominative (vocative counts); without macrons in the text the ablative homograph of the
+  // first declension (puella / puellā) does not disqualify.
+  bool subjectCase(size_t i) const {
+    if (definiteCase(i, Nom)) return true;
+    if (macronMode || !allNominal(i)) return false;
+    bool nom = false;
+    for (const Reading& r : rd[i]) {
+      if (citationOnly(r)) continue;
+      if (r.f.case_ == Nom) nom = true;
+      else if (r.f.case_ != Voc && r.f.case_ != Abl) return false;
+    }
+    return nom;
   }
 
   void agreement() {
     const size_t n = rep.tokens.size();
     attached.assign(n, 0);
-    // (1) + (2): modifiers
+    // (1) + (2): modifiers. A token that can be a noun (or pronoun) on its own is a head, never checked as a
+    // modifier; a pure modifier must agree with an adjacent head, or be a predicate of a copula, or stand alone as a
+    // substantive (then it may not partially agree with a neighbour and may not follow a preposition's noun).
     for (size_t i = 0; i < n; ++i) {
-      if (!any(i, isModifier) || relStart[i]) continue;
+      if (!any(i, isModifier) || strongHead(i) || verbish(i) || relStart[i] || rep.tokens[i].name) continue;
       bool relOnly = true;
       for (const Reading& r : rd[i]) relOnly = relOnly && isRelative(r);
       if (relOnly) continue;
       const int seg = rep.tokens[i].segment;
+      const size_t b = segBegin(i), e = segEnd(i);
       std::vector<size_t> cand;
       for (int dir : {-1, 1}) {
         long j = (long)i + dir;
-        while (j >= 0 && j < (long)n && rep.tokens[(size_t)j].segment == seg && pureModifier((size_t)j) &&
-               !(dir == 1 && boundaryBefore[(size_t)j]))
+        while (j >= 0 && j < (long)n && rep.tokens[(size_t)j].segment == seg && !verbish((size_t)j) &&
+               !strongHead((size_t)j) && !(dir == 1 && boundaryBefore[(size_t)j]) &&
+               !(dir == -1 && boundaryBefore[(size_t)j + 1]))
           j += dir;
         if (j < 0 || j >= (long)n || rep.tokens[(size_t)j].segment != seg) continue;
         if (dir == 1 && boundaryBefore[(size_t)j]) continue;
-        if (dir == -1 && boundaryBefore[(size_t)j + 1] && (size_t)j + 1 <= i) continue;
-        if (any((size_t)j, isHead) && !isVerb[(size_t)j]) cand.push_back((size_t)j);
-      }
-      const size_t b = segBegin(i), e = segEnd(i);
-      if (cand.empty()) {
-        // substantive or predicate: a copula segment needs predicate agreement
-        bool copula = false;
-        for (size_t j = b; j < e; ++j) copula = copula || (isVerb[j] && isCopula(j));
-        if (copula && !any(i, isHead) && !predicateOk(i, b, e))
-          issue("A3", (int)i, "predicate '" + T(i) + "' does not agree with the subject / verb");
-        continue;
+        if (dir == -1 && boundaryBefore[(size_t)j + 1]) continue;
+        if (strongHead((size_t)j) && !verbish((size_t)j)) cand.push_back((size_t)j);
       }
       bool ok = false;
       for (size_t h : cand) ok = ok || agreePair(i, h);
       if (ok) { attached[i] = 1; continue; }
-      if (predicateOk(i, b, e)) continue;
-      bool pronHead = false;
-      for (const Reading& r : rd[i]) pronHead = pronHead || (r.lpos == Pron && isHead(r));
-      if (pronHead) continue;   // a pronoun of its own next to another noun phrase
-      issue("A3", (int)i, "'" + T(i) + "' does not agree with '" + T(cand[0]) + "' (case, number, gender)");
+      bool copula = false;
+      for (size_t j = b; j < e; ++j) copula = copula || (isVerb[j] && isCopula(j));
+      if (copula && predicateOk(i, b, e)) continue;
+      if (cand.empty()) {
+        if (copula) issue("A3", (int)i, "predicate '" + T(i) + "' does not agree with the subject / verb");
+        continue;
+      }
+      bool partial = false;
+      for (size_t h : cand) partial = partial || partialPair(i, h);
+      const bool afterGoverned = i > 0 && governed[i - 1] && !boundaryBefore[i] && std::find(cand.begin(), cand.end(), i - 1) != cand.end();
+      if (partial || afterGoverned || copula)
+        issue("A3", (int)i, "'" + T(i) + "' does not agree with '" + T(cand[0]) + "' (case, number, gender)");
     }
     // (3) subject - verb
     for (size_t b = 0; b < n;) {
@@ -429,7 +528,7 @@ struct LatinChecker::Impl {
       }
       for (size_t j = b; j < e; ++j) {
         if (isVerb[j] || governed[j] || attached[j] || rep.tokens[j].name || relStart[j]) continue;
-        if (!definiteCase(j, Nom)) continue;
+        if (!subjectCase(j)) continue;
         bool rel = false;
         for (const Reading& r : rd[j]) rel = rel || isRelative(r);
         if (rel) continue;
@@ -490,22 +589,23 @@ struct LatinChecker::Impl {
       }
       b = e;
     }
-    // (4) relative pronoun with its antecedent (gender, number)
+    // (4) relative pronoun with its antecedent (gender, number). A bare ablative relative ("quī" as the old
+    // ablative) counts only after a preposition.
     for (size_t i = 1; i < n; ++i) {
       if (!relStart[i]) continue;
       size_t a = i - 1;
+      const bool afterPrep = any(a, [](const Reading& r) { return r.lpos == Prep; });
+      auto relOk = [&](const Reading& r) { return isRelative(r) && (r.f.case_ != Abl || afterPrep); };
       bool ok = false;
       for (const Reading& r : rd[i])
         for (const Reading& h : rd[a])
-          if (isRelative(r) && isHead(h) && numberCompat(r.f.number, h.f.number) &&
-              genderCompat(r.f.gender, headGender(h)))
+          if (relOk(r) && isHead(h) && numberCompat(r.f.number, h.f.number) && genderCompat(r.f.gender, headGender(h)))
             ok = true;
       // the antecedent may carry modifiers after it: look one more word back
       if (!ok && a > 0 && attached[a])
         for (const Reading& r : rd[i])
           for (const Reading& h : rd[a - 1])
-            if (isRelative(r) && isHead(h) && numberCompat(r.f.number, h.f.number) &&
-                genderCompat(r.f.gender, headGender(h)))
+            if (relOk(r) && isHead(h) && numberCompat(r.f.number, h.f.number) && genderCompat(r.f.gender, headGender(h)))
               ok = true;
       if (!ok) issue("A3", (int)i, "relative pronoun '" + T(i) + "' does not agree with its antecedent");
     }
@@ -518,34 +618,47 @@ struct LatinChecker::Impl {
       const size_t e = segEnd(b);
       // verbs of the segment with a valency entry (finite or infinitive)
       std::vector<std::pair<size_t, const curated::Valency*>> vv;
-      bool passive = false, active = false;
+      bool passive = false, active = false, sumFinite = false, perfPart = false;
       for (size_t j = b; j < e; ++j) {
         const curated::Valency* found = nullptr;
         for (const Reading& r : rd[j]) {
+          if (r.f.mood == ParticipleMood && r.f.tense == Perfect && r.f.voice == Passive) perfPart = true;
+          if (r.lpos == Participle && !verbish(j)) perfPart = true;
           if (!(isFinite(r) || isInfinitive(r)) || (!isVerb[j] && !isInfinitive(r))) continue;
-          if (isFinite(r)) { if (r.f.voice == Passive) passive = true; else active = true; }
+          if (isFinite(r)) {
+            if (r.f.voice == Passive) passive = true;
+            else if (r.key == "sum") sumFinite = true;
+            else active = true;
+          }
           if (const curated::Valency* v = cd.valency(r.key)) found = v;
         }
         if (found && (isVerb[j] || any(j, isInfinitive))) vv.push_back({j, found});
       }
+      if (sumFinite && perfPart) passive = true;   // periphrastic perfect passive: amāta est
       if (vv.size() == 1) {
         const curated::Valency* v = vv[0].second;
-        bool strictAcc = true, firstDat = false, firstAbl = false, licAcc = false, licDat = false, licAbl = false;
+        bool firstDat = false, firstAbl = false, licAcc = false, licDat = false, licAbl = false, licGen = false;
         for (const curated::Frame& f : v->frames) {
           using K = curated::FrameKind;
           switch (f.kind) {
-            case K::Acc: case K::AccInf: case K::AccAcc: case K::AccAbl: licAcc = true; break;
+            case K::Acc: case K::AccInf: case K::AccAcc: licAcc = true; break;
+            case K::AccAbl: licAcc = licAbl = true; break;
             case K::DatAcc: licAcc = licDat = true; break;
-            case K::Dat: licDat = true; strictAcc = false; break;
-            case K::Abl: licAbl = true; strictAcc = false; break;
+            case K::Dat: licDat = true; break;
+            case K::Abl: licAbl = true; break;
+            case K::Gen: licGen = true; break;
             case K::Impers:
               if (f.impers.find("acc") != std::string::npos) licAcc = true;
               if (f.impers.find("dat") != std::string::npos) licDat = true;
-              strictAcc = false;
+              if (f.impers.find("abl") != std::string::npos) licAbl = true;
+              if (f.impers.find("gen") != std::string::npos) licGen = true;
               break;
-            default: strictAcc = false; break;
+            default: break;
           }
         }
+        // the verb takes only accusative objects (prepositional, infinitive and clause frames do not license a
+        // bare dative or ablative noun)
+        const bool strictAcc = licAcc && !licDat && !licAbl && !licGen;
         if (!v->frames.empty()) {
           firstDat = v->frames[0].kind == curated::FrameKind::Dat;
           firstAbl = v->frames[0].kind == curated::FrameKind::Abl;
@@ -554,22 +667,17 @@ struct LatinChecker::Impl {
         size_t defDat = n, defAbl = n, defAcc = n;
         for (size_t j = b; j < e; ++j) {
           if (governed[j] || isVerb[j]) continue;
-          if (hasCase(j, Acc)) accPresent = true;
-          if (hasCase(j, Dat)) datPresent = true;
-          if (hasCase(j, Abl)) ablPresent = true;
+          const uint16_t m = argMask(j);   // cases of the nominal readings (a non-verb token with a verb homograph is nominal)
+          if (!m) continue;
+          if ((m & (1u << Acc)) && !attached[j]) accPresent = true;
+          if (m & (1u << Dat)) datPresent = true;
+          if (m & (1u << Abl)) ablPresent = true;
           if (attached[j]) continue;
-          if (definiteCase(j, Dat) && defDat == n) defDat = j;
-          if (definiteCase(j, Abl) && defAbl == n) defAbl = j;
-          if (definiteCase(j, Acc) && defAcc == n) defAcc = j;
-          // dative-or-ablative only (2nd declension -ō, -īs)
-          if (defDat == n && defAbl == n && allNominal(j)) {
-            bool onlyDA = true, seenDA = false;
-            for (const Reading& r : rd[j]) {
-              if (r.f.case_ == Dat || r.f.case_ == Abl) seenDA = true;
-              else onlyDA = false;
-            }
-            if (onlyDA && seenDA) defDat = j;
-          }
+          const uint16_t da = (1u << Dat) | (1u << Abl);
+          if (m == (1u << Dat) && defDat == n) defDat = j;
+          if (m == (1u << Abl) && defAbl == n) defAbl = j;
+          if (m == (1u << Acc) && defAcc == n) defAcc = j;
+          if ((m & ~da) == 0 && defDat == n && defAbl == n) defDat = j;   // dative-or-ablative only (-ō, -īs)
         }
         const std::string& vt = T(vv[0].first);
         if (strictAcc && licAcc && !accPresent && !passive && (defDat < n || defAbl < n)) {
@@ -580,7 +688,7 @@ struct LatinChecker::Impl {
         } else if (firstAbl && !licAcc && defAcc < n && !ablPresent) {
           issue("A4", (int)defAcc, "'" + vt + "' takes an ablative, not the accusative '" + T(defAcc) + "'");
         }
-        (void)licDat; (void)licAbl;
+        (void)licDat; (void)licAbl; (void)licGen;
       }
       // ablative of agent: a passive verb with a bare ablative person (pronoun or name) needs ā/ab
       if (passive && !active) {
@@ -671,6 +779,7 @@ struct LatinChecker::Impl {
 LatinChecker::LatinChecker(const lex::Lexicon& lx, const curated::CuratedData& cd) : lx_(lx), cd_(cd) {
   // every declined form of the names table (A1 exempt)
   for (const curated::NameEntry& n : cd.names()) {
+    if (n.policy == curated::NamePolicy::Translate) continue;   // rēgīna, dominus, rēx are ordinary nouns
     nameKeys_.push_back(text::latin_key(n.latinNom));
     for (uint8_t c : {Nom, Gen, Dat, Acc, Abl, Voc})
       for (uint8_t num : {Sg, Pl}) {
