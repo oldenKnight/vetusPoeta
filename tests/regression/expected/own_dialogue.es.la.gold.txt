@@ -23,7 +23,7 @@ Certē loquī possumus.
 Cane nōbīs carmen. | Cantā nōbīs carmen.
 Nūllum carmen sciō.
 Abī igitur.
-Omnēs valdē inurbānī estis. | Omnēs valdē asperī estis.
+Omnēs valdē inurbānī estis. | Omnēs valdē asperī estis. | Omnēs valdē inurbānī sunt.
 Rēgīna venit!
 Omnēs, inclīnāte vōs!
 Caput eius abscīdite! | Abscīdite eī caput!
@@ -56,8 +56,8 @@ Possuntne fēlēs rīdēre?
 Haec potest.
 Salvē, Māiestās Tua.
 Cūr rosās pingitis?
-Rosās albās errōre sēvimus.
-Rēgīna rubrās voluit.
+Rosās albās errōre sēvimus. | Rosās albās errōre serimus.
+Rēgīna rubrās voluit. | Rēgīna rubrās volēbat.
 Adiuvā nōs, quaesō! | Adiuvāte nōs, quaesō!
 Dā mihi colōrem rubrum.
 Ecce.
@@ -98,5 +98,5 @@ Cūr igitur tremis?
 Frīgeō.
 Sūme pallium meum.
 Valdē benignus es. | Valdē benigna es.
-Bonam noctem; bene dormī. | Bene dormī.
+Bonam noctem; bene dormī. | Bene dormī. | Bonam noctem; dormī bene.
 Crās tē vidēbō.
