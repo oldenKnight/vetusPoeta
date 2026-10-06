@@ -533,3 +533,10 @@ was wrong), tense sequence after an imperfect, "tell my brother" (accusative), "
 circumsiliō, kitchen -> hortus, goat -> hircus, hush, before dark. After the fixes (each with own test sentences):
 15 / 20. Still wrong: #2 the fair (pulcher), #3 hiding (cēlās without object), #11 "was frozen" (gelābat), #12 "as
 big as this one", #18 "left the gate open" (posuit).
+
+### Review of quality loop 3 (main agent)
+- Gold alternatives accepted: #33 ("that" as id), #98 (abeō ut aliquem vīsam). Vetoed: #69, where "I can still make
+  her my slave" is concessive (tamen), not temporal (adhūc); #78, where "get the clothes" is fetching (capere, sūmere),
+  not receiving (accipere). oz_sample therefore stands at 71/100 with wrong among OK 0.
+- Blind check honesty noted: 5/20 acceptable at first run, 15/20 after fixes. The first-run figure is the one that
+  predicts held-out behaviour; see STATUS E3 for the measurement.
