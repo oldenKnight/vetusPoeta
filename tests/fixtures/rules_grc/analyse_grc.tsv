@@ -1,0 +1,73 @@
+# word	lemma	features (one reading must match; empty = any)	mode: exact | bare (accent-insensitive) | any
+ἄνθρωπος	ἄνθρωπος	nom sg	exact
+ἀνθρώπου	ἄνθρωπος	gen sg	exact
+ανθρωπου	ἄνθρωπος	gen sg	bare
+ἀνθρώπους	ἄνθρωπος	acc pl	exact
+ἄνθρωπός	ἄνθρωπος	nom sg	exact
+λόγος	λόγος	nom sg	exact
+λόγοσ	λόγος	nom sg	exact
+λογος	λόγος	nom sg	bare
+θεοῦ	θεός	gen sg	exact
+θεῷ	θεός	dat sg	exact
+πόλεως	πόλις	gen sg	exact
+πόλει	πόλις	dat sg	exact
+πολεως	πόλις	gen sg	bare
+εἰμί	εἰμί	1 sg pres ind	exact
+ἐστί	εἰμί	3 sg pres ind	exact
+ἐστίν	εἰμί	3 sg pres ind	exact
+ἐστιν	εἰμί	3 sg pres ind	exact
+ἔστιν	εἰμί	3 sg pres ind	any
+εἶ	εἰμί	2 sg pres ind	exact
+ἐσμέν	εἰμί	1 pl pres ind	exact
+εἰσίν	εἰμί	3 pl pres ind	exact
+ἦν	εἰμί	3 sg impf ind	exact
+ἦσαν	εἰμί	3 pl impf ind	exact
+ἔσται	εἰμί	3 sg fut ind	exact
+λύω	λύω	1 sg pres ind	exact
+λύει	λύω	3 sg pres ind	exact
+λύουσιν	λύω	3 pl pres ind	exact
+ἔλυσα	λύω	1 sg aor ind	exact
+ἔλυσε	λύω	3 sg aor ind	exact
+ἔλυσεν	λύω	3 sg aor ind	exact
+λῦσον	λύω	2 sg aor imp	exact
+λυσον	λύω	2 sg aor imp	bare
+ποιῶ	ποιέω	1 sg pres ind	exact
+ποιεῖ	ποιέω	3 sg pres ind	exact
+ποιοῦσι	ποιέω	3 pl pres ind	exact
+τιμᾷ	τιμάω	3 sg pres ind	exact
+ὁρᾷ	ὁράω	3 sg pres ind	exact
+εἶδον	ὁράω	1 sg aor ind	exact
+εἶδες	ὁράω	2 sg aor ind	exact
+ἔβην	βαίνω	1 sg aor ind	exact
+ἔλαβον	λαμβάνω	1 sg aor ind	exact
+δίδωσι	δίδωμι	3 sg pres ind	exact
+δός	δίδωμι	2 sg aor imp	exact
+καλή	καλός	nom sg f	exact
+καλὴ	καλός	nom sg f	exact
+καλαῖς	καλός	dat pl f	exact
+καλοῦ	καλός	gen sg m	exact
+μικρά	μικρός	nom sg f	exact
+μεγάλη	μέγας	nom sg f	exact
+τοῦ	ὁ	gen sg	exact
+τῆς	ὁ	gen sg f	exact
+τοῖς	ὁ	dat pl	exact
+τὰς	ὁ	acc pl f	exact
+αὕτη	οὗτος	nom sg f	exact
+τοῦτο	οὗτος	nom sg n	exact
+ταῦτα	οὗτος	acc pl n	exact
+ἡμῖν	ἡμεῖς	dat pl	exact
+αὐτοῦ	αὐτός	gen sg	exact
+οἶδα	οἶδα	1 sg	exact
+ἴσμεν	οἶδα	1 pl	exact
+δύναται	δύναμαι	3 sg pres ind	exact
+φοβοῦ	φοβέω	2 sg pres imp	exact
+σφαῖραν	σφαῖρα	acc sg	exact
+σφαιραν	σφαῖρα	acc sg	bare
+παῖδα	παῖς	acc sg	exact
+πατρός	πατήρ	gen sg	exact
+Ἀθῆναι	Ἀθῆναι		exact
+δ’	δέ		exact
+ἀλλ’	ἀλλά		exact
+ἐπ’	ἐπί		exact
+ἀφ’	ἀπό		exact
+κατ’	κατά		exact

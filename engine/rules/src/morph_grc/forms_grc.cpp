@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "vp/morph_grc.h"
+#include "vp/realise_grc.h"
 #include "vp/text.h"
 
 namespace vp::grc {
@@ -392,9 +393,9 @@ void paradigm(const lex::Lemma& l, std::vector<RuleCell>& out) {
   bool twoTermination = false, alpha = false;
   if (!p.feminine.empty()) {
     const std::string fb = text::greek_bare(p.feminine);
-    if (fb.size() >= 3 && (fb.compare(fb.size() - 3, 3, "οσ") == 0 || fb.compare(fb.size() - 3, 3, "ος") == 0))
-      twoTermination = true;
-    else if (fb.size() >= 2 && fb.compare(fb.size() - 2, 2, "α") == 0) alpha = true;
+    auto ends = [&](std::string_view t) { return fb.size() >= t.size() && fb.compare(fb.size() - t.size(), t.size(), t) == 0; };
+    if (ends("οσ") || ends("ος")) twoTermination = true;
+    else if (ends("α")) alpha = true;
   } else if (!stem.empty()) {
     size_t k = stem.size();
     while (k > 0 && mark(stem[k - 1])) --k;
@@ -418,10 +419,13 @@ bool middleForm(const lex::Lemma& l) {
 }
 
 // Voice preference list for a request; rank 0 best.
-int voiceRank(uint8_t cell, uint8_t want, bool midForm) {
+int voiceRank(uint8_t cell, uint8_t want, bool midForm, uint8_t tense) {
   if (want == 0 || want == Active) {
-    if (midForm) return cell == Middle ? 0 : cell == Passive ? 1 : cell == Active ? 2 : cell == 0 ? 3 : -1;
-    return cell == Active ? 0 : cell == 0 ? 1 : -1;
+    // middle-form lemmas: the middle in the present system; an active cell wins elsewhere (ἦλθον, διελθεῖν)
+    const bool presentSystem = tense == Present || tense == Imperfect || tense == 0;
+    if (midForm && presentSystem) return cell == Middle ? 0 : cell == Passive ? 1 : cell == Active ? 2 : cell == 0 ? 3 : -1;
+    if (midForm) return cell == Active ? 0 : cell == Middle ? 1 : cell == Passive ? 2 : cell == 0 ? 3 : -1;
+    return cell == Active ? 0 : cell == 0 ? 1 : cell == Middle ? 3 : -1;   // middle futures: ἔσομαι, ὄψομαι
   }
   if (want == Middle) return cell == Middle ? 0 : cell == Passive ? 1 : -1;
   if (want == Passive) return cell == Passive ? 0 : cell == Middle ? 1 : -1;
@@ -445,6 +449,30 @@ bool allNonAttic(const lex::Lexicon& lx, uint32_t lemma, const std::string& form
   return any && all;
 }
 
+// Attic forms the lexicon attests through a form-page analysis but whose table cell holds another dialect's form.
+// Used only when the lexicon has an analysis of exactly this form for the lemma with these features.
+struct Override { const char* lemmaKey; uint8_t tense, mood, person, number; const char* form; };
+const Override kOverrides[] = {
+    {"εἰμί", Imperfect, Indicative, P2, Sg, "ἦσθα"},   // the Attic table cell has ἦς
+    {"πίνω", Aorist, Imperative, P2, Sg, "πῖθι"},      // the table cell has πίε
+    {"δεῖ", Present, Indicative, P3, Sg, "δεῖ"},        // the "Attic" table of δεῖ is uncontracted (δέει)
+    {"δεῖ", Imperfect, Indicative, P3, Sg, "ἔδει"},
+    {"βούλομαι", Present, Indicative, P2, Sg, "βούλει"},   // Attic prose -ει (the cell has βούλῃ)
+    {"οἴομαι", Present, Indicative, P2, Sg, "οἴει"},
+};
+
+bool attested(const lex::Lexicon& lx, uint32_t lemma, const char* form, const Features& want) {
+  thread_local std::vector<lex::Analysis> an;
+  an.clear();
+  lx.lookup(text::greek_key(form), an);
+  for (const lex::Analysis& a : an) {
+    if (a.lemma != lemma || (a.flags & lex::NonAttic)) continue;
+    const Features f = unpack(lx.feature(a.feat));
+    if (f.tense == want.tense && f.mood == want.mood && f.person == want.person && f.number == want.number) return true;
+  }
+  return false;
+}
+
 }  // namespace
 
 bool generate(const lex::Lexicon& lx, uint32_t lemma, const Features& want0, std::string& out, GenInfo* info) {
@@ -465,6 +493,17 @@ bool generate(const lex::Lexicon& lx, uint32_t lemma, const Features& want0, std
       return true;
     }
   }
+  for (const Override& ov : kOverrides)
+    if (l.key == ov.lemmaKey && want.tense == ov.tense && want.mood == ov.mood && want.person == ov.person &&
+        want.number == ov.number && (want.voice == 0 || want.voice == Active) && attested(lx, lemma, ov.form, want)) {
+      out = ov.form;
+      gi.exact = gi.attic = true;
+      Features f = want;
+      f.voice = Active;
+      gi.packed = pack(f);
+      if (info) *info = gi;
+      return true;
+    }
   thread_local std::vector<std::pair<uint32_t, std::string_view>> cells;
   cells.clear();
   lx.cells(lemma, cells);
@@ -502,7 +541,7 @@ bool generate(const lex::Lexicon& lx, uint32_t lemma, const Features& want0, std
       else if (morph::genderAdmits(cf.gender, want.gender)) s += 2;
       else continue;
     }
-    const int vr = voiceRank(cf.voice, want.voice, midForm);
+    const int vr = voiceRank(cf.voice, want.voice, midForm, want.tense);
     if (vr < 0) continue;
     s -= 3 * vr;
     const bool cPos = cf.degree <= Positive, wPos = want.degree <= Positive;
@@ -554,18 +593,95 @@ bool generate(const lex::Lexicon& lx, uint32_t lemma, const Features& want0, std
 }
 
 // ---- analysis -----------------------------------------------------------------------------------------------------
+namespace {
+
+void atticFilter(std::vector<lex::Analysis>& an) {
+  std::vector<uint32_t> keep;   // lemmas with at least one analysis not flagged non-Attic
+  for (const lex::Analysis& a : an)
+    if (!(a.flags & lex::NonAttic) && std::find(keep.begin(), keep.end(), a.lemma) == keep.end()) keep.push_back(a.lemma);
+  an.erase(std::remove_if(an.begin(), an.end(), [&](const lex::Analysis& a) {
+             return (a.flags & lex::NonAttic) && std::find(keep.begin(), keep.end(), a.lemma) != keep.end();
+           }),
+           an.end());
+}
+
+// Drops the accent a following enclitic added on the ultima ("ἄνθρωπός" -> "ἄνθρωπος").
+std::string dropEncliticAcute(std::string_view w) {
+  const AccentInfo a = accentOf(w);
+  if (a.accents < 2) return std::string(w);
+  std::u32string u = text::toUtf32(text::nfd(w));
+  for (size_t i = u.size(); i-- > 0;)
+    if (u[i] == kAcuteM || u[i] == 0x0300) { u.erase(u.begin() + (long)i); break; }
+  return text::nfc(text::toUtf8(u));
+}
+
+}  // namespace
+
+std::string restoreElided(std::string_view word) {
+  std::string w = text::nfc(word);
+  static const char* const kApos[] = {"\xE2\x80\x99", "'", "\xE1\xBE\xBD", "\xCA\xBC"};
+  bool elided = false;
+  for (const char* ap : kApos) {
+    const std::string_view a(ap);
+    if (w.size() > a.size() && w.compare(w.size() - a.size(), a.size(), a) == 0) {
+      w.resize(w.size() - a.size());
+      elided = true;
+      break;
+    }
+  }
+  if (!elided) return std::string();
+  static const char* const kFull[] = {"δέ", "ἀλλά", "τε", "οὐδέ", "μηδέ", "ἀπό", "ἐπί", "κατά", "μετά", "παρά",
+                                      "διά", "ὑπό", "ἀντί", "γε", "ἆρα"};
+  std::u32string b = text::toUtf32(text::greek_bare(w));
+  for (const char* f : kFull) {
+    std::u32string fb = text::toUtf32(text::greek_bare(f));
+    fb.pop_back();   // without the elided vowel
+    std::u32string bb = b;
+    if (!bb.empty() && fb.size() == bb.size()) {
+      const char32_t last = bb.back(), want = fb.back();
+      const bool aspirated = (last == U'φ' && want == U'π') || (last == U'θ' && want == U'τ') || (last == U'χ' && want == U'κ');
+      if (aspirated) bb.back() = want;
+    }
+    if (bb == fb) return f;
+  }
+  return std::string();
+}
+
 void analyse(const lex::Lexicon& lx, std::string_view word, morph::Token& out) {
-  morph::analyseGreek(lx, word, out);
-  // Attic filter per lemma
+  // exact readings of the canonical spellings first: as written, grave -> acute, without the acute an enclitic
+  // added, an orthotone enclitic, without a movable nu, an elided word restored
+  std::string cands[7];
+  int nc = 0;
+  const std::string w0 = text::nfc(word);
+  const std::string restored = restoreElided(w0);
+  if (!restored.empty()) cands[nc++] = restored;
+  {   // orthotone ἔστι(ν) is the 3rd singular of εἰμί
+    const std::string b0 = text::greek_bare(w0);
+    if ((b0 == "εστι" || b0 == "εστιν") && accentOf(w0).position == 1) cands[nc++] = "ἐστί";
+  }
+  cands[nc++] = w0;
+  const std::string w1 = dropEncliticAcute(ultimaToAcute(w0));
+  if (w1 != w0) cands[nc++] = w1;
+  if (accentOf(w1).accents == 0 && accentOf(w1).syllables >= 2) cands[nc++] = encliticAccented(w1);
+  {
+    const std::string b = text::greek_bare(w1);
+    if (b.size() > 4 && (b.compare(b.size() - 4, 4, "ιν") == 0 || b.compare(b.size() - 4, 4, "εν") == 0)) {
+      std::u32string u = text::toUtf32(text::nfd(w1));
+      while (!u.empty() && u.back() >= 0x0300 && u.back() <= 0x036F) u.pop_back();
+      if (!u.empty() && u.back() == U'ν') { u.pop_back(); cands[nc++] = text::nfc(text::toUtf8(u)); }
+    }
+  }
+  for (int i = 0; i < nc; ++i) {
+    morph::analyseGreek(lx, cands[i], out);
+    if (!out.analyses.empty() && !out.accentInsensitive) {
+      out.text = w0;
+      atticFilter(out.analyses);
+      return;
+    }
+  }
+  morph::analyseGreek(lx, w0, out);
   if (!out.analyses.empty()) {
-    auto& an = out.analyses;
-    std::vector<uint32_t> keep;   // lemmas with at least one analysis not flagged non-Attic
-    for (const lex::Analysis& a : an)
-      if (!(a.flags & lex::NonAttic) && std::find(keep.begin(), keep.end(), a.lemma) == keep.end()) keep.push_back(a.lemma);
-    an.erase(std::remove_if(an.begin(), an.end(), [&](const lex::Analysis& a) {
-               return (a.flags & lex::NonAttic) && std::find(keep.begin(), keep.end(), a.lemma) != keep.end();
-             }),
-             an.end());
+    atticFilter(out.analyses);
     return;
   }
   // paradigm fallback: guess the citation form (-ος / -ον) with every accent placement, keep lemmas without a table
@@ -617,6 +733,124 @@ void analyse(const lex::Lexicon& lx, std::string_view word, morph::Token& out) {
     out.unknown = false;
     out.nameGuess = false;
   }
+}
+
+// ---- names ------------------------------------------------------------------------------------------------------------
+namespace {
+
+std::string capFirst(const std::string& lowerNfc) {
+  std::u32string u = text::toUtf32(text::nfd(lowerNfc));
+  if (!u.empty() && u[0] >= 0x03B1 && u[0] <= 0x03C9 && u[0] != 0x03C2) u[0] -= 0x20;
+  return text::nfc(text::toUtf8(u));
+}
+
+bool endsWith(std::string_view s, std::string_view t) { return s.size() >= t.size() && s.substr(s.size() - t.size()) == t; }
+
+// Replaces the final letter group of `nom` (NFD, accents kept) and appends `add`.
+std::string firstDecl(std::string_view nom, std::string_view gen, uint8_t case_, bool masc) {
+  std::u32string u = text::toUtf32(text::nfd(nom));
+  if (!u.empty() && (u.back() == U'ς' || u.back() == U'σ')) u.pop_back();   // masculine -ης / -ας
+  // u ends with the final vowel and its marks
+  size_t v = u.size();
+  while (v > 0 && u[v - 1] >= 0x0300 && u[v - 1] <= 0x036F) --v;
+  if (v == 0) return std::string();
+  const std::string gb = text::greek_bare(gen);
+  const bool genEta = endsWith(gb, "ησ") || endsWith(gb, "ης");
+  bool oxy = false;
+  for (size_t k = v; k < u.size(); ++k) oxy = oxy || u[k] == 0x0301;
+  switch (case_) {
+    case feat::Nom: return std::string(nom);
+    case feat::Gen: return std::string(gen);
+    case feat::Voc: return masc ? text::nfc(text::toUtf8(u)) : std::string(nom);
+    case feat::Acc: { u.push_back(U'ν'); return text::nfc(text::toUtf8(u)); }
+    case feat::Dat: {
+      if (u[v - 1] == U'α' && genEta && !masc) u[v - 1] = U'η';
+      for (size_t k = v; k < u.size(); ++k)
+        if (u[k] == 0x0301 && oxy) u[k] = 0x0342;   // oxytone: circumflex in gen / dat
+      u.push_back(0x0345);
+      return text::nfc(text::toUtf8(u));
+    }
+    default: return std::string();
+  }
+}
+
+}  // namespace
+
+bool declineName(std::string_view nom0, std::string_view gen0, int declension, uint8_t gender, uint8_t case_,
+                 std::string_view voc, std::string& out) {
+  const std::string nom = text::nfc(nom0), gen = text::nfc(gen0);
+  if (case_ == feat::Voc && !voc.empty()) { out = text::nfc(voc); return true; }
+  if (declension == 0) { out = nom; return true; }
+  if (case_ == feat::Nom) { out = nom; return true; }
+  if (case_ == feat::Gen && !gen.empty()) { out = gen; return true; }
+  if (declension == 1) {
+    out = firstDecl(nom, gen, case_, gender == feat::M);
+    return !out.empty();
+  }
+  if (declension == 2) {
+    std::u32string u;
+    int fromStart = 0;
+    bool oxy = false;
+    if (!headInfo(nom, u, fromStart, oxy)) return false;
+    if (!(endsWithU(u, U"ος") || endsWithU(u, U"οσ"))) return false;
+    const std::u32string stem = u.substr(0, u.size() - 2);
+    for (const Ending& e : k2M)
+      if (e.c == case_ && e.n == feat::Sg) {
+        out = capFirst(display(accentForm(stem, e.e, fromStart, e.lng, oxy && (case_ == feat::Gen || case_ == feat::Dat),
+                                          e.diphShort)));
+        return true;
+      }
+    return false;
+  }
+  if (declension == 3) {
+    const std::string gb = text::greek_bare(gen);
+    std::u32string g = text::toUtf32(text::nfd(gen));
+    if (endsWith(gb, "ουσ") || endsWith(gb, "ους")) {   // -ης, -ους (Σωκράτης)
+      g.resize(g.size() - 3);
+      if (case_ == feat::Dat) g += U"ει";
+      else if (case_ == feat::Acc) g += U"η";
+      else if (case_ == feat::Voc) { out = nom; return true; }
+      out = text::nfc(text::toUtf8(g));
+      return true;
+    }
+    if (!(endsWith(gb, "οσ") || endsWith(gb, "ος"))) return false;
+    // accent on the ending (Διός)? then the dative carries it on -ι
+    size_t o = g.size();
+    while (o > 0 && g[o - 1] != U'ο') --o;
+    bool endAcc = false;
+    for (size_t k = o; k < g.size(); ++k) endAcc = endAcc || g[k] == 0x0301;
+    g.resize(o - 1);
+    if (case_ == feat::Voc) { out = nom; return true; }
+    if (case_ == feat::Dat) { g.push_back(U'ι'); if (endAcc) g.push_back(0x0301); }
+    else if (case_ == feat::Acc) {
+      const std::string nb = text::greek_bare(nom);
+      const AccentInfo na = accentOf(nom);
+      if ((endsWith(nb, "ισ") || endsWith(nb, "ις")) && na.position != 0) {   // barytone -ις: Δικαιόπολιν
+        std::u32string n = text::toUtf32(text::nfd(nom));
+        n.back() = U'ν';
+        out = text::nfc(text::toUtf8(n));
+        return true;
+      }
+      g.push_back(U'α');
+      if (endAcc) g.push_back(0x0301);
+    } else return false;
+    out = text::nfc(text::toUtf8(g));
+    return true;
+  }
+  return false;
+}
+
+uint8_t mapTense(uint8_t englishTense, bool progressive, bool state, bool perfectResult) {
+  switch (englishTense) {
+    case Present: return Present;
+    case Future: return Future;
+    case Perfect: return perfectResult ? (uint8_t)Perfect : (uint8_t)Aorist;
+    case Pluperfect: return perfectResult ? (uint8_t)Pluperfect : (uint8_t)Aorist;
+    case Imperfect: return Imperfect;
+    default: break;
+  }
+  // past simple and friends
+  return (progressive || state) ? (uint8_t)Imperfect : (uint8_t)Aorist;
 }
 
 }  // namespace vp::grc

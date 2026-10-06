@@ -24,7 +24,11 @@ bool isVowelCp(char32_t c) {
 bool isMarkCp(char32_t c) { return c >= 0x0300 && c <= 0x036F; }
 bool isAccentCp(char32_t c) { return c == kGrave || c == kAcute || c == kCirc; }
 bool isGreekLetterCp(char32_t c) {
-  return (c >= 0x0391 && c <= 0x03A9) || (c >= 0x03B1 && c <= 0x03C9) || c == 0x03C2 || (c >= 0x1F00 && c <= 0x1FFF);
+  if (c >= 0x0386 && c <= 0x03FF) return c != 0x0387 && c != 0x03F6;
+  if (c >= 0x1F00 && c <= 0x1FFF)   // Greek Extended without the spacing accents
+    return !(c == 0x1FBD || (c >= 0x1FBF && c <= 0x1FC1) || (c >= 0x1FCD && c <= 0x1FCF) || (c >= 0x1FDD && c <= 0x1FDF) ||
+             (c >= 0x1FED && c <= 0x1FEF) || c >= 0x1FFD);
+  return false;
 }
 
 struct Nucleus {
@@ -335,7 +339,7 @@ void sandhi(std::vector<SandhiWord>& ws, const SandhiOptions& o) {
       w.form = compose(u);
     }
     const SandhiWord* nx = nextOf(i);
-    const bool atEnd = i + 1 >= n || sentenceEnd(w.punctAfter);
+    const bool atEnd = i + 1 >= n || sentenceEnd(w.punctAfter) || w.punctAfter.find(',') != std::string::npos;
     if (atEnd || (nx && startsWithVowel(nx->form))) w.form += "ν";
   }
   // 3. elision (optional)
@@ -441,6 +445,8 @@ std::string accentuate(std::string_view phrase, const SandhiOptions& o) {
     const std::string b = text::greek_bare(w.form);
     // forms that may take ν by their ending alone (the phrase carries no features): ἐστί / εἰσί and -σι(ν) verbs
     if (b == "εστι" || b == "εστιν" || b == "εισι" || b == "εισιν") w.movableNu = true;
+    // -σι (3rd plural, 3rd singular -σι, dative plural): movable ν by the ending alone
+    if (b.size() > 4 && b.compare(b.size() - 4, 4, "σι") == 0) w.movableNu = true;
     ws.push_back(std::move(w));
   }
   sandhi(ws, o);

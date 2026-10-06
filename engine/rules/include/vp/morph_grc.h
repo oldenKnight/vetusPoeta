@@ -89,7 +89,7 @@ struct SandhiOptions {
   bool autoEnclitic = true;    // mark enclitics by isEncliticForm when the caller did not
 };
 // Applies, in order: οὐ -> οὐκ / οὐχ (before vowels, smooth / rough) and οὔ before a stop; ἐκ -> ἐξ before
-// vowels; movable nu (before a vowel and before a sentence end . ; ! · ?); optional elision; the enclitic accent
+// vowels; movable nu (before a vowel, a sentence end . ; ! · ? and a comma); optional elision; the enclitic accent
 // rules (host oxytone keeps the acute; perispomenon unchanged; paroxytone: a disyllabic enclitic keeps its accent
 // on the ultima; proparoxytone / properispomenon: the host adds an acute on the ultima; proclitic / enclitic host:
 // acute on its ultima; ἐστί orthotone ἔστι at the start, after οὐκ μή εἰ ὡς καί ἀλλά τοῦτο and when
@@ -141,7 +141,12 @@ void paradigm(const lex::Lemma&, std::vector<RuleCell>& out);
 
 // Analysis with the Attic filter: morph::analyseGreek, then analyses flagged non-Attic are dropped when another
 // analysis of the same lemma remains; then the paradigm fallback (fromRule) for lemmas without a table.
+// Exact readings are tried on the canonical spellings of a sentence word first (grave -> acute, the acute a
+// following enclitic added dropped, an unaccented enclitic with its orthotone accent, a movable ν dropped, an elided
+// word restored); only then the accent-insensitive search (Token::accentInsensitive = "accent differs").
 void analyse(const lex::Lexicon&, std::string_view word, morph::Token& out);
+// The full form of an elided word ("δ’" -> "δέ", "ἀφ’" -> "ἀπό"); empty when the word is not elided.
+std::string restoreElided(std::string_view word);
 
 // The feature set the realiser asks for, in Greek terms (aorist is feat::Aorist).
 Features verbForm(uint8_t person, uint8_t number, uint8_t tense, uint8_t mood = feat::Indicative,

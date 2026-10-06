@@ -1,0 +1,125 @@
+# lemma	pos	features	expected form (Attic, display: no length marks; movable nu not added)
+εἰμί	verb	1 sg pres ind act	εἰμί
+εἰμί	verb	2 sg pres ind act	εἶ
+εἰμί	verb	3 sg pres ind act	ἐστί
+εἰμί	verb	1 pl pres ind act	ἐσμέν
+εἰμί	verb	2 pl pres ind act	ἐστέ
+εἰμί	verb	3 pl pres ind act	εἰσί
+εἰμί	verb	1 sg impf ind act	ἦ
+εἰμί	verb	2 sg impf ind act	ἦσθα
+εἰμί	verb	3 sg impf ind act	ἦν
+εἰμί	verb	1 pl impf ind act	ἦμεν
+εἰμί	verb	2 pl impf ind act	ἦτε
+εἰμί	verb	3 pl impf ind act	ἦσαν
+εἰμί	verb	1 sg fut ind act	ἔσομαι
+εἰμί	verb	2 sg fut ind act	ἔσῃ
+εἰμί	verb	3 sg fut ind act	ἔσται
+εἰμί	verb	1 pl fut ind act	ἐσόμεθα
+εἰμί	verb	2 pl fut ind act	ἔσεσθε
+εἰμί	verb	3 pl fut ind act	ἔσονται
+εἰμί	verb	pres inf act	εἶναι
+εἰμί	verb	2 sg pres imp act	ἴσθι
+εἰμί	verb	2 pl pres imp act	ἔστε
+λύω	verb	1 sg pres ind act	λύω
+λύω	verb	3 sg pres ind act	λύει
+λύω	verb	3 pl pres ind act	λύουσι
+λύω	verb	1 sg impf ind act	ἔλυον
+λύω	verb	3 sg impf ind act	ἔλυε
+λύω	verb	1 sg fut ind act	λύσω
+λύω	verb	1 sg aor ind act	ἔλυσα
+λύω	verb	3 sg aor ind act	ἔλυσε
+λύω	verb	3 pl aor ind act	ἔλυσαν
+λύω	verb	1 sg perf ind act	λέλυκα
+λύω	verb	2 sg aor imp act	λῦσον
+λύω	verb	2 sg pres imp act	λῦε
+λύω	verb	2 pl pres imp act	λύετε
+λύω	verb	pres inf act	λύειν
+λύω	verb	aor inf act	λῦσαι
+λύω	verb	3 sg aor subj act	λύσῃ
+λύω	verb	1 sg pres ind mid	λύομαι
+λύω	verb	3 sg aor ind pass	ἐλύθη
+ποιέω	verb	1 sg pres ind act	ποιῶ
+ποιέω	verb	2 sg pres ind act	ποιεῖς
+ποιέω	verb	3 sg pres ind act	ποιεῖ
+ποιέω	verb	1 pl pres ind act	ποιοῦμεν
+ποιέω	verb	3 pl pres ind act	ποιοῦσι
+ποιέω	verb	3 sg impf ind act	ἐποίει
+ποιέω	verb	3 pl impf ind act	ἐποίουν
+ποιέω	verb	pres inf act	ποιεῖν
+ποιέω	verb	2 sg pres imp act	ποίει
+ποιέω	verb	1 sg fut ind act	ποιήσω
+ποιέω	verb	3 sg aor ind act	ἐποίησε
+ποιέω	verb	1 sg aor subj act	ποιήσω
+τιμάω	verb	3 sg pres ind act	τιμᾷ
+τιμάω	verb	3 pl pres ind act	τιμῶσι
+τιμάω	verb	pres inf act	τιμᾶν
+δηλόω	verb	3 sg pres ind act	δηλοῖ
+δηλόω	verb	pres inf act	δηλοῦν
+φιλέω	verb	3 sg pres ind act	φιλεῖ
+βαίνω	verb	3 sg pres ind act	βαίνει
+βαίνω	verb	1 sg aor ind act	ἔβην
+βαίνω	verb	3 sg aor ind act	ἔβη
+βαίνω	verb	3 pl aor ind act	ἔβησαν
+ὁράω	verb	3 sg pres ind act	ὁρᾷ
+ὁράω	verb	1 sg aor ind act	εἶδον
+ὁράω	verb	2 sg aor ind act	εἶδες
+λαμβάνω	verb	1 sg pres ind act	λαμβάνω
+λαμβάνω	verb	1 sg aor ind act	ἔλαβον
+λαμβάνω	verb	2 sg aor imp act	λαβέ
+λαμβάνω	verb	1 sg fut ind act	λήψομαι
+δίδωμι	verb	1 sg pres ind act	δίδωμι
+δίδωμι	verb	3 sg pres ind act	δίδωσι
+δίδωμι	verb	2 sg aor imp act	δός
+δίδωμι	verb	2 pl aor imp act	δότε
+δίδωμι	verb	1 sg aor ind act	ἔδωκα
+δίδωμι	verb	3 sg aor ind act	ἔδωκε
+οἶδα	verb	1 sg pres ind act	οἶδα
+οἶδα	verb	3 sg pres ind act	οἶδε
+οἶδα	verb	1 pl pres ind act	ἴσμεν
+δύναμαι	verb	3 sg pres ind act	δύναται
+βούλομαι	verb	1 sg pres ind act	βούλομαι
+ἔρχομαι	verb	3 sg pres ind act	ἔρχεται
+ἔρχομαι	verb	1 sg aor ind act	ἦλθον
+φοβέω	verb	2 sg pres imp mid	φοβοῦ
+πίνω	verb	2 sg aor imp act	πῖθι
+ὁ	article	nom sg m	ὁ
+ὁ	article	gen sg f	τῆς
+ὁ	article	dat pl n	τοῖς
+ὁ	article	acc pl f	τάς
+ὁ	article	acc sg m	τόν
+ὁ	article	nom pl f	αἱ
+οὗτος	det	nom sg f	αὕτη
+οὗτος	det	acc sg n	τοῦτο
+οὗτος	det	nom pl n	ταῦτα
+οὗτος	det	gen pl m	τούτων
+τις	pron	nom sg m	τις
+τις	pron	gen sg m	τινός
+τις	pron	acc pl n	τινά
+τίς	pron	nom sg m	τίς
+τίς	pron	acc sg n	τί
+ἄνθρωπος	noun	gen sg	ἀνθρώπου
+ἄνθρωπος	noun	dat pl	ἀνθρώποις
+ἄνθρωπος	noun	acc pl	ἀνθρώπους
+πόλις	noun	gen sg	πόλεως
+πόλις	noun	dat sg	πόλει
+πόλις	noun	nom pl	πόλεις
+κῆπος	noun	dat sg	κήπῳ
+θύρα	noun	acc sg	θύραν
+γαλῆ	noun	acc sg	γαλῆν
+σφαῖρα	noun	gen sg	σφαίρας
+παῖς	noun	acc sg	παῖδα
+παῖς	noun	dat pl	παισί
+πατήρ	noun	gen sg	πατρός
+πατήρ	noun	voc sg	πάτερ
+ἄνθος	noun	nom pl	ἄνθη
+ἀδελφός	noun	acc pl	ἀδελφούς
+καλός	adj	dat pl f	καλαῖς
+μικρός	adj	nom sg f	μικρά
+μέγας	adj	nom sg f	μεγάλη
+μέγας	adj	acc sg m	μέγαν
+μέγας	adj	nom sg n	μέγα
+ἀγαθός	adj	gen sg m	ἀγαθοῦ
+ἐγώ	pron	dat sg	ἐμοί
+σύ	pron	acc sg	σέ
+ἡμεῖς	pron	dat pl	ἡμῖν
+αὐτός	pron	gen sg m	αὐτοῦ

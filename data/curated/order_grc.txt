@@ -3,7 +3,7 @@
 # Slots: VOC vocative (ὦ + vocative), CONN connector particle, S subject, IO indirect object, O object,
 #        OBL prepositional / oblique phrases, ADV adverbs, NEG οὐ / μή, V finite verb, PRED predicate noun/adjective,
 #        INF infinitive complement, WH interrogative word. Greek is written in lower case; only names are capitalised.
-RULE order.decl       : clause.type = decl                    => [VOC,] [CONN] S IO O OBL ADV [NEG] V ; Attic prose SOV-neutral ("ὁ δοῦλος τὸν λίθον αἴρει"); the negation directly before the verb
+RULE order.decl       : clause.type = decl                    => [VOC,] [CONN] S IO O OBL [NEG] ADV V ; Attic prose SOV-neutral ("ὁ δοῦλος τὸν λίθον αἴρει"); the negation before the adverbs of the verb and the verb ("ἵνα μὴ ὀψὲ ἥκῃ")
 RULE order.copula     : predicate.lemma = εἰμί & PRED         => [VOC,] [CONN] S PRED [NEG] V ; "ὁ πατήρ μου γεωργός ἐστιν": predicate noun without the article, ἐστί enclitic after the predicate
 RULE order.exist      : predicate.lemma = εἰμί & no PRED | existential / location first => [CONN] [OBL] V S ; "ἐν τῷ κήπῳ ᾤκει ἡ γαλῆ", "ποῦ ἐστιν ἡ σφαῖρα;"; existential ἔστι is orthotone
 RULE order.inf        : modal (δύναμαι, βούλομαι, ἐθέλω, μέλλω, ἐπίσταμαι) + INF => [VOC,] [CONN] S [NEG] V IO O OBL ADV INF ; "οὐ δύναμαι διελθεῖν", "τὰ ἄνθη οὐ δύναται λαλεῖν": the modal before the infinitive, the infinitive's objects between them
@@ -19,7 +19,7 @@ RULE imp.aspect       : imperative aspect                     => present imperat
 RULE order.prohib     : clause.type = imp & polarity = neg    => μή + V + complements ; μή + present imperative ("μὴ φοβοῦ") or μή + aorist subjunctive ("μὴ φοβηθῇς"); never μή + aorist imperative
 RULE order.excl       : clause.type = excl                    => ὡς + ADJ + subject NP ("ὡς θαυμαστὸς ὁ κῆπος!"); interjections (οἴμοι, φεῦ, ὦ) first
 RULE order.voc        : vocative present                      => ὦ + vocative first (after an interjection), comma after; a bare vocative without ὦ for πάντες and pronouns
-RULE order.conn.second: connector in {δέ, γάρ, οὖν, μέν, γε, δή, τοίνυν, δήπου, τε} => second position, after the first word of the clause even when it is an article or a preposition ("ὁ δὲ ἀνήρ", "ἐν δὲ τῷ ἀγρῷ", "οὐ γὰρ οἶδα")
+RULE order.conn.second : connector in {δέ, γάρ, οὖν, μέν, γε, δή, τοίνυν, δήπου, τε} => second position, after the first word of the clause even when it is an article or a preposition ("ὁ δὲ ἀνήρ", "ἐν δὲ τῷ ἀγρῷ", "οὐ γὰρ οἶδα")
 RULE order.conn.first : connector in {ἀλλά, καί, οὐδέ, μηδέ, ἔπειτα, εἶτα, ἆρα} => first position
 RULE order.art        : definite NP                           => article + [attributive adjective / genitive] + noun ("ὁ καλὸς παῖς"); with two attributes: article + noun + article + adjective ("ὁ παῖς ὁ καλός")
 RULE order.art.name   : proper name of a person               => with the article in narrative ("ὁ Δικαιόπολις"), without it in the vocative and in a predicate ("Ἀλίκη εἰμί")
