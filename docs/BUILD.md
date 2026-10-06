@@ -59,7 +59,7 @@ python3 tools/make_dist.py --mingw build-mingw-release     # -> dist/vetus-poeta
 MinGW cannot link Microsoft's static WebView2 loader library, so the MinGW shell loads `WebView2Loader.dll` at run
 time and that DLL ships next to the exe. Reference sizes (MinGW, Release, static): `VetusPoeta.exe` 1.6 MB,
 importing only Windows system DLLs (KERNEL32, USER32, GDI32, ADVAPI32, SHELL32, ole32, dwmapi, msvcrt);
-`vpengine.exe` 4.3 MB without the model.
+`vpengine.exe` 16.1 MB with the local-model engine linked in (4.3 MB with `VP_WITH_LLM=OFF`); the model file itself is not inside.
 
 MinGW-w64 v11 headers (Ubuntu 24.04) lack `THREAD_POWER_THROTTLING_STATE`, which ggml uses; `cmake/vp_llama.cmake`
 probes for it and, only when missing, force-includes `cmake/compat/mingw_thread_power.h` into `ggml-cpu.c`.

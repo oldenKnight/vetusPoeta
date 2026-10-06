@@ -12,8 +12,8 @@ Spanish with an interlinear view under every word. Subtitle timing, numbering an
 byte; only the text changes. It never guesses silently: every cue carries a mark (OK, Check, Fix) and every word can
 show why it was chosen, from which candidates, in which form and on what evidence. The translation is done by a
 deterministic rule engine over dictionaries built from Wiktionary and other open sources; a small local language
-model and an online Wiktionary check are optional helpers that never write the Latin. Ancient Greek and an
-"Orbergise" mode (rewrite Latin into simpler Latin) are designed and partly built, but not available in 0.1.0.
+model and an online Wiktionary check are optional helpers that never write the Latin. Ancient Greek (Attic) works
+the same way in both directions, and the "Orbergise" mode rewrites Latin subtitles in the vocabulary of a chosen tier.
 
 ![The workspace: cue list, English source, Latin translation, player preview and the Word tab](docs/screenshots/word-inspector.en.png)
 
@@ -58,37 +58,41 @@ The task ledger is [docs/STATUS.md](docs/STATUS.md); decisions are in [docs/DECI
 | English and Spanish sentence analysers (B2) | done |
 | Rule engine English/Spanish → Latin (C1, C2, C2b, C13) | done |
 | Rule engine Latin → English/Spanish (C11) | done |
-| Greek side: morphology, realiser, checker (C9) | done; the English/Spanish ↔ Greek engine path (C12) is open |
-| Orbergise (C14) | open: the screen exists, the engine part does not |
+| Greek side: morphology, realiser, checker (C9), English/Spanish ↔ Greek (C12, C13, C16) | done |
+| Orbergise (C14) | done |
 | Engine server `vpengine` (B5, C8) | done |
-| Interface (B3, B6, B7) | done; the follow-up against the real engine (B8) is in progress |
+| Interface (B3, B6, B7, B8, B9) | done |
 | Windows shell (C3), brand (C4) | done; cross-compiled only, not yet run on Windows (owner checklist in [docs/BUILD.md](docs/BUILD.md)) |
 | Local model (C5), online check (C7), measurement harness (C10) | done |
-| Critic pass, Google Translate comparison, release packaging (M7) | open |
+| Critic pass (D1), Latin quality loops (C15, C17), library follow-ups (B4b, B4c) | done |
+| Google Translate comparison, acceptance test | open: they need the owner's files and machine |
 
 Measured numbers. The regression files are our own sentences and **were used to tune the rules** (DECISIONS D14),
-so they are optimistic; the numbers that matter (held-out and acceptance) are not measured yet.
+so they are optimistic. The held-out numbers below come from files nobody read or tuned on; the acceptance file is
+still pending.
 
 | Measure | Result |
 |---|---|
-| English → Latin, 114-cue regression file, balanced fidelity | 114/114 match the reference (110/114 before four engine outputs were accepted as alternative references); marks OK 69, Check 45, Fix 0 |
-| Spanish → Latin, 100-cue regression file | 97/100 at the end of the Spanish loop; the 3 others were then accepted as alternatives (re-run 2026-10-06: 100/100); marks OK 78, Check 22, Fix 0 |
-| Latin → English and Latin → Spanish, 125 own sentences | 125/125 in both (tuned; a batch of 30 written later was 20/30 on its first run) |
-| Greek realiser, first 40 regression lines | 40/40 against the tuned Greek reference, from hand-built clause structures (no end-to-end Greek translation yet) |
-| Held-out set (`tests/heldout/`) | **not measured yet** |
+| English → Latin, 114-cue regression file, balanced fidelity | 114/114 match the reference (110/114 before four engine outputs were accepted as alternative references); marks OK 65, Check 49, Fix 0 |
+| English → Latin, 100-cue public-domain tuning sample (`tests/regression/oz_sample`) | 6 → 50 → 71/100 over three loops; no cue marked OK is wrong |
+| Spanish → Latin, 100-cue regression file | 97/100 at the end of the Spanish loop; the 3 others were then accepted as alternatives (re-run 2026-10-06: 100/100); marks OK 81, Check 19, Fix 0 |
+| Latin → English and Latin → Spanish, 201 own sentences | 201/201 in both (tuned; blind batches of 30 and 40 written later were 20/30 and 31/40 English, 25/40 Spanish on their first run) |
+| English → Greek, 114-cue regression file | 114/114 after two loops (tuned); Spanish → Greek 38/40; Greek → English and Spanish 40/40 |
+| Orbergise | 60/60 own cases, 20/20 blind; with the original-language file 20/22 |
+| Held-out set (`tests/heldout/`, never read, never tuned on) | automatic errors: 74 own cues 10.8 % → 6.8 % (95 % CI 2.2-15.1 %); 700 public-domain cues 25.1 % → 18.9 % (CI 16.0-22.0 %); wrong among cues marked OK: 0 in every run. This is not yet an expert error rate (DESIGN §15) |
 | Acceptance test (the owner's film subtitle file) | **pending**: the file has not arrived |
 | Google Translate side-by-side (Latin) | **pending**: the tool is ready and tested offline; the live run has not been done |
 | Local model, Latin minimal-pair gate (1,000 pairs) | 749/1,000 = 74.9 % (95 % Wilson 72.1-77.5 %), below the 75 % bar fixed in advance: **not passed**, so the model is used for English/Spanish understanding only |
 | Sentence analysers (UD test sets) | English UPOS 94.62 %, LAS 79.65 %; Spanish UPOS 96.71 %, LAS 79.39 % |
 | Determinism and subtitle identity | two engine processes byte-identical; exported numbering, timing and tags byte-identical to the source |
-| Engine memory (Linux) | peak about 140 MB on a 114-cue file; resident memory flat over 1,000 cues |
+| Engine memory (Linux) | peak 216 MB on an 800-cue file with the four lexicons mapped; resident memory flat over 1,000 cues |
 
 ## Platform and minimum hardware
 
 Windows 10 or 11, 64-bit, with the Microsoft Edge WebView2 Runtime (part of current Windows). Target for all three
 engines (decision D4): Intel Core i3 with AVX2 (4th generation or newer), 4 GB RAM, integrated graphics (unused),
-about 800 MB of disk with the optional model (the portable folder is about 240 MB without it; the model file is
-about 400 MB). Planned peak memory: under 250 MB without the model, under 1.2 GB with it. Development and all
+about 650 MB of disk with the optional model (the portable folder is 241 MB without it; the model file is
+398 MB). Planned peak memory: under 250 MB without the model, under 1.2 GB with it. Development and all
 measurements so far are on Linux; nothing has been timed on an i3 yet.
 
 ## Build and test
