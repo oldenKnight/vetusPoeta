@@ -588,6 +588,10 @@ FEATS   open-addressing hash table of u64 feature hashes (FNV-1a 64 of the featu
 WEIGHTS table_size x n_labels x int16 (weights quantised: w_q = round(w * 256); unknown feature = zero row)
 NOTE    UTF-8 text: training data names, licences (CC BY-SA 4.0 / CC BY 4.0), scores
 ```
+Settled by the implementation (tools/train/vpt.py, engine/nlp/README.md): the header carries a u32 reserved field at
+offset 36 so `file_size` sits 8-byte aligned at 40; the parser is trained with a dynamic oracle (static oracle via
+`--explore 0`); the tagger feature list adds s4, p2, p3, lw-1lw, lwlw+1, t-1lw+1, s3-1, s3+1. Measured (dev/test):
+English UPOS 94.7/94.6, LAS 78.8/79.7; Spanish UPOS 96.5/96.7, LAS 80.2/79.4 (target 82 not met; tagger-bound).
 Feature strings are built identically in Python and C++ (`tools/train/features.py` and `engine/nlp/src/features.cpp`,
 tested with a golden list of 500 feature strings and their hashes). Scoring = sum of int16 weights; argmax with the
 lowest label index on ties. The reader memory-maps the file (`vp::MappedFile`), owns no heap for the tables, and
