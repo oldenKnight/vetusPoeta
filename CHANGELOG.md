@@ -5,9 +5,9 @@ All notable changes to vetus poeta. Dates are in ISO format. The task ledger wit
 
 ## 0.1.0 - 2026-10-06
 
-The first version: English and Spanish subtitles into Latin, and Latin into English and Spanish, fully offline.
-Not yet run on Windows (built and tested on Linux, cross-compiled for Windows); Ancient Greek translation and the
-Orbergise mode are not available yet.
+The first version: English and Spanish subtitles and texts into Latin and Ancient Greek, Latin and Greek into English
+and Spanish, and the Orbergise mode, fully offline. Built and tested on Linux, cross-compiled for Windows; not yet
+run on Windows.
 
 ### Milestones
 
@@ -41,10 +41,18 @@ Orbergise mode are not available yet.
   checked). Its Latin gate was not passed (74.9 % on 1,000 minimal pairs against a 75 % bar), so it only helps
   with English and Spanish source understanding. The online Wiktionary check is off by default, sends single
   dictionary words only, is throttled and cached, and never changes text.
-- **M6 (part), Latin into English and Spanish and the Greek groundwork.** Latin analysis with constraint-based
-  disambiguation, an interlinear view and readable English and Spanish sentences (125 of 125 own sentences in both
-  languages, tuned). Greek morphology, realiser and checker (40 of 40 reference lines from hand-built structures);
-  the Greek translation path and Orbergise are still open.
+- **M6, Latin into English and Spanish, Ancient Greek, Orbergise.** Latin analysis with constraint-based
+  disambiguation, an interlinear view and readable English and Spanish sentences (201 of 201 own sentences in both
+  languages after a second analyser pass; a 40-sentence blind batch scored 31 English and 25 Spanish at first run).
+  Ancient Greek (Attic) morphology, realiser, checker and transfer from English and Spanish, with Greek into English
+  and Spanish (114 of 114 reference lines after two loops; 40 of 40 back). Orbergise rewrites Latin subtitles in
+  the vocabulary of the chosen tier with a meaning check (60 of 60 own cases, 20 of 20 blind).
+- **M7 (part), the Latin quality loops.** A third loop on English into Latin with a generalisation guard (every rule
+  comes with its own test sentences, a 20-sentence blind check scored 5 at first run and 15 after fixes). Tuning
+  sample of 100 public-domain cues: 6 → 50 → 71 of 100. Held-out measurement, never read and never tuned on:
+  automatic errors 10.8 % → 6.8 % on 74 own cues and 25.1 % → 18.9 % on 700 public-domain cues; no cue the engine
+  marked OK was wrong in any run. Library follow-ups: Greek supplement lemmas, Attic cell fixes, Spanish pivot
+  glosses so Spanish words unknown to the Latin tables still translate, cleaned headwords.
 - **Measurement.** `tools/eval` runs every engine combination and fidelity over a file and reports cue-level error
   rates with exact confidence intervals, determinism, export identity and memory, guards the held-out set, builds
   expert review sheets and prepares the Google Translate side-by-side (live run pending).
@@ -53,6 +61,8 @@ Orbergise mode are not available yet.
 ### Known limitations
 
 - Not yet run or timed on Windows; the owner's smoke-test checklist is in [docs/BUILD.md](docs/BUILD.md).
-- Ancient Greek pairs and Orbergise are shown in the interface but not available.
-- All quality numbers come from files used for tuning; expect lower results on new texts.
+- The acceptance file and the Google Translate side-by-side are still pending (they need the owner's files and
+  machine). On new texts expect about one cue in five to be flagged Fix or wrong on the public-domain register;
+  cues marked OK have been right in every measurement so far.
+- The local model does not improve Latin (gate failed), so engine ii only helps reading the source language.
 - Names are added to the glossary by hand; the engine does not suggest them yet.
