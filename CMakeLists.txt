@@ -32,6 +32,11 @@ find_package(Threads REQUIRED)
 add_library(vp_third_party INTERFACE)
 target_include_directories(vp_third_party INTERFACE ${CMAKE_SOURCE_DIR}/third_party)
 
+# Vendored llama.cpp (CPU only, static, pinned in third_party/llama/VERSION) -> INTERFACE target `vp_llama`.
+if(VP_WITH_LLM)
+  include(cmake/vp_llama.cmake)
+endif()
+
 # Modules are added when their directory has a CMakeLists.txt, so the tree builds while modules are still arriving.
 foreach(mod core lex subs nlp rules llm online cli)
   if(EXISTS ${CMAKE_SOURCE_DIR}/engine/${mod}/CMakeLists.txt)
@@ -44,6 +49,11 @@ endforeach()
 if(VP_BUILD_TESTS)
   enable_testing()
   add_subdirectory(engine/tests)
+  if(VP_WITH_LLM)
+    add_executable(vp_llama_smoke third_party/vp_llama_smoke.cpp)
+    target_link_libraries(vp_llama_smoke PRIVATE vp_llama)
+    add_test(NAME vp_llama_smoke COMMAND vp_llama_smoke)
+  endif()
 endif()
 if(EXISTS ${CMAKE_SOURCE_DIR}/gui/shell/CMakeLists.txt)
   add_subdirectory(gui/shell)

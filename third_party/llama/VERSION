@@ -1,0 +1,12 @@
+project=llama.cpp
+url=https://github.com/ggml-org/llama.cpp
+commit=50569eb87df530daff11afda229ceb9ab8e6cae8
+tag=b11433
+date=2026-10-06T04:04:32+05:30
+licence=MIT (LICENSE in this directory)
+vendored=2026-10-06; CPU-only subset: LICENSE, CMakeLists.txt, cmake/{common,build-info,license,git-vars}.cmake,
+ cmake/llama-config.cmake.in, cmake/llama.pc.in, include/, src/, ggml/CMakeLists.txt, ggml/cmake/, ggml/include/,
+ ggml/src/ top-level files, ggml/src/ggml-cpu/. Everything else upstream (common/, tools/, examples/, tests/,
+ vendor/, docs/, models/, GPU backends, Python) is deliberately absent.
+build=cmake/vp_llama.cmake adds ggml/ and src/ directly (the upstream top-level CMakeLists.txt is kept for
+ reference only and is not used). Local patches: none (see PATCHES.md).

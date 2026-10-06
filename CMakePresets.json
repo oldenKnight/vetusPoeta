@@ -1,0 +1,79 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "linux-release",
+      "displayName": "Linux release (engine + tests, local model on)",
+      "binaryDir": "${sourceDir}/build-${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "VP_BUILD_GUI": "OFF",
+        "VP_BUILD_TESTS": "ON",
+        "VP_WITH_LLM": "ON"
+      }
+    },
+    {
+      "name": "linux-asan",
+      "displayName": "Linux ASan + LSan + UBSan",
+      "inherits": "linux-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VP_SANITIZE": "ON"
+      }
+    },
+    {
+      "name": "mingw-release",
+      "displayName": "Windows x64 cross build with MinGW-w64 (engine only)",
+      "binaryDir": "${sourceDir}/build-${presetName}",
+      "toolchainFile": "${sourceDir}/cmake/mingw-w64.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "VP_BUILD_GUI": "OFF",
+        "VP_BUILD_TESTS": "OFF",
+        "VP_WITH_LLM": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "linux-release",
+      "configurePreset": "linux-release",
+      "jobs": 4
+    },
+    {
+      "name": "linux-asan",
+      "configurePreset": "linux-asan",
+      "jobs": 4
+    },
+    {
+      "name": "mingw-release",
+      "configurePreset": "mingw-release",
+      "jobs": 4
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "linux-release",
+      "configurePreset": "linux-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "linux-asan",
+      "configurePreset": "linux-asan",
+      "output": {
+        "outputOnFailure": true
+      },
+      "environment": {
+        "ASAN_OPTIONS": "detect_leaks=1:abort_on_error=1",
+        "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1"
+      }
+    }
+  ]
+}

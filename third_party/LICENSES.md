@@ -11,7 +11,7 @@ by someone else, with its origin and licence. The BUILD task keeps this file cur
 | `third_party/json.hpp` | [nlohmann/json](https://github.com/nlohmann/json) 3.12.0 | 2013-2025 Niels Lohmann | MIT |
 | `third_party/miniz.c`, `miniz.h` | [richgel999/miniz](https://github.com/richgel999/miniz) 3.0.2 | 2013-2014 RAD Game Tools and Valve Software; 2010-2014 Rich Geldreich and Tenacious Software LLC | MIT (text in `miniz.c`) |
 | `third_party/doctest.h` (tests only, not shipped) | [doctest/doctest](https://github.com/doctest/doctest) 2.5.0 | 2016-2023 Viktor Kirilov | MIT |
-| `third_party/llama/` (to be vendored by BUILD; pinned commit in `third_party/llama/VERSION`) | [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) | The ggml authors | MIT |
+| `third_party/llama/` (CPU-only subset; `VERSION`, `PATCHES.md`: no local patches) | [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) tag b11433, commit `50569eb87df530daff11afda229ceb9ab8e6cae8` (2026-10-06) | 2023-2026 The ggml authors | MIT (text in `third_party/llama/LICENSE`) |
 
 ## Data shipped next to the program (separate files, their own licences; see the lexicon NOTE section and About)
 
