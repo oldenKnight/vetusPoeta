@@ -305,6 +305,13 @@ code and falls back to the hint.
 | `history.undo {}` / `history.redo {}` | `{canUndo, canRedo, changedIndices}` (cue-level history lives in the engine; UI mirrors it) |
 | `eval.run {outPath}` (dev) | `{reportPath}` runs the checker over all cues and writes report.json |
 
+Settled by the CLI implementation (engine/cli/README.md): `index` is the 0-based cue position everywhere and
+`idRaw` is the file's label; `translate.cue` carries a batch `cues:[CueView...]`; `translate.done.stats` has `done`
+and `translated`; a new cue has state `new` and confidence `check`; `export.write` to an existing path without
+`overwrite:true` returns `io` ("file exists"); `project.new` without a path autosaves under `<data>/unsaved/`;
+`project.close {discard?}`; `translate.start` without `indices` skips edited and reviewed cues; tags around a cue's
+text are kept on export, tags inside the text are dropped with a `tags_dropped` warning.
+
 Shell-handled commands (never reach the engine): `dialog.openFile`, `dialog.saveFile`, `shell.revealFile`,
 `shell.openExternal`, `dialog.droppedFiles` (event), `power.status` (event), `engine.restarted` (event).
 
