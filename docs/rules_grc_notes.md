@@ -108,3 +108,24 @@ files are read by `grc::GreekData::load(dir)` (valency, prepositions, names, par
 `curated::CuratedData` keeps serving tiers_grc.tsv and emoji_grc.tsv. Wish for C2/C8: a Greek path in makeEngine
 (SemFrame → GrcClause, mirroring the Latin mapping; `grc::mapTense` for tenses) and the phrasebook_en_grc.tsv
 pre-pass.
+
+
+## Decisions by the main agent (2026-10-06), binding for C9/C12
+1. Realia without an Attic word (tea): use the nearest hypernym (ποτόν) in both modes, confidence Check, reason
+   "no Attic word; equivalent used"; bracketed English only when no equivalent exists at all.
+2. "Please": dropped in flexible mode (Greek politeness lives in the imperative and particles); faithful keeps
+   ἀντιβολῶ after a comma.
+3. Movable nu: before a vowel, before a comma and at sentence end. Keep.
+4. Yes/no questions: ἆρα + verb first by default ("ἆρα εἶδες τὴν γαλῆν μου;"), object first only for contrastive
+   focus. Mirrors the Latin -ne decision.
+5. Sentence-initial capitals: yes, capitalise sentence starts in subtitles (readability, parity with Latin);
+   names capitalised; everything else lower case.
+6. Names: article in narrative ("ὁ Μᾶρκος"); coined Attic forms for modern names (Ἀλίκη) declined; recorded in
+   names_grc.tsv.
+7. εἰμί imperfect 1st singular: ἦ, ἦν before a vowel. Keep.
+8. Imperative aspect: aorist for a single concrete act, present for general or continuing commands and prohibitions
+   (μή + present imperative). C12 sets it from the frame.
+9. Identifying predicates: a unique definite predicate (title, "the X of Y") takes the article ("ἡ βασίλεια τῶν
+   καρδιῶν ἐστιν"); a classifying predicate takes none. C12 sets forceArticle for titles.
+Lexicon fixes for LIB-3 (B4b): particle head templates must map to pos particle (not participle); final sigma in
+729 table cells; article-bearing cells; unflagged Epic tables; δεῖ Attic table; πίνω/ἀποφεύγω gaps; -μαι deponent flag.
