@@ -219,3 +219,13 @@ are not regression lines, plus the weekday alternative, the "your majesty" polic
 GrcClause::verbFirst. `vp/transfer_grc.h`: GreekTransfer::clause(..., bool subordinate = false),
 GreekTransfer::setWeekdayOrdinal(bool) (const, a mutable switch used by the engine for the alternative).
 `vp/grc2x.h`: Translator::roundTripOverlap. No change in frame/, transfer/ or engine.cpp.
+
+
+## Decisions by the main agent on C16's questions (2026-10-06)
+1. Adjective before an indefinite noun by default, after the noun for the subject of "there was ...": keep.
+2. "Your Majesty" with no addressee evidence: masculine + Check. Keep.
+3. The `weekday` cue flag is acceptable; the UI ignores unknown flags.
+4. Imperative aspect: decision 8 stands (aorist for a single act); the gold now lists both κλεῖε/κλεῖσον and
+   ἅπτε/ἅψον, so either aspect matches. Gold alternatives #52, #107, #112 accepted.
+Note: the C16 constructions case "If you see the cat, call me" fails on the committed tree (36/37) because the
+conditional path depends on C15's uncommitted frame changes; re-checked when C15 lands.
