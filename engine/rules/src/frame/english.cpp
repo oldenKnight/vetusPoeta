@@ -133,9 +133,72 @@ std::string knownBase(const lex::Lexicon& lx, const std::string& lower, const st
   return std::string();
 }
 
+bool compoundParts(const lex::Lexicon& lx, const std::string& w, std::string& first, std::string& head) {
+  static const std::pair<const char*, const char*> kHeads[] = {
+      {"women", "woman"}, {"woman", "woman"}, {"men", "man"},     {"man", "man"},       {"maids", "maid"},
+      {"maid", "maid"},   {"boys", "boy"},    {"boy", "boy"},     {"girls", "girl"},    {"girl", "girl"},
+      {"smiths", "smith"}, {"smith", "smith"}, {"keepers", "keeper"}, {"keeper", "keeper"}, {"makers", "maker"},
+      {"maker", "maker"}, {"castles", "castle"}, {"castle", "castle"}, {"houses", "house"}, {"house", "house"},
+      {"folk", "folk"},   {"birds", "bird"},  {"bird", "bird"},   {"cakes", "cake"},    {"cake", "cake"},
+      {"balls", "ball"},  {"ball", "ball"},   {"flies", "fly"},   {"fly", "fly"},       {"worms", "worm"},
+      {"worm", "worm"},   {"rooms", "room"},  {"room", "room"},   {"yards", "yard"},    {"yard", "yard"},
+      {"trees", "tree"},  {"tree", "tree"},   {"berries", "berry"}, {"berry", "berry"}, {"stones", "stone"},
+      {"stone", "stone"}, {"pots", "pot"},    {"pot", "pot"}};
+  auto known = [&](const std::string& x, bool needNoun) {
+    std::vector<lex::Analysis> an;
+    lx.lookup(text::en_key(x), an);
+    for (const lex::Analysis& a : an) {
+      const lex::Lemma l = lx.lemma(a.lemma);
+      if (l.id == lex::kNoLemma || l.pos == feat::Name) continue;
+      if (!needNoun || l.pos == feat::Noun) return true;
+    }
+    return false;
+  };
+  for (const auto& h : kHeads) {
+    if (!endsWith(w, h.first)) continue;
+    const std::string a = w.substr(0, w.size() - std::string(h.first).size());
+    if (a.size() < 2) continue;
+    if (!known(a, false) || !known(h.second, true)) continue;
+    first = a;
+    head = h.second;
+    return true;
+  }
+  return false;
+}
+
 bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
   bool changed = false;
   const int n = (int)tk.size();
+  // C19: a cue that starts with a preposition or a coordinator in lower case ("with a loud cry.", "to the little
+  // house.", "and the queen's crown,"): the tagger reads the word as an imperative verb. A word of these closed lists
+  // at the start (or right after a coordinator) before the start of a noun phrase is a preposition / coordinator.
+  for (int i = 0; i + 1 < n; ++i) {
+    Token& t = tk[(size_t)i];
+    if (t.upos != "VERB" && t.upos != "NOUN" && t.upos != "PROPN" && t.upos != "ADJ") continue;
+    const bool start = i == 0 || (i == 1 && (tk[0].upos == "CCONJ" || tk[0].lower == "and" || tk[0].lower == "or" ||
+                                             tk[0].lower == "but" || tk[0].lower == "nor"));
+    if (!start) continue;
+    const std::string& nx = tk[(size_t)i + 1].upos;
+    const bool npNext = isIn(nx, {"DET", "PRON", "NOUN", "PROPN", "ADJ", "NUM"}) || tk[(size_t)i + 1].lower == "his" ||
+                        tk[(size_t)i + 1].lower == "her" || tk[(size_t)i + 1].lower == "the";
+    if (isIn(t.lower, {"and", "or", "nor", "but"})) {
+      if (t.upos == "VERB" || t.upos == "NOUN" || t.upos == "PROPN") {
+        t.upos = "CCONJ";
+        t.feats = 0;
+        changed = true;
+      }
+      continue;
+    }
+    if (!npNext) continue;
+    if (isIn(t.lower, {"with", "in", "into", "to", "from", "for", "under", "without", "at", "by", "onto", "upon",
+                       "behind", "among", "amongst", "between", "beneath", "beside", "inside", "against", "toward",
+                       "towards", "across", "through", "during", "of", "near", "after", "before", "over", "around",
+                       "above", "below", "beyond", "along", "outside"})) {
+      t.upos = "ADP";
+      t.feats = 0;
+      changed = true;
+    }
+  }
   bool anyVerb = false;
   for (const Token& t : tk) anyVerb = anyVerb || t.upos == "VERB";
   auto nominal = [&](int i) { return i >= 0 && isIn(tk[(size_t)i].upos, {"NOUN", "PROPN", "PRON"}); };
@@ -193,6 +256,19 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
   for (int i = 0; i < n; ++i) {
     Token& t = tk[(size_t)i];
     if (t.lower.empty() || t.text.empty()) continue;
+    // C19: a word right after a possessive determiner is a noun, not a verb ("without his hat or his coat": not
+    // "hit"), when the lexicon has a noun reading
+    if (t.upos == "VERB" && i > 0 &&
+        isIn(tk[(size_t)i - 1].lower, {"my", "your", "his", "its", "our", "their"}) &&
+        (i + 1 >= n || !isIn(tk[(size_t)i + 1].upos, {"DET", "PRON"}))) {
+      const Reading r = readingOf(lx, t.lower);
+      if (r.noun) {
+        t.upos = "NOUN";
+        t.feats = nlp::morph::fromString(t.lower.size() > 3 && t.lower.back() == 's' && r.nounInflected ? "Number=Plur" : "Number=Sing");
+        changed = true;
+        continue;
+      }
+    }
     // a noun tagged as a verb right after a determiner and before the verb ("when the clown fell down")
     if (t.upos == "VERB" && i > 0 && i + 1 < n && tk[(size_t)i - 1].upos == "DET" &&
         isIn(tk[(size_t)i + 1].upos, {"VERB", "AUX"}) && !isIn(tk[(size_t)i - 1].lower, {"that", "this"})) {

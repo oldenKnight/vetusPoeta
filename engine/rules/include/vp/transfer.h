@@ -49,6 +49,10 @@ struct Memory {
   // C17: the Latin noun chosen for each English noun in this cue and the cues before it in the batch (consistency:
   // "witch" stays sāga); at most 32 entries, the oldest is dropped first
   std::vector<std::pair<std::string, uint32_t>> nounSense;
+  // C19: continuation of a sentence cut at a comma. `lastObjCase` = the case of the object of the last clause
+  // translated (0 = none); the engine sets `contCase` from it for the next sentence of the same speaker when the
+  // previous one ended open (, ; : or a dash), and a fragment "and the queen." then takes that case ("Et rēgīnam.").
+  uint8_t lastObjCase = 0, contCase = 0;
 };
 
 struct Settings {

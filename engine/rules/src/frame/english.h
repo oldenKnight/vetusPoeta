@@ -33,4 +33,9 @@ std::vector<std::string> baseCandidates(const std::string& lower, const std::str
 // (any when empty); empty when none.
 std::string knownBase(const lex::Lexicon& lx, const std::string& lower, const std::string& upos);
 
+// C19: a compound noun the lexicon does not list, split into a known first word and a head noun of a closed list
+// ("snowman" -> snow + man, "tinsmith" -> tin + smith, "milkmaid" -> milk + maid, "snowmen" -> snow + man). `head` is
+// the singular head; false when no split fits (never "kit" + "ten").
+bool compoundParts(const lex::Lexicon& lx, const std::string& lower, std::string& first, std::string& head);
+
 }  // namespace vp::frame::en

@@ -331,6 +331,31 @@ class RulesEngine final : public Engine {
     }
     char g = st.speakerGender;
     if (st.flipSpeakerGender) g = g == 'f' ? 'm' : 'f';
+    // C19: a nominative slot that is plural ("I like Roman roads" -> {1:nom} mihi placent): the verb of the row takes
+    // the plural form its note gives ("plural: placent")
+    std::string pluralWord;
+    {
+      const size_t p = m.note.find("plural:");
+      if (p != std::string::npos) {
+        size_t a = p + 7;
+        while (a < m.note.size() && m.note[a] == ' ') ++a;
+        size_t b = a;
+        while (b < m.note.size() && m.note[b] != ' ' && m.note[b] != ',' && m.note[b] != ';') ++b;
+        pluralWord = m.note.substr(a, b - a);
+      }
+    }
+    bool nomPlural = false;
+    for (const std::string& w0 : ws) {
+      if (w0.size() < 3 || w0[0] != '{') continue;
+      const size_t close = w0.find('}');
+      const std::string inner = w0.substr(1, close == std::string::npos ? std::string::npos : close - 1);
+      const size_t colon = inner.find(':');
+      const int k = std::atoi(inner.substr(0, colon).c_str()) - 1;
+      const std::string cs = colon == std::string::npos ? std::string() : inner.substr(colon + 1);
+      if (k < 0 || (size_t)k >= m.slots.size() || (!cs.empty() && cs != "nom")) continue;
+      const frame::PhraseSlot& sl = m.slots[(size_t)k];
+      if (sl.kind == frame::SlotKind::NP && (sl.np.number == 2 || !sl.np.coord.empty())) nomPlural = true;
+    }
     for (const std::string& w0 : ws) {
       std::string w = w0;
       if (w.size() > 2 && w[0] == '{') {
@@ -449,6 +474,9 @@ class RulesEngine final : public Engine {
         w.pop_back();
       }
       if (w.size() > 2 && w.front() == '(' && w.back() == ')') w = w.substr(1, w.size() - 2);
+      if (nomPlural && !pluralWord.empty() && w.size() >= 4 && pluralWord.size() >= 4 &&
+          text::latin_key(w).substr(0, 4) == text::latin_key(pluralWord).substr(0, 4))
+        w = pluralWord;
       const size_t slash = w.find('/');
       if (slash != std::string::npos) {
         if (g == 'f') w = w.substr(slash + 1);
@@ -919,7 +947,11 @@ class RulesEngine final : public Engine {
         const nlp::Token& t = s.tokens[i];
         if (t.upos == "VERB" || t.upos == "AUX") anyVerb = true;
         if (t.upos == "NOUN" || t.upos == "ADJ" || t.upos == "ADV" || t.upos == "PROPN") ++content;
-        if (t.upos == "NOUN" && i > 0) {
+        // C19: a noun inside a noun phrase (after a determiner, an adjective, a numeral or a possessive: "a very small
+        // mouse with a long tail.") is no candidate verb of a failed parse
+        const std::string& pu = i > 0 ? s.tokens[i - 1].upos : std::string();
+        if (t.upos == "NOUN" && i > 0 && pu != "DET" && pu != "ADJ" && pu != "NUM" && pu != "ADP" &&
+            !(pu == "PRON" && s.tokens[i - 1].deprel == "nmod")) {
           std::vector<lex::Analysis> an;
           en_->lookup(text::en_key(t.lower), an);
           for (const lex::Analysis& a : an) nounVerb = nounVerb || en_->lemma(a.lemma).pos == feat::Verb;
@@ -1259,6 +1291,19 @@ class RulesEngine final : public Engine {
         }
       }
       SentOut so;
+      // C19: a sentence cut at a comma continues in the next one of the same speaker (no speaker dash): its last object
+      // case is offered to a fragment "and the queen."
+      {
+        const SourceSentence* pv = si > 0 ? &sents[si - 1] : nullptr;
+        bool open = false;
+        if (pv && pv->kind == frame::CueKind::Speech && !ss.dash) {
+          size_t e = pv->text.size();
+          while (e > 0 && pv->text[e - 1] == ' ') --e;
+          open = e > 0 && (pv->text[e - 1] == ',' || pv->text[e - 1] == ';' || pv->text[e - 1] == ':' ||
+                           pv->text[e - 1] == '-');
+        }
+        mem.contCase = open ? mem.lastObjCase : 0;
+      }
       memBefore_ = mem;
       if (ss.kind == frame::CueKind::Nonverbal) {
         bool translated = false;
@@ -1473,7 +1518,8 @@ class RulesEngine final : public Engine {
                  a.minMargin < 0.15 || a.song || a.nonverbal || onlineDisagree;
       for (const char* f : {"name-guessed", "from-rule", "addressee-guess", "missing-form", "merged", "frame-fallback",
                             "fragment", "contact-relative", "noun-infinitive", "purpose-guess", "light-verb",
-                            "phrase-order", "participle-phrase", "ellipsis", "could-not-parse", "editorial"})   // C17
+                            "phrase-order", "participle-phrase", "ellipsis", "could-not-parse", "editorial",   // C17
+                            "derived-word"})   // C19
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       // a tier 3 word chosen while a tier 1/2 word of the same sense existed (fidelity 1, a correction aside)
       for (const transfer::Choice& c : a.choices)

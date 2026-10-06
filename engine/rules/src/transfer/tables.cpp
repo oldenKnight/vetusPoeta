@@ -160,7 +160,9 @@ bool stateVerb(std::string_view k) {
 const char* interjection(const std::string& w) {
   static const std::pair<const char*, const char*> kI[] = {
       {"oh", "ō"},   {"o", "ō"},      {"alas", "ēheu"}, {"hey", "heus"}, {"wow", "papae"}, {"hooray", "iō"},
-      {"ugh", "vah"}, {"ah", "ā"},    {"ay", "heu"},    {"eh", "heus"},  {"oye", "heus"}};
+      {"ugh", "vah"}, {"ah", "ā"},    {"ay", "heu"},    {"eh", "heus"},  {"oye", "heus"},
+      // C19
+      {"hurrah", "iō"}, {"hurray", "iō"}, {"yippee", "iō"}, {"bravo", "euge"}, {"aha", "ā"}};
   return lookup(kI, w);
 }
 
@@ -181,6 +183,11 @@ const char* cardinal(int v) {
     case 5: return "quīnque"; case 6: return "sex"; case 7: return "septem"; case 8: return "octō";
     case 9: return "novem"; case 10: return "decem"; case 11: return "ūndecim"; case 12: return "duodecim";
     case 20: return "vīgintī"; case 30: return "trīgintā"; case 100: return "centum"; case 1000: return "mīlle";
+    // C19
+    case 13: return "tredecim"; case 14: return "quattuordecim"; case 15: return "quīndecim";
+    case 16: return "sēdecim"; case 17: return "septendecim"; case 18: return "duodēvīgintī";
+    case 19: return "ūndēvīgintī"; case 40: return "quadrāgintā"; case 50: return "quīnquāgintā";
+    case 60: return "sexāgintā"; case 70: return "septuāgintā"; case 80: return "octōgintā"; case 90: return "nōnāgintā";
     default: return nullptr;
   }
 }

@@ -68,6 +68,7 @@ struct LaNP {
   std::string fixed;              // ready Latin words from the phrasebook ("chartīs"): written as they are (C2b)
   bool nameWords = false;         // C15: a translated name of names_la.tsv ("Urbs Smaragdōrum"): every word is a name
   bool indefinite = false;        // C17: "I am a Scarecrow": a description, not the speaker's name (ego is dropped)
+  std::string numeralLiteral;     // C19: a number Latin writes with numerals ("XXI ovēs"), before the noun
 };
 
 struct LaOblique {

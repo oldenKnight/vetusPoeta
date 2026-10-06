@@ -809,6 +809,10 @@ struct LatinChecker::Impl {
       const CheckedToken& t = rep.tokens[i];
       if (!rd[i].empty() || t.name) continue;
       if (t.fromRule) continue;
+      // C19: a number in Roman numerals ("XXI ovēs") is a known form
+      bool roman = t.text.size() >= 2;
+      for (char ch : t.text) roman = roman && (ch == 'I' || ch == 'V' || ch == 'X' || ch == 'L' || ch == 'C' || ch == 'D' || ch == 'M');
+      if (roman) continue;
       issue("A1", (int)i, "unknown form '" + t.text + "'");
     }
     for (size_t i = 0; i < rep.tokens.size(); ++i)

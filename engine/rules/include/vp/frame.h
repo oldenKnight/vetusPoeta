@@ -275,6 +275,7 @@ class FrameBuilder {
   void fillSlot(Ctx& c, PhraseSlot& slot) const;
   void repairTree(SemSentence& s) const;
   bool segmentParse(std::vector<nlp::Token>& tk) const;   // C15: discourse words, vocatives, parentheticals apart
+  void contractionContext(std::string_view sentence, std::vector<nlp::Token>& tk) const;   // C19: 'd = had, 's = has
 
   SrcLang lang_;
   const nlp::Pipeline* nlp_;

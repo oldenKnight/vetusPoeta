@@ -183,6 +183,12 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
     }
     if (n.interrogative != kNone) out.push_back(modifierWord(n.interrogative, 0, "order.wh"));
     if (n.numeral != kNone) out.push_back(modifierWord(n.numeral, 0, "order.num"));
+    if (!n.numeralLiteral.empty()) {   // C19: "XXI"
+      Word w;
+      w.form = n.numeralLiteral;
+      w.rule = "order.num";
+      out.push_back(std::move(w));
+    }
     for (const LaAdj& ad : n.adjectives) {
       if (!(order_.adjectiveBefore(ad.lemma) || exclFirst || ad.before)) continue;
       for (uint32_t adv : ad.adverbs) { Word w; literal(adv, "?", w, "order.adv"); out.push_back(std::move(w)); }

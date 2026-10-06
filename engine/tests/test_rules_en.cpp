@@ -5,6 +5,7 @@
 #include <doctest.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -1706,4 +1707,209 @@ TEST_CASE("rules-e: fixes after the blind check (own sentences of children's dia
     CHECK_MESSAGE(o[0].text == c.second, c.first << " -> " << o[0].text << " (expected " << c.second << ")");
   }
   CHECK(run({"The children laughed when the clown fell down."})[0].conf != rules::Confidence::Fix);   // cum + nominative
+}
+
+// ================================================================================================================
+// C19 (RULES-F): debugging hook. VP_RULES_TRY=<file>: every line is one cue (a line "---" starts a new batch, so
+// independent sentences do not share the discourse memory when separated); prints target, confidence, flags, failed
+// checks and the emoji tokens. VP_RULES_TRY_SPEAKER=m|f|u (default f), VP_RULES_TRY_FID=1|2|3 (default 2).
+TEST_CASE("rules-f: try (VP_RULES_TRY=<file>)") {
+  const char* env = std::getenv("VP_RULES_TRY");
+  if (!env || !*env) return;
+  NEED_REAL();
+  const char* sg = std::getenv("VP_RULES_TRY_SPEAKER");
+  const char* fd = std::getenv("VP_RULES_TRY_FID");
+  std::ifstream f(env);
+  std::vector<std::vector<std::string>> batches(1);
+  std::string line;
+  while (std::getline(f, line)) {
+    if (line == "---") { batches.emplace_back(); continue; }
+    if (!line.empty()) batches.back().push_back(line);
+  }
+  auto e = engine();
+  int n = 0;
+  for (const auto& b : batches) {
+    if (b.empty()) continue;
+    std::vector<rules::CueInput> in;
+    for (size_t i = 0; i < b.size(); ++i) {
+      rules::CueInput c;
+      c.index = (uint32_t)i;
+      c.sourceText = b[i];
+      c.startMs = (int64_t)i * 4000;
+      c.endMs = c.startMs + 3500;
+      in.push_back(c);
+    }
+    rules::Options o;
+    o.speakerGender = sg && *sg ? sg[0] : 'f';
+    o.fidelity = fd && *fd ? std::atoi(fd) : 2;
+    auto r = e->translate(in, o, rules::Context{}, nullptr, nullptr);
+    REQUIRE(r.ok());
+    for (size_t i = 0; i < r->size(); ++i) {
+      const rules::CueOutput& c = r.value()[i];
+      std::string extra;
+      for (const auto& fl : c.flags) extra += " " + fl;
+      for (const auto& k : c.checks)
+        if (!k.ok) extra += " " + k.id + "(" + k.detail + ")";
+      std::string em;
+      for (const auto& t : c.tokens)
+        if (!t.emoji.empty()) em += " " + t.text + t.emoji;
+      std::printf("%d\t%s\t%s\t%s |%s |%s\n", ++n, b[i].c_str(), flat(c.target).c_str(), confName(c.confidence),
+                  extra.c_str(), em.c_str());
+      if (std::getenv("VP_RULES_TRY_FRAME")) {
+        static frame::FrameBuilder fb(frame::SrcLang::En, &real().pen, &real().en, cur());
+        frame::SemSentence s;
+        fb.analyse(b[i], s);
+        std::string tk;
+        for (const auto& t : s.tokens)
+          tk += " " + t.text + "/" + t.upos + "/" + t.deprel + ">" + std::to_string(t.head) + "(" + fb.lemmaOf(t) + ")";
+        std::printf("    tokens:%s\n    frame: %s\n", tk.c_str(), frame::describe(s).c_str());
+      }
+      if (std::getenv("VP_RULES_TRY_WHY"))
+        for (const auto& rs : c.reasons)
+          std::printf("    %s: %s %s\n", rs.kind.c_str(), rs.text.c_str(), rs.data.substr(0, 600).c_str());
+    }
+  }
+}
+
+// ================================================================================================================
+// C19 (RULES-F, quality loop 4). Generalisation guard: every rule below has at least two sentences of our own, written
+// before the rule was run on the tuning sample (docs/rules_en_notes.md "Quality loop 4").
+namespace {
+std::vector<Out> runBatch(const std::vector<std::string>& src, char gender = 'f') {
+  std::unique_ptr<rules::Engine> e = engine();
+  std::vector<rules::CueInput> in;
+  for (size_t i = 0; i < src.size(); ++i) {
+    rules::CueInput c;
+    c.index = (uint32_t)i;
+    c.sourceText = src[i];
+    c.startMs = (int64_t)i * 4000;
+    c.endMs = c.startMs + 3500;
+    in.push_back(c);
+  }
+  rules::Options o;
+  o.speakerGender = gender;
+  auto r = e->translate(in, o, rules::Context{}, nullptr, nullptr);
+  REQUIRE(r.ok());
+  std::vector<Out> out;
+  for (const auto& c : r.value()) out.push_back(Out{flat(c.target), c.confidence, c.flags, c.checks});
+  return out;
+}
+void expectEach(const std::vector<std::pair<const char*, const char*>>& cases) {
+  for (const auto& c : cases) {
+    const std::vector<Out> o = run({c.first});
+    CHECK_MESSAGE(o[0].text == c.second, c.first << " -> " << o[0].text << " (expected " << c.second << ")");
+  }
+}
+}  // namespace
+
+TEST_CASE("rules-f: fragments keep the case of their phrase (work item d)") {
+  NEED_REAL();
+  // a cue that is only a prepositional phrase: the preposition's case (the tagger read the lower-case preposition
+  // or conjunction as a verb: retagged), never an invented verb or an unknown "[with]"
+  expectEach({
+      {"under the big table,", "Sub mēnsā magnā,"},
+      {"into the dark forest,", "In silvam obscūram,"},
+      {"to the little house.", "Ad domum parvam."},
+      {"with a loud cry.", "Clāmōre magnō."},
+      {"without a word.", "Sine verbō."},
+      // a noun phrase alone: nominative; the possessive inside it is eius (no clause subject to refer to)
+      {"and the queen's golden crown,", "Et corōna aurea rēgīnae,"},
+      {"the old king and his three sons,", "Rēx vetus et trēs fīliī eius,"},
+      // a possessive inside the subject itself is not reflexive either
+      {"The king and his sons are here.", "Rēx et fīliī eius hīc sunt."},
+  });
+  for (const char* s : {"from the top of the hill,", "with her grandmother.", "for my mother.", "in the land of the giants,"}) {
+    const std::vector<Out> o = run({s});
+    CHECK_MESSAGE(o[0].conf != rules::Confidence::Fix, s << " -> " << o[0].text);
+    CHECK_MESSAGE(o[0].text.find('[') == std::string::npos, s << " -> " << o[0].text);
+  }
+  // continuation of the previous cue (it ends open, with a comma): the conjunct takes the case of the last noun there
+  {
+    const std::vector<Out> o = runBatch({"I saw the king,", "and the queen."});
+    CHECK_MESSAGE(o[1].text == "Et rēgīnam.", o[1].text);
+    const std::vector<Out> p = runBatch({"We helped the farmer,", "and his wife."});
+    CHECK_MESSAGE(p[1].text == "Et uxōrem eius.", p[1].text);
+  }
+  // a noun phrase with a prepositional modifier is a fragment, not a failed parse
+  {
+    const std::vector<Out> o = run({"a very small mouse with a long tail."});
+    CHECK_MESSAGE(!hasFlag(o[0], "could-not-parse"), o[0].text);
+    const std::vector<Out> p = run({"an old man with a white beard."});
+    CHECK_MESSAGE(!hasFlag(p[0], "could-not-parse"), p[0].text);
+  }
+}
+
+TEST_CASE("rules-f: unknown English words derived before they are given up (work item c)") {
+  NEED_REAL();
+  // compounds of a known word and a head noun (-man, -woman, -maid, -smith ...): head noun + genitive of the first
+  // part; never a bracketed unknown (Check, the derivation is a guess)
+  {
+    const std::vector<std::pair<std::string, std::string>> parts = {
+        {"snowman", "snow man"}, {"snowmen", "snow man"}, {"tinsmith", "tin smith"}, {"milkmaid", "milk maid"},
+        {"doorkeeper", "door keeper"}, {"sandcastle", "sand castle"}};
+    for (const auto& p : parts) {
+      std::string first, head;
+      CHECK_MESSAGE(frame::en::compoundParts(real().en, p.first, first, head), p.first);
+      CHECK_MESSAGE(first + " " + head == p.second, p.first << " -> " << first << " " << head);
+    }
+    std::string f2, h2;
+    CHECK(!frame::en::compoundParts(real().en, "kitten", f2, h2));   // not "kit" + "ten"
+    CHECK(!frame::en::compoundParts(real().en, "table", f2, h2));
+  }
+  for (const char* s : {"The snowman is very big.", "The tinsmith mended the old pot.", "The milkmaid sang a song.",
+                        "Two snowmen stood in the garden."}) {
+    const std::vector<Out> o = run({s});
+    CHECK_MESSAGE(o[0].text.find('[') == std::string::npos, s << " -> " << o[0].text);
+    CHECK_MESSAGE(o[0].conf != rules::Confidence::Fix, s << " -> " << o[0].text);
+  }
+  CHECK(run({"The snowman is very big."})[0].text.find("nivis") != std::string::npos);
+  CHECK(run({"The tinsmith mended the old pot."})[0].text.find("stannī") != std::string::npos);
+  // numerals written in words: every one is rendered (a dropped numeral was wrong and OK)
+  expectEach({
+      {"I have forty sheep.", "Quadrāgintā ovēs habeō."},
+      {"Fifteen birds sang.", "Quīndecim avēs cecinērunt."},
+      {"He has twenty-two cows.", "Vīgintī duās vaccās habet."},
+      {"We saw sixty ships.", "Sexāgintā nāvēs vīdimus."},
+  });
+  for (const char* s : {"He has twenty-one sheep.", "The ninety sheep ate grass.", "I counted thirty-one stars."}) {
+    const std::vector<Out> o = run({s});
+    const bool numeral = o[0].text.find("XXI") != std::string::npos || o[0].text.find("XXXI") != std::string::npos ||
+                         o[0].text.find("nōnāgintā") != std::string::npos || o[0].text.find("Nōnāgintā") != std::string::npos;
+    CHECK_MESSAGE(numeral, s << " -> " << o[0].text);
+  }
+  // contractions: 'd + past participle / better = had; 's + got / been = has; have got = have (possession)
+  expectEach({
+      {"He'd seen the wolf before.", "Lupum anteā vīderat."},
+      {"She'd never been to the sea.", "Numquam ad mare fuerat."},
+      {"I've got a new hat.", "Pilleum novum habeō."},
+      {"He's got a big dog.", "Canem magnum habet."},
+      {"We've got three cats.", "Trēs fēlēs habēmus."},
+      {"You'd better go home.", "Domum īre dēbēs."},
+      {"You'd better run.", "Currere dēbēs."},
+  });
+  // contraction rows (contractions_en.tsv)
+  expectEach({
+      {"Y'know, I'm hungry.", "Ut scīs, ēsuriō."},
+      {"I'm tired, y'know.", "Fessa sum, ut scīs."},
+      {"'Tis a fine day.", "Diēs bellus est."},
+      {"'Twas a cold night.", "Nox frīgida erat."},
+      {"Gimme the ball!", "Dā mihi pilam!"},
+      {"Gimme some bread.", "Dā mihi pānem."},
+      {"Lemme see.", "Sine mē vidēre."},
+      {"Lemme help you.", "Sine mē tē adiuvāre."},
+  });
+  // interjections
+  expectEach({
+      {"Hurrah, we won!", "Iō, vīcimus!"},
+      {"Hurrah! The snow has come.", "Iō! Nix vēnit."},
+      {"Hooray, the holidays!", "Iō, fēriae!"},
+      {"Bravo, you did it!", "Euge, id fēcistī!"},
+      {"Bravo, little brother!", "Euge, frāter parve!"},
+  });
+  // proper adjectives are adjectives, never dropped
+  expectEach({
+      {"He is a Roman soldier.", "Mīles Rōmānus est."},
+      {"The Greek ship sailed away.", "Nāvis Graeca ēnāvigāvit."},
+      {"I like Roman roads.", "Viās Rōmānās amō."},
+  });
 }

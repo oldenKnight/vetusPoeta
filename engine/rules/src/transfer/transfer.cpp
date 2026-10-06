@@ -1216,6 +1216,46 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
       id = select(n.head, Adj, c.context, false, false, c.st, c2);
       if (id != kNone) { ch = c2; o.gender = N; }
     }
+    // C19: a compound the lexicon does not list ("snowman", "tinsmith", "milkmaid"): the head noun with the first
+    // word as a genitive ("homō nivis", "faber stannī") or an adjective; marked as derived (Check through A9/margin)
+    std::string cmpFirst, cmpHead;
+    if (id == kNone && c.st.lang == frame::SrcLang::En && c.st.srcLex &&
+        frame::en::compoundParts(*c.st.srcLex, text::lower(n.surface.empty() ? n.head : n.surface), cmpFirst, cmpHead)) {
+      Choice c2;
+      c2.token = n.token;
+      const uint32_t hid = select(cmpHead, Noun, c.context, false, false, c.st, c2);
+      if (hid != kNone) {
+        id = hid;
+        ch = c2;
+        ch.source = n.head;
+        ch.note = "compound: \"" + cmpFirst + "\" + \"" + cmpHead + "\"";
+        c.out.flags.push_back("derived-word");
+        Choice c3;
+        c3.token = n.token;
+        const uint32_t fn = select(cmpFirst, Noun, c.context, false, false, c.st, c3);
+        if (fn != kNone) {
+          LaNP g;
+          g.head = fn;
+          g.number = la_.lemma(fn).flags & lex::PluralOnly ? (uint8_t)Pl : (uint8_t)Sg;
+          if (la_.lemma(fn).pos == Adj || la_.lemma(fn).pos == Participle) g.gender = N;
+          o.genitive.push_back(g);
+          c3.source = cmpFirst;
+          c3.token = -1;
+          c.out.choices.push_back(c3);
+        } else {
+          Choice c4;
+          const uint32_t fa = select(cmpFirst, Adj, c.context, false, false, c.st, c4);
+          if (fa != kNone) {
+            LaAdj a;
+            a.lemma = fa;
+            o.adjectives.push_back(a);
+            c4.source = cmpFirst;
+            c4.token = -1;
+            c.out.choices.push_back(c4);
+          }
+        }
+      }
+    }
     c.out.choices.push_back(ch);
     if (id == kNone) {
       if (!n.head.empty() || n.numeral.empty()) {
@@ -1289,7 +1329,16 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
       if (p.pron.person == 3) {
         // reflexive suus when the clause subject is the same 3rd person, else eius / eōrum
         const uint8_t pg = p.pronLemma == "its" ? (uint8_t)0 : p.pron.gender;   // C17: "its" fits any Latin gender
+        // C19: not inside the subject itself ("The king and his sons are here": fīliī eius) nor in a verbless fragment
+        auto inSubject = [&]() {
+          const frame::SemNP& sj = c.frame->subject;
+          if (std::find(sj.tokens.begin(), sj.tokens.end(), n.token) != sj.tokens.end()) return true;
+          for (const frame::SemNP& k : sj.coord)
+            if (k.token == n.token || std::find(k.tokens.begin(), k.tokens.end(), n.token) != k.tokens.end()) return true;
+          return false;
+        };
         if (c.frame && c.frame->hasSubject && c.subjPerson == 3 && c.frame->subject.token != n.token &&
+            !inSubject() && (c.frame->hasPred || c.frame->type != frame::Kind::Frag) &&
             c.subjNumber == (num == Pl ? 2 : 1) && (pg == 0 || c.subjGender == 0 || pg == c.subjGender ||
                                                     num == Pl)) {
           o.possessive = latin("suus", Det);
@@ -1367,6 +1416,28 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
       if (o.numeral == kNone) o.numeral = latin(card);
       tableChoice(o.numeral, n.numeral);
       if (v > 1) o.number = Pl;
+    } else if (v > 20 && v < 100 && v % 10 >= 2 && tables::cardinal(v - v % 10) && tables::cardinal(v % 10)) {
+      // C19: "twenty-two cows" -> vīgintī duae vaccae (the units word agrees)
+      o.numeral = latin(tables::cardinal(v - v % 10), Num);
+      if (o.numeral == kNone) o.numeral = latin(tables::cardinal(v - v % 10));
+      LaAdj u;
+      u.lemma = latin(tables::cardinal(v % 10), Num);
+      if (u.lemma == kNone) u.lemma = latin(tables::cardinal(v % 10));
+      u.before = true;
+      if (u.lemma != kNone) o.adjectives.insert(o.adjectives.begin(), u);
+      tableChoice(o.numeral, n.numeral);
+      o.number = Pl;
+    } else if (v > 1 && v < 4000) {
+      // C19: any other number in words: Roman numerals, as Latin writes them ("XXI ovēs"); never dropped
+      static const std::pair<int, const char*> kRoman[] = {{1000, "M"}, {900, "CM"}, {500, "D"}, {400, "CD"},
+                                                           {100, "C"},  {90, "XC"},  {50, "L"},  {40, "XL"},
+                                                           {10, "X"},   {9, "IX"},   {5, "V"},   {4, "IV"}, {1, "I"}};
+      int r = v;
+      for (const auto& rm : kRoman)
+        while (r >= rm.first) { o.numeralLiteral += rm.second; r -= rm.first; }
+      o.number = Pl;
+      for (int k : n.tokens)
+        if (k >= 0 && (size_t)k < c.s.tokens.size() && c.s.tokens[(size_t)k].upos == "NUM") c.cover(k);
     }
   }
   // "of" attributes (one genitive)
@@ -3047,6 +3118,33 @@ void Transfer::clause(const SemFrame& f, const SemSentence& s, const Settings& s
   out.clear();
   Ctx c(s, st, mem, out);
   clauseInto(f, c, out.clause);
+  // C19: a fragment "and / or + noun phrase" continuing the previous sentence of the same speaker takes the case the
+  // noun had there ("I saw the king," + "and the queen." -> Et rēgīnam.)
+  LaClause& oc = out.clause;
+  if (f.type == frame::Kind::Frag && !f.hasPred && f.hasSubject && !f.subject.isPronoun && mem.contCase &&
+      mem.contCase != Nom && oc.type == realise::ClauseType::Frag && oc.hasSubject && !oc.hasObject &&
+      f.predAdj.empty() && f.obliques.empty() && !f.connectors.empty() &&
+      (f.connectors[0] == "and" || f.connectors[0] == "or" || f.connectors[0] == "nor")) {
+    oc.object = oc.subject;
+    oc.object.case_ = mem.contCase;
+    oc.hasObject = true;
+    oc.hasSubject = false;
+    oc.subject = realise::LaNP{};
+  }
+  mem.lastObjCase = 0;
+  if (oc.hasObject && oc.type != realise::ClauseType::Frag && oc.pred.lemma != kNone) {
+    uint8_t cs = oc.object.case_ ? oc.object.case_ : (uint8_t)Acc;
+    const lex::Lemma vl = la_.lemma(oc.pred.lemma);
+    if (!oc.object.case_ && vl.id != kNone)
+      if (const curated::Valency* v = cd_.valency(vl.key))
+        for (const curated::Frame& fr : v->frames) {
+          if (fr.kind == curated::FrameKind::Dat) { cs = Dat; break; }
+          if (fr.kind == curated::FrameKind::Abl) { cs = Abl; break; }
+          if (fr.kind == curated::FrameKind::Gen) { cs = Gen; break; }
+          if (fr.kind == curated::FrameKind::Acc || fr.kind == curated::FrameKind::DatAcc) break;
+        }
+    mem.lastObjCase = cs;
+  }
   if (mem.addresseeGuess) out.flags.push_back("addressee-guess");
   std::sort(out.covered.begin(), out.covered.end());
   out.covered.erase(std::unique(out.covered.begin(), out.covered.end()), out.covered.end());

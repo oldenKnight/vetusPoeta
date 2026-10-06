@@ -177,11 +177,21 @@ int numberValue(const std::string& w) {
       {"one", 1},      {"two", 2},        {"three", 3},     {"four", 4},     {"five", 5},     {"six", 6},
       {"seven", 7},    {"eight", 8},      {"nine", 9},      {"ten", 10},     {"eleven", 11},  {"twelve", 12},
       {"twenty", 20},  {"thirty", 30},    {"hundred", 100}, {"thousand", 1000},
+      // C19: every English number word up to ninety ("twenty-two" below)
+      {"thirteen", 13}, {"fourteen", 14}, {"fifteen", 15}, {"sixteen", 16}, {"seventeen", 17}, {"eighteen", 18},
+      {"nineteen", 19}, {"forty", 40},    {"fifty", 50},    {"sixty", 60},   {"seventy", 70},  {"eighty", 80},
+      {"ninety", 90},
       {"uno", 1},      {"una", 1},        {"un", 1},        {"dos", 2},      {"tres", 3},     {"cuatro", 4},
       {"cinco", 5},    {"seis", 6},       {"siete", 7},     {"ocho", 8},     {"nueve", 9},    {"diez", 10},
       {"once", 11},    {"doce", 12},      {"veinte", 20},   {"cien", 100},   {"ciento", 100}, {"mil", 1000}};
   for (const auto& n : kNum)
     if (w == n.first) return n.second;
+  // C19: "twenty-two", "ninety-nine"
+  const size_t hy = w.find('-');
+  if (hy != std::string::npos && hy > 0) {
+    const int a = numberValue(w.substr(0, hy)), b = numberValue(w.substr(hy + 1));
+    if (a >= 20 && a <= 90 && a % 10 == 0 && b >= 1 && b <= 9) return a + b;
+  }
   bool digits = !w.empty();
   int v = 0;
   for (char c : w) {
@@ -688,6 +698,67 @@ void FrameBuilder::tokenize(std::string_view sentence, std::vector<Token>& out) 
       out.back().lower = low;
     }
   }
+  if (lang_ == SrcLang::En) contractionContext(sentence, out);
+}
+
+// C19: contractions whose expansion depends on the next word: "'d" + past participle / "better" = had ("He'd seen",
+// "You'd better go"), "'s" + got / been = has ("He's got a dog"), and "have got" (possession) = have ("I've got a
+// hat", "Have you got a pen?", "We've got to go" = have to).
+void FrameBuilder::contractionContext(std::string_view sentence, std::vector<Token>& out) const {
+  auto endsWith = [](const std::string& w, const std::string& suf) {
+    return w.size() >= suf.size() && w.compare(w.size() - suf.size(), suf.size(), suf) == 0;
+  };
+  auto fromApostrophe = [&](const Token& t, const char* letter) {
+    if (t.start < 0 || t.end > (int)sentence.size() || t.end <= t.start) return false;
+    const std::string w = text::lower(std::string(sentence.substr((size_t)t.start, (size_t)(t.end - t.start))));
+    return endsWith(w, std::string("'") + letter) || endsWith(w, std::string("\xE2\x80\x99") + letter);
+  };
+  auto skipAdverbs = [&](size_t j) {
+    while (j < out.size() && in(out[j].lower, {"never", "ever", "already", "just", "not", "always", "only", "once",
+                                               "really", "all", "still", "almost", "nearly", "often"}))
+      ++j;
+    return j;
+  };
+  auto participle = [&](const std::string& w) {
+    if (w == "been" || w == "better") return true;
+    if (!lex_) return false;
+    bool present = false;
+    const std::string v = en::verbOfForm(*lex_, w, &present);
+    if (!v.empty() && !present) {
+      std::vector<lex::Analysis> an;   // a form that is also a present ("come", "run", "put") stays "would"
+      lex_->lookup(text::en_key(w), an);
+      for (const lex::Analysis& a : an) {
+        const lex::Lemma l = lex_->lemma(a.lemma);
+        const feat::Features f = feat::unpack(lex_->feature(a.feat));
+        if (l.pos == feat::Verb && (f.tense == feat::Present || f.mood == feat::Infinitive) && text::lower(l.head) != v)
+          return false;
+        if (l.pos == feat::Verb && text::lower(l.head) == w) return false;
+      }
+      return true;
+    }
+    return w.size() > 4 && endsWith(w, "ed") && !en::knownBase(*lex_, w, "VERB").empty();
+  };
+  for (size_t i = 0; i < out.size(); ++i) {
+    Token& t = out[i];
+    const size_t j = skipAdverbs(i + 1);
+    if (t.lower == "would" && fromApostrophe(t, "d") && j < out.size() && participle(out[j].lower)) {
+      t.text = "had";
+      t.lower = "had";
+    } else if (t.lower == "is" && fromApostrophe(t, "s") && j < out.size() && in(out[j].lower, {"got", "been"})) {
+      t.text = "has";
+      t.lower = "has";
+    }
+  }
+  for (size_t i = 1; i + 1 < out.size(); ++i) {
+    if (out[i].lower != "got") continue;
+    const bool haveBefore = in(out[i - 1].lower, {"have", "has", "had"}) ||
+                            (i >= 2 && in(out[i - 2].lower, {"have", "has", "had"}) &&
+                             in(out[i - 1].lower, {"you", "we", "they", "he", "she", "it", "i", "not"}));
+    const std::string& nx = out[i + 1].text;
+    if (!haveBefore || nx.empty() || nx == "." || nx == "," || nx == "!" || nx == "?" || nx == ";") continue;
+    out.erase(out.begin() + (long)i);
+    --i;
+  }
 }
 
 // ---- lemmas ----------------------------------------------------------------------------------------------------------
@@ -1178,6 +1249,22 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
       np.tokens.push_back(k);
       if (np.head == "hour" && low == "o'clock") np.ordinal = true;
       continue;
+    }
+    // C19: a proper adjective before a common noun ("a Roman soldier", "the Greek ship"): an adjective, never dropped
+    if (en && !np.isName && (d == "compound" || d == "amod") && kt.upos == "PROPN" && k < h && lex_ &&
+        c.t(h).upos == "NOUN") {
+      std::vector<lex::Analysis> an;
+      lex_->lookup(text::en_key(kl), an);
+      bool adj = false;
+      for (const lex::Analysis& a : an) adj = adj || lex_->lemma(a.lemma).pos == feat::Adj;
+      if (adj) {
+        SemAdj a;
+        a.lemma = kl;
+        a.token = k;
+        np.adjectives.push_back(a);
+        np.tokens.push_back(k);
+        continue;
+      }
     }
     if (d == "flat" || (d == "compound" && kt.upos == "PROPN")) {   // multi-word names
       if (np.isName) np.head = k < h ? kt.text + " " + np.head : np.head + " " + kt.text;   // source order (C15)
@@ -1968,7 +2055,30 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     f.hasSubject = true;
     f.subject = p;
   }
-  if (f.copula && !f.existential) {
+  // C19: "She is in the garden.", "She had never been to the sea.": the root noun carries a preposition, so the
+  // predicate is a place, not a noun ("In hortō est", not "Hortus est")
+  int predCase = -1;
+  if (f.copula && !f.existential && en && (hu == "NOUN" || hu == "PROPN" || hu == "PRON"))
+    for (int g : c.kids[(size_t)h])
+      if (c.ok(g) && c.dep(g) == "case" && g < h && c.t(g).upos == "ADP" && !in(c.t(g).lower, {"'s", "of", "like", "than", "as"}))
+        { predCase = g; break; }
+  if (predCase >= 0) {
+    std::string prep;
+    for (int g : c.kids[(size_t)h])
+      if (c.ok(g) && c.dep(g) == "case" && g < h && c.t(g).upos == "ADP") {
+        prep = prep.empty() ? c.t(g).lower : prep + " " + c.t(g).lower;
+        for (int x : c.kids[(size_t)g])
+          if (c.ok(x) && c.dep(x) == "fixed") prep += " " + c.t(x).lower;
+        c.drop(g, Drop::Marker);
+        c.take(g);
+      }
+    SemOblique o;
+    o.prep = canonPrep(lang_, prep == "to" ? std::string("to") : prep);
+    buildNP(c, h, o.np);
+    o.token = h;
+    f.obliques.push_back(o);
+    f.copula = false;   // "be" as a full verb with a place: est / fuerat
+  } else if (f.copula && !f.existential) {
     if (adjHead || (hu == "VERB" && fget(ht, nlp::morph::VerbFormShift) == nlp::morph::VfPart)) {
       SemAdj a;
       a.lemma = hu == "ADJ" ? hl : c.t(h).lower;
@@ -2085,14 +2195,36 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     // fragment / exclamation / vocative
     f.type = Kind::Frag;
     if (hu == "NOUN" || hu == "PROPN" || hu == "PRON" || hu == "NUM") {
+      // C19: a cue that is only a prepositional phrase ("under the big table,", "with a loud cry.") keeps the case
+      // of its preposition: an oblique of a verbless fragment, not a nominative subject that drops the preposition
+      std::string prep;
+      for (int g : c.kids[(size_t)h]) {
+        if (!c.ok(g) || c.dep(g) != "case" || g > h || c.t(g).upos != "ADP") continue;
+        const std::string gl = c.t(g).lower;
+        if (gl == "'s" || gl == "of" || gl == "de") continue;
+        prep = prep.empty() ? gl : prep + " " + gl;
+        for (int x : c.kids[(size_t)g])
+          if (c.ok(x) && c.dep(x) == "fixed") prep += " " + c.t(x).lower;
+      }
       SemNP p;
       buildNP(c, h, p);
       if (p.determiner == "what" && !c.question) {   // "What a strange garden!"
         f.type = Kind::Excl;
         f.exclQuam = true;
       }
-      f.hasSubject = true;
-      f.subject = p;
+      if (!prep.empty() && f.type == Kind::Frag && !p.interrogative) {
+        for (int g : c.kids[(size_t)h])
+          if (c.ok(g) && c.dep(g) == "case" && g < h && c.t(g).upos == "ADP") { c.drop(g, Drop::Marker); c.take(g); }
+        SemOblique o;
+        o.prep = canonPrep(lang_, prep);
+        o.np = p;
+        o.token = h;
+        o.front = true;
+        f.obliques.push_back(o);
+      } else {
+        f.hasSubject = true;
+        f.subject = p;
+      }
     } else if (hu == "ADJ") {
       SemAdj a;
       a.lemma = hl;
@@ -3547,7 +3679,8 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
       }
     }
     if (!verb && fix < 0) {
-      if ((tk[1].upos == "DET" || tk[1].upos == "PRON") && verbReading(tk[0])) {
+      if ((tk[1].upos == "DET" || tk[1].upos == "PRON") && verbReading(tk[0]) && tk[0].upos != "ADP" &&
+          !in(tk[0].lower, {"and", "or", "but", "nor"})) {   // C19: "with her grandmother.", "and the queen's crown,"
         fix = 0;
         feats = nlp::morph::fromString("VerbForm=Fin|Mood=Imp");
       } else {
