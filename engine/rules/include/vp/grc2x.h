@@ -131,6 +131,13 @@ class Translator {
   // Spanish gloss came through English.
   std::string gloss(uint32_t lemma, Target, bool* pivot = nullptr) const;
 
+  // A9 round trip (C16, decision 1 of rules_grc2_notes.md, as la2x serves Latin): the share of the source's content
+  // lemmas (English or Spanish, stop words left out) found among the glosses of the Greek text's chosen readings
+  // (readable_grc.tsv, the teacher's tier notes, the lexicon's senses and keywords) or among its names. 1.0 when the
+  // source has no content word. Never throws (an internal error counts as 1.0).
+  double roundTripOverlap(std::string_view greekText, const std::vector<std::string>& sourceLemmas,
+                          Target sourceLang) const;
+
  private:
   struct Impl;
   std::unique_ptr<Impl> impl_;

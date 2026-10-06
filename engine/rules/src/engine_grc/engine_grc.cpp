@@ -153,7 +153,9 @@ struct GreekPath::Impl {
   std::unique_ptr<frame::FrameBuilder> fbEn, fbEs;
   const std::vector<rules::GlossaryEntry>* glossary = nullptr;
   transfer::Memory memBefore;
-  uint8_t royalGender = 0;   // C16: gender of the last king / queen named in the file (address "your majesty")
+  uint8_t royalGender = 0;
+  std::vector<std::string> a9Sources;   // C16: EN/ES content lemmas of the cue being checked (A9)
+  bool a9Set = false;   // C16: gender of the last king / queen named in the file (address "your majesty")
 
   // C16: the addressee of a title of address: a glossary entry for the title ("Majesty", "Your Majesty") with a
   // gender, else the last royal noun of the file, else 0 (unknown).
@@ -628,6 +630,16 @@ struct GreekPath::Impl {
                                                                    display(l.head), std::max(0.0, 1.0 - amb->margin)});
         }
       }
+      // C16: weekday names: the ordinal counted from Sunday is the alternative ("τρίτη ἡμέρα" for Ἄρεως ἡμέρα)
+      if (std::find(so.flags.begin(), so.flags.end(), "weekday") != so.flags.end()) {
+        transfer::Memory m2 = memBefore;
+        SentOut alt;
+        xfer->setWeekdayOrdinal(true);
+        speech(text, fb, opt, m2, st, alt, false);
+        xfer->setWeekdayOrdinal(false);
+        if (alt.text.text != so.text.text)
+          so.alternatives.push_back(Alternative{alt.text.text, "day name as an ordinal (counted from Sunday)", 0.5});
+      }
       bool genderWords = std::find(so.flags.begin(), so.flags.end(), "speaker-gender") != so.flags.end();
       for (const auto& t : so.text.tokens)
         genderWords = genderWords || (t.features.pos == "adj" && !t.features.gender.empty() && t.features.case_ == "nom");
@@ -720,7 +732,24 @@ struct GreekPath::Impl {
       }
       o.checks.push_back(a8);
     }
-    o.checks.push_back(Check{"A9", true, "round trip not run for Greek (see the interlinear view)"});
+    // A9 (C16, decision 1): round trip through grc2x, overlap of the source's content lemmas with the glosses of the
+    // Greek readings; < 0.5 -> Check
+    {
+      std::vector<std::string> src;
+      src.swap(a9Sources);
+      const bool set = a9Set;
+      a9Set = false;
+      if (!set) o.checks.push_back(Check{"A9", true, "not run for edited cues (no source lemmas)"});
+      else if (!greekText) o.checks.push_back(Check{"A9", true, "not Greek text"});
+      else if (src.empty()) o.checks.push_back(Check{"A9", true, "no source content words"});
+      else {
+        std::string flat = target;
+        std::replace(flat.begin(), flat.end(), '\n', ' ');
+        const double ov = back->roundTripOverlap(flat, src, opt.source == rules::Lang::Es ? grc2x::Target::Es
+                                                                                          : grc2x::Target::En);
+        o.checks.push_back(Check{"A9", ov >= 0.5, "round-trip overlap " + fmt(ov)});
+      }
+    }
     std::stable_sort(o.checks.begin(), o.checks.end(), [](const Check& x, const Check& y) { return x.id < y.id; });
   }
 
@@ -942,6 +971,10 @@ struct GreekPath::Impl {
         }
       }
       bool warn = false;
+      a9Sources.clear();
+      for (const transfer::Choice& c : a.choices)
+        if (c.kind != "table" && !c.source.empty()) a9Sources.push_back(c.source);
+      a9Set = true;
       runChecks(o.target, o.tokens, opt, cues[i], a.greekText && !a.copied, o, lay.overflow, tagsApprox, warn);
       {
         Check a7{"A7", true, ""};
@@ -963,7 +996,7 @@ struct GreekPath::Impl {
         if (k.id == "A5" && !k.ok && k.detail != "tag position approximated") a5fix = true;
       const bool fix = !checkOk(o, "A1") || !checkOk(o, "A3") || !checkOk(o, "A4") || unknown || a5fix;
       bool chk = warn || !checkOk(o, "A1b") || !checkOk(o, "A5") || !checkOk(o, "A6") || !checkOk(o, "A7") ||
-                 !checkOk(o, "A8") || a.minMargin < 0.15 || a.song || a.nonverbal;
+                 !checkOk(o, "A8") || !checkOk(o, "A9") || a.minMargin < 0.15 || a.song || a.nonverbal;
       for (const char* f : {"name-guessed", "from-rule", "addressee-guess", "missing-form", "merged", "frame-fallback",
                             "realia", "name-kept"})
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;

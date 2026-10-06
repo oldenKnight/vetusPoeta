@@ -101,6 +101,8 @@ struct GreekChecker::Impl {
            (r.lpos == Verb && r.f.mood == ParticipleMood);
   }
   static bool isNominal(const Reading& r) { return isHead(r) || isModifier(r) || isArticle(r); }
+  // C16: an adverb cell of an adjective (πρῶτον, ἡδέως): "πρῶτον τὴν θύραν ἄνοιξον" is not an agreement fault
+  static bool isAdverbCell(const Reading& r) { return r.f.pos == Adv && r.f.case_ == 0; }
   static bool isRelative(const Reading& r) { return r.closed && r.key == "ὅσ"; }
   bool any(size_t i, bool (*p)(const Reading&)) const {
     for (const Reading& r : rd[i])
@@ -603,6 +605,7 @@ struct GreekChecker::Impl {
       if (artCovered[i] || governed[i] || !any(i, isModifier) || any(i, isHead) || isVerb[i] || rep.tokens[i].name ||
           any(i, isArticle) || relStart[i])
         continue;
+      if (any(i, isAdverbCell)) { attached[i] = 1; continue; }
       if (closedDet(i)) {
         if (i + 1 < n && sameGroup(i, i + 1) && any(i + 1, isArticle)) {
           if (!agreeArticle(i, i + 1)) issue("A3", (int)i, "'" + T(i) + "' does not agree with the article '" + T(i + 1) + "'");

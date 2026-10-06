@@ -271,7 +271,14 @@ TEST_CASE("rules-grc2: EN -> GRC regression on all 114 lines of own_dialogue.en.
                                    << "); confidence ok " << conf["ok"] << " / check " << conf["check"] << " / fix "
                                    << conf["fix"] << "; report " << (buildDir() / "regression_report_grc.txt").string());
   CHECK(first40 >= 40);
-  CHECK(rest >= 0);
+  CHECK(rest >= 68);   // C16: 71 / 74 at the end of quality loop 2 (14 / 74 before); a small margin for data edits
+  // determinism over the whole file: a second engine gives byte-identical cues
+  auto e2 = path();
+  auto r2 = e2->translate(in, o, ctx, nullptr, nullptr);
+  REQUIRE(r2.ok());
+  bool same = true;
+  for (size_t i = 0; i < n; ++i) same = same && r1.value()[i].target == r2.value()[i].target;
+  CHECK(same);
 }
 
 TEST_CASE("rules-grc2: ES -> GRC on the first 40 lines of own_dialogue.es.srt vs the Greek gold (report only)") {
@@ -649,5 +656,125 @@ TEST_CASE("rules-grc2: try sentences (VP_GRC2_TRY=<file of English lines>)") {
       for (const auto& k : r.value()[i].checks) std::cout << "    " << k.id << (k.ok ? " ok " : " FAIL ") << k.detail << "\n";
       for (const auto& a : r.value()[i].alternatives) std::cout << "    alt: " << a.text << " (" << a.reason << ")\n";
     }
+  }
+}
+
+// C16 (quality loop 2): every construction of the loop as a unit case, on our own sentences that are not regression
+// lines (normalised comparison as the regression).
+TEST_CASE("rules-grc2: C16 constructions (set phrases, indirect questions, acc + inf, conditions, prin, ...)") {
+  NEED_REAL();
+  auto e = path();
+  const char* const cases[][2] = {
+      // set phrases
+      {"Here you are.", "ἰδού."},
+      {"You're welcome.", "οὐδέν ἐστιν."},
+      {"Too late.", "ὀψὲ ἤδη."},
+      {"A little.", "ὀλίγον."},
+      {"Thank you very much.", "πολλὴν χάριν σοι οἶδα."},
+      {"Good night, sleep well.", "καλὴν νύκτα, εὖ κάθευδε."},
+      {"Once upon a time there was a wise king.", "ἦν ποτε βασιλεὺς σοφός."},
+      {"See you tomorrow.", "αὔριόν σε ὄψομαι."},
+      // "Your Majesty" by the addressee: the last king / queen named, else masculine (Check)
+      {"The king is coming. Good morning, Your Majesty.", "ὁ βασιλεὺς ἔρχεται. χαῖρε, ὦ βασιλεῦ."},
+      // indirect questions, phrasebook {WH} / {1:inf} slots
+      {"Do you know how to sing?", "ἆρα οἶσθα ᾄδειν;"},
+      {"That depends on where you live.", "τοῦτο ἐξαρτᾶται ἐκ τοῦ ποῦ οἰκεῖς."},
+      {"It doesn't matter where you live.", "οὐδὲν διαφέρει ποῦ οἰκεῖς."},
+      // "that" clauses: think -> acc + inf, believe -> ὅτι
+      {"We think the boy is wise.", "οἰόμεθα τὸν παῖδα σοφὸν εἶναι."},
+      {"I thought it was Sunday.", "ᾤμην Ἡλίου ἡμέραν εἶναι."},
+      // conditions: ἐάν + aorist subjunctive, unless
+      {"If you see the cat, call me.", "ἐὰν τὴν γαλῆν ἴδῃς, κάλεσόν με."},
+      {"Unless you help me, I will fall.", "ἐάν μοι μὴ βοηθῇς, πεσοῦμαι."},
+      // hortative, πρίν + infinitive
+      {"Let's sing a song.", "ᾠδὴν ᾄδωμεν."},
+      {"Let's go home.", "οἴκαδε ἴωμεν."},
+      {"Let's eat before the teacher comes.", "ἐσθίωμεν πρὶν ἥκειν τὸν διδάσκαλον."},
+      // modals: should -> χρή, must -> δεῖ, could -> ἐδύνατο, go -> ἰέναι
+      {"You should wait.", "χρή σε μένειν."},
+      {"You must go.", "δεῖ σε ἰέναι."},
+      {"Which way should we go?", "ποίαν ὁδὸν χρὴ ἡμᾶς ἰέναι;"},
+      {"He could run fast.", "ἐδύνατο ταχέως τρέχειν."},
+      // passives, perfect state
+      {"The door was opened by the slave.", "ἡ θύρα ὑπὸ τοῦ δούλου ἀνεῴχθη."},
+      {"The letter is written.", "ἡ ἐπιστολὴ γέγραπται."},
+      // state adjectives as verbs (imperfect for a state, aorist for an event)
+      {"She was afraid.", "ἐφοβεῖτο."},
+      {"The children were angry.", "οἱ παῖδες ὠργίζοντο."},
+      {"We are wrong.", "ἁμαρτάνομεν."},
+      // word choice, adjective order, Attic augment, anaphoric "ones", weekdays
+      {"The girl found a big stone.", "ἡ κόρη μέγαν λίθον ηὗρεν."},
+      {"He wanted the white ones.", "τὰ λευκὰ ἐβούλετο."},   // no noun before: neuter "things"
+      {"Today is Friday.", "σήμερον ἀφροδίτης ἡμέρα ἐστίν."},
+      {"What day is it?", "τίς ἡμέρα ἐστίν;"},
+      // first / then, fixed phrases
+      {"First open the door. Then close the window.", "πρῶτον τὴν θύραν ἄνοιξον. ἔπειτα τὴν θυρίδα κλεῖε."},
+      {"Every morning the farmer walks to the field.", "ἑκάστης ἡμέρας ἕωθεν ὁ γεωργὸς εἰς τὸν ἀγρὸν βαδίζει."},
+      {"I wrote a letter in Greek.", "ἐπιστολὴν ἑλληνιστὶ ἔγραψα."},
+      {"We planted roses by mistake.", "ῥόδα ἐφυτεύσαμεν ἁμαρτόντες."},
+      {"The boy fell into a deep river.", "ὁ παῖς εἰς βαθὺν ποταμὸν ἔπεσεν."},
+  };
+  std::vector<rules::CueInput> in;
+  for (const auto& c : cases) {
+    rules::CueInput x;
+    x.index = (uint32_t)in.size();
+    x.sourceText = c[0];
+    in.push_back(x);
+  }
+  rules::Options o;
+  o.source = rules::Lang::En;
+  o.target = rules::Lang::Grc;
+  o.speakerGender = 'f';
+  int ok = 0;
+  for (size_t i = 0; i < in.size(); ++i) {   // one cue at a time: no discourse memory between the cases
+    auto r = e->translate({in[i]}, o, rules::Context{}, nullptr, nullptr);
+    REQUIRE(r.ok());
+    const std::string got = flat(r.value()[0].target);
+    const bool hit = normGrc(got) == normGrc(text::nfc(cases[i][1]));
+    CHECK_MESSAGE(hit, std::string(cases[i][0]) << " -> '" << got << "' expected '" << std::string(cases[i][1]) << "'");
+    ok += hit;
+    CHECK(r.value()[0].confidence != rules::Confidence::Fix);
+  }
+  MESSAGE("C16 constructions: " << ok << " / " << in.size());
+  // the weekday alternative (ordinal counted from Sunday)
+  {
+    rules::CueInput x;
+    x.sourceText = "It's Tuesday.";
+    auto r = e->translate({x}, o, rules::Context{}, nullptr, nullptr);
+    REQUIRE(r.ok());
+    CHECK(normGrc(r.value()[0].target) == normGrc(text::nfc("Ἄρεως ἡμέρα ἐστίν.")));
+    bool ordinal = false;
+    for (const auto& a : r.value()[0].alternatives) ordinal = ordinal || normGrc(a.text) == normGrc(text::nfc("τρίτη ἡμέρα ἐστίν"));
+    CHECK(ordinal);
+  }
+  // "Your Majesty" without a royal noun: masculine, flagged as a guess (Check); a glossary gender decides
+  {
+    rules::CueInput x;
+    x.sourceText = "Good afternoon, Your Majesty.";
+    auto r = e->translate({x}, o, rules::Context{}, nullptr, nullptr);
+    REQUIRE(r.ok());
+    CHECK(normGrc(r.value()[0].target) == normGrc(text::nfc("χαῖρε, ὦ βασιλεῦ")));
+    CHECK(r.value()[0].confidence == rules::Confidence::Check);
+    rules::Context g;
+    g.glossary.push_back(rules::GlossaryEntry{"Majesty", "translate", "", "f", 1});
+    auto rg = e->translate({x}, o, g, nullptr, nullptr);
+    REQUIRE(rg.ok());
+    CHECK(normGrc(rg.value()[0].target) == normGrc(text::nfc("χαῖρε, ὦ βασίλεια")));
+  }
+  // A9 round trip through grc2x: the source's content lemmas against the Greek readings' glosses
+  {
+    grc2x::Translator tr(real().grc, cur(), tables().gd, tables().gt);
+    const std::string g = text::nfc("ὁ δοῦλος τὸν λίθον αἴρει.");
+    CHECK(tr.roundTripOverlap(g, {"slave", "stone", "lift"}, grc2x::Target::En) >= 0.99);
+    CHECK(tr.roundTripOverlap(g, {"queen", "rose"}, grc2x::Target::En) < 0.5);
+    CHECK(tr.roundTripOverlap(g, {"the", "is"}, grc2x::Target::En) == 1.0);   // no content word
+    CHECK(tr.roundTripOverlap(text::nfc("ἡ Ἀλίκη τρέχει."), {"Alice", "run"}, grc2x::Target::En) >= 0.99);
+    rules::CueInput x;
+    x.sourceText = "The slave lifts the stone.";
+    auto r = e->translate({x}, o, rules::Context{}, nullptr, nullptr);
+    REQUIRE(r.ok());
+    bool a9 = false;
+    for (const auto& k : r.value()[0].checks) a9 = a9 || (k.id == "A9" && k.ok && k.detail.find("overlap") != std::string::npos);
+    CHECK(a9);
   }
 }

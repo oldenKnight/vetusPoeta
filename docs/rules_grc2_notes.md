@@ -108,3 +108,114 @@ Wish for the CLI: call `vp::grc::toMonotonic` on Greek cue text when exporting w
 3. δήπου for "of course" + clause stays, tier 2.
 4. The Spanish personal "a" before specific animals is kept ("¿Viste al gato?").
 Gold: "οὐδέποτε ἔπαισα" and "ἔστιν οὐδὲν ποτόν" accepted as alternatives in the Greek gold.
+
+
+## Quality loop 2 (C16, 2026-10-06)
+Material: regression lines 41-114 of `own_dialogue.en.srt` against the main agent's Attic gold (lines 41-114 were not
+tuned by C12); measured with `engine/tests/test_rules_grc2.cpp` (now all 114 lines, report
+`<build>/regression_report_grc.txt`, fidelity 2, speaker f, real data). These lines were the tuning set of this loop,
+so the numbers below are not a held-out measure. tests/heldout/ was not opened.
+
+### Match-rate log
+| step | 1-40 | 41-114 | all | ok / check / fix (all 114) |
+|---|---|---|---|---|
+| start (HEAD f16325e + the 114-line harness) | 40 / 40 | 14 / 74 | 54 / 114 | 47 / 64 / 3 |
+| group 1: phrasebook, lexical, tier rows; transfer (nonfinite / sub verb rows, χρή, elliptical "can", state verbs in the past, pluperfect, perfect active, ἄν, ἐάν + aorist subjunctive, πρίν + infinitive, acc + inf after think, "only if", weekdays, "things", adjectives before an indefinite noun, fixed PPs, "first ... then"); realiser (adjFirst / genFirst, ἄν, verbFirst, εἰ δὲ μή, order.wh.cop, order.yn.inf, imperative last after a fronted sequence adverb, adjective adverbs, indeclinable numerals, χρή by valency) | 40 / 40 | 59 / 74 | 99 / 114 | 77 / 36 / 1 |
+| group 2: Attic augments (ηὗρον, ἐβουλόμην, ᾤμην), {WH} slots as dependent clauses, `{1:inf}` slot, ποτε second position, "or" + counterfactual, enclitic pronoun with the modal in yes/no questions, "what day" -> τίς, head-word weighting, adverb after a quantifier subject, "your majesty" by the addressee, see-you order | 40 / 40 | 71 / 74 | 111 / 114 | 82 / 32 / 0 |
+| group 3: taught nouns over substantive adjectives, checker A3 adverb cells, A9 round trip wired, emoji rows | 40 / 40 | **71 / 74** | **111 / 114** | **81 / 33 / 0** |
+
+Exact (case and punctuation too): 2 / 114 (decision 5 capitals; the gold is lower case). ES -> GRC (lines 1-40,
+report only): 36 / 40 -> 38 / 40. Latin: EN 114 / 114, ES 100 / 100 (unchanged). GRC -> EN / ES 40 / 40, 40 / 40;
+monotonic 23 / 23; C9 primitives all green (the C9 gold test now reads the first 40 lines of the longer gold file:
+`REQUIRE(gold.size() >= 40)`, no expectation changed). New unit case "C16 constructions": 37 / 37 own sentences that
+are not regression lines, plus the weekday alternative, the "your majesty" policy and A9.
+
+### What changed
+* **Data** (all teacher-editable, our own rows): `phrasebook_en_grc.tsv` +28 rows (here you are, you're welcome, too
+  late, here she is, a little, once upon a time -> particle ποτε, you must be -> ἀνάγκη, I don't (much) care (where),
+  that depends on {WH}, it doesn't matter ({WH}), do you know how to {VP}, pass / hand me {NP}, your majesty / highness,
+  good afternoon, good night, sleep well, every morning / day, it is raining, it's going to rain), "my name is {NAME}"
+  -> "{1} ὄνομά μοι", "see you ..." with the enclitic σε second; `phrasebook_es_grc.tsv` mirrors (+12);
+  `lexical_en_grc.tsv` +87 rows and three new kinds: `perfect` (κατάγνυμι: "is broken" -> κατέαγεν), `pp` (fixed
+  prepositional phrases: in Latin / Greek -> Ῥωμαϊστί / Ἑλληνιστί, at the bottom -> ἐν τῷ βάθει, to school -> πρὸς τὸν
+  διδάσκαλον, by mistake -> ἁμαρτών agreeing with the subject), `weekday` (god's name in the genitive + ἡμέρα, the
+  ordinal from Sunday as the alternative); verb-row frames `nonfinite` (go -> εἶμι for infinitives, subjunctives,
+  futures and dependent clauses: ἰέναι, ἴωμεν, εἶ) and `sub` (come -> ἥκω in a dependent clause); state rows mad /
+  cold / wrong / kind; durative rows (help, write, smile, close, light, believe, think ...; a state verb in the past is
+  imperfect when durative, aorist otherwise: ὠργίζετο / ἥμαρτες); `tiers_grc.tsv` +64 rows / 4 notes (teacher glosses:
+  house -> οἰκία, story -> μῦθος, letter -> ἐπιστολή, coat -> ἱμάτιον, window -> θυρίς, candle -> λύχνος, clock ->
+  ὡρολόγιον, paint -> χρῶμα, breakfast -> ἄριστον, homework -> ἔργον, teacher -> διδάσκαλος, dark -> σκότος / σκοτεινός,
+  date -> ἡμέρα ...); `valency_grc.tsv` πιστεύω dat;acc (a thing believed in the accusative), οἴομαι acc+inf, χρή
+  impers:acc+inf; `order_grc.txt` 8 new rules (order.yn.inf, order.wh.cop, order.prin, order.acc.inf.think, mood.an,
+  order.sub.otherwise, order.cond.aspect, order.adv.subj) and amended order.conn.second (ποτε; "διὰ τί" as a unit),
+  order.adj (ordinals and ἕκαστος before the noun; the EN/ES transfer puts adjectives before an indefinite noun except
+  for the subject of an existential clause), order.imp; `emoji_grc.tsv` +4 (θυρίς, λύχνος, ἱμάτιον, χρῶμα).
+* **Transfer** (`transfer_grc.cpp`): head-word weighting of the sense gloss as the Latin transfer (+0.05 when the
+  source word heads the first gloss item, -0.3 when it is only a modifier, not for a teacher's gloss) - house -> οἰκία
+  over οἶκος; a taught noun beats an adjective used as a noun (-0.4); "pass me" now goes through the phrasebook
+  (δός μοι), "paint" (noun) through the teacher's gloss (χρῶμα), so κρίνω / ζωγράφος are gone; Should -> χρή; elliptical
+  "can" -> δύναμαι alone; past perfect -> pluperfect; "would" in a main clause -> ἄν + imperfect / aorist; ἐάν +
+  aorist subjunctive for a single event; "before" -> πρίν + infinitive with its own subject (accusative, after the
+  verb); verbs with an acc+inf valency take accusative + infinitive, others ὅτι; "only if X" (no main clause) -> εἰ μὴ
+  X; "or" + counterfactual -> εἰ δὲ μή, + ἄν clause; elliptical "it is" -> existential ἔστι; "what day" -> τίς ἡμέρα
+  (no second τί); "red ones" takes the gender of the noun before the clause and no article unless the source has one;
+  adjective adverbs (πρῶτον, ἡδέως from the adjective's adverb cell); "first ... then" -> πρῶτον ... ἔπειτα (front);
+  an adverb right after a noun / quantifier subject stays with it ("πάντες ἐνθάδε").
+* **Realiser** (`realiser_grc.cpp`, additive fields): GrcNP adjFirst / genFirst, GrcOblique end, GrcSub otherwise,
+  GrcClause an / verbFirst; χρή and any impersonal acc+inf modal of valency_grc.tsv like δεῖ; the realiser's own
+  defaults (C9 table) are unchanged.
+* **Morphology** (`forms_grc.cpp`): attested Attic overrides εὑρίσκω aorist ηὗρον ... (movable ν on ηὗρε), βούλομαι
+  imperfect ἐβουλόμην ..., οἴομαι imperfect 1 sg ᾤμην (the Attic-flagged cell ᾤομην is a table error).
+* **Checker** (`check_grc.cpp`): an adjective form that is also an adverb cell (πρῶτον, πολύ, ὀλίγον) is not an
+  agreement fault next to a noun of another gender ("πρῶτον τὴν θύραν ἄνοιξον"); the 200 / 200 corruptions are still
+  caught.
+* **Engine** (`engine_grc.cpp`): {WH} slots are translated as dependent clauses; `{1:inf}` renders a {VP} slot as an
+  infinitive; "your majesty" picks ὦ βασιλεῦ / ὦ βασίλεια by the addressee: a glossary entry with a gender, else the
+  last king / queen named in the file, else masculine with flag addressee-guess (Check); the weekday ordinal is offered
+  as an alternative; **A9** (decision 1): `grc2x::Translator::roundTripOverlap` (the source's content lemmas against the
+  glosses of the Greek readings: readable_grc.tsv, tier notes, lexicon senses and keywords, names) < 0.5 -> Check.
+  Effect on confidence: A9 fails on 2 of 114 cues (lines 36-37, ποτόν for "tea", already Check by decision 1), so the
+  confidence counts do not move on this file (a unit case checks a pass at 1.0 and a failing overlap). check() of an
+  edited cue reports A9 as not run (no source lemmas), as for Latin.
+
+### Remaining mismatches (fidelity 2)
+| # | source | gold | ours | why |
+|---|---|---|---|---|
+| 52 | The cat could smile. | ἡ γαλῆ μειδιᾶν ἐδύνατο / ἡ γαλῆ μειδιᾶν οἵα τ' ἦν | Ἡ γαλῆ ἐδύνατο μειδιᾶν. | order.inf puts the modal before the infinitive (gold lines 13, 19) |
+| 107 | Are you afraid of the dark? | ἆρα φοβῇ τὸ σκότος; | Ἆρα φοβεῖ τὸν σκότον; | σκότος is masculine and neuter in the lexicon (gender MN, both tables Attic, the cells carry no gender); the table's contracted 2 sg middle is φοβεῖ (φοβῇ is not a cell) |
+| 112 | You are very kind. | εὔνους εἶ μάλα / μάλα χρηστὸς εἶ / μάλα χρηστὴ εἶ | Πάνυ χρηστὸς εἶ. | "very" is πάνυ everywhere else in the gold (9, 24); εὔνους is not in greek.vpl |
+
+### Proposed gold alternatives (the gold file is unchanged)
+- #52 add "ἡ γαλῆ ἐδύνατο μειδιᾶν." - modal before its infinitive as in lines 13 ("οὐ δύναμαι διελθεῖν") and 19
+  ("τὰ ἄνθη οὐ δύναται λαλεῖν").
+- #107 add "ἆρα φοβεῖ τὸν σκότον;" - ὁ σκότος is the older Attic gender (LSJ: "σκότος, ὁ ... later also τό"), and the
+  -ει ending of the 2nd singular middle is regular Attic prose (as βούλει, οἴει, which the engine already uses).
+- #112 add "πάνυ χρηστὸς εἶ." - the gold renders "very" with πάνυ in lines 9 and 24; μάλα here alone looks arbitrary.
+
+### Lexicon gaps found (for LIB)
+1. No διδασκαλεῖον (school), λάθος (mistake), εὔνους (kind) in greek.vpl: "to school" -> πρὸς τὸν διδάσκαλον (gold
+   line 87 alternative), "by mistake" -> ἁμαρτόντες, "kind" -> χρηστός.
+2. οἴομαι: the Attic-flagged imperfect 1 sg cell is ᾤομην (should be ᾤμην); βούλομαι: the Attic-flagged imperfect cells
+   have ἠβουλ- (the classical ἐβουλ- is unflagged); εὑρίσκω: εὗρον first (classical Attic ηὗρον). Overridden in
+   forms_grc.cpp (attested forms only).
+3. σκότος has gender MN with masculine and neuter tables mixed and no gender on the cells.
+4. φοβέω's table has no contracted 2 sg middle in -ῃ (φοβῇ is only an analysis).
+5. Ἑλληνιστί has a capitalised head (ῥωμαϊστί does not).
+
+### Questions for the main agent
+1. Adjectives before an indefinite noun as the EN/ES transfer default (gold 48, 64, 66, 86, 81) while the realiser's
+   own C9 default stays after the noun; existential subjects after ("ἦν ποτε κόρη μικρά"). Keep?
+2. "Your Majesty" without a king / queen in the file and no glossary entry: masculine + Check. Or ask the user via
+   the glossary?
+3. Weekdays: planetary genitive by default (Ἄρεως ἡμέρα), the ordinal as an alternative. The cue carries a flag
+   "weekday" (informational); fine for the UI?
+4. Present imperatives for close / light (κλεῖε, ἅπτε, as the gold) are data rows of kind durative; an aorist for a
+   single act would follow decision 8 more strictly (κλεῖσον, ἅψον). Keep the gold's practice?
+5. "every morning" -> ἑκάστης ἡμέρας ἕωθεν (genitive of time) because the main gold line needs διδασκαλεῖον, which the
+   lexicon lacks; καθ' ἑκάστην ἡμέραν ἕωθεν would work as well once the noun exists.
+
+### API changes (additive; recorded in STATUS)
+`vp/realise_grc.h`: GrcNP::adjFirst, GrcNP::genFirst, GrcOblique::end, GrcSub::otherwise, GrcClause::an,
+GrcClause::verbFirst. `vp/transfer_grc.h`: GreekTransfer::clause(..., bool subordinate = false),
+GreekTransfer::setWeekdayOrdinal(bool) (const, a mutable switch used by the engine for the alternative).
+`vp/grc2x.h`: Translator::roundTripOverlap. No change in frame/, transfer/ or engine.cpp.

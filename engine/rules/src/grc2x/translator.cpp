@@ -208,6 +208,106 @@ void Translator::resetDiscourse() {}
 
 std::string Translator::gloss(uint32_t lemma, Target t, bool* pivot) const { return impl_->gloss(lemma, t, pivot); }
 
+namespace {
+bool stopWord(const std::string& w, Target lang) {
+  static const char* const en[] = {"a", "about", "all", "an", "and", "any", "are", "as", "at", "be", "been", "but",
+                                   "by", "can", "could", "did", "do", "does", "for", "from", "get", "go", "have", "he",
+                                   "her", "here", "him", "his", "i", "if", "in", "into", "is", "it", "its", "just", "me",
+                                   "my", "no", "not", "now", "of", "off", "oh", "on", "or", "our", "out", "please",
+                                   "she", "so", "some", "than", "that", "the", "their", "them", "then", "there",
+                                   "these", "they", "this", "those", "to", "too", "up", "us", "very", "was", "we",
+                                   "were", "what", "when", "where", "which", "who", "why", "will", "with", "would",
+                                   "you", "your", "yes", "how", "shall", "should", "may", "might", "must", "let",
+                                   "dear", "o", "well", "everyone", "everybody", "one", "ones", "much", "many"};
+  static const char* const es[] = {"a", "al", "de", "del", "el", "la", "los", "las", "un", "una", "unos", "unas", "y",
+                                   "o", "que", "en", "con", "por", "para", "no", "sí", "si", "ser", "estar", "haber",
+                                   "yo", "tú", "él", "ella", "nosotros", "ustedes", "ellos", "ellas", "me", "te", "se",
+                                   "nos", "le", "les", "lo", "mi", "tu", "su", "muy", "ya", "más", "pero", "como",
+                                   "este", "esta", "ese", "esa", "eso", "esto", "qué", "quién", "dónde", "cuándo",
+                                   "cómo", "por favor", "usted", "ir", "hacer", "tener", "todo", "todos", "uno"};
+  if (lang == Target::En) {
+    for (const char* x : en)
+      if (w == x) return true;
+  } else {
+    for (const char* x : es)
+      if (w == x) return true;
+  }
+  return false;
+}
+void wordsOf(std::string_view s, std::vector<std::string>& out) {
+  std::string cur;
+  const std::string low = text::lower(s);
+  for (char ch : low) {
+    const unsigned char c = (unsigned char)ch;
+    if ((c >= 'a' && c <= 'z') || c >= 0x80 || c == '\'') cur += ch;
+    else if (!cur.empty()) { out.push_back(cur); cur.clear(); }
+  }
+  if (!cur.empty()) out.push_back(cur);
+}
+}  // namespace
+
+double Translator::roundTripOverlap(std::string_view greekText, const std::vector<std::string>& sourceLemmas,
+                                    Target lang) const {
+  try {
+    std::vector<std::string> content;
+    for (const std::string& w0 : sourceLemmas) {
+      const std::string w = text::lower(w0);
+      if (w.empty() || stopWord(w, lang)) continue;
+      if (std::find(content.begin(), content.end(), w) == content.end()) content.push_back(w);
+    }
+    if (content.empty()) return 1.0;
+    std::vector<std::string> bag, keys;
+    std::vector<lex::Sense> senses;
+    for (const auto& r : splitSentences(greekText)) {
+      Sentence s;
+      impl_->analyser.analyse(greekText.substr(r.first, r.second - r.first), s, nullptr);
+      for (const Token& t : s.tokens) {
+        const Reading* rd = t.best();
+        if (!rd) continue;
+        keys.push_back(text::greek_key(t.text));
+        if (!rd->nameEn.empty()) wordsOf(rd->nameEn, bag);
+        if (rd->lemma == kNone) continue;
+        const lex::Lemma l = impl_->lx.lemma(rd->lemma);
+        if (l.id == kNone) continue;
+        for (const char* pos : {"", "mid"}) {
+          if (const grc::ReadableRow* row = impl_->gt.readable(l.key, pos))
+            wordsOf(lang == Target::En ? row->en : row->es, bag);
+        }
+        if (lang == Target::En)
+          if (const curated::TierEntry* te = impl_->cd.tierGreek(l.key)) wordsOf(te->note, bag);
+        wordsOf(lang == Target::En ? l.glossEn : l.glossEs, bag);
+        wordsOf(impl_->gloss(rd->lemma, lang, nullptr), bag);
+        senses.clear();
+        impl_->lx.senses(rd->lemma, senses);
+        for (size_t k = 0; k < senses.size() && k < 4; ++k) {
+          wordsOf(lang == Target::En ? senses[k].glossEn : senses[k].glossEs, bag);
+          if (lang == Target::En) wordsOf(senses[k].keywords, bag);
+        }
+      }
+    }
+    std::sort(bag.begin(), bag.end());
+    bag.erase(std::unique(bag.begin(), bag.end()), bag.end());
+    auto has = [&](const std::string& w) { return std::binary_search(bag.begin(), bag.end(), w); };
+    size_t hit = 0;
+    for (const std::string& w : content) {
+      bool ok = has(w);
+      if (!ok && lang == Target::En)
+        for (const char* suf : {"s", "es", "ed", "d", "ing"}) ok = ok || has(w + suf);
+      if (!ok && w.size() > 3 && lang == Target::En && w.back() == 'e') ok = has(w.substr(0, w.size() - 1) + "ing");
+      if (!ok && lang == Target::Es && w.size() > 2) ok = has(w + "s") || has(w + "es");
+      if (!ok)   // names: the Greek form of an English name (names_grc.tsv)
+        if (const grc::NameEntry* ne = impl_->gd.nameByEnglish(w)) {
+          const std::string k = text::greek_key(ne->nom);
+          for (const std::string& gk : keys) ok = ok || gk == k || (k.size() > 4 && gk.compare(0, k.size() - 2, k, 0, k.size() - 2) == 0);
+        }
+      if (ok) ++hit;
+    }
+    return (double)hit / (double)content.size();
+  } catch (...) {
+    return 1.0;
+  }
+}
+
 std::vector<std::pair<size_t, size_t>> splitSentences(std::string_view text) {
   std::vector<std::pair<size_t, size_t>> out;
   size_t a = 0;
