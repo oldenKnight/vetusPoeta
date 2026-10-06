@@ -529,3 +529,40 @@ Wave C: morphology + frame + transfer + realisation (RULES, split in two impleme
 Wave D: checker + cue assembly + eval harness, UI panels/dialogs, shell port, brand.
 Wave E: llm + online + combination gates; LA->EN/ES; Greek; Orbergise.
 Wave F: acceptance loop on the owner's file, held-out measurement, Google Translate comparison, packaging.
+
+## 17. NLP models `.vpt` and training protocol [CONTRACT] (`engine/nlp`, `tools/train`)
+Two models per source language (`english.tag.vpt`, `english.dep.vpt`, `spanish.*`), trained offline by
+`tools/train/train_tagger.py` and `tools/train/train_parser.py` (Python 3 stdlib only) on the CoNLL-U files in
+`data/raw/ud/` (UD_English-EWT; UD_Spanish-GSD + UD_Spanish-AnCora), read at runtime by `engine/nlp` (C++).
+
+**Tagger**: averaged perceptron, UPOS labels (17 UD tags) plus a coarse `Feats` subset predicted by a second
+perceptron (`Number`, `Tense`, `VerbForm`, `Person`, `Mood`, `PronType`), features: `w`, `lw` (lower), suffixes 1-3,
+prefix 1, shape (Xx, xx, dd, punct), `lw-1`, `lw+1`, `lw-2`, `lw+2`, `t-1`, `t-1 t-2`, `lw t-1`, bias. Greedy left to
+right. Target on the UD dev set: >= 94 % UPOS (English), >= 95 % (Spanish).
+**Parser**: arc-eager transition parser (shift, left-arc, right-arc, reduce) with an averaged perceptron over the
+standard stack/buffer features (word, UPOS and deprel of s0, s1, b0, b1, b2, their left/right children, distance),
+projectivised training trees, deprel labels from UD (37 universal relations; language-specific subtypes collapsed).
+Greedy decoding, deterministic tie-break by label index. Target: >= 78 % LAS (English dev), >= 82 % (Spanish dev).
+Both trainers write `tools/train/report.json` with the measured scores and the data SHA-256s; the C++ reader is
+tested against a golden file of 200 dev sentences with the Python model's outputs (`tests/fixtures/nlp/*.golden.tsv`,
+produced by the trainer), and must reproduce them exactly.
+
+File format (little-endian, 8-byte aligned, same header idea as `.vpl`):
+```
+Header: magic "VPTX" | u16 major=1 | u16 minor | char[8] lang | char[8] kind ("tag"|"dep") | u32 n_labels | u32 n_feats
+        | u32 table_size (power of two) | u64 file_size | u8[32] sha256 of body
+LABELS  n_labels NUL-terminated UTF-8 strings (label index = position)
+FEATS   open-addressing hash table of u64 feature hashes (FNV-1a 64 of the feature string, 0 = empty slot),
+        table_size slots; a slot's index i maps to WEIGHTS row i
+WEIGHTS table_size x n_labels x int16 (weights quantised: w_q = round(w * 256); unknown feature = zero row)
+NOTE    UTF-8 text: training data names, licences (CC BY-SA 4.0 / CC BY 4.0), scores
+```
+Feature strings are built identically in Python and C++ (`tools/train/features.py` and `engine/nlp/src/features.cpp`,
+tested with a golden list of 500 feature strings and their hashes). Scoring = sum of int16 weights; argmax with the
+lowest label index on ties. The reader memory-maps the file (`vp::MappedFile`), owns no heap for the tables, and
+rejects a bad magic, size or sha with `lexicon_corrupt`-style errors (code `internal` with hint "model file damaged").
+Size budget: English tagger + parser together <= 12 MB (prune features seen < 2 times; quantise).
+
+**Lemmatiser**: `english.vpl` / `spanish.vpl` (DESIGN §5, built from Wiktionary `forms[]`), plus rules for regular
+inflection (-s, -es, -ed, -ing, -er, -est; Spanish verb endings for the ~80 regular paradigms) when the form is
+absent; proper nouns keep their form. Lemma + UPOS feed the frame builder (DESIGN §10.1).
