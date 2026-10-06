@@ -1,0 +1,123 @@
+1
+00:00:01,000 --> 00:00:03,400
+Good morning, everyone.
+
+2
+00:00:04,000 --> 00:00:06,400
+<i>The old poet walks into the garden.</i>
+
+3
+00:00:07,000 --> 00:00:09,400
+Where is my book?
+I left it on the table.
+
+4
+00:00:10,000 --> 00:00:12,400
+{\an8}Rome, many years ago.
+
+5
+00:00:13,000 --> 00:00:15,400
+The girl sings a song for her mother.
+
+6
+00:00:16,000 --> 00:00:18,400
+- Are you ready?
+- Yes, I am ready.
+
+7
+00:00:19,000 --> 00:00:21,400
+The boy carries water from the well.
+
+8
+00:00:22,000 --> 00:00:24,400
+<i>Listen to the wind in the trees.</i>
+
+9
+00:00:25,000 --> 00:00:27,400
+We read one page every day.
+
+10
+00:00:28,000 --> 00:00:30,400
+The teacher writes a word on the wall.
+
+11
+00:00:31,000 --> 00:00:33,400
+Why are you laughing?
+
+12
+00:00:34,000 --> 00:00:36,400
+Because the dog is wearing my hat.
+
+13
+00:00:37,000 --> 00:00:39,400
+The farmer loves his fields
+and his small house.
+
+14
+00:00:40,000 --> 00:00:42,400
+<i>I remember the sea.</i>
+
+15
+00:00:43,000 --> 00:00:45,400
+Bring me the bread, please.
+
+16
+00:00:46,000 --> 00:00:48,400
+The children run to the river.
+
+17
+00:00:49,000 --> 00:00:51,400
+A letter arrived this morning.
+
+18
+00:00:52,000 --> 00:00:54,400
+Who wrote it?
+
+19
+00:00:55,000 --> 00:00:57,400
+My friend from the city.
+
+20
+00:00:58,000 --> 00:01:00,400
+<i>She waits by the door
+until the sun goes down.</i>
+
+21
+00:01:01,000 --> 00:01:03,400
+The soldiers are tired.
+
+22
+00:01:04,000 --> 00:01:06,400
+They want to go home.
+
+23
+00:01:07,000 --> 00:01:09,400
+Open the window, it is hot.
+
+24
+00:01:10,000 --> 00:01:12,400
+The cat sleeps on the warm stone.
+
+25
+00:01:13,000 --> 00:01:15,400
+Tomorrow we will see the queen.
+
+26
+00:01:16,000 --> 00:01:18,400
+I do not know the answer.
+
+27
+00:01:19,000 --> 00:01:21,400
+Ask the poet. He knows everything.
+
+28
+00:01:22,000 --> 00:01:24,400
+<i>The stars are bright tonight.</i>
+
+29
+00:01:25,000 --> 00:01:27,400
+Thank you for the beautiful day.
+
+30
+00:01:28,000 --> 00:01:30,400
+Goodbye, my friends.

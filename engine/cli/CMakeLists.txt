@@ -1,0 +1,47 @@
+# vpengine: the engine executable (DESIGN.md §9). `vp_cli_core` holds everything but main() so the doctest
+# executable can test the pure helpers (engine/tests/test_cli.cpp).
+option(VP_HAVE_RULES "Link engine/rules (vp::rules::makeEngine) instead of the stub engine" OFF)
+
+add_library(vp_cli_core STATIC
+  src/cmd_serve.cpp
+  src/cmd_tools.cpp
+  src/serve_io.cpp
+  src/rules_stub.cpp
+  src/server.cpp
+  src/server_cues.cpp
+  src/server_export.cpp
+  src/views.cpp)
+target_include_directories(vp_cli_core PUBLIC src ${CMAKE_SOURCE_DIR}/engine/rules/include)
+target_link_libraries(vp_cli_core PUBLIC vp_core vp_subs vp_lex vp_third_party Threads::Threads)
+if(VP_HAVE_RULES AND TARGET vp_rules)
+  target_link_libraries(vp_cli_core PUBLIC vp_rules)
+  target_compile_definitions(vp_cli_core PRIVATE VP_HAVE_RULES=1)
+endif()
+if(WIN32)
+  target_link_libraries(vp_cli_core PUBLIC shell32)
+endif()
+
+add_executable(vpengine src/main.cpp)
+target_link_libraries(vpengine PRIVATE vp_cli_core)
+
+# engine/tests/CMakeLists.txt globs test_cli.cpp into vp_tests, which is created after this directory: link the
+# helpers into it once the whole tree is configured.
+function(vp_cli_link_tests)
+  if(TARGET vp_tests)
+    target_link_libraries(vp_tests PRIVATE vp_cli_core)
+  endif()
+endfunction()
+cmake_language(DEFER DIRECTORY ${CMAKE_SOURCE_DIR} CALL vp_cli_link_tests)
+
+# The protocol test (python3 stdlib). The top level enables testing only after the modules are added, so this
+# directory enables it itself (add_test is a no-op otherwise).
+if(VP_BUILD_TESTS AND NOT CMAKE_CROSSCOMPILING)
+  find_package(Python3 COMPONENTS Interpreter)
+  if(Python3_FOUND)
+    enable_testing()
+    add_test(NAME vpengine_server
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/engine/tests/test_server.py
+                     $<TARGET_FILE:vpengine> ${CMAKE_BINARY_DIR}/testtmp/server)
+    set_tests_properties(vpengine_server PROPERTIES TIMEOUT 600)
+  endif()
+endif()
