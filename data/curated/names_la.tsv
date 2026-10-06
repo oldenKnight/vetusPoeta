@@ -1,0 +1,77 @@
+# english	latin_nom	latin_gen	gender	declension	policy	note
+Alice	Alīcia	Alīciae	f	1	decline	
+Mary	Marīa	Marīae	f	1	decline	
+Anna	Anna	Annae	f	1	decline	
+Anne	Anna	Annae	f	1	decline	
+Julia	Iūlia	Iūliae	f	1	decline	
+Lucy	Lūcia	Lūciae	f	1	decline	
+Emma	Emma	Emmae	f	1	decline	
+Sophia	Sophia	Sophiae	f	1	decline	
+Sophie	Sophia	Sophiae	f	1	decline	
+Clara	Clāra	Clārae	f	1	decline	
+Helen	Helena	Helenae	f	1	decline	
+Diana	Diāna	Diānae	f	1	decline	
+Laura	Laura	Laurae	f	1	decline	
+Victoria	Victōria	Victōriae	f	1	decline	
+Elizabeth	Elīsabetha	Elīsabethae	f	1	decline	
+Margaret	Margarīta	Margarītae	f	1	decline	
+Catherine	Catharīna	Catharīnae	f	1	decline	
+Katherine	Catharīna	Catharīnae	f	1	decline	
+Christina	Chrīstīna	Chrīstīnae	f	1	decline	
+Rose	Rosa	Rosae	f	1	decline	
+Dinah	Dīna	Dīnae	f	1	decline	
+John	Iōannēs	Iōannis	m	3	decline	
+Peter	Petrus	Petrī	m	2	decline	
+Paul	Paulus	Paulī	m	2	decline	
+Mark	Marcus	Marcī	m	2	decline	
+Marcus	Marcus	Marcī	m	2	decline	
+Julius	Iūlius	Iūliī	m	2	decline	
+Anthony	Antōnius	Antōniī	m	2	decline	
+Antonio	Antōnius	Antōniī	m	2	decline	
+George	Geōrgius	Geōrgiī	m	2	decline	
+Henry	Henrīcus	Henrīcī	m	2	decline	
+Charles	Carolus	Carolī	m	2	decline	
+William	Gulielmus	Gulielmī	m	2	decline	
+Thomas	Thomās	Thomae	m	1	decline	Greek-type first declension masculine
+James	Iacōbus	Iacōbī	m	2	decline	
+Jacob	Iacōbus	Iacōbī	m	2	decline	
+Michael	Michaēl	Michaēlis	m	3	decline	
+David	Dāvīd	Dāvīd	m	indecl	keep	indeclinable
+Daniel	Daniēl	Daniēlis	m	3	decline	
+Joseph	Iōsēphus	Iōsēphī	m	2	decline	
+Francis	Franciscus	Franciscī	m	2	decline	
+Edward	Eduardus	Eduardī	m	2	decline	
+Richard	Rīcardus	Rīcardī	m	2	decline	
+Robert	Rōbertus	Rōbertī	m	2	decline	
+Alexander	Alexander	Alexandrī	m	2	decline	
+Philip	Philippus	Philippī	m	2	decline	
+Stephen	Stephanus	Stephanī	m	2	decline	
+Lewis	Ludovīcus	Ludovīcī	m	2	decline	
+Louis	Ludovīcus	Ludovīcī	m	2	decline	
+Arthur	Artūrus	Artūrī	m	2	decline	
+Walt	Gualterus	Gualterī	m	2	decline	
+Walter	Gualterus	Gualterī	m	2	decline	
+London	Londinium	Londiniī	n	2	decline	
+England	Anglia	Angliae	f	1	decline	
+Rome	Rōma	Rōmae	f	1	decline	
+Athens	Athēnae	Athēnārum	f	1	decline	plural
+Paris	Lutētia	Lutētiae	f	1	decline	
+Mexico	Mexicum	Mexicī	n	2	decline	
+Spain	Hispānia	Hispāniae	f	1	decline	
+France	Gallia	Galliae	f	1	decline	
+Italy	Ītalia	Ītaliae	f	1	decline	
+Greece	Graecia	Graeciae	f	1	decline	
+Egypt	Aegyptus	Aegyptī	f	2	decline	
+America	America	Americae	f	1	decline	
+Queen	Rēgīna	Rēgīnae	f	1	translate	title used as name
+King	Rēx	Rēgis	m	3	translate	title used as name
+Duchess	Ducissa	Ducissae	f	1	translate	
+Duke	Dux	Ducis	m	3	translate	
+Prince	Prīnceps	Prīncipis	m	3	translate	
+Princess	Prīncipissa	Prīncipissae	f	1	translate	Medieval form; flexible: fīlia rēgis
+Mr	dominus	dominī	m	2	translate	abbreviations expanded
+Mrs	domina	dominae	f	1	translate	
+Miss	domina	dominae	f	1	translate	
+Sir	domine	-	m	-	translate	vocative only
+Madam	domina	-	f	-	translate	vocative only
+Majesty	Māiestās	Māiestātis	f	3	translate	"Your Majesty" -> Māiestās Tua (phrasebook)

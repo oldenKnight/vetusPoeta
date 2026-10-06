@@ -1,0 +1,295 @@
+1
+00:00:01,000 --> 00:00:02,200
+Stop that horse!
+
+2
+00:00:02,500 --> 00:00:04,166
+Somebody stop that horse.
+
+3
+00:00:04,466 --> 00:00:06,532
+He is running toward the river.
+
+4
+00:00:06,832 --> 00:00:08,232
+The bridge is broken.
+
+5
+00:00:08,532 --> 00:00:09,732
+Jump!
+
+6
+00:00:10,032 --> 00:00:11,498
+I can't jump that far.
+
+7
+00:00:11,798 --> 00:00:12,998
+Then swim.
+
+8
+00:00:13,298 --> 00:00:14,964
+I don't know how to swim.
+
+9
+00:00:15,264 --> 00:00:16,464
+Give me your hand.
+
+10
+00:00:16,764 --> 00:00:17,964
+Hold on tight.
+
+11
+00:00:18,264 --> 00:00:19,464
+We made it.
+
+12
+00:00:19,764 --> 00:00:20,964
+You saved my life.
+
+13
+00:00:21,264 --> 00:00:22,464
+It was nothing.
+
+14
+00:00:22,764 --> 00:00:23,964
+Where do you live?
+
+15
+00:00:24,264 --> 00:00:26,330
+In the village behind the hill.
+
+16
+00:00:26,630 --> 00:00:27,830
+Is it far?
+
+17
+00:00:28,130 --> 00:00:29,596
+About an hour on foot.
+
+18
+00:00:29,896 --> 00:00:31,096
+Let's go then.
+
+19
+00:00:31,396 --> 00:00:32,596
+My feet hurt.
+
+20
+00:00:32,896 --> 00:00:34,762
+We can rest under that tree.
+
+21
+00:00:35,062 --> 00:00:36,528
+Do you have any water?
+
+22
+00:00:36,828 --> 00:00:38,028
+Only a little.
+
+23
+00:00:38,328 --> 00:00:40,061
+Drink it; I'm not thirsty.
+
+24
+00:00:40,361 --> 00:00:41,561
+What's that noise?
+
+25
+00:00:41,861 --> 00:00:43,127
+It's only the wind.
+
+26
+00:00:43,427 --> 00:00:44,627
+I heard a voice.
+
+27
+00:00:44,927 --> 00:00:46,793
+Nobody lives in this forest.
+
+28
+00:00:47,093 --> 00:00:48,293
+Someone does.
+
+29
+00:00:48,593 --> 00:00:49,793
+Look, a light!
+
+30
+00:00:50,093 --> 00:00:51,359
+It's a small house.
+
+31
+00:00:51,659 --> 00:00:52,859
+Knock on the door.
+
+32
+00:00:53,159 --> 00:00:54,359
+Who's there?
+
+33
+00:00:54,659 --> 00:00:57,192
+Two travelers who have lost their way.
+
+34
+00:00:57,492 --> 00:00:59,358
+Come in and sit by the fire.
+
+35
+00:00:59,658 --> 00:01:01,324
+You are very kind, madam.
+
+36
+00:01:01,624 --> 00:01:02,824
+Are you hungry?
+
+37
+00:01:03,124 --> 00:01:04,324
+Very.
+
+38
+00:01:04,624 --> 00:01:06,290
+Here is bread and cheese.
+
+39
+00:01:06,590 --> 00:01:08,190
+Eat as much as you like.
+
+40
+00:01:08,490 --> 00:01:10,956
+Where are you going so late at night?
+
+41
+00:01:11,256 --> 00:01:13,389
+To the city, to find my brother.
+
+42
+00:01:13,689 --> 00:01:15,889
+The city is three days from here.
+
+43
+00:01:16,189 --> 00:01:17,855
+Then we must leave early.
+
+44
+00:01:18,155 --> 00:01:20,355
+Sleep now; I'll wake you at dawn.
+
+45
+00:01:20,655 --> 00:01:21,855
+The sun is rising.
+
+46
+00:01:22,155 --> 00:01:23,621
+The birds are singing.
+
+47
+00:01:23,921 --> 00:01:25,187
+Did you sleep well?
+
+48
+00:01:25,487 --> 00:01:26,687
+Like a stone.
+
+49
+00:01:26,987 --> 00:01:28,653
+Thank you for everything.
+
+50
+00:01:28,953 --> 00:01:30,819
+Come back whenever you want.
+
+51
+00:01:31,119 --> 00:01:33,052
+Which road leads to the city?
+
+52
+00:01:33,352 --> 00:01:34,685
+The one on the left.
+
+53
+00:01:34,985 --> 00:01:36,651
+Don't take the right one.
+
+54
+00:01:36,951 --> 00:01:38,151
+Why not?
+
+55
+00:01:38,451 --> 00:01:40,584
+There are wolves in those woods.
+
+56
+00:01:40,884 --> 00:01:42,684
+We're not afraid of wolves.
+
+57
+00:01:42,984 --> 00:01:44,184
+You should be.
+
+58
+00:01:44,484 --> 00:01:46,084
+How much does this cost?
+
+59
+00:01:46,384 --> 00:01:47,584
+Ten coins.
+
+60
+00:01:47,884 --> 00:01:49,084
+That's too much.
+
+61
+00:01:49,384 --> 00:01:50,584
+Eight, then.
+
+62
+00:01:50,884 --> 00:01:52,084
+Agreed.
+
+63
+00:01:52,384 --> 00:01:53,650
+Can I see the king?
+
+64
+00:01:53,950 --> 00:01:55,350
+Nobody sees the king.
+
+65
+00:01:55,650 --> 00:01:57,516
+Tell him his cousin is here.
+
+66
+00:01:57,816 --> 00:01:59,016
+Wait here.
+
+67
+00:01:59,316 --> 00:02:01,049
+The king will see you now.
+
+68
+00:02:01,349 --> 00:02:04,415
+Your Majesty, I bring a letter from my father.
+
+69
+00:02:04,715 --> 00:02:05,915
+Read it to me.
+
+70
+00:02:06,215 --> 00:02:07,415
+I can't read.
+
+71
+00:02:07,715 --> 00:02:08,981
+Then give it to me.
+
+72
+00:02:09,281 --> 00:02:10,881
+This changes everything.
+
+73
+00:02:11,181 --> 00:02:12,381
+What does it say?
+
+74
+00:02:12,681 --> 00:02:14,614
+It says that the war is over.

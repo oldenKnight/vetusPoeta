@@ -1,0 +1,177 @@
+# pattern	latin	tier	register	note
+hello	salvē	1	greet	plural: salvēte when addressee count > 1 (engine picks by glossary)
+hi	salvē	1	greet	
+good morning	salvē	1	greet	
+good day	salvē	1	greet	
+good evening	salvē	1	greet	
+good night	bene dormī	1	greet	
+goodbye	valē	1	greet	plural valēte
+bye	valē	1	greet	
+farewell	valē	1	greet	
+see you (soon|later)	mox tē vidēbō	1	greet	
+welcome	salvē	1	greet	
+thank you	grātiās (tibi) agō	1	polite	
+thanks	grātiās	1	polite	
+thank you very much	grātiās tibi maximās agō	1	polite	
+you're welcome	libenter	1	polite	
+please	quaesō	1	polite	
+excuse me	ignōsce mihi	1	polite	
+i am sorry	ignōsce mihi	1	polite	
+sorry	ignōsce	1	polite	
+i beg your pardon	ignōsce mihi	1	polite	
+pardon me	ignōsce mihi	1	polite	
+yes	ita	1	answer	or "certē", "sīc"
+no	nōn	1	answer	or "minimē"
+of course	certē	1	answer	
+certainly	certē	1	answer	
+not at all	minimē	1	answer	
+maybe	fortasse	1	answer	
+perhaps	fortasse	1	answer	
+i don't know	nesciō	1	answer	
+i know	sciō	1	answer	
+i see	intellegō	1	answer	
+all right	bene	1	answer	
+okay	bene	1	answer	
+very well	optimē	1	answer	
+good	bene	1	answer	as a reply
+fine	bene	1	answer	
+well done	bene fēcistī	1	praise	
+bravo	euge	1	praise	
+how are you	quid agis	1	q	
+what is your name	quid est nōmen tibi	1	q	
+my name is {NAME}	nōmen mihi est {1}	1	intro	
+i am {NAME}	ego sum {1}	1	intro	
+who are you	quis es	1	q	
+who is that	quis est ille/illa	1	q	
+what is that	quid est illud	1	q	
+what is this	quid est hoc	1	q	
+what is it	quid est	1	q	
+what is the matter	quid est	1	q	
+what happened	quid factum est	1	q	
+what time is it	quota hōra est	1	q	
+where am i	ubi sum	1	q	
+where are you	ubi es	1	q	
+where are we	ubi sumus	1	q	
+where are you going	quō īs	1	q	
+where is {NP}	ubi est {1:nom}	1	q	
+why	cūr	1	q	
+why not	cūr nōn	1	q	
+how	quōmodo	1	q	
+how much	quantum	1	q	
+how many	quot	1	q	
+what do you want	quid vīs	1	q	
+what do you mean	quid dīcis	1	q	
+do you understand	intellegis	1	q	
+really	vērō	1	excl	
+truly	vērē	1	excl	
+indeed	vērō	1	excl	
+oh	ō	1	excl	
+oh dear	ō mē miserum/miseram	1	excl	gender of speaker
+oh my	ō mē miserum/miseram	1	excl	
+oh no	heu	1	excl	
+alas	ēheu	1	excl	
+dear me	heu mē	1	excl	
+goodness	dī bonī	1	excl	
+good heavens	dī bonī	1	excl	
+my goodness	dī bonī	1	excl	
+good gracious	dī immortālēs	1	excl	
+heavens	dī bonī	1	excl	
+wow	papae	1	excl	
+hooray	iō	1	excl	
+hurrah	iō	1	excl	
+ouch	ei	1	excl	
+ow	ei	1	excl	
+ugh	vah	1	excl	
+hey	heus	1	excl	
+look	ecce	1	excl	when used as attention word, not the verb
+behold	ecce	1	excl	
+listen	audī	1	imp	
+come on	age	1	imp	plural agite
+come here	venī hūc	1	imp	
+come in	intrā	1	imp	
+come with me	venī mēcum	1	imp	
+go away	abī	1	imp	
+get out	exī	1	imp	
+go on	perge	1	imp	
+hurry	festīnā	1	imp	
+hurry up	festīnā	1	imp	
+quick	celeriter	1	imp	
+quickly	celeriter	1	imp	
+stop	dēsine	1	imp	
+wait	manē	1	imp	
+wait a minute	manē paulum	1	imp	
+be quiet	tacē	1	imp	
+silence	tacēte	1	imp	
+shut up	tacē	1	imp	
+sit down	sedē	1	imp	
+stand up	surge	1	imp	
+get up	surge	1	imp	
+wake up	ēvigilā	2	imp	flexible: surge
+help	auxilium	1	excl	as a cry: "auxilium!"
+help me	adiuvā mē	1	imp	
+be careful	cavē	1	imp	
+watch out	cavē	1	imp	
+take care	cūrā ut valeās	1	imp	
+don't worry	nōlī timēre	1	imp	
+never mind	nihil est	1	answer	
+it doesn't matter	nihil est	1	answer	
+no matter	nihil est	1	answer	
+of course not	minimē	1	answer	
+that's right	rēctē dīcis	1	answer	
+you're right	rēctē dīcis	1	answer	
+that's all	id est omne	1	answer	
+that's enough	satis est	1	answer	
+enough	satis	1	answer	
+too late	sērō	1	answer	
+i am late	sērō veniō	1	state	
+i'm late	sērō veniō	1	state	
+we are late	sērō venīmus	1	state	
+in time	tempore	1	adv	
+on time	tempore	1	adv	
+at once	statim	1	adv	
+right now	nunc statim	1	adv	
+at last	tandem	1	adv	
+of course	certē	1	adv	
+by the way	cēterum	1	adv	
+for example	exemplī grātiā	2	adv	
+in fact	rē vērā	1	adv	
+after all	tamen	1	adv	
+first of all	prīmum	1	adv	
+so what	quid tum	1	q	
+what for	cūr	1	q	
+nonsense	nūgae	1	excl	
+rubbish	nūgae	1	excl	
+you fool	stulte	1	insult	vocative; stulta for feminine
+silly	stulte	1	insult	
+i love you	tē amō	1	state	
+i like {NP}	{1:nom} mihi placet	1	state	plural: placent
+i want {NP}	{1:acc} volō	1	state	
+i need {NP}	{1:abl} mihi opus est	1	state	
+i am hungry	ēsuriō	1	state	
+i am thirsty	sitiō	1	state	
+i am tired	fessus/fessa sum	1	state	
+i am afraid	timeō	1	state	
+i am cold	frīgeō	1	state	
+i am hot	caleō	1	state	
+i am happy	laetus/laeta sum	1	state	
+i am sad	trīstis sum	1	state	
+i am ready	parātus/parāta sum	1	state	
+it is time	tempus est	1	state	
+it's time to {VP}	tempus est {1:inf}	1	state	
+let's go	eāmus	1	imp	
+let's see	videāmus	1	imp	
+here you are	ecce	1	give	
+here it is	ecce	1	give	
+there it is	ecce	1	give	
+once upon a time	ōlim	1	narr	
+long ago	ōlim	1	narr	
+the end	fīnis	1	narr	
+happy birthday	fēlīx diēs nātālis	1	greet	
+merry christmas	fēlīx diēs nātālis Chrīstī	2	greet	
+your majesty	Māiestās Tua	2	address	vocative phrase
+your highness	Celsitūdō Tua	2	address	
+my dear	mī cāre/mea cāra	1	address	
+my friend	mī amīce/mea amīca	1	address	
+my lord	domine	1	address	
+my lady	domina	1	address	
+ladies and gentlemen	dominae ac dominī	1	address	

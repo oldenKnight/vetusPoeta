@@ -1,0 +1,132 @@
+# key	frame	example	note
+amo	acc	puerum amat	
+video	acc;acc+inf	puellam videt; videt puellam venīre	
+audio	acc;acc+inf	vōcem audit	
+habeo	acc	librum habet	
+do	dat+acc	puerō librum dat	
+dico	acc;dat+acc;acc+inf	vērum dīcit; mihi dīcit; dīcit sē venīre	
+loquor	intr;prep:cum+abl;prep:dē+abl	cum amīcō loquitur	deponent
+venio	intr;prep:ad+acc;prep:in+acc	ad urbem venit	
+eo	intr;prep:ad+acc;prep:in+acc	in hortum it	
+sum	copula	puer bonus est	
+possum	inf	venīre potest	
+volo	inf;acc	venīre vult; pecūniam vult	
+nolo	inf	venīre nōn vult	
+malo	inf	
+debeo	inf;dat+acc	venīre dēbet; pecūniam mihi dēbet	
+scio	acc;acc+inf;quod	
+nescio	acc;acc+inf	
+puto	acc+inf;acc	putat eum venīre	
+credo	dat;acc+inf	mihi crēde	dative person
+timeo	acc;nē;inf	lupum timet; timet nē veniat	
+quaero	acc;prep:ā+abl	librum quaerit; ā mē quaerit	
+invenio	acc	
+facio	acc;ut	
+ago	acc	quid agis?	
+capio	acc	
+accipio	acc;prep:ā+abl	
+pono	acc;prep:in+abl	librum in mēnsā pōnit	
+sedeo	intr;prep:in+abl	in sellā sedet	
+sto	intr	
+curro	intr;prep:ad+acc	
+cado	intr	
+dormio	intr	
+surgo	intr	
+maneo	intr;acc	domī manet; tē manet (waits for)	
+exspecto	acc	tē exspectat	
+specto	acc	
+aspicio	acc	
+peto	acc;prep:ā+abl	auxilium ā tē petit	
+rogo	acc;ut;dat	tē rogō ut veniās	rogō + acc person + ut
+oro	acc;ut	
+iubeo	acc+inf	iubet eum venīre	
+impero	dat;ut	servō imperat ut veniat	
+veto	acc+inf	
+sino	acc+inf	
+cogo	acc+inf;acc	
+moneo	acc;ut;nē	
+hortor	acc;ut	deponent	
+suadeo	dat;ut	
+persuadeo	dat;ut	
+pareo	dat	magistrō pāret	
+placeo	dat	mihi placet	"like": X mihi placet = I like X
+displiceo	dat	
+noceo	dat	
+faveo	dat	
+servio	dat	
+studeo	dat	
+ignosco	dat	
+confido	dat	
+invideo	dat	
+resisto	dat	
+nubo	dat	
+appropinquo	dat;prep:ad+acc	
+occurro	dat	
+subvenio	dat	
+succurro	dat	
+respondeo	dat;acc	
+utor	abl	gladiō ūtitur	deponent
+fruor	abl	
+fungor	abl	
+potior	abl	
+vescor	abl	
+careo	abl	
+egeo	abl;gen	
+opus	impers:dat+abl	mihi opus est pecūniā	"need"
+memini	gen;acc	
+obliviscor	gen;acc	
+misereor	gen	
+licet	impers:dat+inf	mihi licet venīre	"may"
+oportet	impers:acc+inf	oportet mē venīre	"must" (faithful)
+necesse	impers:dat+inf	necesse est mihi venīre	
+paenitet	impers:acc+gen	mē paenitet	"I am sorry"
+pudet	impers:acc+gen	mē pudet	
+taedet	impers:acc+gen	
+decet	impers:acc+inf	
+iuvat	impers:acc+inf	
+pluit	intr	
+ningit	intr	
+gaudeo	abl;quod;acc+inf	hōc gaudeō; gaudeō quod venīs	
+doleo	abl;quod	
+laetor	abl;quod	deponent
+miror	acc;quod;acc+inf	deponent
+sequor	acc	deponent
+proficiscor	intr;prep:ad+acc	deponent
+morior	intr	deponent
+nascor	intr	deponent
+conor	inf	deponent
+videor	inf;dat	mihi videtur	"seem"
+fio	copula;intr	
+nomino	acc;acc	eum rēgem nōminat	double accusative
+appello	acc;acc	
+voco	acc;acc	mē Alīciam vocant	
+doceo	acc;acc	puerōs grammaticam docet	double accusative
+celo	acc;acc	
+posco	acc;acc	
+interrogo	acc;acc	
+emo	acc;abl	librum decem dēnāriīs emit	ablative of price
+vendo	acc;abl	
+muto	acc;abl	
+compleo	acc;abl	
+impleo	acc;abl	
+libero	acc;abl	
+privo	acc;abl	
+orno	acc;abl	
+ludo	intr;abl	pilā lūdit	
+bibo	acc	
+edo	acc	
+coquo	acc	
+aperio	acc	
+claudo	acc	
+scribo	acc;dat	
+lego	acc	
+canto	acc;intr	
+rideo	intr;acc	
+fleo	intr;acc	
+clamo	intr;acc	
+taceo	intr	
+ambulo	intr	
+navigo	intr	
+volo2	intr	volāre, to fly	homograph of volō "want": key volo2 in tiers
+saluto	acc	
+vale	intr	imperative only: valē, valēte	
