@@ -1305,7 +1305,7 @@ struct GreekPath::Impl {
                  !checkOk(o, "A8") || !checkOk(o, "A9") || a.minMargin < 0.15 || a.song || a.nonverbal;
       for (const char* f : {"name-guessed", "from-rule", "addressee-guess", "missing-form", "merged", "frame-fallback",
                             "realia", "name-kept", "contact-relative", "noun-infinitive", "purpose-guess", "light-verb",
-                            "phrase-order", "participle-phrase", "ellipsis", "clause-repair", "wh-statement"})
+                            "phrase-order", "participle-phrase", "ellipsis", "clause-repair", "wh-statement", "det-adverb"})
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       for (const transfer::Choice& c : a.choices)
         if (c.lowTier) {

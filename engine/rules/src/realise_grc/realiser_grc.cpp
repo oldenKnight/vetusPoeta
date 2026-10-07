@@ -474,6 +474,14 @@ void GreekRealiser::verbGroup(const GrcClause& c, const Agree& subj, std::vector
       form(lemma, g, w2, rule);
       if (!w2.missing) w = std::move(w2);
     }
+    // C21: a verb whose table has no imperfect (λυπέω): the aorist for a past state in the indicative
+    if (w.missing && f.tense == Imperfect && f.mood == Indicative) {
+      Features g = f;
+      g.tense = Aorist;
+      GWord w2;
+      form(lemma, g, w2, rule);
+      if (!w2.missing) w = std::move(w2);
+    }
     dst.push_back(std::move(w));
   };
   if (ctx.participle) {   // C18: circumstantial participle agreeing with the main clause's subject (ctx.ante)

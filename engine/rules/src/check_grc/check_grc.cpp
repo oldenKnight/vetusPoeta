@@ -502,7 +502,14 @@ struct GreekChecker::Impl {
       if (!isPrep(i) || punctAfter[i]) continue;
       const uint16_t cases = prepCasesOf(i);
       if (!cases) continue;
-      const size_t x = i + 1;
+      size_t x = i + 1;
+      // C21: a second-position particle after the preposition ("ἐν δὲ τῷ ἀγρῷ", "ἐν οὖν οἰκίᾳ"): the phrase goes on
+      {
+        static const char* const kPost[] = {"δέ", "γάρ", "οὖν", "μέν", "γε", "δή", "τε", "τοίνυν"};
+        const std::string k = text::greek_key(grc::ultimaToAcute(T(x)));
+        for (const char* p : kPost)
+          if (k == text::greek_key(p) && x + 1 < n && !punctAfter[x]) { x = x + 1; break; }
+      }
       if (!any(x, isNominal)) continue;
       size_t head = x;
       const uint16_t m = npStartMask(x, &head);
@@ -699,9 +706,15 @@ struct GreekChecker::Impl {
       for (size_t v : verbs)
         for (const Reading& r : rd[v])
           if (isFinite(r) && r.f.mood != Imperative) imperativeOnly = false;
-      bool third = false;
+      // C21: a nom/acc neuter is read as the subject only when the verb must be 3rd person: ἔφαγον is 1 sg and 3 pl,
+      // so in "οὐδέποτε οὕτως ἡδὺ μῆλον ἔφαγον" μῆλον is the object, not a subject disagreeing with the verb
+      bool third = false, notThird = false;
       for (size_t v : verbs)
-        for (const Reading& r : rd[v]) third = third || (isFinite(r) && r.f.person == P3);
+        for (const Reading& r : rd[v]) {
+          third = third || (isFinite(r) && r.f.person == P3);
+          notThird = notThird || (isFinite(r) && r.f.mood != Imperative && (r.f.person == P1 || r.f.person == P2));
+        }
+      if (notThird) third = false;
       ambiguous.erase(std::remove_if(ambiguous.begin(), ambiguous.end(), [&](size_t j) {
                         for (const Reading& r : rd[j])
                           if (r.closed && (r.key == "τίσ" || r.key == "τισ")) return true;

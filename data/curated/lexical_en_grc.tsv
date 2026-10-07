@@ -21,6 +21,12 @@
 #   verb rows, frame (C16): "nonfinite" = used instead of the main row when the verb is an infinitive, a subjunctive,
 #         a future, or inside a subordinate clause / indirect question ("go" -> εἶμι: ἰέναι, ἴωμεν, εἶ); "sub" = used
 #         inside a subordinate clause only ("before she comes" -> πρὶν ἥκειν).
+#   C21: subject rows may have frame "mid" (the middle voice: "the rain stopped" -> ἐπαύσατο) or "mid-pres" (middle in the
+#         present system, active elsewhere: δύεται / ἔδυ); a subject row's voice overrides a Spanish "se" read as a
+#         passive; verb rows may have frame "mid" (the middle: "touch" -> ἅπτομαι + gen), "impers" (an impersonal weather
+#         verb: "it is snowing" -> νίφει; a Spanish "nieva" read as an imperative is a statement) or "thing" (only with an
+#         object that is a thing: "bring the water" -> φέρω); state rows may have frame "pass" (the passive: λυπεῖται,
+#         ἐλυπήθη); kind noun (a fixed noun used only when greek.vpl has the lemma, else the realia row of the same source).
 #   source: English (or Spanish) lemma(s), lower case. greek: the Greek lemma as in greek.vpl (headword without length
 #   marks). Spanish sources mirror the English rows (the Spanish frame builder keeps Spanish content lemmas).
 phrasal	come back	ἐπανέρχομαι		
@@ -272,7 +278,6 @@ subject	boat leave	ἀποπλέω
 # system, the active elsewhere: "the sun is setting" -> δύεται, "the sun set" -> ἔδυ, the root aorist)
 subject	rain stop	παύω	mid	"the rain stopped" -> ὁ ὄμβρος ἐπαύσατο (not τὸ ὕδωρ ἔστησεν)
 subject	rain cease	παύω	mid	
-subject	storm stop	παύω	mid	
 subject	wind stop	παύω	mid	"the wind stopped" -> ὁ ἄνεμος ἐπαύσατο
 subject	sun set	δύω	mid-pres	"the sun set" -> ὁ ἥλιος ἔδυ; "the sun is setting" -> ὁ ἥλιος δύεται
 subject	moon set	δύω	mid-pres	
@@ -281,15 +286,25 @@ subject	wind blow	πνέω		"the wind blows" -> ὁ ἄνεμος πνεῖ
 subject	lluvia parar	παύω	mid	"la lluvia paró" -> ὁ ὄμβρος ἐπαύσατο
 subject	lluvia cesar	παύω	mid	
 subject	lluvia detener	παύω	mid	
-subject	viento parar	παύω	mid	
 subject	sol poner	δύω	mid-pres	"el sol se puso" -> ὁ ἥλιος ἔδυ
 subject	luna poner	δύω	mid-pres	
 subject	viento soplar	πνέω		"el viento sopla" -> ὁ ἄνεμος πνεῖ
-subject	luna salir	ἀνατέλλω		"salió la luna"
 verb	rain	ὕω	impers	"it rained yesterday" -> χθὲς ὗσεν (impersonal: the subject "it" is dropped)
 verb	snow	νίφω	impers	"it is snowing" -> νίφει
 verb	llover	ὕω	impers	"llueve" -> ὕει
 verb	nevar	νίφω	impers	"nieva" -> νίφει
+verb	touch	ἅπτω	mid	C21: "don't touch the fire" -> μὴ ἅπτου τοῦ πυρός (ἅπτομαι + genitive by valency mid:gen; the active ἅπτω is "fasten, kindle")
+verb	tocar	ἅπτω	mid	
+verb	bring	φέρω	thing	C21: a thing is carried ("bring me some water" -> ἔνεγκέ μοι ὕδωρ); a person or an animal is led (ἄγω)
+verb	traer	φέρω	thing	
+state	sad	λυπέω	pass	C21: "why are you so sad?" -> διὰ τί οὕτω λυπεῖ; (a person grieves: the passive, aorist ἐλυπήθη)
+state	triste	λυπέω	pass	
+pp	at home	οἴκοι	adv	C21: "we will stay at home" -> οἴκοι μενοῦμεν (not ἐν οἰκίᾳ)
+pp	in casa	οἴκοι	adv	Spanish "en casa" (the Spanish frame gives the preposition in English)
+durative	be sad	λυπέω		C21: state in the past: the imperfect (ἐλυπεῖτο; greek.vpl has no imperfect cells, so the aorist ἐλυπήθη)
+verb	poner	τίθημι		C21: "¿dónde pusiste la llave?" -> ποῦ τὴν κλεῖν ἔθηκας; (the reverse index chose ἐπαγιδεύω "trap")
+state	loud	βοάω	verb	C21: "don't be so loud!" -> μὴ οὕτω βόα (was μὴ ἴσθι οὕτω μέγα, "so big")
+state	ruidoso	βοάω	verb	
 verb	lose	ἀπόλλυμι		C21: "I lost my ring" -> τὸν δακτύλιόν μου ἀπώλεσα (the reverse index chose ἁμαρτάνω "miss")
 verb	perder	ἀπόλλυμι		
 durative	hurry	σπεύδω		C21: "Hurry, the ship is leaving!" -> σπεῦδε (present imperative, as Attic says it)

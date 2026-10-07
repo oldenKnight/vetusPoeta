@@ -2,6 +2,8 @@
 // table, and analysis with the Attic filter (vp/morph_grc.h).
 #include <algorithm>
 #include <cstring>
+#include <string>
+#include <vector>
 
 #include "vp/morph_grc.h"
 #include "vp/realise_grc.h"
@@ -486,6 +488,34 @@ const Override kOverrides[] = {
     {"δύω", Aorist, Indicative, P3, Pl, "ἔδυσαν", false, true},
 };
 
+// C21: the simplex verbs with a middle future in Attic (Smyth 805-806; our own selection of the common ones); a
+// compound ends in its simplex (ἀναγιγνώσκω, ἀποπλέω)
+bool futureMiddle(std::string_view key) {
+  static const char* const kList[] = {"ἀκούω", "γιγνώσκω", "ὁράω", "λαμβάνω", "μανθάνω", "φεύγω", "πίνω", "ἐσθίω",
+                                      "πάσχω", "βαίνω", "τρέχω", "πλέω", "θαυμάζω", "ᾄδω", "βοάω", "γελάω", "κάμνω",
+                                      "πίπτω", "θνῄσκω", "τίκτω", "νέω", "πνέω", "κλαίω", "σιγάω", "σιωπάω"};
+  static const char* const kPrefix[] = {"", "ἀνα", "ἀν", "ἀπο", "ἀπ", "ἀφ", "ἐκ", "ἐξ", "εἰσ", "κατα", "κατ", "καθ",
+                                        "δια", "δι", "μετα", "μετ", "μεθ", "παρα", "παρ", "περι", "προσ", "συν",
+                                        "συμ", "ὑπο", "ὑπ", "ὑφ", "ἐπι", "ἐπ", "ἐφ", "προ", "ἀμφι", "ἐν", "ἐμ"};
+  static const std::vector<std::string> list = [] {
+    std::vector<std::string> v;
+    for (const char* k : kList) v.push_back(text::greek_key(k));
+    return v;
+  }();
+  static const std::vector<std::string> prefixes = [] {
+    std::vector<std::string> v;
+    for (const char* p : kPrefix) v.push_back(text::greek_key(p));
+    return v;
+  }();
+  for (const std::string& kk : list) {
+    if (key.size() < kk.size() || key.compare(key.size() - kk.size(), kk.size(), kk) != 0) continue;
+    const std::string_view pre = key.substr(0, key.size() - kk.size());
+    for (const std::string& p : prefixes)
+      if (pre == p) return true;
+  }
+  return false;
+}
+
 bool attested(const lex::Lexicon& lx, uint32_t lemma, const char* form, const Features& want, bool anyDialect = false) {
   thread_local std::vector<lex::Analysis> an;
   an.clear();
@@ -546,6 +576,16 @@ bool generate(const lex::Lexicon& lx, uint32_t lemma, const Features& want0, std
       want.tense = want.tense == Present ? (uint8_t)Perfect : (uint8_t)Pluperfect;
       gi.presentAsPerfect = true;
     }
+  }
+  // C21: verbs whose Attic future is middle in form (ἀκούσομαι, γνώσομαι, ὄψομαι, λήψομαι, φεύξομαι, πλεύσομαι ...):
+  // an active future request takes the middle cells when the table has them (the tables list ἀναγνώσω first)
+  if (want.pos == Verb && want.tense == Future && (want.voice == 0 || want.voice == Active) && futureMiddle(l.key)) {
+    bool mid = false;
+    for (const auto& c : cells) {
+      const Features f = unpack(c.first);
+      mid = mid || (f.tense == Future && f.voice == Middle && f.mood == want.mood);
+    }
+    if (mid) want.voice = Middle;
   }
   int best = -1000;
   std::string bestForm;
