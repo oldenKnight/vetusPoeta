@@ -32,8 +32,9 @@ Last updated: 2026-10-05 (session 1, step 1 of the production process).
 - Gold Latin: tests/regression/expected/*.gold.txt (main agent). Held-out hygiene: nobody reads tests/heldout,
   tests/eval_gold or data/work/eval/heldout-*; BURNED.txt lists the 100 cues moved to the tuning sample.
 - Quality state (honest): tuned EN 114/114, ES 100/100, Greek 114/114 (ES->GRC 39/40), oz_sample 78/100; held-out
-  automatic errors own 3/74 (4.1 %), oz 117/700 (16.7 %); wrong among OK 0 everywhere; model gate 74.9 % so Latin
-  reranking is off. Loops C18 (Greek 3) and C19 (Latin 4) are DONE; the next loop (C20) runs on the acceptance file.
+  automatic errors own 3/74 (4.1 %), oz 109/700 (15.6 %); wrong among OK 0 everywhere; model gate 74.9 % so Latin
+  reranking is off. Acceptance file (owner's partial Alice, 82 cues): expert wrong rate 79 % at first run, 27 % after
+  loop 1 (C22); loop 2 (C24) is queued after the latinity engine task (C23).
 
 ## Open items for the owner
 - The owner's PARTIAL Alice file arrived 2026-10-07 13:13 UTC (82 cues) with his own free Latin version; both are in
