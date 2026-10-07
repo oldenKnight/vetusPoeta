@@ -302,3 +302,12 @@ imperfect is not marked (the frame says only "past").
   εὐχαρίστησόν σε (a phrasebook gap); "I am so sorry." -> οὕτω φαύλη εἰμί; "we will come" -> ἐλευσόμεθα (poetic; Attic
   ἥξομεν or εἶμι); "tonight" -> νύκτωρ "by night"; 2nd singular middle in -ῃ (ἀκούσῃ, ἀναγνώσῃ) where later Attic prose
   writes -ει; "The door was open" -> φανερά (ἀνεῳγμένη).
+
+## Review of loop 4 (main agent, 2026-10-07)
+- Accepted. Fresh spot check of ten unseen sentences: OK 3 (2 right), Check 6, Fix 1. The wrong OK ("Why are you
+  laughing at me?" -> παρὰ ἐμοὶ γελᾷς) was fixed in the tables: verbprep "laugh at", "reír of", "burlar of" ->
+  καταγελάω with a genitive object (valency_grc.tsv). The Spanish key is "reír of" because the Spanish frame keeps the
+  lemma without the clitic and maps "de" to "of", as verbprep_es_la.tsv does.
+- For loop 5: "such a cold night that the river froze" -> ὅτι instead of ὥστε (Check); "wept" not derived (Fix);
+  Spanish "anciano" -> ἀκτέα, the elder tree (gloss ambiguity: add γέρων for anciano); "We had such a good time"
+  rendered word for word and rated OK (reported by the implementer; not fixed).

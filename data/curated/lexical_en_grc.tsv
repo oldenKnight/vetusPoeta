@@ -261,6 +261,12 @@ state	late	ὑστερέω	verb	C18: "we will be late" -> ὑστερήσομε�
 state	late	ὀψέ	adv	C18: "it is late" -> ὀψέ ἐστιν (frame adv: the Greek adverb with an impersonal copula)
 state	early	πρωΐ	adv	"it is early" -> πρωΐ ἐστιν
 verbprep	bark at	ὑλακτέω	prep:πρός+acc	C18: "the dog barked at the moon" -> πρὸς τὴν σελήνην ὑλάκτει
+verbprep	laugh at	καταγελάω	obj	main agent after C21: "why are you laughing at me" -> διὰ τί μου καταγελᾷς; (genitive by valency_grc.tsv; παρὰ ἐμοί was wrong and OK)
+verbprep	reírse de	καταγελάω	obj	
+verbprep	reír of	καταγελάω	obj	the Spanish frame keeps the lemma reír (clitic se removed) and maps de -> of (as verbprep_es_la.tsv)
+verbprep	reír about	καταγελάω	obj	
+verbprep	burlar of	καταγελάω	obj	
+verbprep	burlarse de	καταγελάω	obj	
 realia	pizza	πλακοῦς		C18: no Attic word for pizza: "flat cake" (decision 1)
 realia	pizza	πλακοῦς		Spanish: pizza (the same word)
 phrasal	wake up	ἐγείρω	pass	C18: "the children woke up" -> ἠγέρθησαν (the passive aorist is "woke up")
