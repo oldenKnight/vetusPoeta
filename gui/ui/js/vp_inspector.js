@@ -12,12 +12,20 @@
  * candidate replaces the token through cue.set; the cue shows Check until re-checked) and
  * "Add to my corrections" (cue.set with remember "phrase"). Every analysis line is engine
  * data; the UI only words it. Caches: cue.get 20, word.inspect 200, lemma.get 20 (LRU).
+ * B10 (D18): a Latin word whose shown sense is Medieval / Late / New Latin gets a "late Latin"
+ * badge next to the gloss. The register lives in SenseView.tags ("medieval", "new-latin";
+ * views.cpp senseTagNames), which only lemma.get returns, so a Latin target word fetches its
+ * lemma (same LRU cache as "Other forms", whose table is still built only when opened).
+ * LemmaView has no tags field; its flags are read for the same names. The engine does not
+ * name the chosen sense: it is the sense whose gloss is the one shown (LemmaView glossEn is
+ * the first-ranked sense), else the best-ranked one (lateSense(senses, lemma), pure).
  *
  * VP_Inspector.mount(el, params) / destroy(); show(inspect); toggleWhy(open?) -> bool;
  * toggleForms(open?) -> bool; useCandidate(n) -> Promise; addCorrection() -> Promise;
  * openHelp(feature, value); state(); helpers shared with the other panels: tierBadge(tier,
  * compact), formWords(features) -> {words, abbr, terms}, glossOf(lemma), grid(cells,
- * features, lang) (pure, tests), replaceToken(text, tokens, k, word), stats()
+ * features, lang) (pure, tests), replaceToken(text, tokens, k, word), lateSense(senses,
+ * lemma) (pure), stats()
  * B8: a source word of a reading pair (la-en, la-es, grc-en, grc-es; inspect side
  * "analysis") shows its lexicon entry, the form it was read as, the paradigm, and "Why this
  * reading?" from its `analysis` reason {head, gloss, form, role, confidence, alternatives,
@@ -54,6 +62,9 @@
     act: 'active', pass: 'passive', mid: 'middle', comp: 'comparative', sup: 'superlative' };
   var SOURCES = ['wiktionary', 'whitaker', 'model', 'online'];
   var CHECKS = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9'];
+  // views.cpp names for Medieval / Late / ecclesiastical / New Latin: SenseView.tags "medieval"
+  // and "new-latin"; "late-latin" is the analysis flag name (not sent today, read if it is).
+  var LATE_TAGS = ['medieval', 'new-latin', 'late-latin'];
 
   var s = null;
   var whyOpen = false;
@@ -339,6 +350,59 @@
     });
     list.sort(function (a, b) { return rank(MOODS, a.mood) - rank(MOODS, b.mood) || rank(VOICES, a.voice) - rank(VOICES, b.voice); });
     return { kind: 'verbal', groups: list, other: other, usedGroup: usedGroup || (list[0] ? list[0].key : null), used: usedKey };
+  }
+
+  // ---------------------------------------------------------------- register (B10, D18)
+  function isLate(list) {
+    if (!list || typeof list.length !== 'number') { return false; }
+    for (var i = 0; i < list.length; i++) { if (LATE_TAGS.indexOf(String(list[i]).toLowerCase()) >= 0) { return true; } }
+    return false;
+  }
+
+  function sameGloss(a, b) { return !!a && !!b && String(a).replace(/\s+/g, ' ').trim().toLowerCase() === String(b).replace(/\s+/g, ' ').trim().toLowerCase(); }
+
+  // The sense shown for `lemma`: the one with its gloss (English, then Spanish), else the
+  // best-ranked (lowest rank) one; null without senses.
+  function shownSense(senses, lemma) {
+    var list = senses || [];
+    var l = lemma || {};
+    var i;
+    for (i = 0; i < list.length; i++) { if (list[i] && sameGloss(list[i].glossEn, l.glossEn)) { return list[i]; } }
+    for (i = 0; i < list.length; i++) { if (list[i] && sameGloss(list[i].glossEs, l.glossEs)) { return list[i]; } }
+    var best = null;
+    for (i = 0; i < list.length; i++) {
+      if (list[i] && (!best || (Number(list[i].rank) || 0) < (Number(best.rank) || 0))) { best = list[i]; }
+    }
+    return best;
+  }
+
+  // true when the lemma's flags or the shown sense's tags mark Medieval / Late / New Latin.
+  function lateSense(senses, lemma) {
+    if (isLate(lemma && lemma.flags)) { return true; }
+    var sense = shownSense(senses, lemma);
+    return !!(sense && isLate(sense.tags));
+  }
+
+  function putLateBadge() {
+    var D = window.VP_Dom;
+    if (!s || D.qs('.vp-insp-late', s.body)) { return; }
+    var host = D.qs('.vp-insp-gloss', s.body) || D.qs('.vp-insp-head', s.body);
+    if (host) { host.appendChild(i18nEl('span', 'vp-insp-late', 'inspector.sense.lateLatin')); }
+  }
+
+  // Latin only (the Greek "medieval" tag is Byzantine, not late Latin).
+  function lateBadge(lemma, lang) {
+    if (lang !== 'la' || !lemma) { return; }
+    if (isLate(lemma.flags)) {
+      putLateBadge();
+      return;
+    }
+    if (lemma.id === undefined || lemma.id === null) { return; }
+    var gen = s.gen;
+    fetchLemma(lang, lemma.id).then(function (r) {
+      if (!s || s.gen !== gen || !s.view || s.view.lemma !== lemma) { return; }
+      if (lateSense(r && r.senses, lemma)) { putLateBadge(); }
+    }, function () { return null; });
   }
 
   // ---------------------------------------------------------------- data
@@ -656,6 +720,7 @@
       kids.push(analysisWhy(reasons, reading || {}, detail && detail.checks, features, lang));
       s.others = [];
       setBody([el('div', { className: 'vp-insp-card vp-insp-reading' }, kids)]);
+      lateBadge(lemma, lang);
       if (s.formsOpen && tableOk) { toggleForms(true); }
       return;
     }
@@ -680,6 +745,7 @@
     ]));
     s.others = others;
     setBody([el('div', { className: 'vp-insp-card' }, kids)]);
+    lateBadge(lemma, lang);
     if (s.formsOpen && tableOk) { toggleForms(true); }
   }
 
@@ -1070,7 +1136,7 @@
     var keys = ['inspector.empty.title', 'inspector.loading.label', 'inspector.unknown.label', 'inspector.suggest.label', 'inspector.gloss.label', 'inspector.gloss.viaEnglish.label',
       'inspector.gloss.english.label', 'inspector.form.label', 'inspector.form.none.label', 'inspector.help.aria', 'inspector.help.abbr.label', 'inspector.help.none.label',
       'inspector.forms.caption', 'inspector.forms.used.label', 'inspector.emoji.aria', 'inspector.another.noForm.label', 'inspector.another.done.label',
-      'inspector.correction.done.label', 'why.meaning.sense.label', 'why.meaning.context.label', 'why.model.label', 'why.correction.label', 'why.phrasebook.label', 'why.name.label',
+      'inspector.correction.done.label', 'inspector.sense.lateLatin', 'why.meaning.sense.label', 'why.meaning.context.label', 'why.model.label', 'why.correction.label', 'why.phrasebook.label', 'why.name.label',
       'why.reading.form.label', 'why.reading.gloss.label', 'why.reading.sure.label', 'why.reading.confidence.label', 'source.word.role.label'];
     SOURCES.forEach(function (x) { keys.push('why.evidence.source.' + x + '.label'); });
     ['yes', 'no', 'off', 'none'].forEach(function (x) { keys.push('why.evidence.state.' + x + '.label'); });
@@ -1095,6 +1161,7 @@
     formWords: formWords,
     glossOf: glossOf,
     grid: grid,
+    lateSense: lateSense,
     replaceToken: replaceToken,
     stats: function () { return s ? { cueGet: s.cues.size(), words: s.words.size(), lemmas: s.lemmas.size() } : null; },
     i18nKeys: i18nKeys

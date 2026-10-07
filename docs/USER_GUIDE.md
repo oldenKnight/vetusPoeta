@@ -214,6 +214,12 @@ OK marks (69, against 53 and 43). A line under the slider states the effect in n
 
 - **Emoji after picturable nouns (in the app)**: an emoji only after a noun with one clear picture (🌹 after
   *rosam*); none when the noun has several meanings. `Ctrl+E` hides or shows them.
+- **Accept medieval and ecclesiastical Latin**: on by default. Words, meanings and set phrases of late, medieval
+  and church Latin (for example *Habeās mē excūsātum* for "I'm sorry") are used like classical ones and are not by
+  themselves a reason for Check. Turn it off for classical Latin only: such words are then avoided when a classical
+  word exists and marked Check when none does. In the **Word** tab a small **late Latin** badge next to the meaning
+  shows that the dictionary marks that meaning as medieval, late or New Latin. Changing the switch marks the
+  translated cues out of date (grey dot); use **Translate again**.
 - **Macrons in the exported file**: the Export default. In the app macrons are shown unless you hide them
   (`Ctrl+M`).
 - **Translate again**: **Selected cue** or **All cues**. Cues you edited or accepted are kept as they are.

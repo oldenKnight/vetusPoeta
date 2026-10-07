@@ -85,15 +85,16 @@ describe('VP_Inspector', function () {
     eq(env.errors().length, 0);
   });
 
-  it('"Other forms" is lazy: lemma.get only when opened; the table highlights the used cell; verbs get person/number x tense per mood and voice', function () {
+  it('"Other forms" is lazy: the table is built only when opened (its lemma.get is the one cached for the B10 register badge); the table highlights the used cell; verbs get person/number x tense per mood and voice', function () {
     var env = boot();
     var W = env.window;
     inspect(env, 0);
-    eq(env.cmds('lemma.get').length, 0, 'no lemma.get before opening');
+    eq(env.cmds('lemma.get').length, 1, 'one lemma.get for the sense register (B10)');
     ok(env.q('#vp-insp-forms').hidden);
+    eq(env.q('#vp-insp-forms').childNodes.length, 0, 'no table before opening');
     env.q('[data-insp-action="forms"]').click();
     env.clock.tick(50);
-    eq(env.cmds('lemma.get').length, 1);
+    eq(env.cmds('lemma.get').length, 1, 'the table reuses the cached lemma');
     deepEq(env.cmds('lemma.get')[0].params, { lang: 'la', id: 'puella' });
     var table = env.q('.vp-paradigm');
     ok(table, 'paradigm table');
@@ -223,6 +224,62 @@ describe('VP_Inspector', function () {
     env.clock.tick(300);
     deepEq(W.VP_Debug.failures(), []);
     ok(W.VP_Router.counts().listeners < before.listeners);
+  });
+
+  it('lateSense() (B10, D18): the shown sense is the one with the lemma gloss (English, then Spanish), else the best-ranked; "medieval" / "new-latin" sense tags or a late lemma flag mark it', function () {
+    var env = load('all');
+    var L = env.window.VP_Inspector.lateSense;
+    var senses = [
+      { glossEn: 'girl', glossEs: 'niña', tags: [], rank: 1 },
+      { glossEn: 'nun', glossEs: 'monja', tags: ['medieval'], rank: 2 },
+      { glossEn: 'maid of a college', glossEs: '', tags: ['new-latin', 'figurative'], rank: 3 }
+    ];
+    eq(L(senses, { glossEn: 'girl' }), false, 'classical first sense');
+    eq(L(senses, { glossEn: '  Nun ' }), true, 'gloss matched loosely: the medieval sense');
+    eq(L(senses, { glossEn: 'maid of a college' }), true, 'new-latin');
+    eq(L(senses, { glossEn: '', glossEs: 'monja' }), true, 'Spanish gloss when the English one is empty');
+    eq(L(senses, { glossEn: 'unknown gloss' }), false, 'no match: best-ranked sense (rank 1)');
+    eq(L([{ tags: ['medieval'], rank: 1 }, { tags: [], rank: 2 }], { glossEn: 'x' }), true, 'best-ranked sense is medieval');
+    eq(L([], { flags: ['has-table', 'late-latin'] }), true, 'late lemma flag');
+    eq(L(null, { flags: ['has-table'] }), false, 'no senses, no flag');
+    eq(L([{ glossEn: 'girl', tags: ['poetic', 'rare'], rank: 1 }], { glossEn: 'girl' }), false, 'other register tags are not late Latin');
+    eq(L(senses, null), false, 'no lemma');
+  });
+
+  it('Word tab: a "late Latin" badge next to the gloss when the shown sense is tagged medieval (lemma.get senses); none otherwise; one badge per render; in Spanish too', function () {
+    var env = boot();
+    var W = env.window;
+    var call = W.VP_Bridge.call;
+    W.VP_Bridge.call = function (cmd, params) {
+      var p = call(cmd, params);
+      if (cmd !== 'lemma.get' || params.id !== 'puella') { return p; }
+      return p.then(function (r) {
+        r.senses = [{ glossEn: 'girl', glossEs: 'niña', keywords: 'girl', tags: ['medieval'], rank: 1 }, { glossEn: 'young woman', glossEs: '', keywords: '', tags: [], rank: 2 }];
+        return r;
+      });
+    };
+    inspect(env, 2);
+    eq(W.VP_Inspector.state().word, 'videt');
+    eq(env.q('.vp-insp-late'), null, 'untagged sense: no badge');
+    inspect(env, 0);
+    eq(W.VP_Inspector.state().word, 'Puella');
+    var badge = env.q('.vp-insp-late');
+    ok(badge, 'badge shown');
+    eq(badge.textContent, 'late Latin');
+    ok(badge.parentNode.classList.contains('vp-insp-gloss'), 'next to the gloss');
+    var n = env.cmds('lemma.get').length;
+    W.VP_App.saveSettings({ showEmoji: false });
+    env.clock.tick(50);
+    eq(env.qa('.vp-insp-late').length, 1, 'a re-render keeps one badge');
+    eq(env.cmds('lemma.get').length, n, 'lemma.get cached');
+    W.VP_I18n.setLang('es-MX');
+    env.clock.tick(50);
+    eq(env.q('.vp-insp-late').textContent, 'latín tardío');
+    W.VP_I18n.setLang('en-US');
+    env.clock.tick(50);
+    inspect(env, 2);
+    eq(env.q('.vp-insp-late'), null, 'gone for the next word');
+    eq(env.errors().length, 0);
   });
 });
 

@@ -28,7 +28,7 @@
   var ENCODINGS = ['utf-8', 'utf-16le', 'windows-1252'];
   var DEFAULTS = {
     lang: 'en-US', theme: 'auto', textScale: 100, showMacrons: true, showEmoji: true, grammarColours: false,
-    defaultPair: 'en-la', defaultFidelity: 2,
+    defaultPair: 'en-la', defaultFidelity: 2, latinity: 'wide',
     'export': { emoji: false, macrons: false, encoding: 'utf-8', bom: false, rebreak: true },
     engines: { model: false, online: false },
     online: { wiktionary: false, latinitium: false },

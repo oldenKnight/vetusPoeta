@@ -12,8 +12,10 @@
  * in numbers (tier counts of the lexicon when engine.hello has them, the file's share from
  * words.list); the strings are keyed by the fidelity value (fidelity.stop.fN,
  * fidelity.effect.fN). Emoji in the app
- * (showEmoji) and macrons in the exported file (export.macrons). "Translate again" for the
- * selected cue or all cues. Changing fidelity or an engine marks translated cues stale
+ * (showEmoji) and macrons in the exported file (export.macrons). B10 (D18): "Accept medieval
+ * and ecclesiastical Latin" (settings latinity: on = "wide", the default and the value when
+ * the key is missing, e.g. an engine older than C23; off = "classical"). "Translate again" for the
+ * selected cue or all cues. Changing fidelity, latinity or an engine marks translated cues stale
  * through VP_Workspace.cmd.markStale (grey dot); edited and reviewed cues are never touched.
  *
  * B8: engine.hello.model.rerankEnabled false -> "helps with understanding English/Spanish
@@ -26,7 +28,8 @@
  * under their engine with the engine's hint.
  *
  * VP_Engines.mount(el) / destroy(); setFidelity(1..3); sliderToFidelity(pos) /
- * fidelityToSlider(f) (identity, clamped to 1..3); maxTier(f) (4 - f); setModel(bool) / setOnline(bool) -> Promise; findModel() -> Promise;
+ * fidelityToSlider(f) (identity, clamped to 1..3); maxTier(f) (4 - f); setModel(bool) / setOnline(bool) -> Promise;
+ * latinity() -> "wide" | "classical"; setLatinity(bool on) -> Promise(value); findModel() -> Promise;
  * testOnline() -> Promise; translateAgain('selected'|'all'); stats()
  */
 (function () {
@@ -72,6 +75,9 @@
     var f = settings().defaultFidelity;
     return f >= 1 && f <= 3 ? f : 2;
   }
+
+  // D18: anything but "classical" (missing key, older engine) is the default "wide".
+  function latinity() { return settings().latinity === 'classical' ? 'classical' : 'wide'; }
 
   function sw(id, on, action, opts) {
     opts = opts || {};
@@ -196,6 +202,7 @@
     s.testBtn.disabled = !en.online;
     s.emojiSw.setAttribute('aria-checked', st.showEmoji === false ? 'false' : 'true');
     s.macronSw.setAttribute('aria-checked', st['export'] && st['export'].macrons ? 'true' : 'false');
+    s.latinSw.setAttribute('aria-checked', latinity() === 'wide' ? 'true' : 'false');
     var sel = window.VP_Store.get('selection');
     var job = window.VP_Store.get('job');
     s.againSel.disabled = !sel || !!job;
@@ -234,6 +241,18 @@
     var done = save('engines.model', !!on);
     markStale();
     return done.then(function () { return !!on; });
+  }
+
+  // The engine reads latinity at translate.start, so a change marks translated cues stale.
+  function setLatinity(on) {
+    var v = on ? 'wide' : 'classical';
+    if (v === latinity()) {
+      if (s) { render(); }
+      return P().resolve(v);
+    }
+    var done = save('latinity', v);
+    markStale();
+    return done.then(function () { return v; });
   }
 
   function explainOnline() {
@@ -341,6 +360,8 @@
       testOnline();
     } else if (a === 'emoji') {
       save('showEmoji', st.showEmoji === false);
+    } else if (a === 'latinity') {
+      setLatinity(latinity() !== 'wide');
     } else if (a === 'macrons') {
       save('export.macrons', !(st['export'] && st['export'].macrons));
     } else if (a === 'install') {
@@ -375,6 +396,7 @@
     s.onlineSw = sw('vp-eng-online', false, 'online', { desc: 'vp-eng-online-hint' });
     s.emojiSw = sw('vp-eng-emoji', st.showEmoji !== false, 'emoji');
     s.macronSw = sw('vp-eng-macrons', false, 'macrons');
+    s.latinSw = sw('vp-eng-latinity', latinity() === 'wide', 'latinity', { desc: 'vp-eng-latinity-hint' });
     s.modelStatus = el('div', { className: 'vp-eng-status', 'aria-live': 'polite' });
     s.onlineStatus = el('div', { className: 'vp-eng-status vp-eng-online-status', 'aria-live': 'polite' });
     s.testBtn = i18nEl('button', 'vp-btn vp-btn-secondary', 'engines.online.test.cta', null, { type: 'button', 'data-eng-action': 'test' });
@@ -410,6 +432,8 @@
       ]),
       el('section', { className: 'vp-eng' }, [
         row('vp-eng-emoji', 'engines.emoji.label', s.emojiSw),
+        row('vp-eng-latinity', 'engines.latinity.label', s.latinSw),
+        i18nEl('p', 'vp-hint', 'engines.latinity.hint', null, { id: 'vp-eng-latinity-hint' }),
         row('vp-eng-macrons', 'engines.macrons.label', s.macronSw),
         i18nEl('p', 'vp-hint', 'engines.macrons.hint')
       ]),
@@ -485,6 +509,8 @@
     maxTier: maxTier,
     setModel: setModel,
     setOnline: setOnline,
+    latinity: latinity,
+    setLatinity: setLatinity,
     findModel: findModel,
     testOnline: testOnline,
     translateAgain: translateAgain,

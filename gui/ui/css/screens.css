@@ -299,6 +299,7 @@
 .vp-insp-emoji { font-size: 1.25rem; }
 .vp-insp-gloss { font-size: 1.0625rem; }
 .vp-insp-note, .vp-insp-label { margin-left: var(--space-half); }
+.vp-insp-late { display: inline-block; margin-left: var(--space-half); padding: 0 6px; border: 1px solid currentColor; border-radius: var(--radius-pill); color: var(--muted); font-size: var(--fs-ui); }
 .vp-insp-entry, .vp-insp-uses, .vp-insp-help { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-half) var(--space-1); font-size: var(--fs-ui); }
 .vp-insp-form { color: var(--muted); }
 .vp-insp-unknown { color: var(--bad); }

@@ -231,6 +231,13 @@ números.
 
 - **Emoji después de los sustantivos dibujables (en la app)**: un emoji solo después de un sustantivo con un dibujo
   claro (🌹 después de *rosam*); ninguno si el sustantivo tiene varios significados. `Ctrl+E` los oculta o muestra.
+- **Aceptar latín medieval y eclesiástico**: encendido de forma predeterminada. Las palabras, los significados y
+  las frases hechas del latín tardío, medieval y eclesiástico (por ejemplo *Habeās mē excūsātum* para "lo siento") se
+  usan como las clásicas y no son por sí solos motivo de Revisar. Apágalo para usar solo latín clásico: entonces esas
+  palabras se evitan cuando existe una clásica y se marcan como Revisar cuando no la hay. En la pestaña **Palabra**,
+  una pequeña etiqueta **latín tardío** junto al significado indica que el diccionario marca ese significado como
+  latín medieval, tardío o neolatín. Cambiar el interruptor deja desactualizados los subtítulos traducidos (punto
+  gris); usa **Traducir de nuevo**.
 - **Macrones en el archivo exportado**: el valor predeterminado de Exportar. En la app los macrones se ven a menos
   que los ocultes (`Ctrl+M`).
 - **Traducir de nuevo**: **Subtítulo seleccionado** o **Todos los subtítulos**. Los que editaste o aceptaste se
