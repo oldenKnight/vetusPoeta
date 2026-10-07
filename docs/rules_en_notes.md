@@ -962,3 +962,12 @@ unreal condition with could, habitual "every" in the past, late for X again, ver
   onomatopoeia dropped, "date" (appointment) has no Latin noun in the library, "babbling" as a noun, "understand" is
   simplified to sciō by periphrasis_la.tsv, cue splits that move a coordinated verb or a phrase into the neighbour cue.
 - "Hop and skip and away we go!" and other nonsense song lines without a subject still fail the parser.
+
+### Review of acceptance loop 1 (main agent, 2026-10-07)
+- Accepted. Re-review of the 82 cues: 22 wrong (first run 65), none of the 16 OK cues wrong. By register: dialogue
+  8/42, song 9/31, quoted narrative 5/9. The empty-cue bug is gone and nothing is bracketed except one invented word.
+- For loop 2 (C24): per-cue speaker gender (a male character in a feminine-speaker file got feminine predicate
+  forms); the long quoted narrative sentences still do not parse (fall back is honest but useless: a cue-local
+  clause split before the no-parse fallback); nonsense free relatives "what it is, it wouldn't be" (quod est, nōn
+  esset); sequence after optō; "babbling" as a participle (murmurāns); "falling down stairs" -> dē scālīs cadere;
+  "upside down" -> inversus / capite deorsum; "I wonder where" -> mīror ubi sit.
