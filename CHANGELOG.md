@@ -53,6 +53,17 @@ run on Windows.
   automatic errors 10.8 % → 6.8 % on 74 own cues and 25.1 % → 18.9 % on 700 public-domain cues; no cue the engine
   marked OK was wrong in any run. Library follow-ups: Greek supplement lemmas, Attic cell fixes, Spanish pivot
   glosses so Spanish words unknown to the Latin tables still translate, cleaned headwords.
+- **M7 (continued), the acceptance file and the Latinity decision (2026-10-07).** The owner's partial film file
+  (82 cues: 31 song lines, 9 quoted narrative, 42 dialogue) was measured at first run and reviewed cue by cue
+  against classical norms: 79 % of cues wrong. Two tuning loops on it brought that to 27 % and then 3.7 % (3 of 82,
+  a tuned number; no "< 1 %" claim is made), with no wrong cue among those the engine marked OK. Fixes that carried
+  over to the never-read held-out files: automatic errors on the 700 public-domain cues fell from 16.7 % to 14.4 %
+  with nothing broken. The rules + model combination gave no gain on the file at a thousand times the cost. By the
+  owner's decision (D18) medieval and ecclesiastical Latin is accepted behind a toggle that is on by default, in the
+  interface and in the engine, with a "late Latin" badge in the Word tab. Greek loops 3 and 4 (light verbs, purpose
+  and result clauses, participles, weather verbs, degree words, negation order) kept 114/114 and raised Spanish
+  → Greek to 39/40. A first Orbergise run on real material showed meaning-changing word swaps and emoji handling
+  bugs; the fix loop is open (ledger C27).
 - **Measurement.** `tools/eval` runs every engine combination and fidelity over a file and reports cue-level error
   rates with exact confidence intervals, determinism, export identity and memory, guards the held-out set, builds
   expert review sheets and prepares the Google Translate side-by-side (live run pending).
