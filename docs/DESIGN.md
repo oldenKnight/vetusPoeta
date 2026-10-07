@@ -452,10 +452,18 @@ inserted by definiteness heuristics, tense mapping reversed). Confidence per tok
 
 ### 10.7 Orbergise (`rules/orberg`)
 Input: a Latin document (cues or text) and optionally the original-language file (aligned by cue index, then by time
-overlap). Steps: analyse Latin; if the original is present, build the SemFrame from the original (10.1) and
-re-realise with tier ceiling 1 or 2 and simplification on; else build the frame from the Latin analysis (10.6) and
-re-realise. Every changed word carries `was -> now` with a reason. Meaning check = content-lemma overlap between input
-Latin (or original) and output, reported per cue; cues under 0.6 overlap are Check.
+overlap). Steps (revised by C27 after the first run on real material, E11): analyse Latin (10.6); vocabulary swaps
+come only from same-sense sources (simplify_la.tsv `syn` rows, periphrasis rows, or a lexicon word sharing the sense
+keywords, valency and sense class of the replaced word: a motion verb never becomes a change, cease or return verb);
+fixed phrases (`fixed` rows) are never split; a word above the ceiling with no same-sense core word is KEPT and the cue
+is Check (`tier-kept`); a rewritten sentence that fails re-analysis (A1-A4, la2x round trip, unknown word) is
+discarded (vocabulary only, then structure only, then unchanged, Check `rewrite-discarded` / `rewrite-partial`).
+The original-language file is EVIDENCE only: it ranks swap candidates, feeds the meaning check and supplies the person
+of agentless obligations; a cue is never replaced by a translation of the original. Emoji grapheme clusters are one
+token copied byte for byte; macron convention follows the source document. Every changed word carries `was -> now`
+with a reason. Meaning check = content-lemma comparison of input and output through la2x (gloss-based for swaps),
+reported per cue (`meaning-lost` makes the cue Check); a swap is at most Check unless every swap in the cue is a
+`syn` pair.
 
 ### 10.8 Determinism and memory
 No randomness anywhere in engine i; ties broken by lemma id, then by string. All per-cue scratch buffers live in a
