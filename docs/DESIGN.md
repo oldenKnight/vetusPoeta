@@ -323,7 +323,7 @@ Shell-handled commands (never reach the engine): `dialog.openFile`, `dialog.save
 
 ### 9.1 Settings keys
 `lang` ("en-US"|"es-MX"), `theme` ("auto"|"light"|"dark"), `textScale` (90..140), `showMacrons` (bool), `showEmoji`
-(bool), `grammarColours` (bool), `defaultPair`, `defaultFidelity` (1..3), `latinity` ("wide" default | "classical", D18: with "wide" senses and phrasebook rows tagged Medieval / Late / ecclesiastical (SENS tag bit5, phrasebook register `eccl`) are first-class candidates and never a Check reason; with "classical" they are penalised when a classical candidate exists and marked Check otherwise; rules::Options::latinity mirrors it; `translate.start` reads it from settings), `export.{emoji,macrons,encoding,bom,rebreak}`,
+(bool), `grammarColours` (bool), `defaultPair`, `defaultFidelity` (1..3), `latinity` ("wide" default | "classical", D18: with "wide" senses and phrasebook rows tagged Medieval / Late / ecclesiastical (SENS tag bits 6 Medieval/Late/ecclesiastical and 7 New Latin, phrasebook register `eccl`) are first-class candidates and never a Check reason; with "classical" they are penalised when a classical candidate exists and marked Check otherwise; rules::Options::latinity mirrors it; `translate.start` reads it from settings), `export.{emoji,macrons,encoding,bom,rebreak}`,
 `engines.model` (bool), `engines.online` (bool), `online.wiktionary` (bool), `online.latinitium` (bool, hidden until
 terms are confirmed), `modelPath`, `eco` (bool: 2 threads, unload after each job), `autosave` (bool),
 `cps.adult` (17), `cps.child` (20), `tourSeenVersion`, `recentProjects` (max 20).
