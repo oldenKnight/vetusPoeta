@@ -283,6 +283,7 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
   c.candidates.clear();
   c.lemma = kNone;
   c.kind = "sense";
+  c.registerTag.clear();
   const bool es = st.lang == frame::SrcLang::Es;
   auto keyOf = [&](const std::string& w) { return es ? "es:" + text::es_key(w) : text::en_key(w); };
   std::vector<lex::Candidate> raw;
@@ -298,6 +299,12 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
       std::stable_sort(raw.begin(), raw.end(), [](const lex::Candidate& x, const lex::Candidate& y) { return x.score > y.score; });
     }
   }
+  // C23: the register tags of a lemma's first sense (taught lemmas take sense 0)
+  auto firstSenseTags = [&](uint32_t id) {
+    std::vector<lex::Sense> ss;
+    la_.senses(id, ss);
+    return ss.empty() ? (uint16_t)0 : ss[0].tags;
+  };
   // teacher glosses: tier rows whose note lists the source lemma ("hole" -> fovea; data/curated/tiers_la.tsv)
   std::vector<const curated::TierEntry*> taught;
   if (!es) cd_.glossTiers(text::lower(sourceLemma), taught);
@@ -334,14 +341,27 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
   };
   // the teacher's gloss outweighs one tier step at every fidelity except the faithful one
   const double taughtBonus = st.fidelity >= 3 ? 1.0 : st.fidelity == 2 ? 0.5 : 0.1;
-  struct Scored { uint32_t lemma; uint16_t sense; double score; std::string why; uint8_t tier; bool kwHit; double base; };
+  struct Scored { uint32_t lemma; uint16_t sense; double score; std::string why; uint8_t tier; bool kwHit; double base;
+                  uint16_t tags = 0; };
   std::vector<Scored> sc;
   std::vector<lex::Sense> senses;
   // the best reverse-index score of a compatible lemma: fidelity 3 prefers low tiers only among exact senses
+  // C23 (D18): with latinity "wide" a Medieval / Late / ecclesiastical or New Latin sense is no penalty: the
+  // build-time -30 of the reverse index (applied once, for any of rare / archaic / poetic / medieval / New Latin) is
+  // given back when the late tag is the only register tag of the sense. Integer score units, so ties stay exact.
+  std::vector<lex::Sense> lateProbe;
+  auto lateBonus = [&](const lex::Candidate& k) {
+    if (st.classical) return 0;
+    lateProbe.clear();
+    la_.senses(k.lemma, lateProbe);
+    if (k.sense >= lateProbe.size()) return 0;
+    const uint16_t tg = lateProbe[k.sense].tags;
+    return (tg & (kSenseMedieval | kSenseNewLatin)) && !(tg & kSenseRareArchaicPoetic) ? 30 : 0;
+  };
   double topBase = 0;
   for (const lex::Candidate& k : raw) {
     const lex::Lemma l = la_.lemma(k.lemma);
-    if (l.id != kNone && posCompatible(l.pos, pos)) topBase = std::max(topBase, k.score / 255.0);
+    if (l.id != kNone && posCompatible(l.pos, pos)) topBase = std::max(topBase, (k.score + lateBonus(k)) / 255.0);
   }
   auto tierTerm = [&](uint8_t tier, std::string& why, double base = 1.0) {
     double tt = 0;
@@ -374,12 +394,15 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
     for (const Scored& x : sc)
       if (x.lemma == k.lemma) dup = true;
     if (dup) continue;   // candidates come best first: keep the best sense of each lemma
-    double s = k.score / 255.0;
+    const int late = lateBonus(k);   // C23
+    const double kbase = (k.score + late) / 255.0;
+    double s = kbase;
     std::string why = "base " + std::to_string(k.score);
+    if (late) why += ", late Latin accepted";
     // tier term (fidelity 1: none; 2: -0.25 per tier above 2; 3: -0.5 per tier above 1); T1 preference. The curated
     // tier (key + part of speech) wins over the lexicon's own.
     const uint8_t tier = cd_.effectiveTier(l.key, l.pos, l.tier);
-    s += tierTerm(tier, why, isTaught(l) ? 1.0 : k.score / 255.0);
+    s += tierTerm(tier, why, isTaught(l) ? 1.0 : kbase);
     if (l.flags & lex::Defective) { s -= 0.2; why += ", defective"; }
     if (pos == Adj && l.pos == Participle) { s -= 0.05; why += ", participle"; }
     if (srcGender && l.pos == Noun && simpleGender(l.gender) == srcGender && l.gender != MF && l.gender != MFN) {
@@ -418,7 +441,8 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
       }
     }
     correction(l, s, why);
-    sc.push_back(Scored{k.lemma, k.sense, s, why, tier, kwHit || isTaught(l), k.score / 255.0});
+    sc.push_back(Scored{k.lemma, k.sense, s, why, tier, kwHit || isTaught(l), kbase,
+                        k.sense < senses.size() ? senses[k.sense].tags : (uint16_t)0});
   }
   // taught lemmas the reverse index does not list for this word ("smile" -> rīdeō, "bottom" -> īmum): base 0.5
   for (const curated::TierEntry* te : taught) {
@@ -440,7 +464,7 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
     double s = 0.5 + taughtBonus + tierTerm(tier, why);
     if (substantive) { s -= 0.05; why += ", adjective as noun"; }
     correction(l, s, why);
-    sc.push_back(Scored{id, 0, s, why, tier, true, 0.5});
+    sc.push_back(Scored{id, 0, s, why, tier, true, 0.5, firstSenseTags(id)});
   }
   // Spanish teacher glosses the reverse index does not list for this word (gloss_es_la.tsv has no part-of-speech
   // column: the Latin head is looked up with the part of speech asked for, an adjective may stand for a noun)
@@ -461,7 +485,7 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
     double s = 0.5 + taughtBonus + tierTerm(tier, why);
     if (substantive) { s -= 0.05; why += ", adjective as noun"; }
     correction(l, s, why);
-    sc.push_back(Scored{id, 0, s, why, tier, true, 0.5});
+    sc.push_back(Scored{id, 0, s, why, tier, true, 0.5, firstSenseTags(id)});
   }
   if (!pivotVia.empty())
     for (Scored& x : sc) {
@@ -561,6 +585,7 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
   for (const auto& ov : st.overrides)
     if (ov.first == c.token && ov.second >= 0 && (size_t)ov.second < sc.size()) pick = (size_t)ov.second;
   c.lemma = sc[pick].lemma;
+  c.registerTag = (sc[pick].tags & kSenseMedieval) ? "medieval" : (sc[pick].tags & kSenseNewLatin) ? "new-latin" : "";
   c.margin = sc.size() > 1 ? std::max(0.0, sc[0].score - sc[1].score) : 1.0;
   if (sc.size() > 1 && sc[0].why.find("tier preference") != std::string::npos) c.margin = std::max(c.margin, 0.15);
   // confidence (DESIGN 10.4, C2b): a tier 3 choice while a tier 1/2 candidate of the same sense existed
@@ -578,6 +603,7 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
         if (alt != kNone && alt != c.lemma) {
           c.note = std::string("periphrasis: ") + std::string(l.head) + " -> " + w[0];
           c.lemma = alt;
+          c.registerTag.clear();
           c.kind = "periphrasis";
         }
       }

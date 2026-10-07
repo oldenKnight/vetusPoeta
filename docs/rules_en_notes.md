@@ -971,3 +971,50 @@ unreal condition with could, habitual "every" in the past, late for X again, ver
   clause split before the no-parse fallback); nonsense free relatives "what it is, it wouldn't be" (quod est, nōn
   esset); sequence after optō; "babbling" as a participle (murmurāns); "falling down stairs" -> dē scālīs cadere;
   "upside down" -> inversus / capite deorsum; "I wonder where" -> mīror ubi sit.
+
+## Latinity (C23, 2026-10-07)
+Owner decision D18: Medieval and ecclesiastical Latin are accepted behind the setting `latinity`, "wide" by default.
+- Settings (engine/core): default `latinity` "wide"; validation "wide" | "classical" (a bad patch is `bad_params`, a bad
+  value on disk is repaired to "wide" with a warning). CLI `engineOptions()` sets `rules::Options::latinity`
+  (enum `Latinity {Wide, Classical}`) for translate.start and orbergise.start; anything but "classical" is "wide".
+- Transfer (`Transfer::select`): the reverse index already subtracts 30 of 255 at build time for a sense tagged rare /
+  archaic / poetic / Medieval (SENS bit 6, "medieval": Medieval, Late, ecclesiastical, Vulgar Latin) / New Latin
+  (bit 7) (gloss.py `PENALTY_BITS`, applied once). With "wide" a sense whose only register tags are bit 6 / bit 7 gets
+  the 30 back (integer score units, so ties stay exact ties broken by lemma id; the compensated base also feeds the
+  weak-sense and tier-preference tests); `why` says "late Latin accepted". With "classical" nothing changes in the
+  scores. A penalty that came from a tagged translation-table row (gloss.py `PEN_ROW_TAGS`) is not visible to the
+  engine and is not given back. Every choice records the chosen sense's register (`Choice::registerTag`
+  "medieval" | "new-latin"; taught lemmas use their first sense; cleared by a periphrasis).
+- Confidence: with "classical" a choice of kind sense that still lands on a tagged sense makes the cue Check, flag
+  `late-latin`, and a `sense` reason "... only a Medieval / Late Latin word was found, and classical Latin was asked
+  for: check it". With "wide" the register is never a Check reason. A6 is about tiers only and was not touched (a
+  Medieval word of tier 3 is still Check at fidelity 2/3 for its tier, not for its register).
+- Tokens: `TokenView::registerTag` -> view `TokenView.register` on the token of the chosen lemma; the sense reason
+  text adds "(Medieval / Late Latin sense)" or "(New Latin sense)". words.list prints `register` per word.
+- Phrasebook: register cell `eccl` or `eccl+<register>` (`eccl+polite`, `eccl+greet`, `eccl+excl`) sets
+  `PhraseEntry::eccl` and keeps the functional register for the frame builder's placement rules. The frame
+  builder's pre-pass skips eccl rows with "classical" (`FrameBuilder::analyse(..., classical)`,
+  `Phrasebook::match(..., classical)`). Two rows of the same pattern, one eccl, are twins: the earlier one is chosen
+  ("wide"), the other is offered as an alternative ("classical rendering of ..." / "ecclesiastical rendering of ..."),
+  never an eccl twin with "classical". The phrasebook reason data carries `"register":"eccl"` for an eccl row.
+  Rows: I'm sorry / lo siento -> habeās mē excūsātum/excūsātam (eccl, before ignōsce mihi); goodbye / adiós -> deus tē
+  servet (eccl, after valē); thank God / gracias a Dios -> deō grātiās (eccl) with the classical twin deō grātiās agō;
+  please / por favor stays quaesō.
+- Own sentences (engine/tests/test_rules_en.cpp "rules-i"): "I'm sorry." -> Habeās mē excūsātam. (f) / excūsātum. (m),
+  alternative Ignōsce mihi. ("wide"), Ignōsce mihi. ("classical"); "Goodbye." -> Valē. in both, Deus tē servet. only as
+  the "wide" alternative; "Thank God!" -> Deō grātiās! / Deō grātiās agō!; Spanish mirrors; "The alchemist is here." /
+  "Where is the alchemist?" (alchēmista, Medieval only; fidelity 1) OK in "wide", Check + late-latin in "classical";
+  "knight" -> mīles (its Medieval sense) in "wide", eques in "classical" (fidelity 1); two fresh engines per mode give
+  byte-identical output.
+- Regression files with the default "wide" (fidelity 2, speaker f): EN own_dialogue 114 / 114 (outputs and confidences
+  identical), ES 100 / 100 identical, oz_sample 78 / 100 with two lines changed, Greek EN->GRC 114 / 114, ES->GRC
+  39 / 40, la2x and orberg reports identical. Changed oz lines (neither matches its gold before or after; no gold
+  changed): 67 "You have called us for the third and last time." Tertium et ultimum nōs vocāvistī. ok -> check (the
+  candidate clāmō of a Medieval sense of "call" comes within 0.15 of vocō: margin Check); 93 "Hereafter you will be a
+  great man, for I have given you ..." Posthāc vir magnus et dēlātor eris. (fix) -> ... et auctor eris. (check) (the
+  parse reads "given" as a noun; auctor in a Late sense now passes the tier-preference floor). With "classical" the
+  regression outputs equal the pre-C23 ones; only thēa (New Latin) cues become Check: EN 36, 37, ES 37.
+- Not done / for the main agent: Orbergise without an original (la -> la rewrites by la2x analysis) does not look at
+  the register; Greek is untouched (Byzantine "medieval" tags are not compensated). docs/DESIGN.md §9.1 says "SENS tag
+  bit5" for the register: in the SENS tags it is bit 6 (medieval) / bit 7 (New Latin); bit 5 is the ANAL flag
+  LateLatin of forms (and SENS "poetic").

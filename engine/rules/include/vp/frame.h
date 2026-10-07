@@ -196,13 +196,14 @@ class Phrasebook {
  public:
   void build(const std::vector<curated::PhraseEntry>& entries, const std::vector<curated::PairEntry>& contractions);
   // Longest match starting at token `from` (patterns are matched against each token's lower form and lemma);
-  // slots are filled with token ranges only. Ties: the earlier table row wins.
-  bool match(const std::vector<nlp::Token>& toks, int from, PhraseMatch& out) const;
+  // slots are filled with token ranges only. Ties: the earlier table row wins. C23: `classical` skips the rows marked
+  // eccl (curated::PhraseEntry::eccl).
+  bool match(const std::vector<nlp::Token>& toks, int from, PhraseMatch& out, bool classical = false) const;
   size_t size() const { return pats_.size(); }
 
  private:
   struct Elem { std::vector<std::string> words; bool optional = false; int slot = -1; SlotKind kind = SlotKind::NP; };
-  struct Pattern { std::vector<Elem> elems; int entry = -1; };
+  struct Pattern { std::vector<Elem> elems; int entry = -1; bool eccl = false; };
   bool matchFrom(const std::vector<nlp::Token>& toks, const Pattern& p, size_t ei, int at,
                  std::vector<PhraseSlot>& slots, int& end) const;
   std::vector<Pattern> pats_;
@@ -241,8 +242,10 @@ struct SemSentence {
   void doubt(const char* what) {
     if (std::find(doubts.begin(), doubts.end(), what) == doubts.end()) doubts.emplace_back(what);
   }
+  // C23: the analysis ran with Options::latinity "classical": phrasebook rows marked eccl were not matched
+  bool classical = false;
   void clear() { text.clear(); tokens.clear(); drop.clear(); units.clear(); finalPunct.clear(); question = false;
-                 repairs.clear(); doubts.clear(); }
+                 repairs.clear(); doubts.clear(); classical = false; }
 };
 
 // ---- frame builder -----------------------------------------------------------------------------------------------------
@@ -252,8 +255,9 @@ class FrameBuilder {
   // rule lemmatiser is used); `cd` gives the contraction table and the phrasebook.
   FrameBuilder(SrcLang lang, const nlp::Pipeline* pipeline, const lex::Lexicon* srcLex, const curated::CuratedData& cd);
 
-  // Full analysis of one sentence.
-  void analyse(std::string_view sentence, SemSentence& out) const;
+  // Full analysis of one sentence. C23: `classical` (Options::latinity "classical") leaves out the phrasebook rows
+  // marked eccl (Medieval / ecclesiastical renderings).
+  void analyse(std::string_view sentence, SemSentence& out, bool classical = false) const;
   // Parser-failure test (C2b): a clause unit without a predicate although the unit holds a verb, a fragment made of
   // a verb, or a dependent clause the parser could not attach. The engine then retries on simpler pieces.
   static bool troubled(const SemSentence& s);

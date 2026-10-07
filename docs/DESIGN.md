@@ -342,6 +342,10 @@ Consumed by the UI (B7) and therefore delivered by the engine: `engine.hello.lex
 online, state: yes|no|off}`, orbergise change `{was, now, why}`; `cue.get` adds `meaning {percent, missing[]}` and
 `original` in Orbergise mode; `orbergise.start {indices?}`; settings keys `panelTab`, `onlineExplained`, `orberg{...}`,
 `speakerGender` ("m"|"f"|"u"); samples at `<dataDir>/samples/sample.<lang>.srt` (own sentences, installed by make_dist).
+C23 (additive, D18): `TokenView.register` ("medieval" | "new-latin"; absent when the chosen sense carries no such tag:
+the register of the sense the engine chose, for the Word tab's "late Latin" badge without `lemma.get`); `words.list`
+entries carry the same `register`; phrasebook `ReasonView.data` has `register:"eccl"` for a Medieval / ecclesiastical
+row; cue flag `late-latin` (Check, only with `latinity` "classical") with a `sense` reason as its hint.
 
 ## 10. Rule engine (engine i) — design
 Directory `engine/rules/src/` with sub-directories `morph/`, `frame/`, `transfer/`, `realise_la/`, `realise_grc/`,

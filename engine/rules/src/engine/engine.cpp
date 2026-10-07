@@ -541,9 +541,15 @@ class RulesEngine final : public Engine {
         if (!content || sl.kind == frame::SlotKind::Wh || sl.kind == frame::SlotKind::VP || sl.kind == frame::SlotKind::Name)
           covered.push_back(k);
       }
+    // C23: a Medieval / ecclesiastical row says so in the reason data ("register":"eccl")
+    bool eccl = false;
+    {
+      const std::vector<curated::PhraseEntry>& book = st.lang == frame::SrcLang::Es ? cd_->phrasebookEs() : cd_->phrasebook();
+      eccl = m.entry >= 0 && (size_t)m.entry < book.size() && book[(size_t)m.entry].eccl;
+    }
     reasons.push_back(Reason{out.tokens.empty() ? -1 : 0, "phrasebook", m.pattern + " -> " + m.latin,
                              "{\"pattern\":\"" + jsonEscape(m.pattern) + "\",\"latin\":\"" + jsonEscape(m.latin) +
-                                 "\",\"tier\":" + std::to_string((int)m.tier) + "}"});
+                                 "\",\"tier\":" + std::to_string((int)m.tier) + (eccl ? ",\"register\":\"eccl\"" : "") + "}"});
   }
 
   // C15: word-by-word rendering for a sentence the analysis could not parse: each content word in its Latin
@@ -644,6 +650,39 @@ class RulesEngine final : public Engine {
     so.reasons.push_back(Reason{-1, "form", "the sentence was analysed in pieces (parser fallback): check the structure", ""});
   }
 
+  // C23 (D18): phrasebook rows of the same pattern, one marked eccl and the other not, are twins: the ecclesiastical
+  // and the classical rendering ("I'm sorry" -> Habeās mē excūsātum / Ignōsce mihi). The twin of a row, or -1; with
+  // latinity "classical" an eccl twin is never offered.
+  int phraseTwin(int entry, frame::SrcLang lang, bool classical) const {
+    const std::vector<curated::PhraseEntry>& book = lang == frame::SrcLang::Es ? cd_->phrasebookEs() : cd_->phrasebook();
+    if (entry < 0 || (size_t)entry >= book.size()) return -1;
+    const curated::PhraseEntry& e = book[(size_t)entry];
+    const std::string pat = text::lower(e.pattern);
+    for (size_t q = 0; q < book.size(); ++q) {
+      if ((int)q == entry || book[q].eccl == e.eccl || (classical && book[q].eccl)) continue;
+      if (text::lower(book[q].pattern) == pat) return (int)q;
+    }
+    return -1;
+  }
+  // C23: the rows of transfer::Settings::phraseSwaps replace the matched rows (alternative renderings)
+  void swapPhrases(SemSentence& s, const transfer::Settings& st) const {
+    if (st.phraseSwaps.empty()) return;
+    const std::vector<curated::PhraseEntry>& book = st.lang == frame::SrcLang::Es ? cd_->phrasebookEs() : cd_->phrasebook();
+    for (frame::Unit& u : s.units) {
+      if (u.type != frame::Unit::Phrase) continue;
+      for (const auto& sw : st.phraseSwaps)
+        if (u.phrase.entry == sw.first && sw.second >= 0 && (size_t)sw.second < book.size()) {
+          const curated::PhraseEntry& e = book[(size_t)sw.second];
+          u.phrase.entry = sw.second;
+          u.phrase.latin = e.latin;
+          u.phrase.reg = e.reg;
+          u.phrase.note = e.note;
+          u.phrase.tier = e.tier;
+          break;
+        }
+    }
+  }
+
   void speech(const std::string& text, const frame::FrameBuilder& fb, const Options& opt, const Context& ctx,
               transfer::Memory& mem, const transfer::Settings& st, SentOut& so, bool alternatives,
               bool allowSplit = true) {
@@ -660,7 +699,8 @@ class RulesEngine final : public Engine {
         parseText[a0] = ' ';
         parseText[b0] = ' ';
       }
-    fb.analyse(parseText, s);
+    fb.analyse(parseText, s, st.classical);
+    swapPhrases(s, st);
     if (allowSplit && frame::FrameBuilder::troubled(s)) {
       const std::vector<size_t> pts = frame::FrameBuilder::splitPoints(text);
       if (!pts.empty()) { speechSplit(text, pts, fb, opt, ctx, mem, st, so); return; }
@@ -684,7 +724,8 @@ class RulesEngine final : public Engine {
       }
       if (changed && !simple.empty()) {
         SemSentence s2;
-        fb.analyse(simple, s2);
+        fb.analyse(simple, s2, st.classical);
+        swapPhrases(s2, st);
         if (!frame::FrameBuilder::troubled(s2)) {
           s = std::move(s2);
           s.repairs.emplace_back("simplified");
@@ -1089,6 +1130,28 @@ class RulesEngine final : public Engine {
     else mem.prevFirst = false;
     // alternatives: the second-best lemma of the most ambiguous word; the other speaker gender when unknown
     if (alternatives) {
+      // C23 (D18): a phrasebook row with a twin of the other register (ecclesiastical / classical): the twin's
+      // rendering ("I'm sorry": Habeās mē excūsātum chosen, Ignōsce mihi offered; "goodbye": Valē chosen, Deus tē
+      // servet offered)
+      for (const frame::Unit& u : s.units) {
+        if (u.type != frame::Unit::Phrase) continue;
+        const int twin = phraseTwin(u.phrase.entry, st.lang, st.classical);
+        if (twin < 0) continue;
+        const std::vector<curated::PhraseEntry>& book =
+            st.lang == frame::SrcLang::Es ? cd_->phrasebookEs() : cd_->phrasebook();
+        transfer::Memory m2 = memBefore_;
+        transfer::Settings st2 = st;
+        st2.phraseSwaps.push_back({u.phrase.entry, twin});
+        SentOut alt;
+        speech(text, fb, opt, ctx, m2, st2, alt, false);
+        display(alt.latin, opt.macrons);
+        if (alt.latin.text != so.latin.text)
+          so.alternatives.push_back(Alternative{alt.latin.text,
+                                                book[(size_t)twin].eccl ? "ecclesiastical rendering of \"" + u.phrase.pattern + "\""
+                                                                        : "classical rendering of \"" + u.phrase.pattern + "\"",
+                                                0.5});
+        break;
+      }
       const transfer::Choice* amb = nullptr;
       for (const transfer::Choice& c : so.choices)
         if (c.kind == "sense" && c.candidates.size() > 1 && c.token >= 0 && (!amb || c.margin < amb->margin)) amb = &c;
@@ -1368,6 +1431,7 @@ class RulesEngine final : public Engine {
     transfer::Settings st;
     st.lang = lang;
     st.fidelity = std::max(1, std::min(3, opt.fidelity));
+    st.classical = opt.latinity == Latinity::Classical;   // C23 (D18)
     st.srcLex = lang == frame::SrcLang::Es ? es_ : en_;   // C13: English pivot of Spanish words
     st.speakerGender = opt.speakerGender == 'f' ? 'f' : opt.speakerGender == 'u' ? 'u' : 'm';
     st.context = &ctx;
@@ -1604,6 +1668,11 @@ class RulesEngine final : public Engine {
         if (c.kind == "table") txt += " (closed-class table)";
         if (!c.note.empty()) txt += " (" + c.note + ")";
         if (c.kind == "sense" && !c.candidates.empty()) txt += " (score " + fmt(c.candidates[0].score) + ")";
+        // C23 (D18): the chosen sense's register goes on its token (TokenView.register) and into the reason
+        if (!c.registerTag.empty() && c.kind != "periphrasis") {
+          txt += c.registerTag == "new-latin" ? " (New Latin sense)" : " (Medieval / Late Latin sense)";
+          if (ti >= 0) o.tokens[(size_t)ti].registerTag = c.registerTag;
+        }
         o.reasons.push_back(Reason{ti, kind, txt, ""});
         if (!c.candidates.empty()) {
           std::string data = "[";
@@ -1696,6 +1765,19 @@ class RulesEngine final : public Engine {
         }
       if (opt.speakerGender == 'u' && std::find(o.flags.begin(), o.flags.end(), "speaker-gender") != o.flags.end())
         chk = true;
+      // C23 (D18): latinity "classical" and the word chosen is still a Medieval / Late / New Latin sense (no classical
+      // candidate won): Check with a hint. With "wide" the register is never a Check reason.
+      if (opt.latinity == Latinity::Classical)
+        for (const transfer::Choice& c : a.choices)
+          if (c.kind == "sense" && !c.registerTag.empty() && c.lemma != lex::kNoLemma) {
+            chk = true;
+            addFlag(o.flags, "late-latin");
+            o.reasons.push_back(Reason{-1, "sense", "\"" + c.source + "\" -> " + std::string(la_->lemma(c.lemma).head) +
+                                                    ": only a " + (c.registerTag == "new-latin" ? "New" : "Medieval / Late") +
+                                                    " Latin word was found, and classical Latin was asked for: check it",
+                                       ""});
+            break;
+          }
       o.confidence = fix ? Confidence::Fix : chk ? Confidence::Check : Confidence::Ok;
       // score: product of per-choice confidences (sorting only)
       double score = 1.0;
@@ -1829,6 +1911,7 @@ class RulesEngine final : public Engine {
       transfer::Settings st;
       st.lang = lang == Lang::Es ? frame::SrcLang::Es : frame::SrcLang::En;
       st.fidelity = std::max(1, std::min(3, opt.fidelity));
+      st.classical = opt.latinity == Latinity::Classical;   // C23
       size_t added = 0;
       for (const std::string& lm : lemmas) {
         for (uint8_t pos : {feat::Noun, feat::Verb, feat::Adj, feat::Adv}) {
@@ -2098,6 +2181,7 @@ class RulesEngine final : public Engine {
     transfer::Settings st;
     st.lang = sl;
     st.fidelity = 3;
+    st.classical = opt.latinity == Latinity::Classical;   // C23
     st.srcLex = sl == frame::SrcLang::Es ? es_ : en_;
     st.speakerGender = opt.speakerGender == 'f' ? 'f' : opt.speakerGender == 'u' ? 'u' : 'm';
     st.context = &ctx;

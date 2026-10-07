@@ -54,6 +54,7 @@ void Phrasebook::build(const std::vector<curated::PhraseEntry>& entries,
     const std::string pat = text::lower(entries[ei].pattern);
     Pattern p;
     p.entry = (int)ei;
+    p.eccl = entries[ei].eccl;
     int slotNo = 0;
     size_t i = 0;
     bool bad = false;
@@ -194,11 +195,12 @@ bool Phrasebook::matchFrom(const std::vector<nlp::Token>& toks, const Pattern& p
   return false;
 }
 
-bool Phrasebook::match(const std::vector<nlp::Token>& toks, int from, PhraseMatch& out) const {
+bool Phrasebook::match(const std::vector<nlp::Token>& toks, int from, PhraseMatch& out, bool classical) const {
   int bestEnd = -1;
   const Pattern* best = nullptr;
   std::vector<PhraseSlot> slots, bestSlots;
   for (const Pattern& p : pats_) {
+    if (classical && p.eccl) continue;   // C23: Medieval / ecclesiastical rows only with latinity "wide"
     slots.clear();
     int end = -1;
     if (matchFrom(toks, p, 0, from, slots, end) && end > from && end > bestEnd) {

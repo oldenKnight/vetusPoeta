@@ -76,6 +76,9 @@ For la-en / la-es (C11) the tokens describe the Latin source words (flag `source
 `LemmaView.flags` adds `gloss-es-pivot` (lexicon flag bit 8). `words.list` counts the engine's tokens (lemma ids,
 effective tiers; capitalised unknown words as names). `settings.speakerGender` "m" | "f" | "u" ->
 `Options.speakerGender`. `CueInput.spans` carries the source cue's text/tag spans (newline = text "\n").
+C23: `settings.latinity` "wide" (default) | "classical" -> `Options.latinity` (translate.start, orbergise.start; any other
+stored value reads as "wide"). `TokenView.register` ("medieval" | "new-latin") is stored in the project tokens as bits
+4 / 8 of the flags field (older files: no register) and `words.list` entries carry it as `register`.
 `cue.set {text, remember}` with the text the cue already has and state `edited` only adds the correction (no
 history step, no re-check); any other edit re-checks the cue, stores the new tokens and re-attaches the reasons
 to the words that are still there. `cue.choose` does the same with the alternative's text.

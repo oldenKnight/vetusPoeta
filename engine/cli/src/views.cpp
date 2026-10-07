@@ -559,6 +559,7 @@ json tokenJson(const vp::rules::TokenView& t) {
   if (!t.emoji.empty()) j["emoji"] = t.emoji;
   if (t.unknown) j["unknown"] = true;
   if (t.fromRule) j["fromRule"] = true;
+  if (!t.registerTag.empty()) j["register"] = t.registerTag;   // C23: "medieval" | "new-latin"
   return j;
 }
 
@@ -688,7 +689,9 @@ Features featFromCode(const std::string& c) {
 std::string encodeTokens(const std::vector<vp::rules::TokenView>& tokens) {
   json a = json::array();
   for (const vp::rules::TokenView& t : tokens) {
-    const int bits = (t.unknown ? 1 : 0) | (t.fromRule ? 2 : 0);
+    // C23: bits 4 / 8 = the chosen sense's register "medieval" / "new-latin" (older files: 0, no register)
+    const int bits = (t.unknown ? 1 : 0) | (t.fromRule ? 2 : 0) | (t.registerTag == "medieval" ? 4 : 0) |
+                     (t.registerTag == "new-latin" ? 8 : 0);
     a.push_back(json::array({t.text, t.display == t.text ? json(0) : json(t.display), t.start, t.end,
                              t.hasLemma ? static_cast<int64_t>(t.lemmaId) : int64_t(-1), t.tier, bits,
                              featCode(t.features), t.emoji}));
@@ -717,6 +720,7 @@ bool decodeTokens(const std::string& data, std::vector<vp::rules::TokenView>& ou
     const int bits = e[6].get<int>();
     t.unknown = (bits & 1) != 0;
     t.fromRule = (bits & 2) != 0;
+    t.registerTag = (bits & 4) ? "medieval" : (bits & 8) ? "new-latin" : "";
     t.features = featFromCode(e[7].get<std::string>());
     t.emoji = e[8].get<std::string>();
     out.push_back(std::move(t));

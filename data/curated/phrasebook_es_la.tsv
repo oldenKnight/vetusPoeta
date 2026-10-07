@@ -5,11 +5,13 @@
 # (...), alternatives a|b (one word each); contractions_es.tsv applies to patterns ("del" = "de el"). Inverted marks
 # ¿ ¡ are punctuation and never part of a pattern. Enclitic pronouns are written apart and without the written stress
 # ("pasa me {NP}" for "Pásame ..."), as the tokenizer splits them; a one-word row ("siéntate", "ándale") is never split. Our own rows, mirroring the English phrasebook.
+# C23 (D18): register "eccl" or "eccl+<register>" marks a Medieval / ecclesiastical row, matched only with latinity "wide" (default); a row of the same pattern without it is the classical rendering, offered as the alternative (the earlier row of the two is chosen).
 hola	salvē	1	greet	plural: salvēte when addressee count > 1
 buenos días	salvē	1	greet	
 buenas tardes	salvē	1	greet	
 buenas noches	bonam noctem	1	greet	as a farewell before sleep the English row says "bene dormī"
 adiós	valē	1	greet	plural valēte
+adiós	deus tē servet	1	eccl+greet	D18 (C23): ecclesiastical farewell, latinity "wide" only; offered as the alternative of valē, which stays first
 hasta luego	valē	1	greet	
 hasta pronto	mox tē vidēbō	1	greet	
 hasta mañana	crās tē vidēbō	1	greet	
@@ -19,11 +21,14 @@ bienvenido|bienvenida|bienvenidos|bienvenidas	salvē	1	greet
 gracias	grātiās	1	polite	
 muchas gracias	grātiās tibi maximās agō	1	polite	
 mil gracias	grātiās tibi maximās agō	1	polite	
+gracias a dios	deō grātiās	1	eccl+excl	D18 (C23): ecclesiastical, latinity "wide" only
+gracias a dios	deō grātiās agō	1	excl	C23: the classical rendering (latinity "classical"; the alternative in "wide")
 de nada	libenter	1	polite	
 por favor	quaesō	1	polite	
 perdón	ignōsce mihi	1	polite	
 perdona|perdóname|disculpa|disculpe	ignōsce mihi	1	polite	
 con permiso	ignōsce mihi	1	polite	es-MX: passing someone
+lo siento	habeās mē excūsātum/excūsātam	1	eccl+polite	D18 (C23): the owner's choice, latinity "wide" only (chosen there, the classical row below is its alternative); gender from the speaker
 lo siento	ignōsce mihi	1	polite	
 lo siento mucho	valdē mē paenitet	2	polite	
 sí	ita	1	reply	or "certē", "sīc"

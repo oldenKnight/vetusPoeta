@@ -16,6 +16,9 @@ namespace vp::rules {
 
 enum class Lang { En, Es, La, Grc };
 enum class Confidence { Ok, Check, Fix };
+// C23 (D18): "wide" accepts Medieval / Late / ecclesiastical / New Latin senses and phrasebook rows (register `eccl`)
+// as first-class choices; "classical" keeps them penalised and marks a choice that still lands on one Check.
+enum class Latinity { Wide, Classical };
 
 struct Options {
   Lang source = Lang::En, target = Lang::La;
@@ -30,6 +33,8 @@ struct Options {
   // C14 addition (Orbergise options of orbergise.start; see vp/orberg.h)
   bool orbergKeepNames = true;   // names are left as they are
   bool orbergSimplify = true;    // structure rewrites (false: vocabulary swaps only)
+  // C23 addition: settings key `latinity` ("wide" default | "classical"), set by the CLI for translate / orbergise
+  Latinity latinity = Latinity::Wide;
 };
 
 struct Features { std::string pos, case_, number, gender, person, tense, mood, voice, degree; };
@@ -41,6 +46,9 @@ struct TokenView {
   Features features;
   uint8_t tier = 0; std::string emoji;
   bool unknown = false, fromRule = false;
+  // C23 addition: the register of the chosen sense when the lexicon tags it: "medieval" (Medieval / Late /
+  // ecclesiastical / Vulgar Latin) or "new-latin"; empty otherwise (views: TokenView.register)
+  std::string registerTag;
 };
 struct Check  { std::string id; bool ok = true; std::string detail; };       // "A1".."A9"
 struct Reason { int tokenIndex = -1; std::string kind, text, data; };         // kind per DESIGN §9.2

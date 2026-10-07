@@ -2591,3 +2591,219 @@ TEST_CASE("rules-h: fixes after the blind check (own sentences, C22)") {
   });
   CHECK(run({"Our world is a garden."})[0].conf != rules::Confidence::Fix);
 }
+
+// ================================================================================================================
+// C23 (RULES-I, D18): the latinity toggle. "wide" (default) accepts Medieval / ecclesiastical Latin: tagged senses
+// compete without the build-time penalty and phrasebook rows marked eccl are used; "classical" keeps the penalty,
+// skips the eccl rows and marks a choice that still lands on a tagged sense Check (flag late-latin). Own sentences.
+namespace {
+struct LatOut { std::string text; rules::Confidence conf; rules::CueOutput full; };
+std::vector<LatOut> runLat(const std::vector<std::string>& src, rules::Latinity lat, char gender = 'f', int fidelity = 2,
+                           rules::Lang lang = rules::Lang::En, rules::Engine* eng = nullptr) {
+  static std::unique_ptr<rules::Engine> shared = engine();
+  rules::Engine* e = eng ? eng : shared.get();
+  std::vector<rules::CueInput> in;
+  for (size_t i = 0; i < src.size(); ++i) {
+    rules::CueInput c;
+    c.index = (uint32_t)i;
+    c.sourceText = src[i];
+    c.startMs = (int64_t)i * 4000;
+    c.endMs = c.startMs + 3500;
+    in.push_back(c);
+  }
+  rules::Options o;
+  o.source = lang;
+  o.speakerGender = gender;
+  o.fidelity = fidelity;
+  o.latinity = lat;
+  auto r = e->translate(in, o, rules::Context{}, nullptr, nullptr);
+  REQUIRE(r.ok());
+  std::vector<LatOut> out;
+  for (const auto& c : r.value()) out.push_back(LatOut{flat(c.target), c.confidence, c});
+  return out;
+}
+bool hasAlt(const rules::CueOutput& c, const std::string& text) {
+  for (const auto& a : c.alternatives)
+    if (flat(a.text) == text) return true;
+  return false;
+}
+bool flagged(const rules::CueOutput& c, const char* f) { return std::find(c.flags.begin(), c.flags.end(), f) != c.flags.end(); }
+std::string tokenRegister(const rules::CueOutput& c, const std::string& word) {
+  for (const auto& t : c.tokens)
+    if (text::latin_key(t.text) == text::latin_key(word)) return t.registerTag;
+  return "?";
+}
+constexpr rules::Latinity kWide = rules::Latinity::Wide, kClassical = rules::Latinity::Classical;
+}  // namespace
+
+TEST_CASE("rules-i: phrasebook register eccl: loader, matcher (classical skips the rows)") {
+  // the loader reads "eccl" and "eccl+<register>"; the shipped rows
+  bool sorry = false, sorryClassical = false;
+  for (const curated::PhraseEntry& e : cur().phrasebook()) {
+    if (e.pattern != "i am sorry") continue;
+    if (e.eccl) {
+      sorry = true;
+      CHECK(e.reg == "polite");
+      CHECK(e.latin == "habeās mē excūsātum/excūsātam");
+      CHECK_FALSE(sorryClassical);   // the eccl row comes first: it is the one chosen with "wide"
+    } else {
+      sorryClassical = true;
+      CHECK(e.latin == "ignōsce mihi");
+    }
+  }
+  CHECK(sorry);
+  CHECK(sorryClassical);
+  bool es = false;
+  for (const curated::PhraseEntry& e : cur().phrasebookEs()) es = es || (e.pattern == "lo siento" && e.eccl);
+  CHECK(es);
+  frame::Phrasebook pb;
+  std::vector<curated::PhraseEntry> rows = {{"we are late", "sērō venīmus", "state", "", 1, true},
+                                            {"we are late", "tardē venīmus", "state", "", 1, false},
+                                            {"god bless you", "deus tē benedīcat", "excl", "", 1, true}};
+  pb.build(rows, cur().contractions());
+  auto toks = [](std::initializer_list<const char*> w) {
+    std::vector<nlp::Token> v;
+    for (const char* x : w) {
+      nlp::Token t;
+      t.text = x;
+      t.lower = text::lower(x);
+      t.upos = "X";
+      t.lemma = t.lower;
+      v.push_back(t);
+    }
+    return v;
+  };
+  frame::PhraseMatch m;
+  REQUIRE(pb.match(toks({"We", "are", "late"}), 0, m));
+  CHECK(m.entry == 0);   // ties: the earlier row
+  REQUIRE(pb.match(toks({"We", "are", "late"}), 0, m, true));
+  CHECK(m.entry == 1);   // classical: the eccl row is skipped
+  CHECK(pb.match(toks({"God", "bless", "you"}), 0, m));
+  CHECK_FALSE(pb.match(toks({"God", "bless", "you"}), 0, m, true));
+}
+
+TEST_CASE("rules-i: I'm sorry / lo siento, goodbye, thank God, please by latinity (own sentences)") {
+  NEED_REAL();
+  // wide (default): the owner's ecclesiastical "Habeās mē excūsātum/-am" chosen, Ignōsce mihi offered
+  {
+    const auto w = runLat({"I'm sorry.", "I'm sorry, Mother."}, kWide, 'f');
+    CHECK(w[0].text == "Habeās mē excūsātam.");
+    CHECK(hasAlt(w[0].full, "Ignōsce mihi."));
+    CHECK(w[0].conf == rules::Confidence::Ok);   // no Check for the register
+    CHECK_FALSE(flagged(w[0].full, "late-latin"));
+    CHECK(w[1].text == "Habeās mē excūsātam, māter.");
+    bool eccl = false;
+    for (const auto& r : w[0].full.reasons) eccl = eccl || (r.kind == "phrasebook" && r.data.find("\"register\":\"eccl\"") != std::string::npos);
+    CHECK(eccl);
+    CHECK(runLat({"I'm sorry."}, kWide, 'm')[0].text == "Habeās mē excūsātum.");
+    CHECK(rules::Options{}.latinity == kWide);   // the default
+  }
+  // classical: the classical row, no ecclesiastical alternative
+  {
+    const auto c = runLat({"I'm sorry.", "I'm sorry, Mother."}, kClassical, 'f');
+    CHECK(c[0].text == "Ignōsce mihi.");
+    CHECK_FALSE(hasAlt(c[0].full, "Habeās mē excūsātam."));
+    CHECK(c[1].text == "Ignōsce mihi, māter.");
+  }
+  // goodbye: Valē first in both modes; Deus tē servet only as the alternative, only with "wide"
+  {
+    const auto w = runLat({"Goodbye."}, kWide);
+    CHECK(w[0].text == "Valē.");
+    CHECK(hasAlt(w[0].full, "Deus tē servet."));
+    const auto c = runLat({"Goodbye."}, kClassical);
+    CHECK(c[0].text == "Valē.");
+    CHECK_FALSE(hasAlt(c[0].full, "Deus tē servet."));
+  }
+  // thank God: Deō grātiās (wide), the classical row otherwise; please stays quaesō
+  CHECK(runLat({"Thank God!"}, kWide)[0].text == "Deō grātiās!");
+  CHECK(runLat({"Thank God!"}, kClassical)[0].text == "Deō grātiās agō!");
+  CHECK(runLat({"Please."}, kWide)[0].text == "Quaesō.");
+  CHECK(runLat({"Please."}, kClassical)[0].text == "Quaesō.");
+  // Spanish mirrors
+  if (real().esOk) {
+    const auto w = runLat({"Lo siento.", "Adiós.", "¡Gracias a Dios!"}, kWide, 'm', 2, rules::Lang::Es);
+    CHECK(w[0].text == "Habeās mē excūsātum.");
+    CHECK(hasAlt(w[0].full, "Ignōsce mihi."));
+    CHECK(w[1].text == "Valē.");
+    CHECK(hasAlt(w[1].full, "Deus tē servet."));
+    CHECK(w[2].text == "Deō grātiās!");
+    const auto c = runLat({"Lo siento.", "Adiós.", "¡Gracias a Dios!"}, kClassical, 'm', 2, rules::Lang::Es);
+    CHECK(c[0].text == "Ignōsce mihi.");
+    CHECK(c[1].text == "Valē.");
+    CHECK_FALSE(hasAlt(c[1].full, "Deus tē servet."));
+    CHECK(c[2].text == "Deō grātiās agō!");
+  }
+}
+
+TEST_CASE("rules-i: a lemma whose only sense is Medieval: Check in classical, OK-capable in wide") {
+  NEED_REAL();
+  // alchēmista (Medieval Latin only, the one Latin candidate for "alchemist"); fidelity 1 so the tier ceiling (A6)
+  // does not speak
+  const std::vector<std::string> src = {"The alchemist is here.", "Where is the alchemist?"};
+  const auto w = runLat(src, kWide, 'f', 1);
+  const auto c = runLat(src, kClassical, 'f', 1);
+  for (size_t i = 0; i < src.size(); ++i) {
+    CHECK(w[i].text == c[i].text);   // no classical candidate: the same word, only the mark differs
+    CHECK_MESSAGE(w[i].conf == rules::Confidence::Ok, src[i] << " -> " << w[i].text);
+    CHECK_FALSE(flagged(w[i].full, "late-latin"));
+    CHECK(c[i].conf == rules::Confidence::Check);
+    CHECK(flagged(c[i].full, "late-latin"));
+    bool hint = false;
+    for (const auto& r : c[i].full.reasons) hint = hint || r.text.find("classical Latin was asked for") != std::string::npos;
+    CHECK(hint);
+    // the chosen sense's register is on the token in both modes (the UI's "late Latin" badge)
+    CHECK(tokenRegister(w[i].full, "alchēmista") == "medieval");
+    CHECK(tokenRegister(c[i].full, "alchēmista") == "medieval");
+  }
+  CHECK(w[0].text == "Alchēmista hīc est.");
+  // a word of classical Latin carries no register
+  CHECK(tokenRegister(runLat({"The girl is here."}, kWide)[0].full, "puella") == "");
+}
+
+TEST_CASE("rules-i: a Medieval sense competes as an equal in wide and keeps its penalty in classical") {
+  NEED_REAL();
+  // "knight": mīles in its Medieval sense ("knight") vs eques; the build-time -30 decides only in classical
+  transfer::Transfer tr(real().la, cur());
+  transfer::Settings st;
+  st.fidelity = 1;
+  transfer::Choice cw, cc;
+  const uint32_t wide = tr.select("knight", feat::Noun, {}, false, false, st, cw);
+  st.classical = true;
+  const uint32_t classical = tr.select("knight", feat::Noun, {}, false, false, st, cc);
+  REQUIRE(wide != transfer::kNone);
+  REQUIRE(classical != transfer::kNone);
+  CHECK(morph::cleanHead(real().la.lemma(wide).head) == "mīles");
+  CHECK(cw.registerTag == "medieval");
+  CHECK(cw.candidates[0].why.find("late Latin accepted") != std::string::npos);
+  CHECK(morph::cleanHead(real().la.lemma(classical).head) == "eques");
+  CHECK(cc.registerTag.empty());
+  for (const auto& k : cc.candidates) CHECK(k.why.find("late Latin accepted") == std::string::npos);
+  CHECK(runLat({"The knight is here."}, kWide, 'f', 1)[0].text == "Mīles hīc est.");
+  CHECK(runLat({"The knight is here."}, kClassical, 'f', 1)[0].text == "Eques hīc est.");
+}
+
+TEST_CASE("rules-i: deterministic per mode (two fresh engines, byte-identical), and the modes differ") {
+  NEED_REAL();
+  const std::vector<std::string> src = {"I'm sorry.", "Goodbye, my friend.", "Thank God, the boy is safe.",
+                                        "The knight is here.", "The alchemist is here.", "Please sit down."};
+  for (rules::Latinity lat : {kWide, kClassical}) {
+    auto e1 = engine();
+    auto e2 = engine();
+    const auto a = runLat(src, lat, 'u', 1, rules::Lang::En, e1.get());
+    const auto b = runLat(src, lat, 'u', 1, rules::Lang::En, e2.get());
+    REQUIRE(a.size() == b.size());
+    for (size_t i = 0; i < a.size(); ++i) {
+      CHECK(a[i].full.target == b[i].full.target);
+      CHECK(a[i].conf == b[i].conf);
+      CHECK(a[i].full.flags == b[i].full.flags);
+      REQUIRE(a[i].full.alternatives.size() == b[i].full.alternatives.size());
+      for (size_t k = 0; k < a[i].full.alternatives.size(); ++k)
+        CHECK(a[i].full.alternatives[k].text == b[i].full.alternatives[k].text);
+    }
+  }
+  const auto w = runLat(src, kWide, 'u', 1);
+  const auto c = runLat(src, kClassical, 'u', 1);
+  CHECK(w[0].text != c[0].text);
+  CHECK(w[3].text != c[3].text);
+  CHECK(w[5].text == c[5].text);
+}

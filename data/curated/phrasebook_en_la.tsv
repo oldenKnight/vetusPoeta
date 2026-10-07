@@ -1,4 +1,5 @@
 # pattern	latin	tier	register	note
+# C23 (D18): register "eccl" or "eccl+<register>" marks a Medieval / ecclesiastical row, matched only with latinity "wide" (default); a row of the same pattern without it is the classical rendering, offered as the alternative (the earlier row of the two is chosen).
 hello	salvē	1	greet	plural: salvēte when addressee count > 1 (engine picks by glossary)
 hi	salvē	1	greet	
 good morning	salvē	1	greet	
@@ -7,6 +8,7 @@ good evening	salvē	1	greet
 good afternoon	salvē	1	greet	
 good night	bene dormī	1	greet	
 goodbye	valē	1	greet	plural valēte
+goodbye	deus tē servet	1	eccl+greet	D18 (C23): ecclesiastical farewell, latinity "wide" only; offered as the alternative of valē, which stays first
 bye	valē	1	greet	
 farewell	valē	1	greet	
 see you (soon|later)	mox tē vidēbō	1	greet	
@@ -15,9 +17,12 @@ welcome	salvē	1	greet
 thank you	grātiās (tibi) agō	1	polite	
 thanks	grātiās	1	polite	
 thank you very much	grātiās tibi maximās agō	1	polite	
+thank god	deō grātiās	1	eccl+excl	D18 (C23): ecclesiastical, latinity "wide" only
+thank god	deō grātiās agō	1	excl	C23: the classical rendering (latinity "classical"; the alternative in "wide")
 you're welcome	libenter	1	polite	
 please	quaesō	1	polite	
 excuse me	ignōsce mihi	1	polite	
+i am sorry	habeās mē excūsātum/excūsātam	1	eccl+polite	D18 (C23): the owner's choice, latinity "wide" only (chosen there, the classical row below is its alternative); gender from the speaker
 i am sorry	ignōsce mihi	1	polite	
 sorry	ignōsce	1	polite	
 i beg your pardon	ignōsce mihi	1	polite	

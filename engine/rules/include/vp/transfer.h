@@ -32,7 +32,15 @@ struct Choice {
   bool unknown = false;
   bool lowTier = false;            // a tier 3 lemma was chosen while a tier 1/2 candidate of the same sense existed
   std::string note;                // human text for the reason
+  // C23 (D18): the chosen sense's register when the lexicon tags it (SENS tag bit 6 Medieval / Late / ecclesiastical
+  // -> "medieval", bit 7 -> "new-latin"); empty otherwise and for periphrasis / table choices
+  std::string registerTag;
 };
+
+// C23: SENS tag bits (tools/build_library/gloss.py TAG_BITS): the late registers, and the other registers the reverse
+// index already penalises at build time (-30 of 255 when any of them is set, DESIGN §5.2)
+constexpr uint16_t kSenseMedieval = 1u << 6, kSenseNewLatin = 1u << 7;
+constexpr uint16_t kSenseRareArchaicPoetic = (1u << 3) | (1u << 4) | (1u << 5);
 
 // Discourse memory carried from sentence to sentence (and cue to cue) inside one translate call.
 struct Memory {
@@ -74,6 +82,12 @@ struct Settings {
   // Source-language lexicon (C13): for Spanish, the English pivot reads its lemma's one-line English gloss when the
   // Spanish keyword has no Latin candidate and no teacher gloss. May be null.
   const lex::Lexicon* srcLex = nullptr;
+  // C23 (D18): Options::latinity "classical". Off ("wide"): a sense tagged only Medieval / New Latin gets back the
+  // reverse index's build-time register penalty (+30/255), so it competes as a first-class candidate.
+  bool classical = false;
+  // C23: phrasebook rows swapped after the analysis (row index -> twin row index of the same pattern), for the
+  // alternative rendering of an ecclesiastical / classical pair
+  std::vector<std::pair<int, int>> phraseSwaps;
 };
 
 struct ClauseOut {

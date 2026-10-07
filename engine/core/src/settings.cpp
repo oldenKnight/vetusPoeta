@@ -35,6 +35,7 @@ std::string check(const std::string& key, const json& v) {
   if (key == "textScale") return intIn(v, 90, 140) ? "" : "must be an integer from 90 to 140";
   if (key == "defaultPair") return v.is_string() && isPair(v.get<std::string>()) ? "" : "must be a language pair";
   if (key == "defaultFidelity") return intIn(v, 1, 3) ? "" : "must be 1, 2 or 3";
+  if (key == "latinity") return v.is_string() && (v == "wide" || v == "classical") ? "" : "must be \"wide\" or \"classical\"";   // D18
   if (key == "cps.adult" || key == "cps.child") return intIn(v, 5, 60) ? "" : "must be an integer from 5 to 60";
   if (key == "export.encoding" || key == "modelPath" || key == "tourSeenVersion") return str();
   if (key == "showMacrons" || key == "showEmoji" || key == "grammarColours" || key == "export.emoji" ||
@@ -129,6 +130,7 @@ json Settings::defaults() {
       {"grammarColours", true},
       {"defaultPair", "en-la"},
       {"defaultFidelity", 2},
+      {"latinity", "wide"},   // D18: medieval and ecclesiastical Latin accepted ("classical" avoids it)
       {"export", {{"emoji", false}, {"macrons", false}, {"encoding", "utf-8"}, {"bom", false}, {"rebreak", true}}},
       {"engines", {{"model", false}, {"online", false}}},
       {"online", {{"wiktionary", false}, {"latinitium", false}}},

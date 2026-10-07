@@ -36,6 +36,9 @@ vp::rules::Options Server::engineOptions() const {
   // speaker gender of first-person predicates (rules_la_notes decision 1): "m" | "f" | "u"; default "m"
   const std::string g = s.contains("speakerGender") && s["speakerGender"].is_string() ? s["speakerGender"].get<std::string>() : "m";
   o.speakerGender = g == "f" ? 'f' : (g == "u" || g == "unknown") ? 'u' : 'm';
+  // C23 (D18): "classical" avoids Medieval / ecclesiastical Latin; anything else (missing key, older file) is "wide"
+  o.latinity = s.contains("latinity") && s["latinity"] == "classical" ? vp::rules::Latinity::Classical
+                                                                     : vp::rules::Latinity::Wide;
   return o;
 }
 
@@ -600,6 +603,7 @@ json Server::cmdWordsList(const json& p) {
   const bool classical = greek || side == vp::rules::Lang::La;
   const bool fromSource = side != langs_.target;   // words of the source text when there are no stored tokens
   std::map<uint32_t, std::pair<int, int>> counts;   // lemma -> (count, effective tier of its first token)
+  std::map<uint32_t, std::string> registers;        // C23: lemma -> register of the chosen sense ("medieval", "new-latin")
   int known = 0, unknown = 0, names = 0;
   std::vector<vp::lex::Analysis> an;
   std::vector<vp::rules::TokenView> toks;
@@ -628,6 +632,7 @@ json Server::cmdWordsList(const json& p) {
       for (const vp::rules::TokenView& t : toks) {
         if (t.hasLemma && lx->lemma(t.lemmaId).id != vp::lex::kNoLemma) {
           count(t.lemmaId, t.tier ? t.tier : lx->lemma(t.lemmaId).tier);
+          if (!t.registerTag.empty()) registers.emplace(t.lemmaId, t.registerTag);
         } else if (!t.unknown && !t.text.empty() && t.text[0] != '[' && (t.text[0] & 0x80 || (t.text[0] >= 'A' && t.text[0] <= 'Z'))) {
           ++names;   // a capitalised word kept as a name
           ++known;
@@ -667,7 +672,10 @@ json Server::cmdWordsList(const json& p) {
 #if defined(VP_HAVE_RULES)
       lemma["head"] = vp::morph::cleanHead(l.head);   // C17 (C8b hand-off): no editorial marks ("((caelum")
 #endif
-      words.push_back(json{{"lemma", lemma}, {"count", kv.second.first}, {"tier", tier}});
+      json w{{"lemma", lemma}, {"count", kv.second.first}, {"tier", tier}};
+      const auto rg = registers.find(kv.first);   // C23: the chosen sense is tagged Medieval / New Latin
+      if (rg != registers.end()) w["register"] = rg->second;
+      words.push_back(std::move(w));
     }
   }
   auto share = [known](int n) { return known ? std::round(1000.0 * n / known) / 1000.0 : 0.0; };

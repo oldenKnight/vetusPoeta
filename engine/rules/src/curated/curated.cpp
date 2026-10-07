@@ -257,6 +257,10 @@ struct Loader {
       p.latin = text::nfc(cols[1]);
       p.tier = cols.size() > 2 && !cols[2].empty() ? tierOf(no, cols[2]) : 0;
       p.reg = col(cols, 3);
+      if (p.reg == "eccl" || p.reg.compare(0, 5, "eccl+") == 0) {   // C23: "eccl" / "eccl+polite"
+        p.eccl = true;
+        if (p.reg.size() > 5) p.reg = p.reg.substr(5);
+      }
       p.note = col(cols, 4);
       out.push_back(std::move(p));
     });

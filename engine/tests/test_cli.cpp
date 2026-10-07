@@ -374,6 +374,41 @@ TEST_CASE("cli: stored tokens, flags, job facts and UI reason shapes") {
   CHECK(m.missing[0].rfind("am", 0) == 0);
 }
 
+TEST_CASE("cli: TokenView.register (C23): the chosen sense's register survives the stored tokens") {
+  using vp::rules::TokenView;
+  TokenView a, b, c;
+  a.text = a.display = "Alchēmista";
+  a.end = 11;
+  a.lemmaId = 7;
+  a.hasLemma = true;
+  a.registerTag = "medieval";
+  b.text = b.display = "hīc";
+  b.start = 12;
+  b.end = 16;
+  c.text = c.display = "computātrum";
+  c.registerTag = "new-latin";
+  c.fromRule = true;
+  // the view: "register" only when tagged (additive field, absent otherwise)
+  CHECK(tokenJson(a)["register"] == "medieval");
+  CHECK_FALSE(tokenJson(b).contains("register"));
+  CHECK(tokenJson(c)["register"] == "new-latin");
+  CHECK(tokenJson(c)["fromRule"] == true);
+  // stored in the project (bits of the flags field) and read back
+  std::vector<TokenView> back;
+  REQUIRE(decodeTokens(encodeTokens({a, b, c}), back));
+  REQUIRE(back.size() == 3);
+  CHECK(back[0].registerTag == "medieval");
+  CHECK(back[1].registerTag.empty());
+  CHECK(back[2].registerTag == "new-latin");
+  CHECK(back[2].fromRule);
+  CHECK_FALSE(back[2].unknown);
+  // a project written before C23 (bits 0..3 only) has no register
+  REQUIRE(decodeTokens("[[\"hīc\",0,0,3,-1,0,2,\"\",\"\"]]", back));
+  REQUIRE(back.size() == 1);
+  CHECK(back[0].registerTag.empty());
+  CHECK(back[0].fromRule);
+}
+
 TEST_CASE("cli: Orbergise original alignment, language detection, stored facts, monotonic export") {
   auto t = [](const char* s, int64_t a, int64_t b) {
     TimedText x;

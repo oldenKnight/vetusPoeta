@@ -53,7 +53,10 @@ struct PrepEntry {
   bool infinitive = false;      // case column "inf"
 };
 // ---- phrasebook_en_la.tsv, contractions_en.tsv, nonverbal_en_la.tsv, gloss_es_la.tsv ------------------------------
-struct PhraseEntry { std::string pattern, latin, reg, note; uint8_t tier = 0; };
+// C23 (D18): a register cell "eccl" or "eccl+<register>" ("eccl+polite") marks a Medieval / ecclesiastical row: `eccl`
+// is set and `reg` keeps the register after the "+" ("eccl" when there is none). Such rows match only with
+// Options::latinity "wide"; a row of the same pattern without the mark is the classical rendering (alternative).
+struct PhraseEntry { std::string pattern, latin, reg, note; uint8_t tier = 0; bool eccl = false; };
 struct PairEntry { std::string a, b; };                 // contractions (form, expansion), nonverbal (english, latin)
 struct GlossEsEntry { std::string key, head, glossEs; };
 // ---- macron_overrides.tsv (rules_la_notes.md decision 5) -------------------------------------------------------------

@@ -3507,7 +3507,8 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
       if (leadPos) {
         int le = -1;
         for (size_t q = 0; q < book.size() && le < 0; ++q)
-          if (book[q].reg == "lead" && text::lower(book[q].pattern) == s.tokens[(size_t)i].lower) le = (int)q;
+          if (book[q].reg == "lead" && !(s.classical && book[q].eccl) &&
+              text::lower(book[q].pattern) == s.tokens[(size_t)i].lower) le = (int)q;
         if (le >= 0) {
           PhraseMatch m;
           m.entry = le;
@@ -3524,7 +3525,7 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
         }
       }
       PhraseMatch m;
-      if (!book_.match(s.tokens, i, m)) { ++i; continue; }
+      if (!book_.match(s.tokens, i, m, s.classical)) { ++i; continue; }
       const curated::PhraseEntry& e = book[(size_t)m.entry];
       if (e.reg == "lead") { ++i; continue; }
       // C19: an imperative row ("wake up" -> ēvigilā, "hurry" -> festīnā) needs the bare verb: "She woke up." and
@@ -4489,8 +4490,9 @@ std::vector<size_t> FrameBuilder::splitPoints(std::string_view t) {
   return out;
 }
 
-void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
+void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool classical) const {
   out.clear();
+  out.classical = classical;
   out.lang = lang_;
   out.text = std::string(sentence);
   tokenize(sentence, out.tokens);

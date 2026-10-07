@@ -670,6 +670,33 @@ def part_real(exe, work, _lex):
     check(forms["m"] != forms["f"], "speakerGender: m %r, f %r" % (forms["m"], forms["f"]))
     eng.req("settings.set", {"patch": {"speakerGender": None}})
 
+    # latinity (C23, D18: settings.latinity -> Options.latinity): "wide" (default) takes the ecclesiastical phrasebook
+    # row, "classical" the classical one and marks a Medieval-only word Check; TokenView.register and words.list
+    # carry the chosen sense's register
+    check(eng.req("settings.get")["latinity"] == "wide", "settings: latinity defaults to wide")
+    got = {}
+    for lat in ("wide", "classical"):
+        eng.req("settings.set", {"patch": {"latinity": lat}})
+        eng.req("project.new", {"kind": "text", "pair": "en-la", "text": "I'm sorry.\n\nThe alchemist is here."})
+        j = eng.req("translate.start", {"fidelity": 1})["jobId"]
+        eng.wait_event("translate.done", lambda e, j=j: e["jobId"] == j, timeout=120)
+        got[lat] = [eng.req("cue.get", {"index": i}) for i in range(2)]
+    wl = eng.req("words.list")   # the classical project
+    w0, c0, w1, c1 = got["wide"][0], got["classical"][0], got["wide"][1], got["classical"][1]
+    check(w0["cue"]["target"].startswith("Habeās mē excūsāt") and any(a["text"].startswith("Ignōsce mihi") for a in w0["alternatives"]),
+          "latinity wide: %r, alternatives %s" % (w0["cue"]["target"], [a["text"] for a in w0["alternatives"]]))
+    check(c0["cue"]["target"].startswith("Ignōsce mihi"), "latinity classical: %r" % c0["cue"]["target"])
+    check(w1["cue"]["confidence"] == "ok" and "late-latin" not in w1["cue"]["flags"] and
+          c1["cue"]["confidence"] == "check" and "late-latin" in c1["cue"]["flags"],
+          "latinity: a Medieval-only word is OK in wide (%s), Check late-latin in classical (%s)" %
+          (w1["cue"]["confidence"], c1["cue"]["flags"]))
+    check(any(t.get("register") == "medieval" for t in w1["tokens"]) and
+          not any("register" in t for t in w0["tokens"]), "TokenView.register on the Medieval word only")
+    check(any(x.get("register") == "medieval" for x in wl["words"]), "words.list: register of the chosen sense")
+    e = eng.err("settings.set", {"patch": {"latinity": "vulgar"}})
+    check(e["code"] == "bad_params" and "latinity" in e["message"], "settings: latinity must be wide or classical")
+    eng.req("settings.set", {"patch": {"latinity": None}})
+
     # Latin -> English (C11): source-side tokens and "analysis" reasons pass through; words.list on the Latin side
     if "la-en" in hello["pairs"]:
         eng.req("project.new", {"kind": "subs", "pair": "la-en", "sourcePath": samples.get("la")})

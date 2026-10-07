@@ -469,6 +469,31 @@ TEST_CASE("settings: defaults, merge, save, reload, unknown keys") {
   CHECK(json::parse(slurp(p))["fromTheFuture"]["x"] == 1);
 }
 
+TEST_CASE("settings: latinity is \"wide\" by default and only \"wide\" or \"classical\" (D18, C23)") {
+  const std::string dir = coreTmp("settings_latinity");
+  const std::string p = vp::fs::join(dir, "settings.json");
+  vp::Settings s(p);
+  s.load();
+  CHECK(s.get()["latinity"] == "wide");
+  auto r = s.set(json{{"latinity", "classical"}});
+  REQUIRE(r);
+  CHECK(r.value()["latinity"] == "classical");
+  for (const json& bad : {json("medieval"), json(true), json(1), json("Wide")}) {
+    auto b = s.set(json{{"latinity", bad}});
+    REQUIRE_FALSE(b);
+    CHECK(b.error().code == vp::ErrorCode::BadParams);
+    CHECK(b.error().message.find("latinity") != std::string::npos);
+  }
+  CHECK(s.get()["latinity"] == "classical");   // a refused patch changes nothing
+  REQUIRE(s.set(json{{"latinity", nullptr}}));  // null resets to the default
+  CHECK(s.get()["latinity"] == "wide");
+  // an invalid value on disk is repaired to the default with a warning
+  spit(p, "{\"latinity\": \"vulgar\"}");
+  s.load();
+  CHECK(s.get()["latinity"] == "wide");
+  CHECK(s.warnings().size() == 1);
+}
+
 TEST_CASE("settings: a corrupt file falls back to defaults with a warning") {
   const std::string dir = coreTmp("settings_corrupt");
   const std::string p = vp::fs::join(dir, "settings.json");
