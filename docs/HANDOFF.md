@@ -35,6 +35,14 @@ Last updated: 2026-10-05 (session 1, step 1 of the production process).
   own 5/74 (6.8 %), oz 132/700 (18.9 %); wrong among OK 0 everywhere; model gate 74.9 % so Latin reranking is off.
 
 ## Open items for the owner
+- The owner announced a PARTIAL Alice subtitle file (not the whole film) about three hours after 2026-10-07 00:40 UTC.
+  Intake plan: save it under data/acceptance/ (gitignored: the file is copyrighted and never enters the repo or the
+  docs; only our own Latin output lines and numbers are recorded), run `vpengine check` on it, then
+  `tools/eval/run_eval.py --tuned --file data/acceptance/<file> --pair en-la --combos R,RM,RO,RMO --fidelity 1,2,3`
+  (every engine combination, first run, per-cue error with intervals; the online cells only if the owner toggles
+  them), write the expert review sheet (docs/EVAL.md §3), review every cue as the four reviewers of DECISIONS D15,
+  report the true first-run error rate per cell, then open the tuning loop on its mismatches (C20) and re-measure
+  on the held-out files. The partial file gives a wider interval; the protocol is unchanged.
 - Create the `main` branch so a draft pull request can be opened for claude/fervent-cannon-6qif8i.
 - Run tools/eval/gt_compare.js headful on your machine (the container cannot trust the proxy CA).
 - Upload the Alice subtitle file (acceptance test) and a second subtitle file (held-out test).
