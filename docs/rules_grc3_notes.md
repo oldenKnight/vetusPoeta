@@ -151,3 +151,9 @@ Fixes (Greek side only; they hold whether or not the frame builder changes):
 * Conservative confidence: clause-repair, wh-statement and participle-phrase (every participle made from a clause or an
   -ing phrase: the subordinator is dropped) are never OK.
 Unit case "C18 review" 13 / 13 (the four sentences and two own ones per rule) and the transfer-level repair test.
+
+## Review after round 2 (main agent, 2026-10-07)
+Ten unseen sentences, fidelity 2: three OK (ἕως + imperfect for "while"; οὐδέποτε ... εἶδον; αὔριον εἰς τὴν θάλατταν
+ἴωμεν), seven Check, none wrong among OK. For Greek loop 4: "such a big dog" -> μέγαν κύνα drops "such" and is still OK
+(should be οὕτω μέγαν or τοιοῦτον, or at least Check with "such" in meaningMissing); "the rain stopped" -> τὸ ὕδωρ
+ἔστησεν (Check; ὁ ὄμβρος ἐπαύσατο); "why did you not come yesterday" -> διὰ τί οὐ χθὲς ἦλθες (Check; οὐκ ἦλθες χθές).
