@@ -36,8 +36,9 @@ Last updated: 2026-10-05 (session 1, step 1 of the production process).
   reranking is off. Loops C18 (Greek 3) and C19 (Latin 4) are DONE; the next loop (C20) runs on the acceptance file.
 
 ## Open items for the owner
-- The owner announced a PARTIAL Alice subtitle file (not the whole film) about three hours after 2026-10-07 00:40 UTC.
-  Intake plan: save it under data/acceptance/ (gitignored: the file is copyrighted and never enters the repo or the
+- The owner's PARTIAL Alice file arrived 2026-10-07 13:13 UTC (82 cues) with his own free Latin version; both are in
+  data/acceptance/ (gitignored). First run measured: STATUS E5 (expert wrong rate 79 %). Tuning loop C22 opened.
+  The intake plan that was followed: save it under data/acceptance/ (gitignored: the file is copyrighted and never enters the repo or the
   docs; only our own Latin output lines and numbers are recorded), run `vpengine check` on it, then
   `tools/eval/run_eval.py --tuned --file data/acceptance/<file> --pair en-la --combos R,RM,RO,RMO --fidelity 1,2,3`
   (every engine combination, first run, per-cue error with intervals; the online cells only if the owner toggles
