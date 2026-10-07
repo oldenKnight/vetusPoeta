@@ -833,3 +833,13 @@ tagged amod without a verb form is a participle; the "retag" repair also for int
 - "Is this hat yours?": the tagger reads hat as an adjective (Check).
 - "Whose shoes are these?" -> cuius + wh order needs a genitive interrogative in LaNP (Check now).
 - "all afternoon" hung on the previous noun (parser); "The dog that I saw was big." (relative misparse, Check).
+
+### Review of the pre-loop C20 (main agent, 2026-10-07)
+- Accepted: speed fix (signatures computed once; byte-identical output), possessives, asyndeton, tam/tantus/tālis,
+  gerundives, mī fīlī. Fresh 12-sentence spot check: OK 3 (2 right), Check 6, Fix 3.
+- Faults for C22 (acceptance loop): "Is this your cat or mine?" -> "Estne hoc fēlēs tua aut mea?" rated OK: the
+  demonstrative must agree with the predicate noun (haec) and an alternative question takes utrum ... an / -ne ... an;
+  "You must not open that door." -> Fix "Nōn patēns illam iānuam": negative obligation is nōlī + infinitive or nōn
+  dēbēs; "tomorrow" was read as a noun (prōcrāstinātiō) when the sentence has a future verb: crās; "secret" (noun)
+  -> sēcrētum / arcānum; "Give the children something to drink." mixes the cases (puerīs aliquid ad bibendum dā);
+  "Whose book is this?" -> Cuius est hic liber?; "without finding" -> sine + gerund or nec ... invēnimus.
