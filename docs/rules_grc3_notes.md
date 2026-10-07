@@ -125,3 +125,29 @@ the accent shift); προσκυνέω's aorist cells have the augment before the
 πρῴ is only listed as πρωΐ; "morning" gives the poetic ἠώς (ἠόα); "happy" -> λευκός, "box" -> κυψέλη, "table" ->
 ποτηροθήκη, "stick" -> ἀρχή, "game" -> θήραμα, "ring" -> κύκλος (and "gold" -> ἄχρυσος) in the reverse index (teacher
 glosses needed; not added in this loop beyond the unit sentences).
+
+## Review round 2 (main agent's spot check, 2026-10-07)
+| # | source | before | after |
+|---|---|---|---|
+| 1 | The shepherd, seeing the wolf, fled. | Ὁ ποιμὴν τὸν λύκον ὁρᾷ ἐπεὶ ἔφυγεν. (OK, wrong) | Ὁ ποιμὴν τὸν λύκον ὁρῶν ἔφυγεν. (Check) |
+| 2 | When the sun rose, we went to the river. | Πότε τὸ ῥόδον ἡλίου εἰς τὸν ποταμὸν ἀπήλθομεν. (OK, wrong) | Ἐπεὶ ὁ ἥλιος ἀνέτειλεν, εἰς τὸν ποταμὸν ἀπήλθομεν. (Check when rebuilt) |
+| 3 | Where is your mother? | Ποῦ ἐστι μήτηρ; (Check) | Ποῦ ἐστιν ἡ μήτηρ σου; |
+| 4 | Hurry, the ship is leaving! | Ὦ Hurry, ἡ ναῦς λείπει! (Check) | Ὦ Hurry, ἡ ναῦς ἀποπλεῖ! (Check: "Hurry" read as a name, frame builder) |
+
+Fixes (Greek side only; they hold whether or not the frame builder changes):
+* An -ing word without an auxiliary right after a comma is never the main verb: the clause the frame hung after it is
+  the main clause with that subject, the -ing phrase a participle (#1; "The girl, hearing the bell, ran home.").
+* "When X, Y." that is not a question (engine_grc `frontedWhen`): when the frame builder gives no time clause before Y,
+  X and Y are analysed apart (X alone, so "the bell rang." / "the sun rose." are retagged as pasts by C17's helpers)
+  and merged as time clause + main clause; flag clause-repair (Check). With C19's live frame builder the sentence is
+  already parsed right and the cue may be OK; the HEAD frame builder exercises the rebuild. A wh frame in a sentence
+  without "?" is flagged wh-statement (Check). The transfer's own repair (wh "when" + coordinated clause) is tested on
+  a hand-built frame.
+* A possessive determiner (my, your, his, its, our, their; not the ambiguous "her") just before the head noun that
+  the frame did not attach is restored from its token (#3, "Where is my book?"); a verbless fragment "where + NP" in a
+  question is rebuilt as the wh question with "be" (πῶς ἔχει for "how is"), Check.
+* Intransitive "leave" -> ἀπέρχομαι (verb rows may have frame `intr`: used without object and PP); "ship / boat leave"
+  -> ἀποπλέω (kind subject).
+* Conservative confidence: clause-repair, wh-statement and participle-phrase (every participle made from a clause or an
+  -ing phrase: the subordinator is dropped) are never OK.
+Unit case "C18 review" 13 / 13 (the four sentences and two own ones per rule) and the transfer-level repair test.

@@ -264,3 +264,6 @@ subject	moon rise	ἀνατέλλω
 subject	sol salir	ἀνατέλλω		"salió el sol"
 durative	be tired	κάμνω		state in the past: ἔκαμνεν
 durative	be hungry	πεινάω		state in the past: ἐπείνα
+verb	leave	ἀπέρχομαι	intr	C18: intransitive "leave" = depart ("we left early" -> ἀπήλθομεν); with an object λείπω
+subject	ship leave	ἀποπλέω		C18: "the ship is leaving" -> ἡ ναῦς ἀποπλεῖ
+subject	boat leave	ἀποπλέω		

@@ -873,6 +873,26 @@ void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
     if (o.interrogative == kNone) o.interrogative = greek("τίς", Pron);
     o.definite = false;
   }
+  // C18: a possessive determiner right before the head that the frame builder left out ("Where is my book?" -> exist
+  // subj=book): restored from the token ("ποῦ ἐστι τὸ βιβλίον μου;"); "her" is left alone (object pronoun or possessive)
+  if (n.possessor.empty() && n.token > 0 && (size_t)n.token < c.s.tokens.size() &&
+      std::find(n.tokens.begin(), n.tokens.end(), n.token - 1) == n.tokens.end()) {
+    const std::string w = c.s.tokens[(size_t)n.token - 1].lower;
+    uint8_t pp = 0, pn = 0, pg = 0;
+    if (w == "my") { pp = 1; pn = Sg; }
+    else if (w == "our") { pp = 1; pn = Pl; }
+    else if (w == "your") { pp = 2; pn = c.mem.addresseePlural ? (uint8_t)Pl : (uint8_t)Sg; }
+    else if (w == "his") { pp = 3; pn = Sg; pg = M; }
+    else if (w == "its") { pp = 3; pn = Sg; pg = c.mem.lastGender ? c.mem.lastGender : (uint8_t)N; }
+    else if (w == "their") { pp = 3; pn = Pl; pg = M; }
+    if (pp && o.head != kNone && !o.isPronoun) {
+      o.possPerson = pp;
+      o.possNumber = pn;
+      o.possGender = pg;
+      o.definite = true;
+      c.cover(n.token - 1);
+    }
+  }
   // possessor
   for (const SemNP& p : n.possessor) {
     if (p.isPronoun && p.pron.person > 0) {
@@ -1222,6 +1242,9 @@ void GreekTransfer::predicateInto(const SemFrame& f, Ctx& c, GrcClause& cl) cons
     const char* want = past ? "past" : "present";
     for (const std::string& s : {src, en}) {
       if (s.empty()) continue;
+      // C18: frame "intr" = the verb without an object ("the ship is leaving" -> ἀπέρχεται, not λείπει)
+      if (!f.hasObject && f.obliques.empty())
+        if (const LexRow* r = row("verb", s, "intr")) return r;
       if (const LexRow* r = row("verb", s, want)) return r;
       for (const LexRow& r : gt_.rows())
         if (r.kind == "verb" && r.source == s && (r.frame.empty())) return &r;
@@ -1987,6 +2010,9 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
                 participle(lx_, sc.pred.lemma, pt, sc.pred.voice, Nom, num, gen, probe)) {
               gs.participle = true;
               gs.conj = kNone;
+              // the subordinator is dropped and the phrase rebuilt as a participle: Check, never OK
+              if (std::find(c.out.flags.begin(), c.out.flags.end(), "participle-phrase") == c.out.flags.end())
+                c.out.flags.push_back("participle-phrase");
               sc.hasSubject = false;
               sc.pred.tense = pt;
               sc.connectors.clear();
@@ -2124,6 +2150,33 @@ namespace {
 // "when" with Y coordinated; "Singing a song, the girl walked ..." comes as an imperative "sing" with the real clause
 // as a time clause after it. Both become the main clause Y with X as a time clause before it.
 bool repairFrontedTime(const SemFrame& f, const SemSentence& s, SemFrame& out) {
+  // "Where is his dog?" left as a fragment "dog (his) + where" without its verb: the wh question with "be" (existential
+  // order: ποῦ ἐστιν ὁ κύων αὐτοῦ;)
+  if (f.type == Kind::Frag && !f.hasPred && f.hasSubject && !f.subject.isPronoun && f.subordinate.empty() &&
+      f.predAdj.empty() && f.predicative.empty() && f.adverbs.size() == 1 &&
+      (s.question || s.finalPunct.find('?') != std::string::npos)) {
+    const std::string a = text::lower(f.adverbs[0].lemma);
+    int be = -1;
+    bool pastBe = false;
+    for (size_t t = 0; t < s.tokens.size(); ++t)
+      if (in(s.tokens[t].lower, {"is", "are", "was", "were", "'s", "'re"})) { be = (int)t; pastBe = s.tokens[t].lower[0] == 'w'; break; }
+    if (be >= 0 && (a == "where" || a == "how" || a == "when")) {
+      out = f;
+      out.type = Kind::Wh;
+      out.hasPred = true;
+      out.copula = false;
+      out.existential = a == "where";
+      out.pred = frame::SemPredicate{};
+      out.pred.lemma = a == "how" ? "have" : "be";   // "how is X?" -> πῶς ἔχει X;
+      out.pred.token = be;
+      out.pred.tense = pastBe ? frame::Tense::Past : frame::Tense::Present;
+      out.wh.word = a;
+      out.wh.role = frame::Role::Adverb;
+      out.wh.token = f.adverbs[0].token;
+      out.adverbs.clear();
+      return true;
+    }
+  }
   if (f.subordinate.empty()) return false;
   const frame::SemSub& last = f.subordinate.back();
   if (last.frame.empty() || !last.frame[0].hasPred || last.before) return false;
@@ -2171,6 +2224,30 @@ bool repairFrontedTime(const SemFrame& f, const SemSentence& s, SemFrame& out) {
     out.subordinate.insert(out.subordinate.begin(), std::move(ts));
     return true;
   }
+  // "The shepherd, seeing the wolf, fled.": the -ing word (no auxiliary) was taken for the main verb and the real
+  // verb hangs in a time / coordinated clause without a subject: that clause is the main one, with this subject
+  if (!question && f.type == Kind::Decl && f.hasSubject && f.pred.token > 0 && (size_t)f.pred.token < s.tokens.size() &&
+      f.pred.auxTokens.empty() && f.pred.aspect == frame::Aspect::Simple &&
+      ingForm(s.tokens[(size_t)f.pred.token].lower) && s.tokens[(size_t)f.pred.token - 1].text == "," &&
+      (last.relation == Relation::Time || last.relation == Relation::Coord) && !last.frame[0].hasSubject &&
+      last.frame[0].type == Kind::Decl) {
+    SemFrame pf = f;
+    pf.subordinate.pop_back();
+    pf.hasSubject = false;
+    pf.subject = SemNP{};
+    out = last.frame[0];
+    out.hasSubject = true;
+    out.subject = f.subject;
+    for (const std::string& k : f.connectors) out.connectors.push_back(k);
+    pf.connectors.clear();
+    frame::SemSub ts;
+    ts.relation = Relation::Time;
+    ts.marker = "";
+    ts.before = true;
+    ts.frame.push_back(std::move(pf));
+    out.subordinate.insert(out.subordinate.begin(), std::move(ts));
+    return true;
+  }
   // "Oh little bird, where is your nest?": a fragment NP after "oh" with the real clause coordinated after it is the
   // addressee of that clause (ὦ + vocative)
   bool oh = false;
@@ -2193,7 +2270,10 @@ void GreekTransfer::clause(const SemFrame& f0, const SemSentence& s, const trans
   const SemFrame& f = rep ? repaired : f0;
   Ctx c(s, st, mem, out);
   c.depth = subordinate ? 1 : 0;
-  if (rep) c.cover(f0.wh.token);   // the "when" of a repaired fronted time clause
+  if (rep) {   // the "when" of a repaired fronted time clause; a rebuilt structure is never OK
+    c.cover(f0.wh.token);
+    out.flags.push_back("clause-repair");
+  }
   clauseInto(f, c, out.clause);
   // C16: a clause that starts with "if" and has no main clause ("Only if you believe it is.") is the condition
   // alone; "only if" = "not unless": εἰ μή ("εἰ μὴ πιστεύεις ὅτι ἔστιν")

@@ -115,6 +115,99 @@ Layout greekLayout(const std::string& text, int maxLine, int maxLines) {
   return l;
 }
 
+// C18: token indices of a frame shifted by `d` (a frame analysed on its own and merged into another sentence)
+void shiftNP(frame::SemNP& n, int d);
+void shiftFrame(frame::SemFrame& f, int d) {
+  auto sh = [d](int& t) { if (t >= 0) t += d; };
+  auto shv = [d](std::vector<int>& v) { for (int& t : v) if (t >= 0) t += d; };
+  sh(f.pred.token);
+  sh(f.pred.complementToken);
+  shv(f.pred.auxTokens);
+  if (f.hasSubject) shiftNP(f.subject, d);
+  if (f.hasObject) shiftNP(f.object, d);
+  if (f.hasIndirect) shiftNP(f.indirectObject, d);
+  for (auto& o : f.obliques) { sh(o.token); shiftNP(o.np, d); }
+  for (auto& n : f.predicative) shiftNP(n, d);
+  for (auto& a : f.predAdj) { sh(a.token); shv(a.advTokens); }
+  for (auto& n : f.vocatives) shiftNP(n, d);
+  for (auto& a : f.adverbs) sh(a.token);
+  for (auto& sb : f.subordinate)
+    for (auto& x : sb.frame) shiftFrame(x, d);
+  sh(f.wh.token);
+  shv(f.tokens);
+  for (auto& n : f.objComplement) shiftNP(n, d);
+  for (auto& a : f.objComplementAdj) { sh(a.token); shv(a.advTokens); }
+  for (auto& x : f.secondary) shiftFrame(x, d);
+}
+void shiftNP(frame::SemNP& n, int d) {
+  auto sh = [d](int& t) { if (t >= 0) t += d; };
+  sh(n.token);
+  for (int& t : n.tokens) sh(t);
+  for (auto& p : n.possessor) shiftNP(p, d);
+  for (auto& a : n.adjectives) { sh(a.token); for (int& t : a.advTokens) sh(t); }
+  for (auto& g : n.genitive) shiftNP(g, d);
+  for (auto& r : n.relative) shiftFrame(r, d);
+  for (auto& k : n.coord) shiftNP(k, d);
+}
+
+// C18: "When X, Y." (a statement, not a question). The shared frame builder reads such a sentence as a wh question
+// "when" and often takes the verb of X for a noun ("the bell rang" -> rang of bell) and loses Y's subject. X and Y are
+// analysed apart (X alone: "the bell rang." is retagged by C17's english helpers) and merged: Y with X as a time
+// clause before it. False when the sentence does not have that shape or a part does not give a clause.
+bool frontedWhen(const std::string& text, const frame::FrameBuilder& fb, frame::SemSentence& out) {
+  std::string low = text::lower(text);
+  size_t lead = 0;
+  while (lead < low.size() && (low[lead] == ' ' || low[lead] == '-' || low[lead] == '"')) ++lead;
+  size_t kw = 0;
+  if (low.compare(lead, 5, "when ") == 0) kw = 5;
+  else if (low.compare(lead, 7, "cuando ") == 0) kw = 7;
+  if (!kw) return false;
+  size_t e = text.size();
+  while (e > 0 && text[e - 1] == ' ') --e;
+  if (e == 0 || text[e - 1] == '?') return false;
+  const size_t comma = text.find(',', lead + kw);
+  if (comma == std::string::npos || comma + 2 >= e) return false;
+  const size_t aStart = lead + kw;
+  std::string a = text.substr(aStart, comma - aStart);
+  size_t bStart = comma + 1;
+  while (bStart < text.size() && text[bStart] == ' ') ++bStart;
+  std::string b = text.substr(bStart);
+  if (a.empty() || b.empty()) return false;
+  frame::SemSentence sa, sb;
+  fb.analyse(a + ".", sa);
+  fb.analyse(b, sb);
+  if (sa.units.size() != 1 || sa.units[0].type != frame::Unit::Clause || !sa.units[0].frame.hasPred ||
+      sa.units[0].frame.type != frame::Kind::Decl)
+    return false;
+  if (sb.units.empty() || sb.units[0].type != frame::Unit::Clause || !sb.units[0].frame.hasPred ||
+      (sb.units[0].frame.type != frame::Kind::Decl && sb.units[0].frame.type != frame::Kind::Imp))
+    return false;
+  out = std::move(sb);
+  const int base = (int)out.tokens.size();
+  for (nlp::Token& t : out.tokens) { t.start += (int)bStart; t.end += (int)bStart; }
+  for (nlp::Token t : sa.tokens) {
+    if (t.start >= (int)a.size()) continue;   // the "." added for the analysis
+    t.start += (int)aStart;
+    t.end += (int)aStart;
+    out.tokens.push_back(t);
+  }
+  for (size_t i = 0; i < sa.drop.size() && out.drop.size() < out.tokens.size(); ++i) out.drop.push_back(sa.drop[i]);
+  while (out.drop.size() < out.tokens.size()) out.drop.push_back(frame::Drop::Punct);
+  frame::SemFrame tf = sa.units[0].frame;
+  shiftFrame(tf, base);
+  tf.punct.clear();
+  frame::SemSub ts;
+  ts.relation = frame::Relation::Time;
+  ts.marker = kw == 5 ? "when" : "cuando";
+  ts.before = true;
+  ts.frame.push_back(std::move(tf));
+  out.units[0].frame.subordinate.insert(out.units[0].frame.subordinate.begin(), std::move(ts));
+  out.text = text;
+  for (const std::string& r : sa.repairs) out.repairs.push_back(r);
+  for (const std::string& d : sa.doubts) out.doubt(d.c_str());
+  return true;
+}
+
 bool checkOk(const CueOutput& o, const char* id) {
   for (const Check& c : o.checks)
     if (c.id == id) return c.ok;
@@ -429,7 +522,22 @@ struct GreekPath::Impl {
               const transfer::Settings& st, SentOut& so, bool alternatives, bool allowSplit = true) {
     frame::SemSentence s;
     fb.analyse(text, s);
-    if (allowSplit && frame::FrameBuilder::troubled(s)) {
+    // C18: "When X, Y." read as a question or with X broken: X and Y analysed apart and merged (never OK: Check)
+    bool whenRepaired = false;
+    {
+      bool fine = false;
+      for (const frame::Unit& u : s.units)
+        if (u.type == frame::Unit::Clause)
+          for (const frame::SemSub& sb : u.frame.subordinate)
+            fine = fine || (sb.relation == frame::Relation::Time && sb.before && !sb.frame.empty() &&
+                            sb.frame[0].hasPred && sb.frame[0].type == frame::Kind::Decl);
+      frame::SemSentence merged;
+      if (!fine && frontedWhen(text, fb, merged)) {
+        s = std::move(merged);
+        whenRepaired = true;
+      }
+    }
+    if (!whenRepaired && allowSplit && frame::FrameBuilder::troubled(s)) {
       const std::vector<size_t> pts = frame::FrameBuilder::splitPoints(text);
       if (!pts.empty()) { speechSplit(text, pts, fb, opt, mem, st, so); return; }
       s.repairs.emplace_back("no-verb");
@@ -584,6 +692,18 @@ struct GreekPath::Impl {
       }
       if (i + 1 < units.size()) L.text += greekSeparator(ut.sep);
     }
+    if (whenRepaired) {
+      addFlag(flags, "clause-repair");
+      so.reasons.push_back(Reason{-1, "form", "\"When ..., ...\" analysed in two parts (time clause + main clause): check it", ""});
+    }
+    // C18: a wh question frame in a sentence that is not a question (an interrogative word in a statement): Check
+    if (s.finalPunct.find('?') == std::string::npos)
+      for (const frame::Unit& u : s.units)
+        if (u.type == frame::Unit::Clause && u.frame.type == frame::Kind::Wh) {
+          addFlag(flags, "wh-statement");
+          so.reasons.push_back(Reason{-1, "form", "an interrogative word in a statement: check the structure", ""});
+          break;
+        }
     if (!s.repairs.empty()) {
       std::string what;
       for (const std::string& r : s.repairs) what += (what.empty() ? "" : ", ") + r;
@@ -1020,7 +1140,7 @@ struct GreekPath::Impl {
                  !checkOk(o, "A8") || !checkOk(o, "A9") || a.minMargin < 0.15 || a.song || a.nonverbal;
       for (const char* f : {"name-guessed", "from-rule", "addressee-guess", "missing-form", "merged", "frame-fallback",
                             "realia", "name-kept", "contact-relative", "noun-infinitive", "purpose-guess", "light-verb",
-                            "phrase-order", "participle-phrase", "ellipsis"})
+                            "phrase-order", "participle-phrase", "ellipsis", "clause-repair", "wh-statement"})
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       for (const transfer::Choice& c : a.choices)
         if (c.lowTier) {

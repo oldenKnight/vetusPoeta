@@ -425,3 +425,120 @@ TEST_CASE("rules-grc3: noun sense consistency in a batch") {
   }
   CHECK(mem.nounSense.size() <= 32);
 }
+
+// C18 review: four cases of the main agent's spot check plus two of our own per rule. Structures the shared frame
+// builder gets wrong are rebuilt on the Greek side and are never OK; the text must be right whether or not the frame
+// builder is fixed.
+TEST_CASE("rules-grc3: C18 review (fronted when, -ing between commas, lost possessives, intransitive leave)") {
+  NEED_REAL3();
+  auto e = engine3();
+  struct R { const char* src; const char* expected; bool mustCheck; };
+  const std::vector<R> cases = {
+      // "-ing" phrase between commas after the subject: a participle with that subject (rebuilt: Check)
+      {"The shepherd, seeing the wolf, fled.", "ὁ ποιμὴν τὸν λύκον ὁρῶν ἔφυγεν. | ὁ ποιμὴν τὸν λύκον ἰδὼν ἔφυγεν.", true},
+      {"The girl, hearing the bell, ran home.", "ἡ κόρη τὸν κώδωνα ἀκούουσα οἴκαδε ἔδραμεν.", true},
+      {"The farmer, seeing the horse, laughed.", "ὁ γεωργὸς τὸν ἵππον ὁρῶν ἐγέλασεν.", true},
+      // "When X, Y." is a statement with a time clause, never πότε
+      {"When the sun rose, we went to the river.",
+       "ἐπεὶ ὁ ἥλιος ἀνέτειλεν, εἰς τὸν ποταμὸν ἀπήλθομεν. | ἐπεὶ ὁ ἥλιος ἀνέτειλεν, εἰς τὸν ποταμὸν ἤλθομεν.", false},
+      {"When the moon rose, the dogs barked.", "ἐπεὶ ἡ σελήνη ἀνέτειλεν, οἱ κύνες ὑλάκτουν.", false},
+      {"When the king came, we bowed.", "ἐπεὶ ὁ βασιλεὺς ἧκεν, προσεκυνήσαμεν.", false},
+      // possessives the frame builder lost; a verbless "where" fragment (rebuilt: Check)
+      {"Where is your mother?", "ποῦ ἐστιν ἡ μήτηρ σου;", false},
+      {"Where is my book?", "ποῦ ἐστι τὸ βιβλίον μου;", false},
+      {"Where is his dog?", "ποῦ ἐστιν ὁ κύων αὐτοῦ;", false},
+      {"Where is her cat?", "ποῦ ἐστιν ἡ γαλῆ αὐτῆς;", false},
+      // intransitive "leave" = depart; a ship / boat sails away (kind subject)
+      {"The guests are leaving.", "οἱ ξένοι ἀπέρχονται.", false},
+      {"We left early.", "πρωῒ ἀπήλθομεν.", false},
+      {"The boat is leaving.", "ἡ ναῦς ἀποπλεῖ.", false},
+  };
+  int ok = 0;
+  for (const R& k : cases) {
+    rules::CueInput x;
+    x.sourceText = k.src;
+    auto r = e->translate({x}, opts3(false), rules::Context{}, nullptr, nullptr);
+    REQUIRE(r.ok());
+    const rules::CueOutput& o = r.value()[0];
+    const std::string got = flat3(o.target);
+    bool hit = false;
+    std::string exp = k.expected;
+    for (size_t a = 0;;) {
+      const size_t b = exp.find(" | ", a);
+      hit = hit || norm3(got) == norm3(text::nfc(exp.substr(a, b == std::string::npos ? std::string::npos : b - a)));
+      if (b == std::string::npos) break;
+      a = b + 3;
+    }
+    CHECK_MESSAGE(hit, k.src << " -> '" << got << "' expected '" << k.expected << "'");
+    ok += hit;
+    const bool rebuilt = std::find(o.flags.begin(), o.flags.end(), "clause-repair") != o.flags.end() ||
+                         std::find(o.flags.begin(), o.flags.end(), "wh-statement") != o.flags.end() ||
+                         std::find(o.flags.begin(), o.flags.end(), "participle-phrase") != o.flags.end();
+    if (rebuilt || k.mustCheck) CHECK_MESSAGE(o.confidence != rules::Confidence::Ok, k.src << " was rebuilt but is OK");
+    CHECK(o.confidence != rules::Confidence::Fix);
+  }
+  MESSAGE("C18 review cases: " << ok << " / " << cases.size());
+  // "Hurry, the ship is leaving!": "Hurry" is read as a name by the frame builder (Check); the ship sails away
+  {
+    rules::CueInput x;
+    x.sourceText = "Hurry, the ship is leaving!";
+    auto r = e->translate({x}, opts3(false), rules::Context{}, nullptr, nullptr);
+    REQUIRE(r.ok());
+    CHECK(r.value()[0].target.find(text::nfc("ἀποπλεῖ")) != std::string::npos);
+    CHECK(r.value()[0].confidence == rules::Confidence::Check);
+  }
+  // the transfer's own repair, independent of the frame builder: a statement "When the sun rose, we went to the
+  // river." built as a wh question "when" with the main clause coordinated becomes a time clause + main clause, flagged
+  {
+    static curated::CuratedData cg = [] {
+      auto r = curated::CuratedData::load(repo3() / "data" / "curated");
+      REQUIRE(r.ok());
+      return std::move(r.value());
+    }();
+    auto gd = grc::GreekData::load(repo3() / "data" / "curated");
+    auto gt = grc::GreekTables::load(repo3() / "data" / "curated");
+    REQUIRE(gd.ok());
+    REQUIRE(gt.ok());
+    grc::GreekTransfer xf(real3().grc, cg, gd.value(), gt.value());
+    grc::GreekRealiser rl(real3().grc, cg, gd.value());
+    frame::SemSentence s;
+    s.finalPunct = ".";
+    frame::SemFrame f;
+    f.type = frame::Kind::Wh;
+    f.wh.word = "when";
+    f.wh.role = frame::Role::Adverb;
+    f.hasPred = true;
+    f.pred.lemma = "rise";
+    f.pred.tense = frame::Tense::Past;
+    f.hasSubject = true;
+    f.subject.head = "sun";
+    f.subject.definite = true;
+    frame::SemFrame m;
+    m.hasPred = true;
+    m.pred.lemma = "go";
+    m.pred.tense = frame::Tense::Past;
+    m.hasSubject = true;
+    m.subject.isPronoun = true;
+    m.subject.pronLemma = "we";
+    m.subject.pron.person = 1;
+    m.subject.pron.number = 2;
+    frame::SemOblique ob;
+    ob.prep = "to";
+    ob.np.head = "river";
+    ob.np.definite = true;
+    m.obliques.push_back(ob);
+    frame::SemSub sb;
+    sb.relation = frame::Relation::Coord;
+    sb.frame.push_back(m);
+    f.subordinate.push_back(sb);
+    transfer::Settings st;
+    transfer::Memory mem;
+    grc::GrcClauseOut out;
+    xf.clause(f, s, st, mem, out);
+    CHECK(std::find(out.flags.begin(), out.flags.end(), "clause-repair") != out.flags.end());
+    CHECK(out.clause.type == realise::ClauseType::Decl);
+    grc::GrcOptions go;
+    const std::string txt = rl.realise(out.clause, go).text;
+    CHECK_MESSAGE(norm3(txt) == norm3(text::nfc("ἐπεὶ ὁ ἥλιος ἀνέτειλεν, εἰς τὸν ποταμὸν ἀπήλθομεν.")), txt);
+  }
+}
