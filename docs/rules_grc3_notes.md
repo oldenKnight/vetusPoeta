@@ -184,7 +184,7 @@ Children's-book dialogue, our own sentences, none from a sample, the regression 
 20. Come quickly, the soldiers are near!
 
 ## Blind check result (C21)
-First run (after work items 1-5, before any fix for these sentences): **11 / 20** acceptable Attic of the same meaning
+First run (after work items 1-5, before any fix for these sentences; run once, before a usage-limit interruption, with the live frame builder that already held C20's work in progress): **11 / 20** acceptable Attic of the same meaning
 (1, 3, 4, 8, 9, 12, 13, 14, 17, 19, 20; #1 φαίνει "shines" is the intransitive active of LSJ A.II, accepted; #13 was
 correct Greek but rated Fix by a checker false positive). Not acceptable: #2 ἀναγνώσεις (active future; Attic
 ἀναγνώσομαι), #5 λευγαλέος (poetic "wretched" for "sad"), #6 "Νίφει ὅτε οὐκ οὖν ..." (a time clause with an invented
