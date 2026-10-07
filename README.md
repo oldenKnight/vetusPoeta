@@ -74,12 +74,12 @@ still pending.
 | Measure | Result |
 |---|---|
 | English → Latin, 114-cue regression file, balanced fidelity | 114/114 match the reference (110/114 before four engine outputs were accepted as alternative references); marks OK 65, Check 49, Fix 0 |
-| English → Latin, 100-cue public-domain tuning sample (`tests/regression/oz_sample`) | 6 → 50 → 71/100 over three loops; no cue marked OK is wrong |
+| English → Latin, 100-cue public-domain tuning sample (`tests/regression/oz_sample`) | 6 → 50 → 71 → 78/100 over four loops; no cue marked OK is wrong |
 | Spanish → Latin, 100-cue regression file | 97/100 at the end of the Spanish loop; the 3 others were then accepted as alternatives (re-run 2026-10-06: 100/100); marks OK 81, Check 19, Fix 0 |
 | Latin → English and Latin → Spanish, 201 own sentences | 201/201 in both (tuned; blind batches of 30 and 40 written later were 20/30 and 31/40 English, 25/40 Spanish on their first run) |
 | English → Greek, 114-cue regression file | 114/114 after two loops (tuned); Spanish → Greek 38/40; Greek → English and Spanish 40/40 |
 | Orbergise | 60/60 own cases, 20/20 blind; with the original-language file 20/22 |
-| Held-out set (`tests/heldout/`, never read, never tuned on) | automatic errors: 74 own cues 10.8 % → 6.8 % (95 % CI 2.2-15.1 %); 700 public-domain cues 25.1 % → 18.9 % (CI 16.0-22.0 %); wrong among cues marked OK: 0 in every run. This is not yet an expert error rate (DESIGN §15) |
+| Held-out set (`tests/heldout/`, never read, never tuned on) | automatic errors: 74 own cues 10.8 % → 4.1 % (95 % CI 0.8-11.4 %); 700 public-domain cues 25.1 % → 16.7 % (CI 14.0-19.7 %); wrong among cues marked OK: 0 in every run. This is not yet an expert error rate (DESIGN §15) |
 | Acceptance test (the owner's film subtitle file) | **pending**: the file has not arrived |
 | Google Translate side-by-side (Latin) | **pending**: the tool is ready and tested offline; the live run has not been done |
 | Local model, Latin minimal-pair gate (1,000 pairs) | 749/1,000 = 74.9 % (95 % Wilson 72.1-77.5 %), below the 75 % bar fixed in advance: **not passed**, so the model is used for English/Spanish understanding only |

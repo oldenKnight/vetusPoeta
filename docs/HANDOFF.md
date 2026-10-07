@@ -18,7 +18,7 @@ Last updated: 2026-10-05 (session 1, step 1 of the production process).
   missing, check `data/raw/dl-*.log` and rerun the curl commands (they resume with `-C -`).
 
 ## Next step (updated 2026-10-06, evening)
-- 36 tasks DONE (waves A-C, D1, B4c, C17, R1). No implementer running. Engineering is complete for 0.1.0; the tree
+- 38 tasks DONE (waves A-C, D1, B4c, C17, R1, C18, C19). No implementer running. Engineering is complete for 0.1.0; the tree
   is quiet and every commit is pushed to claude/fervent-cannon-6qif8i.
 - Waiting on the owner: the Alice .srt (acceptance run: `tools/eval/run_eval.py --tuned`, then a tuning loop C18 on
   its first-run mismatches, then the true held-out file), a `main` branch for the draft pull request, the Google
@@ -31,8 +31,9 @@ Last updated: 2026-10-05 (session 1, step 1 of the production process).
   (`git commit docs/STATUS.md -m ...`) so staged files of implementers are not swept in.
 - Gold Latin: tests/regression/expected/*.gold.txt (main agent). Held-out hygiene: nobody reads tests/heldout,
   tests/eval_gold or data/work/eval/heldout-*; BURNED.txt lists the 100 cues moved to the tuning sample.
-- Quality state (honest): tuned EN 114/114, ES 100/100, Greek 114/114, oz_sample 71/100; held-out automatic errors
-  own 5/74 (6.8 %), oz 132/700 (18.9 %); wrong among OK 0 everywhere; model gate 74.9 % so Latin reranking is off.
+- Quality state (honest): tuned EN 114/114, ES 100/100, Greek 114/114 (ES->GRC 39/40), oz_sample 78/100; held-out
+  automatic errors own 3/74 (4.1 %), oz 117/700 (16.7 %); wrong among OK 0 everywhere; model gate 74.9 % so Latin
+  reranking is off. Loops C18 (Greek 3) and C19 (Latin 4) are DONE; the next loop (C20) runs on the acceptance file.
 
 ## Open items for the owner
 - The owner announced a PARTIAL Alice subtitle file (not the whole film) about three hours after 2026-10-07 00:40 UTC.
