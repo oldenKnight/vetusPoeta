@@ -1393,8 +1393,12 @@ class RulesEngine final : public Engine {
         // C19: a noun inside a noun phrase (after a determiner, an adjective, a numeral or a possessive: "a very small
         // mouse with a long tail.") is no candidate verb of a failed parse
         const std::string& pu = i > 0 ? s.tokens[i - 1].upos : std::string();
+        // C26: nor the head of a compound noun ("a silver cup", "a small brown mouse")
         if (t.upos == "NOUN" && i > 0 && pu != "DET" && pu != "ADJ" && pu != "NUM" && pu != "ADP" &&
-            !(pu == "PRON" && s.tokens[i - 1].deprel == "nmod")) {
+            !(pu == "PRON" && s.tokens[i - 1].deprel == "nmod") &&
+            !(pu == "NOUN" && s.tokens[i - 1].deprel == "compound" && s.tokens[i - 1].head == (int)i + 1 &&
+              nlp::morph::get(s.tokens[i - 1].feats, nlp::morph::NumberShift) != nlp::morph::NumPlur &&
+              !s.tokens[i - 1].lower.empty() && s.tokens[i - 1].lower.back() != 's')) {
           std::vector<lex::Analysis> an;
           en_->lookup(text::en_key(t.lower), an);
           for (const lex::Analysis& a : an) nounVerb = nounVerb || en_->lemma(a.lemma).pos == feat::Verb;
@@ -1930,6 +1934,11 @@ class RulesEngine final : public Engine {
           while (e > 0 && pv->text[e - 1] == ' ') --e;
           open = e > 0 && (pv->text[e - 1] == ',' || pv->text[e - 1] == ';' || pv->text[e - 1] == ':' ||
                            pv->text[e - 1] == '-');
+          // C26: a sentence that starts with a lower-case word continues the one before, whatever its last mark
+          // ("I saw the king." + "and the queen." -> Et rēgīnam.)
+          size_t a = 0;
+          while (a < ss.text.size() && (ss.text[a] == ' ' || ss.text[a] == '"' || ss.text[a] == '\'')) ++a;
+          if (a < ss.text.size() && ss.text[a] >= 'a' && ss.text[a] <= 'z') open = true;
         }
         mem.contCase = open ? mem.lastObjCase : 0;
       }

@@ -1478,7 +1478,7 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
     const Token& kt = c.t(k);
     const std::string d = kt.deprel;
     const std::string kl = kt.lower;
-    if (d == "det" || (d == "nmod" && kt.upos == "DET")) {
+    if (d == "det" || (d == "nmod" && (kt.upos == "DET" || (en && kl == "whose")))) {   // C26: "whose" read as nmod
       np.tokens.push_back(k);
       const std::string cd = canonDet(lang_, kl);
       // possessive determiners (Spanish "mi", "su")
@@ -1736,6 +1736,20 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
       c.liftedAdv = keepAdv;
       rf.obliques.insert(rf.obliques.end(), l2.begin(), l2.end());
       rf.adverbs.insert(rf.adverbs.end(), a2.begin(), a2.end());
+      // C26: a bare past participle on a noun ("a crown made of gold", "a house built of stone") is passive: the noun
+      // is what was made (quae ex aurō facta est), never the maker
+      if (en && fget(c.t(k), nlp::morph::VerbFormShift) == nlp::morph::VfPart &&
+          fget(c.t(k), nlp::morph::TenseShift) == nlp::morph::TensePast && !rf.hasSubject && rf.hasPred &&
+          rf.pred.voice == Voice::Active && rf.pred.auxTokens.empty() && !rf.hasObject && k > h) {
+        bool relWord = false;
+        for (int g : c.kids[(size_t)k])
+          if (c.ok(g) && in(c.t(g).lower, {"who", "whom", "which", "that", "whose"})) relWord = true;
+        if (!relWord) {
+          rf.pred.voice = Voice::Passive;
+          rf.pred.tense = Tense::Present;
+          rf.pred.aspect = Aspect::Simple;
+        }
+      }
       // C15: a stranded preposition of a contact relative ("I told you of") is the relative pronoun's preposition
       if (en)
         for (size_t q = 0; q < rf.adverbs.size(); ++q) {
@@ -1775,7 +1789,15 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
         if (x < first) first = x;
       }
       const bool comma = commaKid || (first > 0 && c.t(first - 1).text == ",");
-      if ((d == "appos" || (the && comma)) && !cc) {
+      // C26: "the lion, the tiger and the bear": a conjunct after a comma with a later conjunct joined by and / or is
+      // a member of a list, not an apposition
+      bool listMember = false;
+      if (d == "conj")
+        for (int x : c.kids[(size_t)h])
+          if (x > k && c.ok(x) && c.dep(x) == "conj")
+            for (int y : c.kids[(size_t)x])
+              if (c.ok(y) && c.dep(y) == "cc" && in(c.t(y).lower, {"and", "or"})) listMember = true;
+      if ((d == "appos" || (the && comma)) && !cc && !listMember) {
         // "of" phrases the parser hung on the head after the apposition belong to the apposition ("Edwin, the Duke
         // of Rome,")
         std::vector<int> moved;
@@ -1810,6 +1832,13 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
       }
     }
     if (d == "conj") {
+      // C26: a verb with its own subject coordinated with a predicate noun ("you will be a great man, for I have
+      // given you ...") is a clause of its own (the clause builder takes it as a coordinated clause), never a conjunct
+      if (en && (kt.upos == "VERB" || kt.upos == "AUX") && k > h) {
+        bool ownSubj = false;
+        for (int g : c.kids[(size_t)k]) ownSubj = ownSubj || (c.ok(g) && c.dep(g) == "nsubj");
+        if (ownSubj) continue;
+      }
       if (en && (kt.upos == "VERB" || kt.upos == "AUX")) c.s.doubt("participle-phrase");   // C15: a verb hung on a noun
       SemNP g;
       buildNP(c, k, g);
@@ -2398,7 +2427,9 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       f.pred.lemma = xl;
       f.pred.token = xcomp;
       c.drop(h, Drop::Aux);
-    } else if (hl == "let" || hl == "dejar") {
+    } else if ((hl == "let" && !(en && nsubj >= 0 && obj >= 0)) || hl == "dejar") {
+      // C26: "let" with its own subject and an object ("She never let the dog come in") is "allow" (sinō + accusative +
+      // infinitive), not the jussive of "let us go" / "let him go"
       f.pred.modality = Modality::Let;
       f.pred.lemma = xl;
       f.pred.token = xcomp;
@@ -3156,6 +3187,9 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
             c.consumed[(size_t)g - 1] = 1;
             c.drop(g - 1, Drop::Marker);
           }
+          // C26: "without + -ing" ("walked for hours without finding water"): a negated coordinated clause of the
+          // same subject (nec aquam invēnērunt); the clause is marked negative below
+          if (en && gl == "without" && c.t(k).upos == "VERB") { s.relation = Relation::Coord; marker = "without"; found = true; }
           // C17: "as" after its main clause compares ("as men call me", "as I promised"): ut + indicative
           if (en && gl == "as" && k > h && found && marker == "because") { s.relation = Relation::Manner; marker = "as"; }
           c.drop(g, Drop::Marker);
@@ -3208,6 +3242,7 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       buildClause(c, k, sf);
       // C15: a dependent clause is never a yes/no question of its own ("help me find my way?" -> ut viam inveniam)
       if (sf.type == Kind::Yn) sf.type = Kind::Decl;
+      if (marker == "without") { sf.negative = true; s.before = false; }   // C26
       if (whTok >= 0) {
         const std::string ww = c.t(whTok).lower;
         // the wh word belongs to the dependent clause; the main clause loses it
@@ -4061,6 +4096,226 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
 void FrameBuilder::repairTree(SemSentence& s) const {
   std::vector<nlp::Token>& tk = s.tokens;
   const int n = (int)tk.size();
+  // C26: verbless fragments (a cue that is a noun phrase).
+  bool anyVerb = false;
+  for (const nlp::Token& t : tk) anyVerb = anyVerb || t.upos == "VERB" || t.upos == "AUX";
+  if (lang_ == SrcLang::En && !anyVerb && n >= 6) {
+    // (a) a list "the brains, the heart and the courage.": every noun phrase after a comma or and / or is a conjunct
+    // of the first (the parser made them punctuation, genitives or appositions)
+    std::vector<int> heads;   // the head noun of each segment
+    std::vector<int> cc;      // the and / or tokens
+    int segStart = 0;
+    bool ok = true, sawAnd = false;
+    for (int k = 0; k <= n && ok; ++k) {
+      const bool end = k == n || tk[(size_t)k].text == "," || in(tk[(size_t)k].lower, {"and", "or"}) ||
+                       (tk[(size_t)k].upos == "PUNCT" && k == n - 1);
+      if (!end) continue;
+      int h = -1;
+      for (int j = segStart; j < k; ++j) {
+        const std::string& u = tk[(size_t)j].upos;
+        if (in(u, {"NOUN", "PROPN"})) h = j;
+        else if (!in(u, {"DET", "ADJ", "NUM", "PRON"})) ok = false;
+      }
+      if (k < n && in(tk[(size_t)k].lower, {"and", "or"})) { cc.push_back(k); sawAnd = true; }
+      if (h < 0 && k > segStart) ok = false;
+      if (h >= 0) heads.push_back(h);
+      segStart = k + 1;
+      if (k < n && tk[(size_t)k].upos == "PUNCT" && k == n - 1) break;
+    }
+    if (ok && sawAnd && heads.size() >= 3 && cc.size() == 1 && cc[0] > heads[heads.size() - 2]) {
+      const int r = heads[0];
+      for (int k = 0; k < n; ++k) {
+        nlp::Token& t = tk[(size_t)k];
+        if (k == r) { t.head = 0; t.deprel = "root"; continue; }
+        int hn = -1;   // the head of k's segment
+        for (int h : heads) if (h >= k && (hn < 0 || h < hn)) hn = h;
+        bool isHead = false;
+        for (int h : heads) isHead = isHead || h == k;
+        if (isHead) { t.head = r + 1; t.deprel = "conj"; continue; }
+        if (k == cc[0]) { t.head = heads.back() + 1; t.deprel = "cc"; continue; }
+        if (t.upos == "PUNCT") { t.head = (k == n - 1 ? r : (hn >= 0 ? hn : r)) + 1; t.deprel = "punct"; continue; }
+        if (hn >= 0) { t.head = hn + 1; t.deprel = t.upos == "DET" ? "det" : t.upos == "ADJ" ? "amod" : t.upos == "NUM" ? "nummod" : "nmod"; }
+      }
+    }
+  }
+  // (a2) a verbless cue the parser rooted on its final punctuation ("and the girls too."): the first noun is the root,
+  // the words before it its determiners / adjectives, a leading and / or / but its conjunction, an adverb its modifier
+  if (lang_ == SrcLang::En && !anyVerb && n >= 3) {
+    int root = -1, noun = -1;
+    for (int k = 0; k < n; ++k) {
+      if (tk[(size_t)k].head == 0 && root < 0) root = k;
+      if (noun < 0 && in(tk[(size_t)k].upos, {"NOUN", "PROPN"})) noun = k;
+    }
+    bool simple = noun >= 0;
+    for (int k = 0; k < n && simple; ++k)
+      simple = in(tk[(size_t)k].upos, {"DET", "ADJ", "NUM", "NOUN", "PROPN", "PRON", "ADV", "CCONJ", "PUNCT"}) &&
+               (k <= noun || !in(tk[(size_t)k].upos, {"NOUN", "PROPN", "DET", "ADJ"}));
+    if (root >= 0 && tk[(size_t)root].upos == "PUNCT" && simple) {
+      for (int k = 0; k < n; ++k) {
+        nlp::Token& t = tk[(size_t)k];
+        if (k == noun) { t.head = 0; t.deprel = "root"; continue; }
+        t.head = noun + 1;
+        t.deprel = t.upos == "DET" ? "det" : t.upos == "ADJ" ? "amod" : t.upos == "NUM" ? "nummod" : t.upos == "PRON" ? "nmod"
+                 : t.upos == "ADV" ? "advmod" : t.upos == "CCONJ" ? "cc" : "punct";
+      }
+    }
+  }
+  // (b) "Not my sister!", "Not the old dog!": "not" before a noun phrase without a verb is the negation of the
+  // phrase (nōn soror mea), not a verb
+  if (lang_ == SrcLang::En && n >= 3 && tk[0].lower == "not" && in(tk[1].upos, {"DET", "PRON", "NOUN", "PROPN", "ADJ", "NUM"})) {
+    bool verb = false;
+    for (int k = 1; k < n; ++k) verb = verb || (tk[(size_t)k].upos == "VERB" || tk[(size_t)k].upos == "AUX");
+    int h = -1;
+    for (int k = 1; k < n; ++k)
+      if (in(tk[(size_t)k].upos, {"NOUN", "PROPN"})) { h = k; break; }
+    if (!verb && h > 0) {
+      for (int k = 0; k < n; ++k) {
+        nlp::Token& t = tk[(size_t)k];
+        if (k == h) { t.head = 0; t.deprel = "root"; }
+        else if (t.head == 1 || k == 0) t.head = h + 1;
+      }
+      tk[0].upos = "PART";
+      tk[0].deprel = "advmod";
+      tk[0].feats = 0;
+      for (int k = 1; k < h; ++k)
+        tk[(size_t)k].deprel = tk[(size_t)k].upos == "DET" ? "det" : tk[(size_t)k].upos == "PRON" ? "nmod"
+                             : tk[(size_t)k].upos == "NUM" ? "nummod" : "amod";
+    }
+  }
+  // (c) "A crown made of gold.", "A house built of stone.": a noun phrase with an indefinite article and a past
+  // participle + "of" / "from" / "with" and no other verb is a noun phrase with a participle, not a sentence
+  if (lang_ == SrcLang::En && n >= 5) {
+    int v = -1, verbs = 0;
+    for (int k = 0; k < n; ++k)
+      if (tk[(size_t)k].upos == "VERB" || tk[(size_t)k].upos == "AUX") { ++verbs; v = k; }
+    int last = n - 1;
+    while (last > 0 && tk[(size_t)last].upos == "PUNCT") --last;
+    if (verbs == 1 && v >= 2 && tk[(size_t)v].deprel == "root" && in(tk[(size_t)v].lower,
+            {"made", "built", "covered", "filled", "painted", "carved", "woven", "sewn", "dressed", "tied", "full"}) &&
+        in(tk[0].lower, {"a", "an", "two", "three", "some", "many"}) && v + 1 <= last &&
+        in(tk[(size_t)v + 1].lower, {"of", "from", "with", "in"}) && tk[(size_t)n - 1].text != "?") {
+      int s0 = -1;
+      for (int k = 0; k < v; ++k)
+        if (tk[(size_t)k].head == v + 1 && tk[(size_t)k].deprel == "nsubj") s0 = k;
+      if (s0 >= 0) {
+        tk[(size_t)s0].head = 0;
+        tk[(size_t)s0].deprel = "root";
+        tk[(size_t)v].head = s0 + 1;
+        tk[(size_t)v].deprel = "acl";
+        tk[(size_t)v].feats = nlp::morph::fromString("Tense=Past|VerbForm=Part");
+        for (int k = 0; k < n; ++k)
+          if (k != v && k != s0 && tk[(size_t)k].head == v + 1 && tk[(size_t)k].deprel == "punct") tk[(size_t)k].head = s0 + 1;
+      }
+    }
+  }
+  // C26: "he never lets anyone come into his presence", "makes the children laugh": a bare verb the parser hung on the
+  // object of let / make / help / see / hear / watch (acl) is that verb's complement (xcomp): sinō + accusative +
+  // infinitive, not a relative clause of the object
+  if (lang_ == SrcLang::En)
+    for (int v = 0; v < n; ++v) {
+      if (tk[(size_t)v].upos != "VERB" || !in(tk[(size_t)v].lower, {"let", "lets", "letting"})) continue;
+      for (int o = v + 1; o < n; ++o) {
+        if (tk[(size_t)o].head != v + 1 || tk[(size_t)o].deprel != "obj") continue;
+        for (int k = o + 1; k < n; ++k) {
+          if (tk[(size_t)k].head != o + 1 || tk[(size_t)k].deprel != "acl" || tk[(size_t)k].upos != "VERB") continue;
+          const uint32_t vf = nlp::morph::get(tk[(size_t)k].feats, nlp::morph::VerbFormShift);
+          if (vf == nlp::morph::VfPart || vf == nlp::morph::VfGer || vf == nlp::morph::VfFin) continue;
+          bool to = false;
+          for (int j = 0; j < n; ++j) to = to || (tk[(size_t)j].head == k + 1 && tk[(size_t)j].lower == "to");
+          if (to) continue;
+          tk[(size_t)k].head = v + 1;
+          tk[(size_t)k].deprel = "xcomp";
+        }
+      }
+    }
+  // C26: "Is the box big or small?", "Are the apples ripe?": a yes / no question opening with a form of "be" and a
+  // predicate adjective (or noun) at the root: the noun phrase between them is the subject (the parser made it an
+  // oblique without a preposition)
+  if (lang_ == SrcLang::En && n >= 4 && in(tk[0].lower, {"is", "are", "was", "were"}) && tk[0].deprel == "cop") {
+    const int r = tk[0].head - 1;
+    bool subj = false;
+    for (int k = 1; k < n; ++k) subj = subj || (tk[(size_t)k].head == r + 1 && tk[(size_t)k].deprel == "nsubj");
+    if (r > 1 && r < n && in(tk[(size_t)r].upos, {"ADJ", "NOUN"}) && !subj)
+      for (int k = 1; k < r; ++k) {
+        if (tk[(size_t)k].head != r + 1 || !in(tk[(size_t)k].deprel, {"obl", "obj", "nmod"}) ||
+            !in(tk[(size_t)k].upos, {"NOUN", "PROPN"}))
+          continue;
+        bool cs = false;
+        for (int j = 0; j < n; ++j) cs = cs || (tk[(size_t)j].head == k + 1 && tk[(size_t)j].deprel == "case");
+        if (!cs) tk[(size_t)k].deprel = "nsubj";
+        break;
+      }
+  }
+  // C26: "without" + an -ing verb the parser hung on the next noun as an adjective ("walked without finding water"):
+  // the verb is a clause of the main verb with "without" as its marker and the noun as its object
+  if (lang_ == SrcLang::En)
+    for (int k = 0; k + 2 < n; ++k) {
+      if (tk[(size_t)k].lower != "without") continue;
+      nlp::Token& v = tk[(size_t)k + 1];
+      if (v.upos != "VERB" || v.lower.size() < 5 || v.lower.compare(v.lower.size() - 3, 3, "ing") != 0) continue;
+      if (v.deprel != "amod" && v.deprel != "compound") continue;
+      const int nn = v.head - 1;
+      if (nn <= k + 1 || nn >= n || !in(tk[(size_t)nn].upos, {"NOUN", "PROPN"})) continue;
+      const int mh = tk[(size_t)nn].head;
+      if (mh <= 0) continue;
+      v.head = mh;
+      v.deprel = "advcl";
+      tk[(size_t)nn].head = k + 2;
+      tk[(size_t)nn].deprel = "obj";
+      tk[(size_t)k].head = k + 2;
+      tk[(size_t)k].deprel = "mark";
+      tk[(size_t)k].upos = "SCONJ";
+    }
+  // C26: "Whose house did you see?", "Which book will you read?": an interrogative noun phrase before an auxiliary
+  // and a second subject is the object of the verb (the parser made it a second subject)
+  if (lang_ == SrcLang::En && n >= 5 && in(tk[0].lower, {"whose", "which", "what"})) {
+    int q = 1;
+    while (q < n && tk[(size_t)q].upos == "ADJ") ++q;
+    const int nh = q;
+    if (nh < n - 3 && in(tk[(size_t)nh].upos, {"NOUN", "PROPN"}) && tk[(size_t)nh].deprel == "nsubj" &&
+        tk[(size_t)nh + 1].upos == "AUX" && in(tk[(size_t)nh + 1].lower, {"do", "does", "did", "will", "can", "could",
+                                                                        "should", "would", "shall", "must", "may"})) {
+      const int v = tk[(size_t)nh].head - 1;
+      int other = -1;
+      for (int j = nh + 2; j < n; ++j)
+        if (tk[(size_t)j].head == v + 1 && tk[(size_t)j].deprel == "nsubj") other = j;
+      int last = n - 1;
+      while (last > 0 && tk[(size_t)last].upos == "PUNCT") --last;
+      if (v > nh && other > nh && tk[(size_t)v].upos == "VERB" && tk[(size_t)last].upos != "ADP") {
+        tk[(size_t)nh].deprel = "obj";
+        tk[0].head = nh + 1;
+        tk[0].deprel = "det";
+        tk[0].upos = "DET";
+      }
+    }
+  }
+  // C26: "Whose book is this?", "Whose shoes are those?": "whose" + noun phrase + be + a demonstrative / pronoun
+  // at the end is a copula question: the noun phrase is the predicate (root), the demonstrative its subject (the
+  // parser hung the copula on the pronoun and the clause became a fragment)
+  if (lang_ == SrcLang::En && n >= 5 && tk[0].lower == "whose") {
+    int q = 1;
+    while (q < n && tk[(size_t)q].upos == "ADJ") ++q;
+    const int nh = q;
+    int last = n - 1;
+    while (last > 0 && tk[(size_t)last].upos == "PUNCT") --last;
+    if (nh < n && in(tk[(size_t)nh].upos, {"NOUN", "PROPN"}) && nh + 2 == last &&
+        in(tk[(size_t)nh + 1].lower, {"is", "are", "was", "were"}) &&
+        in(tk[(size_t)last].lower, {"this", "that", "these", "those", "it", "they"}) && tk[(size_t)n - 1].text == "?") {
+      tk[0].head = nh + 1;
+      tk[0].deprel = "det";
+      tk[0].upos = "DET";
+      for (int k = 1; k < nh; ++k) { tk[(size_t)k].head = nh + 1; tk[(size_t)k].deprel = "amod"; }
+      tk[(size_t)nh].head = 0;
+      tk[(size_t)nh].deprel = "root";
+      tk[(size_t)nh + 1].head = nh + 1;
+      tk[(size_t)nh + 1].deprel = "cop";
+      tk[(size_t)nh + 1].upos = "AUX";
+      tk[(size_t)last].head = nh + 1;
+      tk[(size_t)last].deprel = "nsubj";
+      tk[(size_t)last].upos = "PRON";
+      for (int k = last + 1; k < n; ++k) { tk[(size_t)k].head = nh + 1; tk[(size_t)k].deprel = "punct"; }
+    }
+  }
   // C24: "After this he will ...": "after" + "this" before the subject is a time phrase (post hoc), not a
   // subordinator with a second subject
   if (lang_ == SrcLang::En && n >= 4 && in(tk[0].lower, {"after", "before"}) && in(tk[1].lower, {"this", "that"}) &&
@@ -5142,7 +5397,7 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
     }
     if (!verb && fix < 0) {
       if ((tk[1].upos == "DET" || tk[1].upos == "PRON") && verbReading(tk[0]) && tk[0].upos != "ADP" &&
-          !in(tk[0].lower, {"and", "or", "but", "nor"})) {   // C19: "with her grandmother.", "and the queen's crown,"
+          !in(tk[0].lower, {"and", "or", "but", "nor", "just", "only", "merely", "simply", "not", "even"})) {   // C19: "with her grandmother.", "and the queen's crown,"; C26: "Just an old box."
         fix = 0;
         feats = nlp::morph::fromString("VerbForm=Fin|Mood=Imp");
       } else {
@@ -5160,7 +5415,9 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
         }
         for (int i = 1; i + 1 < n && fix < 0; ++i) {
           const std::string& w = tk[(size_t)i].lower;
+          // C26: not a word in -ss / -us / -is ("a silk dress", "the glass", "a circus"): no 3rd-person -s
           if ((tk[(size_t)i].upos == "NOUN" || tk[(size_t)i].upos == "ADJ") && w.size() > 3 && w.back() == 's' &&
+              w[w.size() - 2] != 's' && w[w.size() - 2] != 'u' && w[w.size() - 2] != 'i' &&
               nounLike(i - 1) && verbReading(tk[(size_t)i]) &&
               !in(tk[(size_t)i - 1].lower, {"my", "your", "our", "their", "its", "his"})) {   // C22: "My ears!" 
             fix = i;

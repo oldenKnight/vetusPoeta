@@ -256,6 +256,8 @@ struct Transfer::Ctx {
   uint8_t prepOverrideCase = 0;
   bool reflObject = false;              // phrasal_en_la.tsv frame refl: "bow" -> inclīnāte vōs
   bool routeObject = false;             // "which way (do I go)": the way is the route (ablative), not an object
+  bool rideObject = false;              // C26: "rode his horse" -> equō suō vectus est (the mount in the ablative)
+  bool knowPerson = false;              // C26: "know" + a person -> nōvī (perfect of nōscō with present meaning)
   uint8_t phrasalCase = 0;              // phrasal_en_la.tsv frame acc/dat/abl: case of the object
   bool negConsumed = false;             // an NP carries the clause's negation ("neque ... neque")
   bool afterSi = false;                 // C15: inside a sī / nisi clause: "anything" is quid, not aliquid
@@ -315,6 +317,25 @@ uint32_t Transfer::latin(const char* head, uint8_t pos) const {
 }
 
 // ---- lexical selection ----------------------------------------------------------------------------------------------
+// C26: what one gets by being given it (accipiō), not by fetching it (capiō)
+static bool receivedThing(const std::string& w) {
+  static const char* const k[] = {"heart", "brain", "brains", "courage", "reward", "prize", "present", "gift", "letter",
+                                  "answer", "news", "wish", "permission", "advice", "praise", "punishment", "message",
+                                  "name", "medal", "payment", "wage", "wages", "share", "thanks", "kiss", "help"};
+  for (const char* x : k)
+    if (w == x) return true;
+  return false;
+}
+
+// C26: "or" between the alternatives of a yes / no question is an ("Estne haec fēlēs tua an mea?"), else aut
+uint32_t Transfer::orConj(const Ctx& c) const {
+  if (c.frame && c.frame->type == Kind::Yn) {
+    const uint32_t an = latin("an", Conj);
+    if (an != kNone) return an;
+  }
+  return latin("aut", Conj);
+}
+
 uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std::vector<std::string>& context,
                           bool hasObject, bool personObject, const Settings& st, Choice& c, uint8_t srcGender) const {
   c.source = sourceLemma;
@@ -490,7 +511,8 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
     if (!lp) continue;
     const bool substantive = pos == Noun && lp == Adj;   // "the bottom" -> īmum (neuter adjective as a noun)
     if (!posCompatible(lp, pos) && !substantive) continue;
-    const uint32_t id = morph::findLemma(la_, te->head, lp);
+    uint32_t id = morph::findLemma(la_, te->head, lp);
+    if (id == kNone && lp == Adj && pos == Adj) id = morph::findLemma(la_, te->head, Participle);   // C26: potēns
     if (id == kNone) continue;
     bool dup = false;
     for (const Scored& x : sc)
@@ -1273,8 +1295,29 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
       npInto(k, c, x);
       o.coord.push_back(x);
     }
-    if (!o.coord.empty() && n.coordConj == "or") o.coordConj = latin("aut", Conj);
+    if (!o.coord.empty() && n.coordConj == "or") o.coordConj = orConj(c);
   };
+  // C26: "all the rest of us" -> nōs omnēs; "the rest of us" -> nōs cēterī; "the rest of the children" -> cēterī
+  // puerī (cēterus agreeing; never "tōtum cēterum nostrī")
+  if (c.st.lang == frame::SrcLang::En && !n.isPronoun && !n.isName && n.genitive.size() == 1 && n.adjectives.empty() &&
+      text::lower(n.head) == "rest" && n.relative.empty() && n.coord.empty()) {
+    const SemNP& gn = n.genitive[0];
+    const bool all = n.determiner == "all";
+    const uint32_t q = latin(all ? "omnis" : "cēterus", Adj);
+    if (q != kNone && (gn.isPronoun ? tables::personalPronoun(gn.pronLemma) && gn.pron.number == 2 : gn.number == 2 || gn.determiner == "all")) {
+      npInto(gn, c, o);
+      c.cover(n.tokens);
+      LaAdj m;
+      m.lemma = q;
+      if (gn.isPronoun) m.after = true;
+      else m.before = true;
+      o.adjectives.insert(o.adjectives.begin(), m);
+      o.number = Pl;
+      if (o.isPronoun) o.pron.number = Pl;
+      tableChoice(q, n.head);
+      return;
+    }
+  }
   // C17: "plenty of silk" / "a lot of water" -> multum sēricī (neuter + partitive genitive); "lots of apples" ->
   // multa māla (a plural noun takes multī)
   if (c.st.lang == frame::SrcLang::En && !n.isPronoun && !n.isName && n.genitive.size() == 1 && n.adjectives.empty() &&
@@ -1285,7 +1328,7 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
       LaNP g;
       npInto(n.genitive[0], c, g);
       tableChoice(multus, n.head);
-      if (n.genitive[0].number == 2) {
+      if (n.genitive[0].number == 2 && g.number == Pl) {   // C26: "a lot of brains": the mass singular (multum cerebrī)
         o = g;
         LaAdj m;
         m.lemma = multus;
@@ -1426,6 +1469,9 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
     else if (p == "nothing") { id = latin("nihil", Pron); gender = N; }
     else if ((p == "someone" || p == "anyone") && c.afterSi) { id = latin("quis", Pron); gender = M; }   // C15: sī quis
     else if ((p == "something" || p == "anything") && c.afterSi) { id = latin("quis", Pron); gender = N; }   // sī quid
+    else if ((p == "someone" || p == "anyone" || p == "anybody") && c.frame &&
+             std::find(c.frame->connectors.begin(), c.frame->connectors.end(), "nor") != c.frame->connectors.end() &&
+             p != "someone" && latin("quisquam", Pron) != kNone) { id = latin("quisquam", Pron); gender = M; }   // C26: nec quisquam
     else if (p == "someone" || p == "anyone") { id = latin("aliquis", Pron); gender = M; }
     else if (p == "something" || p == "anything") { id = latin("aliquis", Pron); gender = N; }
     else if (p == "who") { id = latin("quis", Pron); gender = M; }
@@ -1628,6 +1674,23 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
     ch.token = n.token;
     uint32_t id = kNone;
     if (n.head == "hour" && n.ordinal) id = latin("hōra", Noun);
+    // C26: a match that is lit or struck is a small torch (fax), not a contest (certāmen): "a lighted match"
+    if (id == kNone && c.st.lang == frame::SrcLang::En && text::lower(n.head) == "match") {
+      bool fire = false;
+      for (const std::string& w : c.context) fire = fire || w == "light" || w == "strike" || w == "burn" || w == "fire" || w == "candle";
+      for (const frame::SemAdj& a : n.adjectives) fire = fire || a.lemma == "light" || a.lemma == "burn" || a.lemma == "lighted";
+      if (fire && latin("fax", Noun) != kNone) id = latin("fax", Noun);
+    }
+    // C26: "old man" / "old woman" -> senex / anus (the adjective is in the noun; "an old woman" was fēmina vetus)
+    bool oldPerson = false;
+    if (c.st.lang == frame::SrcLang::En && (text::lower(n.head) == "man" || text::lower(n.head) == "woman"))
+      for (const frame::SemAdj& a : n.adjectives)
+        if (text::lower(a.lemma) == "old" && a.adverbs.empty() && a.degree == 0) oldPerson = true;
+    if (oldPerson) {
+      const uint32_t sx = latin(text::lower(n.head) == "man" ? "senex" : "anus", Noun);
+      if (sx != kNone) id = sx;
+      else oldPerson = false;
+    }
     // C17: "men" in general (no article, no possessive, no adjective) are people: hominēs ("as men call me")
     if (c.st.lang == frame::SrcLang::En && text::lower(n.head) == "man" && n.number == 2 && n.determiner.empty() && !n.definite &&
         n.possessor.empty() && n.adjectives.empty() && n.numeral.empty())
@@ -1744,6 +1807,11 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
       const lex::Lemma l = la_.lemma(id);
       if (l.flags & lex::PluralOnly) o.number = Pl;
       if (text::lower(n.head) == "people" && n.numeral.empty()) o.number = Pl;   // C15: people -> hominēs
+      // C26: English plurals that name one thing in Latin ("brains" = wits, "news"): the Latin singular, unless a
+      // numeral counts them
+      if (c.st.lang == frame::SrcLang::En && n.number == 2 && n.numeral.empty() && !(l.flags & lex::PluralOnly) &&
+          (text::lower(n.surface) == "brains" || text::lower(n.surface) == "wits" || text::lower(n.surface) == "news"))
+        o.number = Sg;
       if (l.pos == Adj || l.pos == Participle) o.gender = N;   // a taught adjective as a noun: "in īmō"
       if (l.pos == Noun && !(l.flags & lex::PluralOnly) && pluralOnly(id)) o.number = Pl;   // tenebrae
       if (l.pos == Noun) {
@@ -1771,7 +1839,20 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
   else if (d == "that") o.det = realise::Det::Ille;
   else if (d == "no") { addAdj("nūllus", d); c.negative = true; nullusSingular(); }
   else if (d == "any") {
-    if (c.negative) { addAdj("nūllus", d); nullusSingular(); }
+    // C26: "nor do I know of any living person" -> nec quemquam vīvum: "any" + a word for a person in a negative
+    // clause (or one carried by nec) is quisquam, its adjectives agreeing
+    bool norCtx = false;
+    if (c.frame)
+      for (const std::string& k : c.frame->connectors) norCtx = norCtx || k == "nor";
+    const std::string hl = text::lower(n.head);
+    if (norCtx && c.st.lang == frame::SrcLang::En && n.genitive.empty() && n.numeral.empty() &&
+        (hl == "person" || hl == "one" || hl == "body" || hl == "man" || hl == "woman" || hl == "human") &&
+        n.number != 2 && latin("quisquam", Pron) != kNone) {
+      o.head = latin("quisquam", Pron);
+      o.number = Sg;
+      o.gender = hl == "woman" ? F : M;
+      tableChoice(o.head, "any " + n.head);
+    } else if (c.negative) { addAdj("nūllus", d); nullusSingular(); }
     else if (c.question) addAdj("ūllus", d);
   } else if (d == "every") addAdj("omnis", d);
   else if (d == "all" && n.number == 1 && c.st.lang == frame::SrcLang::En && latin("tōtus", Adj) != kNone) addAdj("tōtus", d);   // C17: "all night" -> tōtam noctem
@@ -1797,7 +1878,10 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
   if (n.interrogative) {
     if (n.wh == "how many") o.interrogative = latin("quot");
     else if (n.wh == "how much") o.interrogative = latin("quantus", Adj);
-    else o.interrogative = latin("quī", Pron);
+    else if (n.wh == "whose" && c.st.lang == frame::SrcLang::En && latin("quis", Pron) != kNone) {
+      o.interrogative = latin("quis", Pron);   // C26: "whose" -> cuius
+      o.whoseGen = true;
+    } else o.interrogative = latin("quī", Pron);
   }
   // possessor
   for (const SemNP& p : n.possessor) {
@@ -1844,7 +1928,11 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
     break;
   }
   // adjectives
+  const bool oldInNoun = o.head != kNone && (o.head == latin("senex", Noun) || o.head == latin("anus", Noun)) &&
+                         c.st.lang == frame::SrcLang::En &&
+                         (text::lower(n.head) == "man" || text::lower(n.head) == "woman");   // C26
   for (const frame::SemAdj& a : n.adjectives) {
+    if (oldInNoun && text::lower(a.lemma) == "old" && a.adverbs.empty() && a.degree == 0) { c.cover(a.token); continue; }
     // an adjective the phrasebook renders as a verb phrase ("impossible" -> fierī nōn potest): attributive use is a
     // relative clause agreeing with the noun ("sex rēs quae fierī nōn possunt")
     if (n.relative.empty() && o.relative.empty() && a.adverbs.empty()) {
@@ -2098,8 +2186,9 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
     o.coord.push_back(x);
   }
   // C15: "my aunt and uncle" -> amitam et avunculum meum: a shared possessive goes with the last conjunct
+  // (C26: not when the last conjunct is a standalone possessive without a noun: "your book or his" -> tuus an eius)
   if (!o.coord.empty() && o.possessive != kNone && o.coord.back().possessive == kNone && !o.coord.back().isPronoun &&
-      !o.coord.back().isName) {
+      !o.coord.back().isName && o.coord.back().head != kNone) {
     o.coord.back().possessive = o.possessive;
     o.possessive = kNone;
   }
@@ -2109,7 +2198,7 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
     o.coordBoth = o.coordConj != kNone;
     if (o.coordBoth) c.negConsumed = true;
   } else if (!o.coord.empty() && n.coordConj == "or") {
-    o.coordConj = latin("aut", Conj);
+    o.coordConj = orConj(c);
   }
 }
 
@@ -2715,6 +2804,30 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     }
   } else if (c.forcedVerb != kNone) {
     verb = c.forcedVerb;
+  } else if (c.st.lang == frame::SrcLang::En && sp.lemma == "know" && sp.particle.empty() && sp.complementVerb.empty() &&
+             sp.voice == frame::Voice::Active && latin("nōscō", Verb) != kNone &&
+             [&] {   // C26: a person known ("Do you know him?", "I know of nobody who ...")
+               auto person = [](const SemNP& x) {
+                 if (x.isPronoun) return x.pronLemma == "him" || x.pronLemma == "her" || x.pronLemma == "me" ||
+                                         x.pronLemma == "you" || x.pronLemma == "us" || x.pronLemma == "them" ||
+                                         x.pronLemma == "anyone" || x.pronLemma == "anybody" || x.pronLemma == "nobody" ||
+                                         x.pronLemma == "someone" || x.pronLemma == "everyone";
+                 return animate(x) && !x.isName;
+               };
+               if (f.hasObject) return person(f.object) && f.object.pronLemma != "them";
+               for (const frame::SemOblique& o : f.obliques)
+                 if (o.prep == "of") return person(o.np);
+               return false;
+             }()) {
+    verb = latin("nōscō", Verb);
+    c.knowPerson = true;
+    Choice ch;
+    ch.token = sp.token;
+    ch.source = sp.lemma;
+    ch.lemma = verb;
+    ch.kind = "table";
+    ch.note = "know a person: nōvī";
+    c.out.choices.push_back(ch);
   } else if (sn) {
     verb = latin(sn, Verb);
     c.objectInVerb = true;
@@ -2807,6 +2920,20 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     ch.note = "rise / set of the sun, moon, stars";
     c.out.choices.push_back(ch);
   } else if (c.st.lang == frame::SrcLang::En && sp.lemma == "get" && sp.particle.empty() && hasObj && !personObj &&
+             f.hasObject && !f.object.isPronoun && !f.object.isName && sp.tense != frame::Tense::Past &&
+             sp.aspect == frame::Aspect::Simple && receivedThing(text::lower(f.object.head)) &&
+             latin("accipiō", Verb) != kNone) {
+    // C26: "get" + a thing that is given, not fetched ("at last I shall get my heart", "you will get a present"):
+    // accipiō; things to fetch keep capiō below
+    verb = latin("accipiō", Verb);
+    Choice ch;
+    ch.token = sp.token;
+    ch.source = sp.lemma;
+    ch.lemma = verb;
+    ch.kind = "table";
+    ch.note = "get = receive";
+    c.out.choices.push_back(ch);
+  } else if (c.st.lang == frame::SrcLang::En && sp.lemma == "get" && sp.particle.empty() && hasObj && !personObj &&
              f.hasObject && !f.object.isPronoun && sp.tense != frame::Tense::Past && sp.aspect == frame::Aspect::Simple &&
              [&] { for (const frame::SemOblique& o : f.obliques) if (o.prep == "from" && animate(o.np)) return false; return true; }() &&
              latin("capiō", Verb) != kNone) {
@@ -2819,6 +2946,20 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     ch.lemma = verb;
     ch.kind = "table";
     ch.note = "get = fetch, take";
+    c.out.choices.push_back(ch);
+  } else if (c.st.lang == frame::SrcLang::En && sp.lemma == "ride" && sp.particle.empty() &&
+             sp.voice == frame::Voice::Active && sp.complementVerb.empty() && latin("equitō", Verb) != kNone &&
+             latin("vehō", Verb) != kNone) {
+    // C26: "rode to the castle" -> equitāvit; "rode his horse" -> equō suō vectus est (vehor + ablative of the mount);
+    // never the active vexit (= carried)
+    c.rideObject = f.hasObject && !c.routeObject && !f.object.isPronoun;
+    verb = latin(c.rideObject ? "vehō" : "equitō", Verb);
+    Choice ch;
+    ch.token = sp.token;
+    ch.source = sp.lemma;
+    ch.lemma = verb;
+    ch.kind = "table";
+    ch.note = c.rideObject ? "ride + mount: vehī + ablative" : "ride: equitāre";
     c.out.choices.push_back(ch);
   } else if (sp.lemma == "tell" && f.hasObject && !f.object.isPronoun &&
              tables::narrativeNoun(text::lower(f.object.head)) && latin("nārrō", Verb) != kNone) {
@@ -2992,6 +3133,13 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
       }
     }
   }
+  if (c.rideObject) p.voice = Passive;   // C26: vehor
+  // C26: nōvī (I know) is the perfect of nōscō (I get to know); nōveram (I knew), nōveris (you will know)
+  if (c.knowPerson) {
+    tense = sp.tense == frame::Tense::Present ? (uint8_t)Perfect
+          : sp.tense == frame::Tense::Future ? (uint8_t)FuturePerfect : (uint8_t)Pluperfect;
+    c.knowPerson = false;
+  }
   // C24: "seem" is the passive of videō ("Domus magna vidētur", "quod vidētur"), never the active "see"
   if (c.st.lang == frame::SrcLang::En && sp.lemma == "seem" && p.lemma != kNone && p.lemma == latin("videō", Verb))
     p.voice = Passive;
@@ -3086,6 +3234,18 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
     c.forcedVerb = keep;
     return;
   }
+  // C26: "Give the children something to drink.": the parser made the person the object and the thing the indirect
+  // object; with a verb of giving the person is the dative and the thing the accusative (puerīs aliquid ad bibendum dā)
+  if (c.st.lang == frame::SrcLang::En && f0.hasObject && f0.hasIndirect && animate(f0.object) &&
+      !animate(f0.indirectObject) &&
+      (f0.pred.lemma == "give" || f0.pred.lemma == "bring" || f0.pred.lemma == "show" || f0.pred.lemma == "send" ||
+       f0.pred.lemma == "hand" || f0.pred.lemma == "offer" || f0.pred.lemma == "pass" || f0.pred.lemma == "lend" ||
+       f0.pred.lemma == "fetch" || f0.pred.lemma == "buy" || f0.pred.lemma == "make" || f0.pred.lemma == "get")) {
+    SemFrame g = f0;
+    std::swap(g.object, g.indirectObject);
+    clauseInto(g, c, cl);
+    return;
+  }
   // C24: "be late for X" with a person or animal as the subject: sērō venīre ad X ("What is the dog late for?" ->
   // Ad quid canis sērō venit?), as the phrasebook's "I am late for X"
   if (c.st.lang == frame::SrcLang::En && f0.copula && f0.predAdj.size() == 1 && f0.predAdj[0].lemma == "late" &&
@@ -3110,15 +3270,25 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
   // C15 (neg.nemo): "I do not want to kill anybody" -> nēminem necāre volō: the negation moves into the pronoun
   SemFrame fneg;
   const SemFrame* fp = &f0;
-  if (f0.negative && f0.hasObject && f0.object.isPronoun &&
+  bool never0 = false;
+  for (const frame::SemAdverb& a : f0.adverbs) never0 = never0 || a.lemma == "never";
+  if ((f0.negative || never0) && f0.hasObject && f0.object.isPronoun &&
       (f0.object.pronLemma == "anyone" || f0.object.pronLemma == "anything")) {
-    bool never = false;
-    for (const frame::SemAdverb& a : f0.adverbs) never = never || a.lemma == "never";
+    const bool never = never0;
     if (!never) {
       fneg = f0;
       fneg.negative = false;
       fneg.object.pronLemma = f0.object.pronLemma == "anyone" ? "nobody" : "nothing";
       fneg.object.negative = true;
+      fp = &fneg;
+    } else if (c.st.lang == frame::SrcLang::En) {
+      // C26: "he never lets anyone ..." -> nēminem umquam ...: the negation goes into the pronoun, "never" is umquam
+      fneg = f0;
+      fneg.negative = false;
+      fneg.object.pronLemma = f0.object.pronLemma == "anyone" ? "nobody" : "nothing";
+      fneg.object.negative = true;
+      for (frame::SemAdverb& a : fneg.adverbs)
+        if (a.lemma == "never") a.lemma = "ever";
       fp = &fneg;
     }
   }
@@ -3253,11 +3423,17 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
   // exclamation: Ō pilleum et digitābula mea!
   if (c.st.lang == frame::SrcLang::En && f.type == Kind::Frag && f.punct == "!" && f.hasSubject && !f.hasPred &&
       f.obliques.empty() && f.predAdj.empty() && !f.subject.isPronoun && !f.subject.isName && f.subject.possessor.size() == 1 &&
-      f.subject.possessor[0].isPronoun && f.subject.possessor[0].pron.person == 1) {
+      f.subject.possessor[0].isPronoun && f.subject.possessor[0].pron.person == 1 && !f.negative) {
     cl.type = realise::ClauseType::Excl;
     cl.exclO = true;
   }
-  if (f.negative) cl.polarity = realise::Polarity::Neg;
+  // C26: "Not my sister!", "Not the old dog!": a negated noun phrase without a verb is nōn + the noun phrase
+  if (c.st.lang == frame::SrcLang::En && f.type == Kind::Frag && !f.hasPred && f.negative && latin("nōn", Adv) != kNone) {
+    realise::LaAdverb na;
+    na.lemma = latin("nōn", Adv);
+    na.pos = realise::AdvPos::Front;
+    cl.adverbs.push_back(na);
+  } else if (f.negative) cl.polarity = realise::Polarity::Neg;
   if (f.expectYes) cl.bias = realise::YnBias::ExpectYes;
   // C15: a negated yes/no question ("Can't you get down?", "Don't you know?") is a statement with a question mark:
   // "Nōn potes dēscendere?", "Nescīs?" (the main agent's gold; nōnne is kept for tag questions)
@@ -3375,7 +3551,14 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
   if (saidImpers) { cl.predGender = N; cl.pred.person = 3; cl.pred.number = Sg; }
   (void)saidPersonal;
   // object
-  if (c.routeObject) {   // "Which way should I go?" -> Quā viā īre dēbeō? (ablative of the route)
+  if (c.rideObject) {   // C26: "rode his horse" -> equō suō vectus est: the mount in the ablative, first oblique
+    LaOblique o;
+    o.case_ = Abl;
+    npInto(f.object, c, o.np);
+    o.np.case_ = Abl;
+    cl.obliques.insert(cl.obliques.begin(), o);
+    c.rideObject = false;
+  } else if (c.routeObject) {   // "Which way should I go?" -> Quā viā īre dēbeō? (ablative of the route)
     LaOblique o;
     o.case_ = Abl;
     npInto(f.object, c, o.np);
@@ -3667,6 +3850,28 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
         cl.subject = ps;
       }
     }
+    // C26: "Is the box big or small?" -> Estne arca magna an parva?: predicate adjectives joined by "or"
+    if (f.predAdj.size() >= 2 && cl.predAdj.size() >= 2 && f.predAdj[0].token >= 0 && f.predAdj[1].token > f.predAdj[0].token)
+      for (int t = f.predAdj[0].token + 1; t < f.predAdj[1].token && (size_t)t < c.s.tokens.size(); ++t)
+        if (text::lower(c.s.tokens[(size_t)t].text) == "or" || text::lower(c.s.tokens[(size_t)t].text) == "o" ||
+            text::lower(c.s.tokens[(size_t)t].text) == "u")
+          cl.predConj = orConj(c);
+    // C26: "Whose book is this?" -> Cuius est hic liber?: the demonstrative subject and the predicate noun are one
+    // noun phrase, the interrogative genitive the predicate (copula second)
+    if (c.st.lang == frame::SrcLang::En && f.type == Kind::Wh && f.hasSubject && f.subject.isPronoun &&
+        (f.subject.pronLemma == "this" || f.subject.pronLemma == "these" || f.subject.pronLemma == "that" ||
+         f.subject.pronLemma == "those") &&
+        cl.predicative.size() == 1 && cl.predicative[0].whoseGen && cl.predicative[0].head != kNone) {
+      LaNP x = cl.predicative[0];
+      cl.wh.lemma = x.interrogative;
+      cl.wh.role = realise::Role::Predicate;
+      cl.wh.case_ = Gen;
+      x.interrogative = kNone;
+      x.whoseGen = false;
+      x.det = (f.subject.pronLemma == "this" || f.subject.pronLemma == "these") ? realise::Det::Hic : realise::Det::Ille;
+      cl.subject = x;
+      cl.predicative.clear();
+    }
     // C22: a predicate adjective of "you" (one person) whose masculine and feminine differ, with no name to tell the
     // gender of the person addressed, is a guess (Check): "You are very kind." -> benignus / benigna
     if (cl.hasSubject && cl.subject.isPronoun && cl.subject.pron.person == 2 && cl.subject.pron.number != Pl &&
@@ -3911,6 +4116,86 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
         ch.lemma = domus;
         ch.kind = "table";
         ch.note = c.motion ? "home (goal): domum" : "home (place): domī";
+        c.out.choices.push_back(ch);
+        c.cover(a.token);
+        continue;
+      }
+    }
+    // C26: "only" right before the subject restricts it: sōlus agreeing with the subject ("Only witches wear white."
+    // -> Sōlae sāgae album gerunt; "modo" after the object said something else)
+    // C26: "Just an old box.", "Only a little bird.": in a verbless fragment "only" / "just" is tantum, first
+    if (c.st.lang == frame::SrcLang::En && !f.hasPred && (a.lemma == "only" || a.lemma == "just" || a.lemma == "merely") &&
+        latin("tantum", Adv) != kNone) {
+      realise::LaAdverb la;
+      la.lemma = latin("tantum", Adv);
+      la.pos = realise::AdvPos::Front;
+      cl.adverbs.push_back(la);
+      Choice ch;
+      ch.token = a.token;
+      ch.source = a.lemma;
+      ch.lemma = la.lemma;
+      ch.kind = "table";
+      ch.note = "only / just + noun phrase: tantum";
+      c.out.choices.push_back(ch);
+      c.cover(a.token);
+      continue;
+    }
+    if (c.st.lang == frame::SrcLang::En && a.lemma == "only" && f.hasPred && f.hasSubject && cl.hasSubject && !cl.subject.isPronoun &&
+        f.subject.numeral.empty() && f.subject.determiner != "few" && f.subject.determiner != "a few" &&
+        !f.subject.tokens.empty() && a.token >= 0 && latin("sōlus", Adj) != kNone) {
+      int first = f.subject.tokens[0];
+      for (int t : f.subject.tokens) first = std::min(first, t);
+      bool adjacent = a.token + 1 == first;
+      if (!adjacent && a.token + 2 == first && (size_t)first <= c.s.tokens.size())
+        adjacent = c.s.tokens[(size_t)a.token + 1].upos == "DET";
+      if (adjacent) {
+        LaAdj so;
+        so.lemma = latin("sōlus", Adj);
+        so.before = true;
+        cl.subject.adjectives.insert(cl.subject.adjectives.begin(), so);
+        Choice ch;
+        ch.token = a.token;
+        ch.source = a.lemma;
+        ch.lemma = so.lemma;
+        ch.kind = "table";
+        ch.note = "only + subject: sōlus";
+        c.out.choices.push_back(ch);
+        c.cover(a.token);
+        continue;
+      }
+    }
+    // C26: "never ... anyone" -> nēminem umquam: umquam right after the negative pronoun, before the verb
+    if (c.st.lang == frame::SrcLang::En && a.lemma == "ever" && f.hasObject && f.object.negative && latin("umquam", Adv) != kNone) {
+      realise::LaAdverb la;
+      la.lemma = latin("umquam", Adv);
+      la.pos = realise::AdvPos::Inner;
+      cl.adverbs.push_back(la);
+      Choice ch;
+      ch.token = a.token;
+      ch.source = "never";
+      ch.lemma = la.lemma;
+      ch.kind = "table";
+      ch.note = "never + anyone: nēminem umquam";
+      c.out.choices.push_back(ch);
+      c.cover(a.token);
+      continue;
+    }
+    // C26: "together" closing a comparison ("more powerful than all of us together") belongs to the quam phrase: last
+    if (c.st.lang == frame::SrcLang::En && a.lemma == "together" && a.token >= 0) {
+      bool afterThan = false;
+      for (const frame::SemOblique& o : f.obliques) afterThan = afterThan || (o.prep == "than" && o.np.token >= 0 && o.np.token < a.token);
+      const uint32_t una = latin("ūnā", Adv);
+      if (afterThan && una != kNone) {
+        realise::LaAdverb la;
+        la.lemma = una;
+        la.pos = realise::AdvPos::End;
+        cl.adverbs.push_back(la);
+        Choice ch;
+        ch.token = a.token;
+        ch.source = a.lemma;
+        ch.lemma = una;
+        ch.kind = "table";
+        ch.note = "together after a comparison: at the end";
         c.out.choices.push_back(ch);
         c.cover(a.token);
         continue;
@@ -4418,6 +4703,15 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
           }
         }
         if (sb.marker == "nor") sc.polarity = realise::Polarity::Pos;
+        // C26: "without + -ing" -> nec + the main verb's tense and mood ("Hōrās ambulāvērunt nec aquam invēnērunt")
+        if (sb.marker == "without") {
+          k = "neque";
+          sc.polarity = realise::Polarity::Pos;
+          if (sc.type != realise::ClauseType::Imp) {
+            sc.pred.tense = cl.pred.tense;
+            sc.pred.mood = cl.pred.mood;
+          }
+        }
         // C19: "I'll chop it down, and then we can get ..." -> poterimus: "can" after a future clause is future
         if (c.st.lang == frame::SrcLang::En && cl.pred.tense == Future && sc.pred.modal != kNone &&
             sc.pred.modal == latin("possum", Verb) && sc.pred.tense == Present && sf.pred.modality == Modality::Can &&

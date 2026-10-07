@@ -460,7 +460,7 @@ TEST_CASE("rules-es: constructions of the Spanish source (one sentence each)") {
       {"Veo a la maestra.", "Magistram videō."},                    // personal "a"
       {"¿Has visto a mi perro?", "Vīdistīne canem meum?"},
       {"No sé nada.", "Nihil sciō."},                               // double negation
-      {"No tengo ni perros ni gatos.", "Neque canēs neque fēlēs habeō."},   // ni ... ni
+      {"No tengo ni perros ni gatos.", "Nec canēs nec fēlēs habeō."},   // ni ... ni
       {"Nadie me ayuda.", "Nēmō mē adiuvat."},
       {"¿Por qué lloras?", "Cūr flēs?"},                            // ¿ ? and por qué
       {"¿Cuántos libros tienes?", "Quot librōs habēs?"},            // the noun "subject" of a 2nd-person verb

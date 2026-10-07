@@ -185,7 +185,13 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
       w.rule = "order.adj";
       out.push_back(std::move(w));
     }
-    if (n.interrogative != kNone) out.push_back(modifierWord(n.interrogative, 0, "order.wh"));
+    if (n.interrogative != kNone && n.whoseGen) {   // C26: cuius (quis in the genitive), whatever the head's case
+      Word w;
+      Features f; f.pos = Pron; f.case_ = Gen; f.number = Sg; f.gender = M;
+      forms_.select(n.interrogative, f, w);
+      w.rule = "order.wh";
+      out.push_back(std::move(w));
+    } else if (n.interrogative != kNone) out.push_back(modifierWord(n.interrogative, 0, "order.wh"));
     if (n.numeral != kNone) out.push_back(modifierWord(n.numeral, 0, "order.num"));
     if (!n.numeralLiteral.empty()) {   // C19: "XXI"
       Word w;
@@ -524,6 +530,7 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
     literal(ad.lemma, "?", w, "order.adv");
     if (ad.pos == AdvPos::Front || (ad.pos == AdvPos::Auto && order_.timeAdverb(ad.lemma))) s[kFRONT].push_back(std::move(w));
     else if (ad.pos == AdvPos::End) s[kEND].push_back(std::move(w));
+    else if (ad.pos == AdvPos::Inner) s[kADV].push_back(std::move(w));   // C26: "nēminem umquam vīdit"
     else if (order_.timeAdverb(ad.lemma)) s[kTADV].push_back(std::move(w));   // C15 order.adv: after the subject
     else s[kADV].push_back(std::move(w));
   }
@@ -542,7 +549,7 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
     if (c.predNumber) pa.number = c.predNumber;
     if (!c.hasSubject && !c.predGender && subj.gender == 0) pa.gender = M;
     for (size_t i = 0; i < c.predAdj.size(); ++i) {
-      if (i) { Word et; literal(k_.et, "et", et, "order.copula"); s[kPRED].push_back(std::move(et)); }
+      if (i) { Word et; literal(c.predConj != kNone ? c.predConj : k_.et, "et", et, "order.copula"); s[kPRED].push_back(std::move(et)); }
       for (uint32_t adv : c.predAdj[i].adverbs) { Word w; literal(adv, "?", w, "order.adv"); s[kPRED].push_back(std::move(w)); }
       Word w;
       forms_.select(c.predAdj[i].lemma,
@@ -568,6 +575,7 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
       Features f; f.pos = Pron; f.number = Sg; f.gender = c.wh.gender ? c.wh.gender : (uint8_t)M;
       f.case_ = c.wh.role == Role::Object ? cases_.objectCase(c.pred.lemma) : c.wh.role == Role::IndirectObject ? (uint8_t)Dat
                                                                               : (uint8_t)Nom;
+      if (c.wh.case_) f.case_ = c.wh.case_;   // C26
       forms_.select(c.wh.lemma, f, w);
       w.rule = "order.wh";
     }
@@ -908,6 +916,11 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
 }
 
 void LatinRealiser::finish(const RealiseOptions& o, std::vector<Word>& words, LaSentence& out) {
+  // C26: neque before a consonant is nec ("nec quemquam", "nec aquam invēnērunt"), as the teacher writes it
+  for (size_t i = 0; i + 1 < words.size(); ++i)
+    if (words[i].punctAfter.empty() && text::latin_key(words[i].form) == "neque" &&
+        !startsWithVowelOrH(words[i + 1].form) && !words[i + 1].form.empty())
+      words[i].form = words[i].form[0] == 'N' ? "Nec" : "nec";
   if (!words.empty()) Punctuation::capitaliseFirst(words[0].form);
   for (size_t i = 0; i < words.size(); ++i) {
     Word& w = words[i];

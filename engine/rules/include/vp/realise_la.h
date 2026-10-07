@@ -24,7 +24,8 @@ enum class YnBias : uint8_t { Neutral, ExpectYes /* nōnne */, ExpectNo /* num *
 enum class Det : uint8_t { None, Hic, Ille, Is, Iste };
 // Clause roles (relative pronoun role, wh role).
 enum class Role : uint8_t { None, Subject, Object, IndirectObject, Oblique, Predicate };
-enum class AdvPos : uint8_t { Auto /* order.adv: time adverbs first, others before the verb */, Front, BeforeVerb, End };
+enum class AdvPos : uint8_t { Auto /* order.adv: time adverbs first, others before the verb */, Front, BeforeVerb, End,
+                              Inner /* C26: after the objects and obliques, right before the verb, also a time adverb */ };
 enum class SubRel : uint8_t { Cause, Time, Condition, Purpose, Concession, Result, AccInf, IndirectQ, Coord,
                               Apposition /* C17: ", paleā fartum" agreeing with the subject / predicate noun */ };
 
@@ -75,6 +76,7 @@ struct LaNP {
   std::vector<LaNP> apposition;   // C22: between commas after the NP and its coordination, in the same case
   bool elideHead = false;         // C24: the antecedent is understood (a free relative: "quod vidētur" for "what it seems"):
                                   // the head is not written, the relative clause agrees with it
+  bool whoseGen = false;          // C26: `interrogative` is quis in the genitive before the head ("Cuius canis lātrat?")
 };
 
 struct LaOblique {
@@ -101,7 +103,8 @@ struct LaSub {
   bool asyndeton = false;          // C20: Coord without a conjunction, after `sep` ("Curre, dracō venit!")
 };
 
-struct LaWh { uint32_t lemma = kNone; Role role = Role::None; uint8_t gender = 0; };
+struct LaWh { uint32_t lemma = kNone; Role role = Role::None; uint8_t gender = 0;
+              uint8_t case_ = 0; /* C26: a forced case ("Cuius est hic liber?": genitive); 0 = by the role */ };
 
 struct LaClause {
   ClauseType type = ClauseType::Decl;
@@ -113,6 +116,7 @@ struct LaClause {
   std::vector<LaOblique> obliques;
   std::vector<LaNP> predicative;   // copula with a noun predicate (0 or 1)
   std::vector<LaAdj> predAdj;      // copula with adjective predicate(s), joined by et
+  uint32_t predConj = kNone;       // C26: the conjunction between predicate adjectives instead of et ("magna an parva")
   uint8_t predGender = 0, predNumber = 0;   // agreement of a predicate without a subject ("obscūrum est")
   std::vector<LaNP> vocatives;
   std::vector<uint32_t> interjections;

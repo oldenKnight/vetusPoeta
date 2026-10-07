@@ -73,6 +73,7 @@ struct LatinChecker::Impl {
   std::vector<char> governed, attached, isVerb, boundaryBefore, relStart;
   std::vector<char> advHint;   // C17: the generator chose an adverb that has an adjective homograph (tantum)
   std::vector<char> verbHint;  // C17: the generator chose a finite verb that has a participle homograph (habitō)
+  std::vector<char> nounHint;  // C26: the generator chose a noun / adjective that has a finite-verb homograph (flāvī)
 
   // ---- reading classes ----
   static bool isFinite(const Reading& r) {
@@ -257,6 +258,7 @@ struct LatinChecker::Impl {
     }
     advHint.assign(rep.tokens.size(), 0);
     verbHint.assign(rep.tokens.size(), 0);
+    nounHint.assign(rep.tokens.size(), 0);
     if (opt.hints)
       for (const TokenHint& h : *opt.hints)
         for (size_t ti = 0; ti < rep.tokens.size(); ++ti) {
@@ -274,6 +276,9 @@ struct LatinChecker::Impl {
               if (hp == Verb)
                 for (const Reading& r : rd[ti])
                   if (r.lemma == h.lemma && isFinite(r)) verbHint[ti] = 1;
+              if (hp == Noun || hp == Adj || hp == Participle)
+                for (const Reading& r : rd[ti])
+                  if (r.lemma == h.lemma && isNominal(r)) nounHint[ti] = 1;
             }
           }
         }
@@ -328,7 +333,9 @@ struct LatinChecker::Impl {
     isVerb.assign(n, 0);
     for (size_t i = 0; i < n; ++i) {
       if (!any(i, isFinite)) continue;
-      const bool last = i + 1 == n || rep.tokens[i + 1].segment != rep.tokens[i].segment;
+      // C26: a segment-final word the generator wrote as a noun or adjective with that reading is no verb ("Via
+      // lateris flāvī": flāvī is yellow, not "I blew")
+      const bool last = (i + 1 == n || rep.tokens[i + 1].segment != rep.tokens[i].segment) && !nounHint[i];
       const bool first = i == 0 || rep.tokens[i - 1].segment != rep.tokens[i].segment;
       bool nominal = false, adv = false, imperative = false;
       for (const Reading& r : rd[i]) {
@@ -346,7 +353,7 @@ struct LatinChecker::Impl {
       bool has = false;
       for (size_t j = b; j < e; ++j) {
         has = has || isVerb[j];
-        if (any(j, isFinite)) { ++cands; which = j; }
+        if (any(j, isFinite) && !nounHint[j]) { ++cands; which = j; }   // C26: not a word written as a noun / adjective
       }
       if (!has && cands == 1) isVerb[which] = 1;
       b = e;
@@ -445,8 +452,13 @@ struct LatinChecker::Impl {
     if (numbers.empty() && !esse) return false;
     // (number, gender) of every nominative reading of every possible subject
     std::vector<std::pair<uint8_t, uint8_t>> subjects;
+    // C26: the nominative after quam is the term of a comparison, not the subject ("Potentior est quam nōs omnēs")
+    size_t quamAt = e;
+    for (size_t j = m + 1; j < e && quamAt == e; ++j)
+      if (text::latin_key(rep.tokens[j].text) == "quam") quamAt = j;
     for (size_t j = b; j < e; ++j) {
       if (j == m || governed[j] || attached[j] || isVerb[j] || !strongHead(j)) continue;
+      if (j > quamAt) continue;
       for (const Reading& r : rd[j])
         if (isHead(r) && (r.f.case_ == Nom || (esse && r.f.case_ == Acc))) subjects.emplace_back(r.f.number, headGender(r));
     }
@@ -687,7 +699,8 @@ struct LatinChecker::Impl {
       std::vector<size_t> verbs, subj;
       bool copula = false;
       for (size_t j = b; j < e; ++j) {
-        if (isVerb[j]) { verbs.push_back(j); copula = copula || isCopula(j); }
+        // C26: a word a preposition governs is no finite verb ("Vir altus in palliō viridī": palliō is the noun)
+        if (isVerb[j] && !governed[j]) { verbs.push_back(j); copula = copula || isCopula(j); }
       }
       for (size_t j = b; j < e; ++j) {
         if (isVerb[j] || governed[j] || attached[j] || rep.tokens[j].name || relStart[j]) continue;
@@ -1018,7 +1031,7 @@ LatinChecker::LatinChecker(const lex::Lexicon& lx, const curated::CuratedData& c
 
 void LatinChecker::check(std::string_view text, const Options& o, Report& out) {
   out.clear();
-  Impl im{lx_, cd_, nameKeys_, o, out, {}, {}, {}, {}, {}, {}, {}, {}};
+  Impl im{lx_, cd_, nameKeys_, o, out, {}, {}, {}, {}, {}, {}, {}, {}, {}};
   im.tokenise(text);
   im.analyse(hasMacron(text));
   im.names();

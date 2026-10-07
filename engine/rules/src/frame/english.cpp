@@ -143,7 +143,11 @@ bool compoundParts(const lex::Lexicon& lx, const std::string& w, std::string& fi
       {"balls", "ball"},  {"ball", "ball"},   {"flies", "fly"},   {"fly", "fly"},       {"worms", "worm"},
       {"worm", "worm"},   {"rooms", "room"},  {"room", "room"},   {"yards", "yard"},    {"yard", "yard"},
       {"trees", "tree"},  {"tree", "tree"},   {"berries", "berry"}, {"berry", "berry"}, {"stones", "stone"},
-      {"stone", "stone"}, {"pots", "pot"},    {"pot", "pot"}};
+      {"stone", "stone"}, {"pots", "pot"},    {"pot", "pot"},
+      // C26: the Oz register ("housetop", "hilltop", "hillside", "wayside", "riverbank", "cornfield", "doorway")
+      {"tops", "top"},    {"top", "top"},     {"sides", "side"},  {"side", "side"},     {"banks", "bank"},
+      {"bank", "bank"},   {"fields", "field"}, {"field", "field"}, {"ways", "way"},     {"way", "way"},
+      {"paths", "path"},  {"path", "path"},   {"lands", "land"},  {"land", "land"}};
   auto known = [&](const std::string& x, bool needNoun) {
     std::vector<lex::Analysis> an;
     lx.lookup(text::en_key(x), an);
@@ -599,12 +603,147 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
       }
     }
   }
+  // C26: a lower-case word tagged as a proper name that english.vpl knows as a common noun is that noun ("The road
+  // of yellow brick." had "brick" as a name); a colour word tagged as a noun before "and" / "," and another
+  // adjective or colour of the same noun is an adjective ("the pink and orange sky")
+  for (int i = 0; i < n; ++i) {
+    Token& t = tk[(size_t)i];
+    if (t.upos == "PROPN" && !t.text.empty() && t.text[0] >= 'a' && t.text[0] <= 'z') {
+      const Reading r = readingOf(lx, t.lower);
+      if (r.noun) {
+        t.upos = "NOUN";
+        t.feats = nlp::morph::fromString(endsWith(t.lower, "s") && r.nounInflected ? "Number=Plur" : "Number=Sing");
+        changed = true;
+      }
+    }
+    if (t.upos == "NOUN" && colourWord(t.lower) && i + 2 < n && (tk[(size_t)i + 1].lower == "and" || tk[(size_t)i + 1].text == ",") &&
+        (tk[(size_t)i + 2].upos == "ADJ" || colourWord(tk[(size_t)i + 2].lower))) {
+      int k = i + 2;
+      while (k < n && (tk[(size_t)k].upos == "ADJ" || colourWord(tk[(size_t)k].lower) || tk[(size_t)k].lower == "and")) ++k;
+      if (k < n && isIn(tk[(size_t)k].upos, {"NOUN", "PROPN"}) && k > i + 2) {
+        for (int j = i; j < k; ++j)
+          if (colourWord(tk[(size_t)j].lower) && tk[(size_t)j].upos != "ADJ") { tk[(size_t)j].upos = "ADJ"; tk[(size_t)j].feats = 0; }
+        changed = true;
+      }
+    }
+  }
+  // C26: "A beautiful silk dress.": a verbless noun phrase whose last word the tagger read as a verb after a noun or
+  // an adjective is a noun when english.vpl lists one
+  {
+    int verbs = 0, v = -1;
+    for (int i = 0; i < n; ++i)
+      if (tk[(size_t)i].upos == "VERB" || tk[(size_t)i].upos == "AUX") { ++verbs; v = i; }
+    int last = n - 1;
+    while (last > 0 && tk[(size_t)last].upos == "PUNCT") --last;
+    if (verbs == 1 && v == last && v >= 2 && isIn(tk[0].lower, {"a", "an"}) &&
+        isIn(tk[(size_t)v - 1].upos, {"NOUN", "ADJ"}) && tk[(size_t)n - 1].text != "?" &&
+        fget(tk[(size_t)v - 1], nlp::morph::NumberShift) != nlp::morph::NumPlur) {
+      bool np = true;
+      for (int i = 1; i < v; ++i) np = np && isIn(tk[(size_t)i].upos, {"DET", "ADJ", "NOUN", "NUM", "ADV"});
+      const Reading r = readingOf(lx, tk[(size_t)v].lower);
+      if (np && r.noun && !r.finitePast && !endsWith(tk[(size_t)v].lower, "ed") && !endsWith(tk[(size_t)v].lower, "s")) {
+        tk[(size_t)v].upos = "NOUN";
+        tk[(size_t)v].feats = nlp::morph::fromString(r.nounInflected && endsWith(tk[(size_t)v].lower, "s") ? "Number=Plur" : "Number=Sing");
+        changed = true;
+      }
+    }
+  }
+  // C26: "Just an old box.", "Only a little bird.": a sentence-initial restricting word before a noun phrase is the
+  // adverb (the tagger read "just" as a verb)
+  if (n >= 3 && isIn(tk[0].lower, {"just", "only", "merely", "simply"}) && tk[0].upos != "ADV" &&
+      isIn(tk[1].upos, {"DET", "ADJ", "NUM", "NOUN", "PROPN", "PRON"})) {
+    bool verb = false;
+    for (int i = 1; i < n; ++i) verb = verb || tk[(size_t)i].upos == "VERB" || tk[(size_t)i].upos == "AUX";
+    if (!verb) {
+      tk[0].upos = "ADV";
+      tk[0].feats = 0;
+      changed = true;
+    }
+  }
+  // C26: a word tagged as an adverb that modifies a noun ("Two pretty girls": amod) and that english.vpl knows as an
+  // adjective is the adjective
+  for (int i = 0; i + 1 < n; ++i) {
+    Token& t = tk[(size_t)i];
+    if (t.upos != "ADV" || t.deprel != "amod" || t.head <= 0 || t.head - 1 >= n) continue;
+    if (!isIn(tk[(size_t)t.head - 1].upos, {"NOUN", "PROPN"})) continue;
+    const Reading r = readingOf(lx, t.lower);
+    if (!r.adj) continue;
+    t.upos = "ADJ";
+    t.feats = 0;
+    changed = true;
+  }
+  // C26: a verb whose past is its bare form ("let", "put", "cut", "hit", "set", "shut", "hurt") with a 3rd-person
+  // singular subject and no auxiliary is the past ("She never let the dog in" was the present sinit)
+  for (int i = 1; i < n; ++i) {
+    Token& t = tk[(size_t)i];
+    if (t.upos != "VERB" || !isIn(t.lower, {"let", "put", "cut", "hit", "set", "shut", "hurt", "cost", "spread", "burst",
+                                            "cast", "split", "shed", "quit"}))
+      continue;
+    if (fget(t, nlp::morph::TenseShift) == nlp::morph::TensePast) continue;
+    int subj = -1;
+    bool aux = false;
+    for (int j = 0; j < n; ++j) {
+      if (tk[(size_t)j].head != i + 1) continue;
+      if (tk[(size_t)j].deprel == "nsubj" && j < i) subj = j;
+      if (tk[(size_t)j].deprel == "aux" || tk[(size_t)j].deprel == "mark") aux = true;
+    }
+    if (subj < 0 || aux) continue;
+    const Token& sj = tk[(size_t)subj];
+    const bool third = isIn(sj.lower, {"he", "she", "it"}) || sj.upos == "PROPN" ||
+                       (sj.upos == "NOUN" && fget(sj, nlp::morph::NumberShift) != nlp::morph::NumPlur);
+    if (!third) continue;
+    t.feats = nlp::morph::fromString("Tense=Past|VerbForm=Fin|Mood=Ind");
+    changed = true;
+  }
+  // C26: "tomorrow" / "yesterday" / "today" / "tonight" in a sentence with a verb of its own are the time adverbs
+  // (crās, herī, hodiē), never a noun subject ("Tomorrow the king will arrive." was "prōcrāstinātiō rēx perveniō", a
+  // Fix): not after a determiner, a possessive or a preposition, and not as the subject of "be" ("Tomorrow is ...")
+  {
+    bool verb = false;
+    for (const Token& t : tk) verb = verb || t.upos == "VERB" || (t.upos == "AUX" && !isIn(t.lower, {"is", "was", "'s"}));
+    for (int i = 0; verb && i < n; ++i) {
+      Token& t = tk[(size_t)i];
+      if (!isIn(t.lower, {"tomorrow", "yesterday", "today", "tonight"}) || t.upos == "ADV") continue;
+      if (i > 0 && tk[(size_t)i - 1].text != "," && tk[(size_t)i - 1].text != ";") continue;   // sentence or clause start
+      if (i > 0 && isIn(tk[(size_t)i - 1].upos, {"DET", "ADP"})) continue;
+      if (i > 0 && isIn(tk[(size_t)i - 1].lower, {"my", "your", "his", "her", "its", "our", "their", "of"})) continue;
+      if (i + 1 < n && (isIn(tk[(size_t)i + 1].lower, {"is", "was", "will", "'s", "morning", "evening", "night", "afternoon"}) ||
+                        tk[(size_t)i + 1].text == "'s"))
+        continue;
+      t.upos = "ADV";
+      t.feats = 0;
+      changed = true;
+    }
+  }
+  // C26: after a modal (must, can, should, will ...; "not" / "never" between) English has a bare verb: a word the
+  // tagger read as an adjective or a noun that english.vpl knows as a verb is that verb ("You must not open that
+  // door": "open" was an adjective and the cue a Fix)
+  for (int i = 1; i < n; ++i) {
+    Token& t = tk[(size_t)i];
+    if (t.upos != "ADJ" && t.upos != "NOUN") continue;
+    int p = i - 1;
+    while (p > 0 && isIn(tk[(size_t)p].lower, {"not", "n't", "never", "always", "just", "also", "really", "only"})) --p;
+    const Token& m = tk[(size_t)p];
+    if (m.upos != "AUX" || !isIn(m.lower, {"must", "can", "cannot", "could", "should", "would", "will", "shall", "may",
+                                           "might", "'ll", "ca", "wo", "sha"}))
+      continue;
+    // not the subject of an inverted question ("Can cats smile?"): a word stands before the modal and no verb follows
+    if (p == 0 || isIn(tk[(size_t)p - 1].upos, {"PUNCT", "CCONJ", "SCONJ"}) ||
+        isIn(tk[(size_t)p - 1].lower, {"what", "where", "when", "why", "how", "who", "which", "whom", "whose"}))
+      continue;
+    if (i + 1 < n && isIn(tk[(size_t)i + 1].upos, {"VERB", "AUX"})) continue;
+    const Reading r = readingOf(lx, t.lower);
+    if (!r.verb || !r.presentVerb) continue;
+    t.upos = "VERB";
+    t.feats = nlp::morph::fromString("VerbForm=Inf");
+    changed = true;
+  }
   return changed;
 }
 
 bool colourWord(const std::string& w) {
   return isIn(w, {"blue", "black", "white", "red", "green", "yellow", "grey", "gray", "brown", "golden", "silver",
-                  "pink"});
+                  "pink", "orange", "purple", "violet", "scarlet", "crimson"});   // C26: + orange ... crimson
 }
 
 }  // namespace vp::frame::en

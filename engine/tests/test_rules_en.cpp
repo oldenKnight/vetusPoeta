@@ -1387,7 +1387,7 @@ TEST_CASE("rules-d: constructions of quality loop 2 (one sentence each)") {
       {"And then we can go.", "Et tum īre possumus."},
       {"Exactly so!", "Ita plānē!"},
       // comparison
-      {"He is more powerful than his brother.", "Fortior est quam frāter suus."},
+      {"He is more powerful than his brother.", "Potentior est quam frāter suus."},
       {"That is greater than the sea.", "Id maius est quam mare."},
       {"She is as tall as her mother.", "Tam alta est quam māter sua."},
       {"They are so tired that they cannot walk.", "Tam fessī sunt ut ambulāre nōn possint."},
@@ -1489,7 +1489,7 @@ TEST_CASE("rules-e: unknown and misread English forms are derived from known lem
       // an adjective tagged as an adverb between a determiner and a noun
       {"You are a clever girl.", "Puella callida es."},
       // plural nouns read as verbs before their own verb
-      {"Only witches wear black hats.", "Modo sāgae pilleōs nigrōs portant."},   // C19: hat -> pilleus (tier row),
+      {"Only witches wear black hats.", "Sōlae sāgae pilleōs nigrōs gerunt."},   // C19: hat -> pilleus (tier row),
       // English plural-only nouns
       {"She washed the clothes.", "Vestēs lāvit."},
   };
@@ -2026,7 +2026,7 @@ TEST_CASE("rules-f: relative clauses attach to their noun; heavy objects follow 
       {"Nobody dares to hurt a person who is kind.", "Nēmō audet nocēre eī quī benignus est."},
       // "a person who" -> is quī; the heavy object after the verb group, the modal before its infinitive
       {"No one will help a person who steals.", "Nēmō adiuvābit eum quī fūrātur."},
-      {"I know a girl who sings beautifully.", "Puellam quae pulchrē canit sciō."},
+      {"I know a girl who sings beautifully.", "Puellam quae pulchrē canit nōvī."},
       // phrasebook rows (C19)
       {"How have you been?", "Quōmodo valuistī?"},
       {"How have you been, my friend?", "Quōmodo valuistī, mea amīca?"},
@@ -2168,7 +2168,7 @@ TEST_CASE("rules-f: fixes after the blind check (own sentences of children's dia
       {"The fisherman's wife wanted a bigger house.", "Uxor piscātōris domum maiōrem voluit."},
       {"The farmer's dog barked.", "Canis agricolae lātrāvit."},
       // give + person + thing: the person is the indirect object
-      {"She gave the poor old man some bread and cheese.", "Virō pauperī veterī pānem et cāseum dedit."},
+      {"She gave the poor old man some bread and cheese.", "Senī pauperī pānem et cāseum dedit."},
       {"He gave the hungry dog a bone.", "Canī ieiūnō os dedit."},
       // "may I / we ...?" asks permission: licet + dative + infinitive; a common noun before the comma is addressed
       {"Mother, may I go out?", "Māter, licetne mihi exīre?"},
@@ -2394,13 +2394,13 @@ TEST_CASE("rules-h: function words, greetings and table words never in brackets 
   NEED_REAL();
   expectEach({
       {"I am lonely.", "Sōla sum."},
-      {"The old man was very lonely.", "Vir vetus valdē sōlus erat."},
+      {"The old man was very lonely.", "Senex valdē sōlus erat."},
       {"She bought a dozen apples.", "Duodecim māla ēmit."},
       {"I saw two dozen eggs.", "Vīgintī quattuor ōva vīdī."},
       {"That is nonsense.", "Nūgae sunt."},
       {"What nonsense, Tom!", "Quae nūgae, Tom!"},
       {"Contrariwise, the dog was happy.", "Contrā canis laetus erat."},
-      {"The man wore a red waistcoat.", "Vir subūculam rubram portāvit."},
+      {"The man wore a red waistcoat.", "Vir subūculam rubram gessit."},
       {"Within the castle we were safe.", "Intrā castrum tūtae erāmus."},
       {"Under the table or here or there", "Sub mēnsā aut hīc aut illīc"},
       {"Over the bridge or here or there", "Super pontem aut hīc aut illīc"},
@@ -3004,4 +3004,71 @@ TEST_CASE("rules-j: deterministic with the new rules, in both latinity modes") {
     }
     CHECK(first.find("fessus sum") != std::string::npos);
   }
+}
+
+// ================================================================================================================
+// C26 (RULES-K, Latin loop 5 on the public-domain tuning sample). Generalisation guard: every rule below has at least
+// two sentences of our own, written before the rule was run on the tuning sample (docs/rules_en_notes.md "Quality
+// loop 5 (C26)").
+TEST_CASE("rules-k: ride, alternative questions, must not, whose (work item d)") {
+  NEED_REAL();
+  expectEach({
+      {"The knight rode to the castle.", "Mīles ad castrum equitāvit."},
+      {"We rode through the forest.", "Per silvam equitāvimus."},
+      {"The boy rode his horse to the river.", "Puer equō suō ad flūmen vectus est."},
+      {"My sister rides a white horse.", "Soror mea equō albō vehitur."},
+      {"Is this your cat or mine?", "Estne haec fēlēs tua an mea?"},
+      {"Is the box big or small?", "Estne arca magna an parva?"},
+      {"Are you a boy or a girl?", "Esne puer an puella?"},
+      {"Is this your book or his?", "Estne hic liber tuus an eius?"},
+      {"You must not open that door.", "Illam iānuam aperīre nōn dēbēs."},
+      {"You must not touch the fire.", "Ignem tangere nōn dēbēs."},
+      {"We must not wake the baby.", "Īnfantem excitāre nōn dēbēmus."},
+      {"Whose book is this?", "Cuius est hic liber?"},
+      {"Whose shoes are these?", "Cuius sunt hī calceī?"},
+      {"Whose dog is barking?", "Cuius canis lātrat?"},
+  });
+  for (const char* s : {"You must not open that door.", "You must not touch the fire.", "Whose book is this?"})
+    CHECK(run({s})[0].conf != rules::Confidence::Fix);
+}
+
+TEST_CASE("rules-k: tomorrow, give + person + something to drink, without + -ing, secret (work item d)") {
+  NEED_REAL();
+  expectEach({
+      {"We will go to the market tomorrow.", "Crās ad forum ībimus."},
+      {"I will come back tomorrow.", "Crās redībō."},
+      {"Tomorrow the king will arrive.", "Crās rēx perveniet."},
+      {"Give the children something to drink.", "Puerīs aliquid ad bibendum dā."},
+      {"Bring the old man something to eat.", "Senī aliquid ad edendum fer."},
+      {"They walked for hours without finding water.", "Hōrās ambulāvērunt neque aquam invēnērunt."},
+      {"He left without saying goodbye.", "Exiit nec valedīxit."},
+      {"The dog waited without barking.", "Canis mānsit nec lātrāvit."},
+      {"I know a secret.", "Arcānum sciō."},
+      {"She told me a secret.", "Arcānum mihi dīxit."},
+  });
+}
+
+TEST_CASE("rules-k: fragments keep the case and agreement of their phrase (work item b)") {
+  NEED_REAL();
+  expectEach({
+      {"A tall man in a green coat.", "Vir altus in palliō viridī."},
+      {"An old woman in a red cloak.", "Anus in palliō rubrō."},
+      {"The lion, the tiger and the bear.", "Leō et tigris et ursus."},
+      {"The bread, the milk and the eggs.", "Pānis et lac et ōva."},
+      {"Not my sister!", "Nōn soror mea!"},
+      {"Not the old dog!", "Nōn canis vetus!"},
+      {"Just an old box.", "Tantum arca vetus."},
+      {"Only a little bird.", "Tantum avis parva."},
+      {"A crown made of gold.", "Corōna quae ex aurō facta est."},
+      {"A boat made of paper.", "Nāvis quae ē chartā facta est."},
+      {"They waited for a long time.", "Diū mānsērunt."},
+      {"We talked for a long time.", "Locūtae sumus diū."},
+      {"There is a tree in the middle of the garden.", "In mediō hortī est arbor."},
+      {"The boat was in the middle of the lake.", "Nāvis in mediō lacūs erat."},
+  });
+  // a cue that starts with a lower-case word continues the sentence of the cue before
+  CHECK(run({"We found the cat.", "and the little dog."})[1].text == "Et canem parvum.");
+  CHECK(run({"She called the boys.", "and the girls too."})[1].text == "Et puellās quoque.");
+  for (const char* s : {"A tall man in a green coat.", "An old woman in a red cloak.", "Just an old box."})
+    CHECK(run({s})[0].conf != rules::Confidence::Fix);
 }
