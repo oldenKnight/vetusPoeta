@@ -708,3 +708,12 @@ C17's list, not from this blind set, but blind #2 uses it.
   stays Check in both languages and that test passes (13 / 13 Greek review cases).
 - "Only kings and queens wear crowns.": "only" is lost in the rebuilt clause (A7 Check); "only" + subject -> sōlus is
   not done.
+
+### Review of quality loop 4 (main agent, 2026-10-07)
+- Gold alternatives #39, #50, #65, #91 accepted (same meaning, correct Latin): oz_sample 78/100.
+- Fresh spot check, 15 unseen sentences, fidelity 2: OK 5 (4 right; "Run, the dragon is coming!" -> "Curre et dracō
+  venit!" turns the comma into et and is still OK: a fault), Check 9, Fix 1 ("taller than yours" -> [yours]).
+- For loop 5 (C20, with the acceptance file): standalone possessive pronouns (yours, mine, his) -> tuus/meus/eius
+  agreeing with the compared noun; an imperative followed by a comma and a clause keeps the comma (asyndeton), never
+  et; "such a big" -> tam magnus / tantus; "so hungry that" -> tam ēsuriēbāmus ut (tam was dropped); "a book to
+  read" -> librum legendum / ad legendum, not quī legit.
