@@ -436,8 +436,9 @@ struct LatinChecker::Impl {
     bool esse = false;
     for (size_t j = b; j < e; ++j) {
       if (isVerb[j] && isCopula(j))
-        for (const Reading& r : rd[j])
-          if (isFinite(r) && r.key == "sum") numbers.push_back(r.f.number);
+        for (const Reading& r : rd[j])   // C24: also fīō and videor ("fessa vidēris")
+          if (isFinite(r) && (r.key == "sum" || r.key == "fio" || (r.key == "uideo" && r.f.voice == Passive)))
+            numbers.push_back(r.f.number);
       for (const Reading& r : rd[j])
         if (isInfinitive(r) && r.key == "sum") esse = true;
     }
@@ -767,6 +768,11 @@ struct LatinChecker::Impl {
         for (const Reading& h : rd[a])
           if (relOk(r) && isHead(h) && numberCompat(r.f.number, h.f.number) && genderCompat(r.f.gender, headGender(h)))
             ok = true;
+      // C24: a free relative with its antecedent understood ("Amō quod videō", "Nihil esset quod est"): a neuter
+      // singular nominative / accusative relative after a word that is no noun phrase (a verb)
+      if (!ok && (!any(a, [](const Reading& h) { return isNominal(h); }) || any(a, [](const Reading& h) { return h.lpos == Verb && h.f.person != 0; })))
+        for (const Reading& r : rd[i])
+          if (isRelative(r) && r.f.gender == N && r.f.number == Sg && (r.f.case_ == Nom || r.f.case_ == Acc)) ok = true;
       // "ex eō quō īre vīs": an ablative relative right after an ablative antecedent (C2b)
       for (const Reading& r : rd[i])
         for (const Reading& h : rd[a])

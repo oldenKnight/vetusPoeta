@@ -85,9 +85,22 @@ std::vector<Latin> splitSentence(const frame::SourceSentence& src, const Latin& 
   for (size_t p = 1; p < src.parts.size(); ++p) {
     double share = src.parts[p].start / srcLen;
     if (mapped) {   // share of Latin words translating earlier parts (unmapped words count proportionally)
+      // C24: when most words are mapped, an unmapped word goes with its mapped neighbour (a preposition with its noun:
+      // "cum Henrīcō", a connector with the clause after it) instead of counting proportionally
+      std::vector<int> off(srcOffset->begin(), srcOffset->end());
+      size_t nm = 0;
+      for (int o : off) nm += o >= 0;
+      if (nm * 3 >= nt * 2)
+        for (size_t i = 0; i < nt; ++i) {
+          if (off[i] >= 0) continue;
+          for (size_t j = i + 1; j < nt && off[i] < 0; ++j)
+            if ((*srcOffset)[j] >= 0) off[i] = (*srcOffset)[j];
+          for (size_t j = i; j > 0 && off[i] < 0; --j)
+            if ((*srcOffset)[j - 1] >= 0) off[i] = (*srcOffset)[j - 1];
+        }
       double before = 0;
       for (size_t i = 0; i < nt; ++i) {
-        const int o = (*srcOffset)[i];
+        const int o = off[i];
         if (o < 0) before += share;
         else if (o < src.parts[p].start) before += 1;
       }

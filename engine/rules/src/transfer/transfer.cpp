@@ -1382,6 +1382,31 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
       }
       return;
     }
+    // C24: a free relative ("what it is", "what I see"): the neuter antecedent is understood, quod + the clause
+    if (c.st.lang == frame::SrcLang::En && p == "what" && !n.relative.empty() && latin("is", Pron) != kNone) {
+      o = LaNP{};
+      o.head = latin("is", Pron);
+      o.gender = N;
+      o.number = Sg;
+      o.elideHead = true;
+      // fronted in the source ("What you have, you keep."): it stays first (emphasis)
+      bool front = n.token >= 0;
+      for (int k = 0; k < n.token && (size_t)k < c.s.tokens.size(); ++k) {
+        const std::string& u = c.s.tokens[(size_t)k].upos;
+        if (u != "PUNCT" && u != "CCONJ" && u != "ADV") front = false;
+      }
+      o.emphasis = front;
+      c.cover(n.token);
+      relativeInto(n, c, o);
+      // "everything would be what it isn't": "it" stands for the clause's subject: its number (omnia ... quod nōn sunt)
+      const frame::SemNP& rs = n.relative[0].subject;
+      if (!o.relative.empty() && n.relative[0].hasSubject && rs.isPronoun &&
+          (rs.pronLemma == "it" || text::lower(rs.head) == "it") && c.frame && c.frame->hasSubject &&
+          (c.frame->subject.number == 2 || c.frame->subject.pronLemma == "everything" ||
+           c.frame->subject.pronLemma == "all"))
+        o.relative[0].pred.number = Pl;
+      return;
+    }
     // other closed-class pronouns
     uint32_t id = kNone;
     uint8_t gender = 0, number = Sg;
@@ -2906,8 +2931,13 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     else if (sp.aspect == frame::Aspect::Progressive || state || sp.pastModal || everyTime) tense = Imperfect;
     else tense = Perfect;
   } else {
+    // C24: "What could it possibly be?": "could" with "possibly" in a question asks about the present (potest)
+    bool possibly = false;
+    for (const frame::SemAdverb& a : f.adverbs) possibly = possibly || a.lemma == "possibly";
+    const bool presentQ = c.st.lang == frame::SrcLang::En && possibly && sp.modality == Modality::Can &&
+                          (f.type == Kind::Wh || f.type == Kind::Yn);
     if (sp.aspect == frame::Aspect::Perfect) tense = Perfect;
-    else if (sp.pastModal) tense = Imperfect;
+    else if (sp.pastModal && !presentQ) tense = Imperfect;
   }
   if (sp.voice == frame::Voice::Passive) {
     p.voice = Passive;
@@ -2931,6 +2961,9 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
       }
     }
   }
+  // C24: "seem" is the passive of videō ("Domus magna vidētur", "quod vidētur"), never the active "see"
+  if (c.st.lang == frame::SrcLang::En && sp.lemma == "seem" && p.lemma != kNone && p.lemma == latin("videō", Verb))
+    p.voice = Passive;
   if (sp.deliberative) {
     tense = Present;
     p.mood = Subjunctive;
@@ -2991,6 +3024,27 @@ bool Transfer::deponentActive(const SemFrame& in, Ctx& c, SemFrame& out) const {
 
 // ---- clauses --------------------------------------------------------------------------------------------------------
 void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
+  // C24: "be late for X" with a person or animal as the subject: sērō venīre ad X ("What is the dog late for?" ->
+  // Ad quid canis sērō venit?), as the phrasebook's "I am late for X"
+  if (c.st.lang == frame::SrcLang::En && f0.copula && f0.predAdj.size() == 1 && f0.predAdj[0].lemma == "late" &&
+      f0.predAdj[0].adverbs.empty() && f0.predicative.empty() && f0.hasSubject) {
+    bool forPhrase = false;
+    for (const frame::SemOblique& o : f0.obliques) forPhrase = forPhrase || o.prep == "for";
+    if (forPhrase) {
+      SemFrame g = f0;
+      g.copula = false;
+      g.predAdj.clear();
+      g.pred.lemma = "come";
+      frame::SemAdverb a;
+      a.lemma = "late";
+      a.token = f0.predAdj[0].token;
+      g.adverbs.push_back(a);
+      for (frame::SemOblique& o : g.obliques)
+        if (o.prep == "for") o.prep = "to";
+      clauseInto(g, c, cl);
+      return;
+    }
+  }
   // C15 (neg.nemo): "I do not want to kill anybody" -> nēminem necāre volō: the negation moves into the pronoun
   SemFrame fneg;
   const SemFrame* fp = &f0;
@@ -3981,7 +4035,7 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
     else if (w == "why") la = "cūr";
     else if (w == "how") la = "quōmodo";
     else if (w == "when") la = "quandō";
-    else if ((w == "who" || w == "what") &&
+    else if ((w == "who" || w == "what") && f.wh.role != frame::Role::Oblique &&   // C24: the oblique NP says it
              !((f.wh.role == frame::Role::Subject && f.hasSubject && !f.subject.isPronoun) ||
                (f.wh.role == frame::Role::Object && f.hasObject && !f.object.isPronoun) ||
                (f.wh.role == frame::Role::Predicate &&

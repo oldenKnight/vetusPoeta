@@ -214,6 +214,8 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
       nameWord(n, case_, o, w);
       if (n.capitalise) Punctuation::capitaliseFirst(w.form);
       out.push_back(std::move(w));
+    } else if (n.head != kNone && n.elideHead && !n.relative.empty()) {
+      // C24: a free relative: only the relative clause is written
     } else if (n.head != kNone) {
       const lex::Lemma l = lx_.lemma(n.head);
       Features f;
@@ -478,7 +480,9 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
       }
     }
     if (c.object.emphasis) focus = kO;
-    if (c.object.interrogative != kNone) append(s[kWH], s[kO]);
+    if (c.object.interrogative != kNone ||
+        (c.type == ClauseType::Wh && k_.quis != kNone && c.object.head == k_.quis && c.wh.lemma == kNone))   // C24
+      append(s[kWH], s[kO]);
   }
   if (c.hasIndirect && !(ctx.relative && c.relRole == Role::IndirectObject)) {
     np(c.indirect, c.indirect.case_ ? c.indirect.case_ : (uint8_t)Dat, &c, o, s[kIO]);
@@ -740,15 +744,20 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
     // C19 order.heavy: an object or indirect object "is quī ..." (pronoun + relative clause) follows the verb group
     // ("Nēmō audēbit nocēre eī quem Saga ōsculāta est", "Amāmus eōs quī honestī sunt"); a modal then precedes its
     // infinitive
-    if ((c.type == ClauseType::Decl || c.type == ClauseType::Wh) && ctx.main && !ctx.relative && !ctx.accInf && !ctx.apposition &&
-        !c.plainQuestion && !s[kV].empty())
-      for (int sl : {kIO, kO}) {
-        const bool has = sl == kO ? c.hasObject : c.hasIndirect;
-        const LaNP& hn = sl == kO ? c.object : c.indirect;
+    // C24: a free relative is also moved in a subordinate clause ("quia omnia essent quod nōn sunt")
+    const bool subFree = (c.hasObject && c.object.elideHead && !c.object.emphasis) ||
+                         (!c.predicative.empty() && c.predicative[0].elideHead && !c.predicative[0].emphasis);
+    if ((c.type == ClauseType::Decl || c.type == ClauseType::Wh) && (ctx.main || subFree) && !ctx.relative && !ctx.accInf &&
+        !ctx.apposition && !c.plainQuestion && !s[kV].empty())
+      for (int sl : {kIO, kO, kPRED}) {
+        const bool has = sl == kO ? c.hasObject : sl == kIO ? c.hasIndirect : !c.predicative.empty();
+        const LaNP& hn = sl == kO ? c.object : sl == kIO ? c.indirect : c.predicative.empty() ? c.object : c.predicative[0];
         // only the pronoun antecedent "is quī" (a noun with its relative stays before the verb: "Librum quem legis
-        // habeō", "Sex rēs quae fierī nōn possunt ... crēdō")
-        if (!has || hn.relative.empty() || s[sl].empty() || hn.interrogative != kNone || !hn.isPronoun ||
-            hn.pron.person != 3)
+        // habeō", "Sex rēs quae fierī nōn possunt ... crēdō"); C24: a free relative with its antecedent understood
+        // ("Nihil esset quod est") unless the source put it first (emphasis: "Quod habēs, tenē")
+        const bool freeRel = hn.elideHead && !hn.emphasis;
+        if (!has || hn.relative.empty() || s[sl].empty() || hn.interrogative != kNone ||
+            (!freeRel && (sl == kPRED || !hn.isPronoun || hn.pron.person != 3)))
           continue;
         if (c.type == ClauseType::Wh && (c.wh.role == Role::Object || c.wh.role == Role::IndirectObject)) continue;
         auto it = std::find(seq.begin(), seq.end(), sl);

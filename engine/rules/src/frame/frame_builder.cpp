@@ -502,7 +502,7 @@ bool clause(std::vector<nlp::Token>& tk, int p, Clause& out, bool apply, bool& a
           hang(tk, sh, vh, "nsubj");
           for (int k = e2; k < e3; ++k)
             if (k != vh) hang(tk, k, vh, negWord(tk[(size_t)k]) || tk[(size_t)k].upos == "ADV" ? "advmod" : "aux");
-          hang(tk, p, vh, verb ? "obj" : "dep");
+          hang(tk, p, vh, "obj");
         }
         hang(tk, e1, hd, "punct");
         for (int k = e1 + 1; k < e2; ++k)
@@ -600,7 +600,73 @@ bool sentence(std::vector<nlp::Token>& tk, bool apply) {
   for (int k : post) hang(tk, k, root, "punct");
   return true;
 }
+
+// C24: a noun with its relative clause and nothing else ("the sea that sailors cannot find", "the girls who sing"):
+// the parser reads the relative clause as the main clause; the noun is the fragment's head, the clause its relative
+// clause (the relative word the object when the clause has its own subject, else the subject)
+bool nounRelative(std::vector<nlp::Token>& tk, bool apply) {
+  const int n = (int)tk.size();
+  int i = 0;
+  if (i < n && tk[(size_t)i].upos == "DET") ++i;
+  while (i < n && tk[(size_t)i].upos == "ADJ") ++i;
+  if (i >= n || tk[(size_t)i].upos != "NOUN") return false;
+  const int noun = i;
+  const int rel = i + 1;
+  if (rel >= n || !in(tk[(size_t)rel].lower, {"that", "which", "who"})) return false;
+  int sh = -1;
+  const int e1 = subject(tk, rel + 1, sh);
+  int vh = -1;
+  bool verb = false, be = false;
+  const int e2 = verbGroup(tk, e1 >= 0 ? e1 : rel + 1, vh, verb, be);
+  if (e2 < 0 || !verb) return false;
+  int q = e2;
+  while (q < n && tk[(size_t)q].upos == "PUNCT") ++q;
+  if (q != n) return false;
+  if (!apply) return true;
+  for (int k = 0; k < noun; ++k) hang(tk, k, noun, tk[(size_t)k].upos == "ADJ" ? "amod" : "det");
+  tk[(size_t)noun].head = 0;
+  tk[(size_t)noun].deprel = "root";
+  hang(tk, vh, noun, "acl");
+  tk[(size_t)rel].upos = "PRON";
+  hang(tk, rel, vh, e1 >= 0 ? "obj" : "nsubj");
+  if (e1 >= 0) {
+    hang(tk, sh, vh, "nsubj");
+    for (int k = rel + 1; k < e1; ++k)
+      if (k != sh) hang(tk, k, sh, tk[(size_t)k].upos == "ADJ" ? "amod" : "det");
+  }
+  for (int k = e1 >= 0 ? e1 : rel + 1; k < e2; ++k)
+    if (k != vh) hang(tk, k, vh, negWord(tk[(size_t)k]) || tk[(size_t)k].upos == "ADV" || tk[(size_t)k].upos == "PART" ? "advmod" : "aux");
+  for (int k = e2; k < n; ++k) hang(tk, k, noun, "punct");
+  return true;
+}
 }  // namespace fr
+
+// C24: "What it wouldn't do, it would." / "What it isn't, it would be.": an elliptic verb group whose object is a free
+// relative takes the relative clause's verb; with "be" the free relative is the predicate ("Quod nōn esset, esset.")
+void freeRelativeEllipsis(SemFrame& f) {
+  for (SemSub& sb : f.subordinate)
+    for (SemFrame& x : sb.frame) freeRelativeEllipsis(x);
+  const bool auxOnly = f.hasPred && f.pred.complementVerb.empty() &&
+                       in(f.pred.lemma, {"would", "will", "could", "should"});
+  if (!f.hasPred || !(f.pred.ellipsis || auxOnly) || !f.hasObject || f.object.pronLemma != "what" ||
+      f.object.relative.empty())
+    return;
+  const SemFrame& r = f.object.relative[0];
+  if (!r.hasPred || r.pred.lemma.empty()) return;
+  if (f.pred.lemma == "would") f.pred.mood = SrcMood::Conditional;
+  else if (f.pred.lemma == "will") f.pred.tense = Tense::Future;
+  else if (f.pred.lemma == "could") { f.pred.modality = Modality::Can; f.pred.pastModal = true; }
+  else if (f.pred.lemma == "should") f.pred.modality = Modality::Should;
+  f.pred.ellipsis = false;
+  f.pred.lemma = r.pred.lemma;
+  if (r.pred.lemma == "be" || r.copula) {
+    f.pred.lemma = "be";
+    f.copula = true;
+    f.predicative.push_back(f.object);
+    f.hasObject = false;
+    f.object = SemNP{};
+  }
+}
 }  // namespace
 
 // ---- names ---------------------------------------------------------------------------------------------------------
@@ -3886,6 +3952,7 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
         if (groupOf[(size_t)i] != heads[it.idx] && !isPunctTok(s.tokens[(size_t)i])) c.consumed[(size_t)i] = 1;
       buildClause(c, heads[it.idx], u.frame);
       c.consumed = keep;
+      freeRelativeEllipsis(u.frame);
       // C15: only the clause that carries the question mark is the question ("Even if I wanted to, how could I ...?")
       if (u.frame.type == Kind::Yn && s.question && &it != &items.back()) {
         bool qmark = false;
@@ -3993,6 +4060,66 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
 void FrameBuilder::repairTree(SemSentence& s) const {
   std::vector<nlp::Token>& tk = s.tokens;
   const int n = (int)tk.size();
+  // C24: "What could a fox possibly want?", "What are you afraid of?", "What could a dog be late for?": in a question
+  // "what" + auxiliaries + a noun phrase, the noun phrase is the subject (the parser sometimes made "what" a second
+  // subject or the noun an oblique); "what" is the object of the preposition stranded at the end, else the object
+  if (lang_ == SrcLang::En && n >= 4 && tk[0].lower == "what" && tk[0].upos == "PRON" && tk[0].head > 0) {
+    bool qm = false;
+    for (const nlp::Token& t : tk) qm = qm || t.text == "?";
+    int h = tk[0].head - 1;
+    int j = 1;
+    while (j < n && (tk[(size_t)j].upos == "AUX" || in(tk[(size_t)j].lower, {"not", "n't"}))) ++j;
+    int sh = -1, s0 = j;
+    if (j > 1 && j < n) {
+      if (tk[(size_t)j].upos == "PRON" && in(tk[(size_t)j].lower, {"you", "he", "she", "it", "we", "they", "i"})) sh = j;
+      else {
+        int q = j;
+        if (q < n && tk[(size_t)q].upos == "DET") ++q;
+        while (q < n && tk[(size_t)q].upos == "ADJ") ++q;
+        if (q < n && in(tk[(size_t)q].upos, {"NOUN", "PROPN"})) sh = q;
+      }
+    }
+    int last = n - 1;
+    while (last > 0 && tk[(size_t)last].upos == "PUNCT") --last;
+    if (qm && sh > 0 && h >= 0 && h != sh && h > sh && (tk[0].deprel == "nsubj" || tk[0].deprel == "obl")) {
+      for (int k = 0; k < n; ++k)   // dependents of the noun phrase words hung elsewhere stay; the head is the subject
+        if (k > sh && tk[(size_t)k].head == sh + 1 && tk[(size_t)k].deprel == "advmod") tk[(size_t)k].head = h + 1;
+      tk[(size_t)sh].head = h + 1;
+      tk[(size_t)sh].deprel = "nsubj";
+      for (int k = s0; k < sh; ++k) {
+        tk[(size_t)k].head = sh + 1;
+        tk[(size_t)k].deprel = tk[(size_t)k].upos == "ADJ" ? "amod" : "det";
+      }
+      for (int k = 1; k < s0; ++k)
+        if (tk[(size_t)k].head != h + 1) tk[(size_t)k].head = h + 1;
+      for (int k = 0; k < n; ++k)
+        if (k != h && tk[(size_t)k].head == h + 1 && tk[(size_t)k].deprel == "nsubj" && k != sh && k != 0)
+          tk[(size_t)k].deprel = "obl";
+      if (tk[(size_t)last].upos == "ADP" && last > sh) {
+        tk[0].deprel = "obl";
+        tk[(size_t)last].head = 1;
+        tk[(size_t)last].deprel = "case";
+        for (int k = 1; k < n; ++k)
+          if (tk[(size_t)k].head == 1 && in(tk[(size_t)k].deprel, {"cop", "aux"})) tk[(size_t)k].head = h + 1;
+      } else if (tk[(size_t)h].upos == "VERB") {
+        tk[0].deprel = "obj";
+      }
+    }
+  }
+  // C24: "... the other side where trees grow": a "where" clause right after a noun of the verb (its object or
+  // oblique) is a relative clause of that noun ("ubi", "in quō"), not a time clause of the verb
+  if (lang_ == SrcLang::En)
+    for (int k = 1; k + 2 < n; ++k) {
+      if (tk[(size_t)k].lower != "where" || tk[(size_t)k].upos != "ADV") continue;
+      const int v = tk[(size_t)k].head - 1;
+      if (v <= k || v >= n || tk[(size_t)v].deprel != "advcl") continue;
+      const int noun = k - 1;
+      if (!in(tk[(size_t)noun].upos, {"NOUN", "PROPN"}) || tk[(size_t)v].head - 1 != tk[(size_t)noun].head - 1 ||
+          !in(tk[(size_t)noun].deprel, {"obl", "obj", "nmod"}))
+        continue;
+      tk[(size_t)v].head = noun + 1;
+      tk[(size_t)v].deprel = "acl";
+    }
   // C24: "Cats say it and dogs say it.": a clause complement that opens with its own "and" / "but" / "or" is the
   // second clause of a coordination (conj), not the content of the first verb
   if (lang_ == SrcLang::En)
@@ -4419,6 +4546,33 @@ void FrameBuilder::repairTree(SemSentence& s) const {
       tk[(size_t)v].deprel = "root";
       for (int q = 0; q < n; ++q)
         if (q != r && q < r && tk[(size_t)q].head == r + 1 && tk[(size_t)q].deprel != "punct") tk[(size_t)q].head = v + 1;
+      s.repairs.emplace_back("reroot");
+      break;
+    }
+    // C24: "And even Paul, the Bishop of York, agreed to ...": the name is the root with its apposition and the verb
+    // after the second comma hangs on it without a subject (dep / acl / parataxis): the verb is the root, the name
+    // its subject (the long quoted sentences of a history lesson)
+    for (int r = 0; r + 4 < n; ++r) {
+      if (tk[(size_t)r].head != 0 || tk[(size_t)r].upos != "PROPN" || tk[(size_t)r + 1].text != ",") continue;
+      bool lead = true;
+      for (int q = 0; q < r; ++q) lead = lead && in(tk[(size_t)q].upos, {"PUNCT", "CCONJ", "ADV"});
+      if (!lead) break;
+      int ap = -1, v = -1;
+      for (int q = r + 2; q < n; ++q) {
+        if (tk[(size_t)q].head != r + 1) continue;
+        if (tk[(size_t)q].deprel == "appos" && ap < 0) ap = q;
+        else if (ap >= 0 && q > ap && tk[(size_t)q].upos == "VERB" && in(tk[(size_t)q].deprel, {"dep", "acl", "parataxis"})) { v = q; break; }
+      }
+      if (ap < 0 || v < 0 || tk[(size_t)v - 1].text != ",") break;
+      bool subj = false;
+      for (int q = 0; q < n; ++q) subj = subj || (tk[(size_t)q].head == v + 1 && in(tk[(size_t)q].deprel, {"nsubj", "nsubj:pass"}));
+      if (subj) break;
+      for (int q = 0; q < n; ++q)
+        if (q != v && tk[(size_t)q].head == r + 1 && (q < r ? tk[(size_t)q].deprel != "punct" : q > v)) tk[(size_t)q].head = v + 1;
+      tk[(size_t)v].head = 0;
+      tk[(size_t)v].deprel = "root";
+      tk[(size_t)r].head = v + 1;
+      tk[(size_t)r].deprel = "nsubj";
       s.repairs.emplace_back("reroot");
       break;
     }
@@ -5164,6 +5318,8 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
     if (!(q && !tk.empty() && tk[0].lower == "what") && fr::sentence(tk, false)) {
       fr::sentence(tk, true);
       out.doubt("free-relative");
+    } else if (fr::nounRelative(tk, false)) {
+      fr::nounRelative(tk, true);
     }
   }
   buildUnits(out);

@@ -870,6 +870,63 @@ class RulesEngine final : public Engine {
     }
   }
 
+  // C24: the noun that ends the previous song line (no punctuation after it) when this line opens with a relative
+  // word (that, which, who, where) followed by more words; empty otherwise
+  std::string songAntecedent(const std::string& prev, const std::string& line) const {
+    if (prev.empty() || line.empty()) return std::string();
+    size_t e = prev.size();
+    while (e > 0 && prev[e - 1] == ' ') --e;
+    if (e == 0 || !std::isalpha((unsigned char)prev[e - 1])) return std::string();
+    size_t b = e;
+    while (b > 0 && std::isalpha((unsigned char)prev[b - 1])) --b;
+    const std::string last = text::lower(prev.substr(b, e - b));
+    size_t a = 0;
+    while (a < line.size() && line[a] == ' ') ++a;
+    size_t w = a;
+    while (w < line.size() && std::isalpha((unsigned char)line[w])) ++w;
+    const std::string first = text::lower(line.substr(a, w - a));
+    if (first != "that" && first != "which" && first != "who") return std::string();
+    if (line.find(' ', w) == std::string::npos) return std::string();
+    // the words of the previous line, lower case
+    std::vector<std::string> ws;
+    {
+      size_t i = 0;
+      while (i < e) {
+        while (i < e && !std::isalpha((unsigned char)prev[i])) ++i;
+        size_t j = i;
+        while (j < e && (std::isalpha((unsigned char)prev[j]) || prev[j] == '\'')) ++j;
+        if (j > i) ws.push_back(text::lower(prev.substr(i, j - i)));
+        i = j;
+      }
+    }
+    auto has = [&](const std::string& word, uint8_t pos) {
+      std::vector<lex::Analysis> an;
+      en_->lookup(text::en_key(word), an);
+      for (const lex::Analysis& x : an)
+        if (en_->lemma(x.lemma).pos == pos) return true;
+      return false;
+    };
+    auto plainNoun = [&](const std::string& word) {
+      return has(word, feat::Noun) && !has(word, feat::Det) && !has(word, feat::Prep) && !has(word, feat::Pron);
+    };
+    if (ws.empty() || !plainNoun(last)) return std::string();
+    // a noun inside a prepositional phrase that closes the line ("the land beyond the hills"): the noun before the
+    // preposition is the antecedent
+    size_t k = ws.size() - 1;
+    size_t p = k;
+    while (p > 0 && (ws[p - 1] == "the" || ws[p - 1] == "a" || ws[p - 1] == "an" || has(ws[p - 1], feat::Adj))) --p;
+    if (p > 0 && has(ws[p - 1], feat::Prep) && !has(ws[p - 1], feat::Verb)) {
+      size_t q = p - 1;
+      while (q > 0 && !plainNoun(ws[q - 1])) {
+        if (has(ws[q - 1], feat::Verb) && !has(ws[q - 1], feat::Noun)) { q = 0; break; }
+        --q;
+      }
+      if (q > 0) return "the " + ws[q - 1];
+    }
+    (void)k;
+    return "the " + last;
+  }
+
   static void stutter(std::string& t) {
     auto wordAt = [&](size_t a) {
       size_t b = a;
@@ -888,6 +945,20 @@ class RulesEngine final : public Engine {
         while (p < t.size() && t[p] == ' ') ++p;
       }
       if (dots < 2 || p >= t.size()) continue;
+      // C24: a hesitation inside a verb group ("we shouldn't... be going", "you must... come"): the dots go
+      {
+        const std::string prev = text::lower(t.substr(i, e - i));
+        static const char* const kOpen[] = {"should", "shouldn't", "would", "wouldn't", "could", "couldn't", "can",
+                                            "can't", "must", "mustn't", "will", "won't", "shall", "might", "may",
+                                            "not", "never", "to", "really", "just"};
+        bool open = false;
+        for (const char* w : kOpen) open = open || prev == w;
+        if (open && p < t.size() && t[p] >= 'a' && t[p] <= 'z') {
+          for (size_t k = e; k < p; ++k) if (t[k] == '.' || (unsigned char)t[k] >= 0x80) t[k] = ' ';
+          i = p - 1;
+          continue;
+        }
+      }
       const size_t e2 = wordAt(p);
       if (e2 - p != e - i || text::lower(t.substr(p, e2 - p)) != text::lower(t.substr(i, e - i))) continue;
       for (size_t k = e; k < e2; ++k) t[k] = ' ';
@@ -1232,17 +1303,47 @@ class RulesEngine final : public Engine {
       cue::append(L, ut.latin);
       // source offsets: the source word of the choice that produced each lemma, else the unit's start
       std::vector<char> usedChoice(so.choices.size(), 0);
+      const size_t offFrom = so.srcOffset.size();
+      std::vector<char> found;
       for (const rules::TokenView& t : ut.latin.tokens) {
         int off = ut.srcStart;
+        bool hit = false;
         if (t.hasLemma)
           for (size_t k = ut.choiceFrom; k < ut.choiceTo; ++k)
             if (!usedChoice[k] && so.choices[k].lemma == t.lemmaId && so.choices[k].token >= 0 &&
                 (size_t)so.choices[k].token < s.tokens.size()) {
               usedChoice[k] = 1;
               off = s.tokens[(size_t)so.choices[k].token].start;
+              hit = true;
+              break;
+            }
+        // C24: a name is found by its source spelling
+        if (!hit && !t.text.empty() && (unsigned char)t.text[0] >= 'A' && (unsigned char)t.text[0] <= 'Z')
+          for (int k = ut.first; k <= ut.last && k < (int)s.tokens.size(); ++k)
+            if (k >= 0 && s.tokens[(size_t)k].upos == "PROPN" && !s.tokens[(size_t)k].text.empty() &&
+                std::tolower((unsigned char)s.tokens[(size_t)k].text[0]) == std::tolower((unsigned char)t.text[0]) &&
+                s.tokens[(size_t)k].text.size() >= 3 && t.text.size() >= 3 &&
+                std::tolower((unsigned char)s.tokens[(size_t)k].text[1]) == std::tolower((unsigned char)t.text[1])) {
+              off = s.tokens[(size_t)k].start;
+              hit = true;
               break;
             }
         so.srcOffset.push_back(off);
+        found.push_back(hit ? 1 : 0);
+      }
+      // C24: a word without a source word of its own (a pronoun, "et", a preposition) goes with its neighbour to the
+      // right, else to the left (the cue split then keeps "cum Henrīcō" and a verb's clause together)
+      if (s.tokens.size() > 0 && ut.last > ut.first) {
+        std::vector<int> fill(found.size(), -1);
+        for (size_t q = 0; q < found.size(); ++q) {
+          if (found[q]) continue;
+          for (size_t r = q + 1; r < found.size() && fill[q] < 0; ++r)
+            if (found[r]) fill[q] = so.srcOffset[offFrom + r];
+          for (size_t r = q; r > 0 && fill[q] < 0; --r)
+            if (found[r - 1]) fill[q] = so.srcOffset[offFrom + r - 1];
+        }
+        for (size_t q = 0; q < found.size(); ++q)
+          if (!found[q] && fill[q] >= 0) so.srcOffset[offFrom + q] = fill[q];
       }
       for (Reason r : ut.reasons) {
         if (r.tokenIndex >= 0) r.tokenIndex += base;
@@ -1732,6 +1833,7 @@ class RulesEngine final : public Engine {
     std::vector<uint8_t> cueVoc(texts.size(), 0);
     std::vector<char> cueInv(texts.size(), 0);
     char turnHint = 0;
+    std::string prevSongText;
     uint8_t lastSentVoc = 0;
     bool lastSentInv = false;
     for (size_t si = 0; si < sents.size(); ++si) {
@@ -1819,7 +1921,62 @@ class RulesEngine final : public Engine {
         transfer::Settings sts = st;
         const bool hinted = turnHint && lang == frame::SrcLang::En && ss.kind == frame::CueKind::Speech;
         if (hinted) sts.speakerGender = turnHint;
-        speech(ss.text, fb, opt, ctx, mem, sts, so, true);
+        // C24: a song line that opens with a relative word ("That ...", "Where ...") after a line ending in a noun
+        // without punctuation continues that line as its relative clause: it is analysed with the noun in front
+        // ("town that sailors cannot find") and the noun's Latin word is taken out again ("quod nautae ...")
+        std::string antecedent;
+        if (lang == frame::SrcLang::En && ss.kind == frame::CueKind::Song && en_) antecedent = songAntecedent(prevSongText, ss.text);
+        if (!antecedent.empty()) {
+          std::string t2 = ss.text;
+          if (!t2.empty() && t2[0] >= 'A' && t2[0] <= 'Z') t2[0] = (char)(t2[0] - 'A' + 'a');
+          std::string qmark;
+          while (!t2.empty() && (t2.back() == '?' || t2.back() == ' ')) { if (t2.back() == '?') qmark = "?"; t2.pop_back(); }
+          t2 = antecedent + " " + t2;
+          speech(t2, fb, opt, ctx, mem, sts, so, true);
+          if (!qmark.empty() && !so.latin.text.empty() && so.latin.text.back() == '.') so.latin.text.back() = '?';
+          else if (!qmark.empty()) so.latin.text += qmark;
+          const int plen = (int)antecedent.size();
+          long cut = -1;
+          for (size_t q = 0; q < so.latin.tokens.size() && q < so.srcOffset.size(); ++q)
+            if (so.srcOffset[q] >= 0 && so.srcOffset[q] < plen && so.latin.tokens[q].features.pos == "noun") { cut = (long)q; break; }
+          if (cut >= 0) {
+            cue::Latin rest;
+            const rules::TokenView& ct = so.latin.tokens[(size_t)cut];
+            size_t from = (size_t)ct.end;
+            while (from < so.latin.text.size() && so.latin.text[from] == ' ') ++from;
+            rest.text = so.latin.text.substr(0, (size_t)ct.start) + so.latin.text.substr(from);
+            for (size_t q = 0; q < so.latin.tokens.size(); ++q) {
+              if ((long)q == cut) continue;
+              rules::TokenView x = so.latin.tokens[q];
+              if ((long)q > cut) { x.start -= (int)(from - (size_t)ct.start); x.end -= (int)(from - (size_t)ct.start); }
+              rest.tokens.push_back(x);
+            }
+            std::vector<Reason> rs;
+            for (Reason rr : so.reasons) {
+              if (rr.tokenIndex == (int)cut) continue;
+              if (rr.tokenIndex > (int)cut) --rr.tokenIndex;
+              rs.push_back(rr);
+            }
+            so.reasons = rs;
+            so.srcOffset.erase(so.srcOffset.begin() + cut);
+            if (cut == 0 && !rest.tokens.empty()) {   // the line starts with the relative word: a capital
+              std::vector<std::string> tx;
+              for (const auto& t : rest.tokens) tx.push_back(t.text);
+              capitalise(tx[0]);
+              rewriteTokens(rest, tx);
+              capitalise(rest.tokens[0].display);
+            }
+            so.latin = rest;
+            addFlag(so.flags, "song-relative");
+            so.reasons.push_back(Reason{-1, "form", "this song line is read as a relative clause of the line before it", ""});
+          } else {
+            so = SentOut{};
+            mem = memBefore_;
+            speech(ss.text, fb, opt, ctx, mem, sts, so, true);
+          }
+        } else {
+          speech(ss.text, fb, opt, ctx, mem, sts, so, true);
+        }
         retryMissingForms(ss.text, fb, opt, ctx, mem, sts, so);
         if (opt.useModel && cfg_.advisors.chooseSense) askModel(ss.text, fb, opt, ctx, mem, sts, so);
         // C24: the reply's speaker differs from the project setting and the Latin depends on it (a first-person
@@ -1925,6 +2082,7 @@ class RulesEngine final : public Engine {
         }
         if (mem.addresseeGuess) addFlag(a.flags, "addressee-guess");
       }
+      prevSongText = ss.kind == frame::CueKind::Song ? ss.text : std::string();   // C24
       if (!ss.parts.empty() && ss.kind == frame::CueKind::Speech) {   // C24
         const size_t lc = ss.parts.back().cue;
         if (lc < cueVoc.size()) {
@@ -2093,7 +2251,7 @@ class RulesEngine final : public Engine {
                             "phrase-order", "participle-phrase", "ellipsis", "could-not-parse", "editorial",   // C17
                             "derived-word",   // C19
                             "cue-split", "addressee-gender",   // C22
-                            "speaker-reply"})   // C24
+                            "speaker-reply", "free-relative"})   // C24
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       // a tier 3 word chosen while a tier 1/2 word of the same sense existed (fidelity 1, a correction aside)
       for (const transfer::Choice& c : a.choices)
