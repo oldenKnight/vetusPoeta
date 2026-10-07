@@ -318,6 +318,21 @@ class RulesEngine final : public Engine {
         if (b > a) latin = m.note.substr(a, b - a);
       }
     }
+    // C19: an alternative of several words on both sides ("mī amīce/mea amīca") is chosen whole by the speaker
+    // glossary; a one-word right side ("ō mē miserum/miseram") alternates the word before the slash only
+    {
+      const size_t sl = latin.find('/');
+      if (sl != std::string::npos && latin.find('/', sl + 1) == std::string::npos && latin.find('{') == std::string::npos) {
+        const std::string right = latin.substr(sl + 1), left = latin.substr(0, sl);
+        auto words = [](const std::string& x) { return std::count(x.begin(), x.end(), ' ') + 1; };
+        if (right.find(' ') != std::string::npos && words(left) == words(right)) {
+          char gg = st.speakerGender;
+          if (st.flipSpeakerGender) gg = gg == 'f' ? 'm' : 'f';
+          latin = gg == 'f' ? right : latin.substr(0, sl);
+          addFlag(flags, "speaker-gender");
+        }
+      }
+    }
     std::vector<std::string> ws;
     {
       size_t a = 0;
@@ -493,8 +508,16 @@ class RulesEngine final : public Engine {
       cue::append(out, one);
     }
     for (int k = m.first; k <= m.last; ++k) covered.push_back(k);
+    // C19: a slot's content words count as translated only when the slot's translation used them (a word lost inside
+    // a slot shows in A7, e.g. a dropped possessive); function words of the slot are covered by the row
     for (const frame::PhraseSlot& sl : m.slots)
-      for (int k = sl.first; k <= sl.last; ++k) covered.push_back(k);
+      for (int k = sl.first; k <= sl.last; ++k) {
+        if (k < 0 || (size_t)k >= s.tokens.size()) continue;
+        const std::string& u = s.tokens[(size_t)k].upos;
+        const bool content = u == "NOUN" || u == "PROPN" || u == "VERB" || u == "ADJ" || u == "ADV" || u == "NUM" || u == "PRON";
+        if (!content || sl.kind == frame::SlotKind::Wh || sl.kind == frame::SlotKind::VP || sl.kind == frame::SlotKind::Name)
+          covered.push_back(k);
+      }
     reasons.push_back(Reason{out.tokens.empty() ? -1 : 0, "phrasebook", m.pattern + " -> " + m.latin,
                              "{\"pattern\":\"" + jsonEscape(m.pattern) + "\",\"latin\":\"" + jsonEscape(m.latin) +
                                  "\",\"tier\":" + std::to_string((int)m.tier) + "}"});

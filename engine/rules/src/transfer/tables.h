@@ -9,6 +9,8 @@
 namespace vp::transfer::tables {
 
 bool animateNoun(const std::string& lemma);           // person / animal nouns (EN + ES)
+bool celestialNoun(const std::string& lemma);   // C19: sun, moon, star (rise -> orior, set -> occidō)
+bool plantNoun(const std::string& lemma);   // C19: flower, poppy, cabbage ... ("flower bed" -> ager flōrum)
 bool narrativeNoun(const std::string& lemma);   // C15: "tell a story" -> nārrō
 bool personalPronoun(const std::string& w);           // i, me, you, he ... yo, tú, él ...
 const char* adverb(const std::string& lemma, bool motion);   // here -> hīc (motion: hūc) ...; nullptr if not listed

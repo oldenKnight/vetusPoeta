@@ -43,6 +43,15 @@ bool animateNoun(const std::string& l) {
                 "señora", "dios"});
 }
 
+// C19: what rises and sets ("the sun rose" -> sōl ortus est)
+bool celestialNoun(const std::string& l) { return in(l, {"sun", "moon", "star", "stars", "day", "dawn"}); }
+
+// C19: plants that grow in a garden bed ("flower bed" -> ager flōrum)
+bool plantNoun(const std::string& l) {
+  return in(l, {"flower", "poppy", "rose", "lily", "tulip", "cabbage", "vegetable", "strawberry", "bean", "pea",
+                "lettuce", "carrot", "herb", "daisy", "violet", "onion", "turnip", "pumpkin"});
+}
+
 bool narrativeNoun(const std::string& l) {
   return in(l, {"story", "tale", "fable", "history", "joke", "news", "legend", "adventure", "dream", "cuento",
                 "historia", "fábula"});

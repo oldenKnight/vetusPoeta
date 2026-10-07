@@ -540,3 +540,171 @@ big as this one", #18 "left the gate open" (posuit).
   not receiving (accipere). oz_sample therefore stands at 71/100 with wrong among OK 0.
 - Blind check honesty noted: 5/20 acceptable at first run, 15/20 after fixes. The first-run figure is the one that
   predicts held-out behaviour; see STATUS E3 for the measurement.
+
+## Quality loop 4 (C19, 2026-10-07)
+Material: the remaining oz_sample mismatches (C17 table), the held-out error classes of E3 (flags and checks only, no
+text: fragment 63, unknown 28, emoji 24, purpose-guess 20, missing-form 10 ...), four frame cases from the Greek
+review (coordinator), tests/samples/sample.en.srt, own_dialogue EN / ES. tests/heldout/, tests/eval_gold/ and
+data/work/eval/heldout-* were not opened. Generalisation guard: every rule below has at least two sentences of our own
+in `engine/tests/test_rules_en.cpp` (test cases "rules-f: ..."), written before the rule was run on the oz sample;
+20 blind sentences of children's dialogue were written at the start (before any change) and run once at the end.
+
+### Before / after
+| file | start of C19 | end of C19 |
+|---|---|---|
+| oz_sample EN (100) | 71 / 100, exact 48, ok 25 / check 67 / fix 8, wrong among OK 0 | **74 / 100** without and **78 / 100** with the 4 proposed gold alternatives below; exact 50; ok 26 / check 68 / fix 6; wrong among OK 0 |
+| own_dialogue EN (114) | 114 / 114, ok 65 / check 49 | 114 / 114, ok 65 / check 49 / fix 0 |
+| own_dialogue ES (100) | 100 / 100, ok 81 / check 19 | 100 / 100, ok 81 / check 19 |
+| sample.en.srt (12) | 12 / 12 | 12 / 12 |
+| la2x own / orberg own | 201 / 201, 60 / 60 | unchanged |
+| Greek: EN->GRC / ES->GRC / GRC->EN, ES | 114 / 114, 38 / 40 (39 / 40 with C18's work), 40 / 40 | unchanged (114, 39, 40) |
+| blind check (20 own sentences) | first run **10 / 20** acceptable | 14 / 20 after the fixes below |
+
+The oz threshold in the test is raised 68 -> 74 (the count without the proposed alternatives).
+
+### (a) emoji on wrong cues
+Finding: the `emoji` flag never changes confidence and the emoji is not part of the target text (RealiseOptions::
+emojiInText is false; A1-A9 never see it), so it cannot make a cue wrong. It is a passive marker of a depictable noun:
+on our material it sits on 28 / 100 oz cues and 42 / 114 own_dialogue cues, and 4 / 8 oz Fix cues; 24 / 132 (18 %)
+of the held-out wrong cues is below that base rate. The 24 are wrong for their other flags (fragments, unknown words,
+parse errors), which the items below address. One real fault was found and fixed: translated titles and names got
+an emoji ("Leō🦁 Timidus", "Cicōnia", DESIGN 10.3 says never for names): `LaNP::capitalise` / `nameWords` heads take
+none now (test "rules-f: emoji never on a title ...").
+
+### (b) missing-form
+- `Engine::retryMissingForms`: a token with "no lexicon cell for these features" makes the sentence be translated again
+  with the next candidate of that word forced (at most three tries; the first result without a missing form wins), so
+  a defective lemma never ends as a bracketed Fix literal while another candidate has the form.
+- A Latin verb without passive forms says the English passive actively: "I shall be all melted" -> liquēscam,
+  "The witch was melted" -> Sāga licuit (passive probe on the 3rd plural; impersonal 3rd singular cells do not count).
+- A personal passive takes a transitive candidate (accusative valency, transitive sense tag, passive cells) when one
+  scores within 0.6: "The boy was hurt" -> laesus est (not doleō), "The ship was damaged" -> afflīctāta (not noceō +
+  dat, which made "nocita est" OK and wrong before).
+- The paradigm generator stays reserved for lemmas without a table (DESIGN 6); with a table the next candidate is used.
+
+### (c) unknown words (src/frame/english.{h,cpp}, transfer)
+- Compounds the lexicon lacks: `en::compoundParts` splits a known first word and a head of a closed list (-man/-men,
+  -woman, -maid, -boy, -girl, -smith, -keeper, -maker, -castle, -house, -folk, -bird, -cake, -ball, -fly, -worm,
+  -room, -yard, -tree, -berry, -stone, -pot): head noun + genitive of the first word ("snowman" -> vir nivis,
+  "milkmaid" -> ancilla lactis, "sandcastle" -> castrum harēnae), flag `derived-word` (Check). Never "kit" + "ten".
+- Numerals in words: 13-19, 40-90, hyphenated 21-99 ("twenty-two cows" -> vīgintī duōs bovēs: the units word agrees);
+  any other number in words is written in Roman numerals ("XXI ovēs"; A1 accepts Roman numerals) instead of being
+  dropped (a dropped numeral was wrong and OK).
+- Contractions by the next word: 'd + past participle / "better" = had ("He'd seen" -> vīderat; "You'd better go" ->
+  should -> dēbēs), 's + got / been = has, "have got" (possession) = have ("I've got a new hat" -> Pilleum novum
+  habeō); table rows y'know, 'tis, 'twas, gimme, lemme; "let me" -> sine mē + infinitive (phrasebook), "let him go"
+  -> Eat (jussive of the subject's person, was "Eāmus").
+- Interjections: hurrah / hurray / yippee -> iō, bravo -> euge, aha -> ā (tier rows iō, euge).
+- Proper adjectives before a noun are adjectives, never dropped ("a Roman soldier" -> mīles Rōmānus; "Mīles est" was
+  wrong and OK); a noun used as a modifier with no Latin adjective is a genitive ("the poppy bed" -> ager papāverum).
+- An adverb in -ly without a Latin adverb in the reverse index takes the Latin adjective's own adverb when the lexicon
+  lists it (clārus -> clārē, fortis -> fortiter, dulcis -> dulciter); never an invented form.
+
+### (d) fragments
+- A lower-case cue that starts with a preposition or "and / or / but / nor" was tagged as an imperative verb
+  ("with a loud cry." -> "Clāmōrem magnum [with]", "to the hungry birds." -> "Cursitā avēs"): such words before a noun
+  phrase are retagged (the verbless-sentence retag no longer turns them back into verbs).
+- A prepositional-phrase fragment keeps its preposition's case: an oblique of the fragment ("Sub mēnsā magnā,",
+  "In silvam obscūram,", "Ad domum parvam.", "Clāmōre magnō."); a noun-phrase fragment is nominative; a possessive in a
+  fragment or inside the subject is eius (never a reflexive without a clause subject: "Rēx et fīliī eius").
+- Continuation: when the previous sentence of the same speaker ended open (, ; : dash) a fragment "and / or + noun
+  phrase" takes the case of that sentence's object ("I saw the king," + "and the queen." -> "Et rēgīnam.";
+  `Memory::lastObjCase / contCase`).
+- A noun phrase with a prepositional modifier is a fragment, not a failed parse ("a very small mouse with a long tail."
+  was could-not-parse).
+- "those who ..." -> eīs quī ...; a cue-initial coordinator parsed as the root gives the root back to its phrase ("But
+  to those who are honest," -> Sed eīs quī honestī sunt,); a second relative coordinated with the first keeps the
+  relative pronoun ("aut quī ... appropinquant", not "aut quis"); "from" + a feeling is a bare ablative of cause
+  (cūriōsitāte, timōre; A4 accepts it with a verb that takes the accusative); a PP fragment whose verbs are all inside
+  its relative clauses is not a troubled parse.
+
+### (e) A6 tier
+The fidelity-2 weights were checked: -0.25 per tier above 2, +0.1 for tier 1, the teacher gloss +0.5, and the C2b
+"tier preference" (a tier 1/2 candidate with the sense keyword and base >= max(0.2, half the top) beats a tier 3 top).
+On all our material (oz, own, the probes of this loop) only four tier-3 choices had a tier 1/2 candidate at all
+(sorceress -> sāga base 60, deadly -> āter, ladder -> gradus "gloss modifier only", possible -> potis), none of the same
+sense: the scorer is right there. The A6 findings come from words whose every Latin candidate is tier 3 and from
+closed-class tables choosing tier-3 words. Tier rows (each with two own sentences, test "rules-f: core words ..."):
+serva, avia, coquus, baculum, uxor (tier 1); graviter, retrō, tertium, argenteus, ubīque, nusquam, usquam, rāna, gigās,
+glaciēs, catulus, papāver, fūnis, pilleus, liquēscō, occurrō, iō, euge and the numerals ūndecim .. ūndēvīgintī,
+vīgintī .. nōnāgintā, ūndecimus, duodecimus, vīcēsimus, trīcēsimus, centēsimus, mīllēsimus (tier 2); Rōmānus (tier 1).
+
+### (f) structure, oz items and the frame cases of the Greek review
+- Relative clauses attach to their noun: after a comma ("my teacher, who is very kind" was "et quis ...", OK and
+  wrong), right after a noun when the parser hung them on the verb ("people who are honest" was an accusative +
+  infinitive, OK and wrong), a "who" clause hung on another noun of the phrase ("bread to the man who was hungry").
+- "a person who ..." / "people who ..." -> is quī; an object "is quī ..." follows the verb group with the modal before
+  its infinitive (#12 "nēmō audēbit nocēre eī quem ..."); a noun with its relative clause stays before the verb (the
+  realiser table and own_dialogue).
+- An apposition to the object between commas has the object's case and follows the verb when it carries a relative
+  clause (#43 "amīcum nostrum servāre potes, Leōnem Timidum, quī in agrō papāverum dormit"); "X bed" of plants ->
+  ager + genitive plural; "out of" -> ex.
+- Copula + prepositional phrase is a place ("She is in the garden." was "Hortus est.", OK and wrong; "We have been to
+  Rome." -> Rōmae fuimus); "Where were you? / Where have you been?" (where read as a subject, been as a clause) ->
+  Ubi erās? / Ubi fuistī?; a word after a possessive is a noun ("Where is my hat?" was "Ubi meum ferit?"); a predicate
+  after "be" that the lexicon knows as an adjective is one ("a person who is kind" -> benignus, not genus).
+- "as + clause" about the object -> the object's present participle (#65 "eīs venientibus occurram"); "get behind" ->
+  stō, "get under" -> subeō (verbprep rows); occurrō + dative for "meet"; "for / by + yourself, myself ..." -> emphatic
+  ipse agreeing with the subject (#91; gender of the person addressed from the speaker glossary, flag speaker-gender);
+  "all" describing the subject of a passive or of an adjective -> tōtus / omnēs (#74 "mox tōta liquēscam"); "get" + a
+  thing (not in the past, not from a person) -> capiō; "can" joined to a future clause -> future (#78 "capere
+  poterimus"); pronoun + "all" as object keeps the pronoun ("nōs omnēs"); eīs for the dative plural of is (macron
+  override, as iīs was listed first), trēs / omnēs for the accusative (trīs / omnīs).
+- Greek-review cases (coordinator): (1) "When / Before / After / While / As soon as X, Y." is a statement with a time
+  clause: the subordinate verb after its subject is retagged within its comma segment (rose = rise, set = set),
+  a parse that made the subordinate verb the root is turned round, "as soon as" -> ubi; sun / moon / stars rise ->
+  orior, set -> occidō; "sett" is no lemma of "set". (2) "The shepherd, seeing the wolf, fled." -> "Pāstor, lupum
+  vidēns, fūgit.": rebuilt on the Latin side (Transfer::clause), not in the frame: a frame-level repair made C18's
+  committed Greek review test lose the participle (the Greek transfer ignores SemFrame::secondary with an object), so
+  the frame keeps the parser's shape and each language rebuilds it; LaSub::afterSubject places the phrase between
+  commas; flee -> fugiō (the "flee" gloss moved from aufugiō to fugiō). (3) A possessive the parser hung outside a
+  phrasebook slot is kept ("Ubi est māter tua?"), and content words of a slot count for A7 only when the slot's
+  translation used them. (4) A sentence-initial verb before a comma is an imperative, never a name candidate ("Hurry,"
+  "Run,"); a common noun there is the person addressed ("Grandmother," -> Avia); imperative phrasebook rows need the
+  bare verb ("She woke up." is no "ēvigilā").
+- Blind-check fixes: a possessor 's hung on the verb ("The fisherman's wife" was "Piscātōrem uxor"); give / show /
+  bring + person + thing parsed as one phrase (indirect object); "may I / we ...?" asks permission (licetne mihi /
+  nōbīs + infinitive; "Mother, may I go out?" was "exeōne fortāsse", OK and wrong); an -s verb after "where the X"
+  (lives, not the plural of life) and live = dwell (habitō) with where / here / there; "than the first" agrees with
+  the subject (quam prīmus); a plural noun subject coordinated by "and" before a bare verb ("kings and queens wear");
+  "witches and sorceresses" parsed as compound + "and" is a coordination; "two-gender" nouns with a plural in -a agree
+  as neuters (papāvera rubra).
+- Checker false alarms fixed: "quam prīmum", emphatic nominative ipse, a nominative participle closing a phrase between
+  commas, a neuter substantive object right before its verb (only when no accusative noun stands next to it; the
+  corruption test stays 200 / 200), ablatives of cause.
+
+Rows: tiers_la.tsv +47 (listed under (e), plus uxor) and 3 notes edited (coquō "cook, bake", fugiō "flee", aufugiō
+"run away, escape"); phrasebook_en_la.tsv +3 (let me {VP}, how have you been, how old are you); phrasal_en_la.tsv +1
+(hide: cēlō|lateō); verbprep_en_la.tsv +2 (get behind -> stō, get under -> subeō); contractions_en.tsv +5; macron_
+overrides.tsv +3 (omnis omnīs -> omnēs, tres trīs -> trēs, is iīs -> eīs).
+
+API changes (additive): transfer.h `Memory::lastObjCase / contCase`; realise_la.h `LaNP::numeralLiteral`,
+`LaAdj::after`, `LaSub::afterSubject`; frame.h private `FrameBuilder::contractionContext`; english.h
+`en::compoundParts`; src/transfer/tables.h `plantNoun`, `celestialNoun`. New flag `derived-word` (Check).
+Changed test expectation: C17 "Only witches wear black hats." -> pilleōs (tier row pilleus "hat, cap").
+
+### Proposed gold alternatives (added after " | " in oz_sample.la.gold.txt; veto freely)
+- #39 "et ex hōc agrō mortiferō flōrum exī quam prīmum." - the gold's words, the genitive after the noun (order.gen) and
+  the tail phrase after the verb.
+- #50 "Sed eīs quī honestī nōn sunt, aut quī eī cūriōsitāte appropinquant," - appropinquāre + dative is "approach".
+- #65 "itaque stā post mē, et eīs venientibus occurram." - order.imp: a short imperative puts the verb first.
+- #91 "Tamen tibi dīcere nōn possum quōmodo eīs ūtāris; id ipsa cognōscere dēbēs." - "find out" = cognōscere
+  (phrasal_en_la.tsv).
+
+### Blind check
+20 sentences of children's dialogue written at the start of C19 (before any change), run once after the changes:
+**10 / 20** acceptable at the first run (2, 3, 4, 5, 6, 7, 8, 9, 11, 20). Wrong: #1 "Grandmother, may we bake ..."
+(name guess, fortāsse, nātālis), #10 "out of wood" (ē silvā), #12 "brightly" unknown and "tonight" -> hodiē, #13 "left
+the door open", #14 "one day" (ūnō diē for "some day"), #15 "than the first" (prīmum), #16 "gets dark", #17 "gave the
+poor old man some bread" (accusative + genitives), #18 "where the dragon lives" (lives as a noun), #19 "the
+fisherman's wife" (Piscātōrem). After the fixes above (each with own test sentences): 14 / 20; still wrong #1
+(nātālis agreement, torreō/coquō aside), #10, #12 (tonight), #13, #14, #16. Note: the hide row (cēlō|lateō) came from
+C17's list, not from this blind set, but blind #2 uses it.
+
+### Open points
+- C18's committed test `rules-grc3: C18 review` expected "Hurry, the ship is leaving!" in Greek to be Check because the
+  frame read "Hurry" as a name. With the requested frame fix (case 4) the frame now records the repair ("retag": a
+  sentence-initial word the tagger took for a name and the lexicon gives back as a verb or a common noun), so the cue
+  stays Check in both languages and that test passes (13 / 13 Greek review cases).
+- "Only kings and queens wear crowns.": "only" is lost in the rebuilt clause (A7 Check); "only" + subject -> sōlus is
+  not done.

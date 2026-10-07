@@ -39,7 +39,7 @@ aut Lignātor Stanneus in saxīs īnfrā graviter contūsus. | aut Lignātor Sta
 Cūr nōn curris et salīs?
 sed benigna Cicōnia mē servāvit,
 Semper eōs quī in perīculō sunt adiuvāre libet. | Semper libenter adiuvō eōs quī in perīculō sunt.
-et ex hōc flōrum lētālī agrō quam prīmum exī. | et ex hōc papāverum agrō mortiferō quam prīmum exī.
+et ex hōc flōrum lētālī agrō quam prīmum exī. | et ex hōc papāverum agrō mortiferō quam prīmum exī. | et ex hōc agrō mortiferō flōrum exī quam prīmum.
 Puellam parvam nōbīscum feremus,
 Ō, grātiās tibi! | Ō, grātiās tibi agō!
 Ō Māiestās Tua, putābāmus tē necātum esse! | Ō Māiestās Tua, putābāmus tē necātum īrī!
@@ -50,7 +50,7 @@ Dīcunt eum nēminem umquam ad sē admittere. | Quid? Dīcitur nēminem umquam a
 nec quemquam vīvum nōvī quī eum vīdit.
 et quīdam dīcunt eum fēlī similem esse.
 Et nōbīs dictum est Oz magum bonum esse.
-Sed eīs quī nōn sunt honestī, aut quī cūriōsitāte ad eum accēdunt, | Sed eīs quī nōn probī sunt, aut quī cūriōsitāte ad eum adeunt,
+Sed eīs quī nōn sunt honestī, aut quī cūriōsitāte ad eum accēdunt, | Sed eīs quī nōn probī sunt, aut quī cūriōsitāte ad eum adeunt, | Sed eīs quī honestī nōn sunt, aut quī eī cūriōsitāte appropinquant,
 et sī quid vīs, tintinnābulum pulsā.
 Oz crās māne tē arcesset.
 sī mē vidēbit. | sī mē admittet.
@@ -65,7 +65,7 @@ Leō Timidus sum, omnia timēns. | Leō Timidus sum, quī omnia timeō.
 ut rē vērā Rēx Bēstiārum fīam, ut hominēs mē vocant.
 Putō nōs id cōnārī dēbēre; sed certē nēminem necāre volō, | Putō nōs cōnārī dēbēre; sed certē nēminem necāre volō,
 Nēmō umquam illā viā īre vult.
-itaque post mē stā, et eīs venientibus occurram. | itaque post mē stāte, et eīs venientibus occurram.
+itaque post mē stā, et eīs venientibus occurram. | itaque post mē stāte, et eīs venientibus occurram. | itaque stā post mē, et eīs venientibus occurram.
 et apēs eōs pungere nōn possunt.
 Tertium et ultimum nōs vocāvistī.
 et id maius est quam Potestās Malī.
@@ -91,7 +91,7 @@ Ita plānē! | Rēctē!
 Quōmodo mihi ut Caput magnum appāruistī?
 Eōs iussī hanc Urbem et Rēgiam meam aedificāre;
 Nōn magnus magus sum, ut dīxī; sed sī crās māne ad mē veniēs,
-Tamen tibi dīcere nōn possum quōmodo eīs ūtāris; id ipsa invenīre dēbēs. | Tamen tibi dīcere nōn possum quōmodo eīs ūtendum sit; id ipsa invenīre dēbēs.
+Tamen tibi dīcere nōn possum quōmodo eīs ūtāris; id ipsa invenīre dēbēs. | Tamen tibi dīcere nōn possum quōmodo eīs ūtendum sit; id ipsa invenīre dēbēs. | Tamen tibi dīcere nōn possum quōmodo eīs ūtāris; id ipsa cognōscere dēbēs.
 quōmodo in Kansiam redībō? | quōmodo in Kansiam redīre possum?
 Posthāc vir magnus eris, nam multum cerebrī novī tibi dedī. | Posthāc vir magnus eris, nam cerebrum novum tibi dedī.
 Prō corde meō vēnī. | Cor meum petītum vēnī.

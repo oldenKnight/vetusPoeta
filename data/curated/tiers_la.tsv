@@ -69,7 +69,7 @@ bibo	bibō	verb	1	derived
 edo	edō	verb	1	derived	
 esurio	ēsuriō	verb	1	derived	
 sitio	sitiō	verb	1	derived	
-coquo	coquō	verb	1	derived	
+coquo	coquō	verb	1	derived	cook, bake
 emo	emō	verb	1	derived	
 vendo	vēndō	verb	1	derived	
 numero	numerō	verb	1	derived	
@@ -85,7 +85,7 @@ mitto	mittō	verb	1	derived
 duco	dūcō	verb	1	derived	
 traho	trahō	verb	1	derived	
 sequor	sequor	verb	1	derived	
-fugio	fugiō	verb	1	derived	
+fugio	fugiō	verb	1	derived	flee
 redeo	redeō	verb	1	derived	
 abeo	abeō	verb	1	derived	
 exeo	exeō	verb	1	derived	
@@ -516,7 +516,7 @@ placenta	placenta	noun	2	derived	cake
 ientaculum	ientāculum	noun	2	derived	breakfast
 candela	candēla	noun	2	derived	candle
 pluit	pluit	verb	2	derived	rain (it rains)
-aufugio	aufugiō	verb	2	derived	run away, flee
+aufugio	aufugiō	verb	2	derived	run away, escape
 frigeo	frīgeō	verb	2	derived	be cold
 cotidie	cotīdiē	adv	1	derived	every day, daily
 antea	anteā	adv	1	derived	before, previously
@@ -632,3 +632,5 @@ glacies	glaciēs	noun	2	teacher	ice
 catulus	catulus	noun	2	teacher	puppy, kitten, cub, young animal
 baculum	baculum	noun	1	teacher	stick, staff, walking stick
 funis	fūnis	noun	2	teacher	rope, cord
+papaver	papāver	noun	2	teacher	poppy
+occurro	occurrō	verb	2	teacher	meet, go to meet, run to meet

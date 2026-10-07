@@ -92,6 +92,7 @@ struct LaSub {
   bool before = false;             // order.sub.pre: before the main clause when the source puts it first
   std::string sep;                 // punctuation between the main clause and a following sub ("; aliter ...") (C2b)
   std::vector<LaClause> clause;    // exactly one
+  bool afterSubject = false;       // C19: Apposition right after the subject, between commas ("Pāstor, lupum vidēns, fūgit")
 };
 
 struct LaWh { uint32_t lemma = kNone; Role role = Role::None; uint8_t gender = 0; };

@@ -1270,7 +1270,7 @@ TEST_CASE("rules-d: end to end on oz_sample.en.srt vs the gold Latin (report; de
   MESSAGE("oz regression: " << matches << " / 100 match the gold; confidence ok " << conf["ok"] << " / check "
                             << conf["check"] << " / fix " << conf["fix"] << "; wrong among OK " << wrongOk);
   CHECK(wrongOk == 0);
-  CHECK(matches >= 68);   // C15 50 / 100; C17 68 / 100 without the gold alternatives it proposes (docs/rules_en_notes.md)
+  CHECK(matches >= 74);   // C15 50 / 100; C17 68 / 100; C19 74 / 100 without the gold alternatives it proposes (docs/rules_en_notes.md)
 }
 
 TEST_CASE("rules-d: tests/samples/sample.en.srt, 12 cues with the expected Latin") {
@@ -2013,4 +2013,193 @@ TEST_CASE("rules-f: passives (transitive Latin verb, agents, born, intransitive 
       {"The ice will be melted soon.", "Glaciēs mox liquēscet."},
       {"The witch was melted.", "Sāga licuit."},
   });
+}
+
+TEST_CASE("rules-f: relative clauses attach to their noun; heavy objects follow the verb (work item f)") {
+  NEED_REAL();
+  expectEach({
+      // a relative after a comma belongs to the noun before it, never "et quis ..."
+      {"I love my teacher, who is very kind.", "Magistrum meum quī valdē benignus est amō."},
+      {"We saw the old baker, who lives near the river.", "Pānificem veterem quī prope flūmen habitat vīdimus."},
+      // without a comma, right after its noun ("people who are honest", "the man who was hungry")
+      {"We love people who are honest.", "Amāmus eōs quī honestī sunt."},
+      {"Nobody dares to hurt a person who is kind.", "Nēmō audet nocēre eī quī benignus est."},
+      // "a person who" -> is quī; the heavy object after the verb group, the modal before its infinitive
+      {"No one will help a person who steals.", "Nēmō adiuvābit eum quī fūrātur."},
+      {"I know a girl who sings beautifully.", "Puellam quae pulchrē canit sciō."},
+      // phrasebook rows (C19)
+      {"How have you been?", "Quōmodo valuistī?"},
+      {"How have you been, my friend?", "Quōmodo valuistī, mea amīca?"},
+      {"How old are you?", "Quot annōs nāta es?"},
+      {"How old are you, little girl?", "Quot annōs nāta es, puella parva?"},
+      {"The queen was kind.", "Rēgīna benigna erat."},
+  });
+  for (const char* s : {"I love my teacher, who is very kind.", "We saw the old baker, who lives near the river."})
+    CHECK(run({s})[0].text.find("quis") == std::string::npos);
+}
+
+TEST_CASE("rules-f: appositions, garden beds, out of, hide, two-gender nouns (C19)") {
+  NEED_REAL();
+  expectEach({
+      // an apposition to the object between commas: the object's case, after the verb when it has a relative clause
+      {"We visited our uncle, the old fisherman, who lives near the sea.",
+       "Avunculum nostrum vīsitāvimus piscātōrem veterem quī prope mare habitat."},
+      {"You must help my friend, the little mouse, who is hungry.", "Amīcum meum adiuvāre dēbēs mūrem parvum quī ēsurit."},
+      // a bed of plants is a plot: ager + genitive plural; a noun used as a modifier is a genitive
+      {"The lion is asleep in the poppy bed.", "Leō in agrō papāverum dormit."},
+      {"The roses grow in the flower bed.", "Rosae in agrō flōrum crēscunt."},
+      // out of -> ex
+      {"Get out of this flower bed.", "Ex hōc agrō flōrum exī."},
+      {"The mouse came out of its hole.", "Mūs ē foveā suā exiit."},
+      // hide: with an object cēlō, without one lateō (phrasal_en_la.tsv)
+      {"She hid the key under a stone.", "Clāvem sub saxō cēlāvit."},
+      {"Where are you hiding?", "Ubi latēs?"},
+      // a noun of two genders whose plural ends in -a agrees as a neuter
+      {"The poppies are red.", "Papāvera rubra sunt."},
+      {"She picked a red poppy.", "Papāver rubrum carpsit."},
+  });
+}
+
+TEST_CASE("rules-f: get behind / under, meet, as + clause, emphatic ipse (C19)") {
+  NEED_REAL();
+  expectEach({
+      // verbprep_en_la.tsv rows
+      {"Get behind the door!", "Stā post iānuam!"},
+      {"Get under the table!", "Subī mēnsam!"},
+      {"Quickly, get under the bed!", "Celeriter, subī lectum!"},
+      // occurrō + dative (tiers_la.tsv, valency_la.tsv)
+      {"I will meet you at the gate.", "Tibi in portā occurram."},
+      {"We will meet the king tomorrow.", "Crās rēgī occurrēmus."},
+      {"I saw your sister yesterday.", "Heri sorōrem tuam vīdī."},
+      // "as" + a clause about the object: the object's present participle
+      {"I greeted them as they came.", "Eōs venientēs salūtāvī."},
+      {"I will meet them as they come.", "Eīs venientibus occurram."},
+      // for / by + reflexive: emphatic ipse (gender of the person addressed or speaking from the speaker glossary)
+      {"You must find that out for yourself.", "Id ipsa cognōscere dēbēs."},
+      {"I made this cake by myself.", "Hanc placentam ipsa fēcī."},
+      {"The boy built the boat by himself.", "Puer nāvem ipse aedificāvit."},
+      {"She did it for herself.", "Sibi id fēcit."},
+      // eīs (dative / ablative plural of is) as the readers write it
+      {"I gave them bread.", "Pānem eīs dedī."},
+  });
+  // "quam prīmum" is no agreement error
+  const std::vector<Out> o = run({"Come home as soon as you can."});
+  for (const auto& k : o[0].checks)
+    if (k.id == "A3") CHECK_MESSAGE(k.ok, o[0].text << ": " << k.detail);
+}
+
+TEST_CASE("rules-f: frame cases from the Greek review (fronted time clauses, -ing phrases, possessives, imperatives)") {
+  NEED_REAL();
+  expectEach({
+      // 1. "When / After / While / Before / As soon as X, Y." is a statement with a time clause, never a question;
+      // "rose" / "set" after the subject of such a clause are its verbs (rise of the sun -> orior, set -> occidō)
+      {"When the sun rose, we went to the river.", "Cum sōl ortus est, ad flūmen iimus."},
+      {"When the moon rose, the wolves howled.", "Cum lūna orta est, lupī ululāvērunt."},
+      {"Before the sun set, we were home.", "Antequam sōl occidit, domī erāmus."},
+      {"After the rain stopped, the children played outside.", "Postquam pluvia dēsiit, puerī forīs lūsērunt."},
+      {"As soon as the bell rang, the boys ran out.", "Ubi tintinnābulum pulsāvit, puerī excurrērunt."},
+      {"As soon as the sun rose, the birds sang.", "Ubi sōl ortus est, avēs cecinērunt."},
+      // 2. an -ing phrase between commas after the subject: a participle agreeing with the subject, in place
+      {"The shepherd, seeing the wolf, fled.", "Pāstor, lupum vidēns, fūgit."},
+      {"The girl, hearing a noise, woke up.", "Puella, strepitum audiēns, experrēcta est."},
+      {"The boy, holding a lamp, entered the cave.", "Puer, lucernam tenēns, antrum invāsit."},
+      // flee -> fugiō (tier 1); run away -> aufugiō
+      {"The shepherd fled.", "Pāstor fūgit."},
+      {"The thief ran away.", "Fūr aufūgit."},
+      // 3. a possessive inside a phrasebook slot is kept ("Ubi est māter tua?")
+      {"Where is your mother?", "Ubi est māter tua?"},
+      {"Where is her cat?", "Ubi est fēlēs eius?"},
+      // 4. an imperative row needs the bare verb; an imperative before a comma stays an imperative
+      {"Hurry, the ship is leaving!", "Festīnā, nāvis exit!"},
+      {"He hurried home.", "Domum festīnāvit."},
+      {"The girl woke up.", "Puella experrēcta est."},
+      // an object the parser hung on a time word
+      {"We will meet the king tomorrow.", "Crās rēgī occurrēmus."},
+      {"I saw your sister yesterday.", "Heri sorōrem tuam vīdī."},
+  });
+  for (const char* s : {"When the sun rose, we went to the river.", "Hurry, the ship is leaving!", "Run, the bear is coming!"}) {
+    const std::vector<Out> o = run({s});
+    CHECK_MESSAGE(o[0].text.find("Quandō") == std::string::npos, s << " -> " << o[0].text);
+    CHECK_MESSAGE(!hasFlag(o[0], "name-guessed"), s << " -> " << o[0].text);
+  }
+  // a frame check that the Greek path shares: an imperative before a comma is no name candidate
+  frame::FrameBuilder fb(frame::SrcLang::En, &real().pen, &real().en, cur());
+  for (const char* s : {"Hurry, the ship is leaving!", "Run, the bear is coming!"}) {
+    frame::SemSentence ss;
+    fb.analyse(s, ss);
+    REQUIRE(!ss.tokens.empty());
+    CHECK_MESSAGE(ss.tokens[0].upos != "PROPN", s << ": " << ss.tokens[0].upos);
+  }
+}
+
+TEST_CASE("rules-f: all (= completely) -> tōtus / omnēs; get = fetch; can after a future (C19)") {
+  NEED_REAL();
+  expectEach({
+      // "all" describing the subject of a passive or of an adjective predicate
+      {"The cake was all eaten.", "Placenta tōta ēsa est."},
+      {"I am all wet.", "Tōta ūmida sum."},
+      {"The children were all tired.", "Puerī omnēs fessī erant."},
+      // get + a thing (not from a person, not in the past) is fetching: capiō
+      {"Go and get some water.", "Ī et cape aquam."},
+      {"Please get the ball from the garden.", "Quaesō cape pilam ab hortō."},
+      {"I got a letter from my aunt.", "Epistulam ab amitā meā accēpī."},
+      // "can" in a clause joined to a future clause is future (poterimus)
+      {"We will win, and then we can rest.", "Vincēmus et tum requiēscere poterimus."},
+      {"I will find the key, and then you can open the door.", "Clāvem inveniam et tum iānuam aperīre poteris."},
+  });
+}
+
+TEST_CASE("rules-f: two plural nouns joined by and stay a coordination; a neuter substantive object (C19)") {
+  NEED_REAL();
+  for (const auto& c : std::vector<std::pair<const char*, const char*>>{
+           {"Only witches and sorceresses wear white.", "sāgae et venēficae"},
+           {"and only witches and sorceresses wear white.", "sāgae et venēficae"},
+           {"Only kings and queens wear crowns.", "Rēgēs et rēgīnae"}}) {
+    const std::vector<Out> o = run({c.first});
+    CHECK_MESSAGE(o[0].text.find(c.second) != std::string::npos, c.first << " -> " << o[0].text);
+    CHECK_MESSAGE(o[0].conf != rules::Confidence::Fix, c.first << " -> " << o[0].text);
+  }
+}
+
+TEST_CASE("rules-f: fixes after the blind check (own sentences of children's dialogue, C19)") {
+  NEED_REAL();
+  expectEach({
+      // a possessor ('s) the parser hung on the verb
+      {"The fisherman's wife wanted a bigger house.", "Uxor piscātōris domum maiōrem voluit."},
+      {"The farmer's dog barked.", "Canis agricolae lātrāvit."},
+      // give + person + thing: the person is the indirect object
+      {"She gave the poor old man some bread and cheese.", "Virō pauperī veterī pānem et cāseum dedit."},
+      {"He gave the hungry dog a bone.", "Canī ieiūnō os dedit."},
+      // "may I / we ...?" asks permission: licet + dative + infinitive; a common noun before the comma is addressed
+      {"Mother, may I go out?", "Māter, licetne mihi exīre?"},
+      {"May we play in the garden?", "Licetne nōbīs in hortō lūdere?"},
+      {"It may rain tomorrow.", "Crās fortāsse pluit."},
+      // an -s verb after "where the X" (lives, not the plural of life); live = dwell with where / here
+      {"Nobody knows where the dragon lives.", "Nēmō scit ubi dracō habitet."},
+      {"Tell me where the king lives.", "Dīc mihi ubi rēx habitet."},
+      {"We live here.", "Hīc habitāmus."},
+      // an adverb in -ly through the Latin adjective's own adverb
+      {"The stars are shining brightly.", "Stēllae clārē lūcent."},
+      {"The sun shone brightly.", "Sōl clārē lūxit."},
+      // "than the first": the adjective agrees with the subject
+      {"The second bear was smaller than the first.", "Ursus alter minor erat quam prīmus."},
+      {"The second girl was taller than the first.", "Puella altera altior erat quam prīma."},
+  });
+  CHECK(run({"Grandmother, may we bake a cake?"})[0].text.find("Avia, licetne") == 0);
+}
+
+TEST_CASE("rules-f: those who, coordinated relatives, ablative of cause (fragments, C19)") {
+  NEED_REAL();
+  expectEach({
+      {"to those who are poor,", "Eīs quī pauperēs sunt,"},
+      {"But to those who are honest,", "Sed eīs quī honestī sunt,"},
+      // a second relative clause coordinated with the first keeps the relative pronoun
+      {"But to those who are not honest, or who approach him from curiosity,",
+       "Sed eīs quī honestī nōn sunt aut quī eī cūriōsitāte appropinquant,"},
+      // "from" + a feeling is the cause: a bare ablative
+      {"She cried from fear.", "Timōre flēvit."},
+      {"He opened the box from curiosity.", "Arcam cūriōsitāte aperuit."},
+  });
+  const std::vector<Out> o = run({"We thanked those who were kind, or who helped us."});
+  CHECK_MESSAGE(o[0].text.find("quis") == std::string::npos, o[0].text);
 }

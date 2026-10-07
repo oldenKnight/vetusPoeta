@@ -536,6 +536,25 @@ struct LatinChecker::Impl {
     // substantive (then it may not partially agree with a neighbour and may not follow a preposition's noun).
     for (size_t i = 0; i < n; ++i) {
       if (!any(i, isModifier) || strongHead(i) || verbish(i) || relStart[i] || rep.tokens[i].name || advHint[i]) continue;
+      // C19: emphatic ipse in the nominative stands for the subject ("id ipsa invenīre dēbēs"), not for its neighbour
+      {
+        bool ipseNom = false;
+        for (const Reading& r : rd[i]) ipseNom = ipseNom || (r.key == "ipse" && r.f.case_ == Nom);
+        if (ipseNom) continue;
+      }
+      // C19: a participle phrase between commas closes with its participle, which agrees with the subject, not with its
+      // own object ("Pāstor, lupum vidēns, fūgit")
+      if (i + 1 < n && boundaryBefore[i + 1]) {
+        bool partNom = false;
+        for (const Reading& r : rd[i]) partNom = partNom || ((r.f.mood == ParticipleMood || r.lpos == Participle) && r.f.case_ == Nom);
+        if (partNom) continue;
+      }
+      // C19: "quam prīmum" (as soon as possible): an adverb after quam, not an adjective
+      if (i > 0 && text::latin_key(rep.tokens[i - 1].text) == "quam") {
+        bool adv = false;
+        for (const Reading& r : rd[i]) adv = adv || r.lpos == Adv;
+        if (adv) continue;
+      }
       bool relOnly = true;
       for (const Reading& r : rd[i]) relOnly = relOnly && isRelative(r);
       if (relOnly) continue;
@@ -556,6 +575,20 @@ struct LatinChecker::Impl {
       bool ok = false;
       for (size_t h : cand) ok = ok || agreePair(i, h);
       if (ok) { attached[i] = 1; continue; }
+      // C19: a neuter adjective used as a noun, the object right before its verb ("sāgae et venēficae album gerunt")
+      size_t nv = i + 1;
+      while (nv < n && !isVerb[nv] && !boundaryBefore[nv] && !rd[nv].empty() &&
+             std::all_of(rd[nv].begin(), rd[nv].end(), [](const Reading& r) { return r.lpos == Adv; }))
+        ++nv;
+      if (nv < n && isVerb[nv] && !boundaryBefore[nv]) {
+        bool neutAcc = false;
+        for (const Reading& r : rd[i]) neutAcc = neutAcc || (isModifier(r) && r.f.gender == N && r.f.case_ == Acc);
+        bool accHead = false;
+        for (size_t h : cand)
+          for (const Reading& r : rd[h]) accHead = accHead || (isHead(r) && r.f.case_ == Acc);
+        if (neutAcc && !accHead) continue;
+      }
+
       bool copula = false;
       for (size_t j = b; j < e; ++j) copula = copula || (isVerb[j] && isCopula(j));
       if (copula && predicateOk(i, b, e)) continue;
@@ -761,6 +794,13 @@ struct LatinChecker::Impl {
           if (attached[j]) continue;
           const uint16_t da = (1u << Dat) | (1u << Abl);
           if (m == (1u << Dat) && defDat == n) defDat = j;
+          // C19: an ablative of cause (timōre, cūriōsitāte, famē, gaudiō ...) is no misplaced object
+          bool cause = false;
+          for (const Reading& r : rd[j])
+            for (const char* k : {"timor", "curiositas", "gaudium", "fames", "ira", "pudor", "misericordia", "invidia",
+                                  "superbia", "dolor", "sitis", "amor", "odium", "terror", "metus", "lassitudo"})
+              cause = cause || r.key == k;
+          if (cause) continue;
           if (m == (1u << Abl) && defAbl == n) defAbl = j;
           if (m == (1u << Acc) && defAcc == n) defAcc = j;
           if ((m & ~da) == 0 && defDat == n && defAbl == n) defDat = j;   // dative-or-ablative only (-ō, -īs)

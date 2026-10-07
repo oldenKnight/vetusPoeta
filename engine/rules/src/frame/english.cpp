@@ -238,6 +238,51 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
     }
     changed = true;
   }
+  // C19: a sentence-initial word before a comma that the lexicon knows as a verb (base form) and not as a name is an
+  // imperative ("Hurry, the ship is leaving!", "Run, the bear is coming!"), never a name candidate; a common noun there
+  // is the person addressed ("Grandmother, may we ...?")
+  if (n >= 3 && tk[0].upos == "PROPN" && tk[1].text == "," && !tk[0].text.empty()) {
+    std::vector<lex::Analysis> an;
+    lx.lookup(text::en_key(tk[0].lower), an);
+    bool verb = false, name = false, noun = false;
+    for (const lex::Analysis& a : an) {
+      const lex::Lemma l = lx.lemma(a.lemma);
+      if (l.pos == feat::Name) name = true;
+      if (l.pos == feat::Verb && text::lower(std::string(l.head)) == tk[0].lower) verb = true;
+      if (l.pos == feat::Noun) noun = true;
+    }
+    if (verb && !name) {
+      tk[0].upos = "VERB";
+      tk[0].feats = nlp::morph::fromString("VerbForm=Fin|Mood=Imp");
+      changed = true;
+    } else if (noun && !name) {
+      tk[0].upos = "NOUN";
+      tk[0].feats = nlp::morph::fromString("Number=Sing");
+      changed = true;
+    }
+  }
+  // C19: "Nobody knows where the dragon lives.": an -s word after "wh / subordinator + the + noun" that the lexicon
+  // knows as a verb is that clause's verb (lives, not the plural of life)
+  for (int i = 3; i < n; ++i) {
+    Token& t = tk[(size_t)i];
+    if (t.upos != "NOUN" || t.lower.size() < 4 || t.lower.back() != 's') continue;
+    if (tk[(size_t)i - 1].upos != "NOUN" || tk[(size_t)i - 2].upos != "DET") continue;
+    if (!isIn(tk[(size_t)i - 3].lower, {"where", "when", "why", "how", "what", "if", "because", "that", "until", "while",
+                                        "whether", "before", "after"}))
+      continue;
+    if (i + 1 < n && !isIn(tk[(size_t)i + 1].upos, {"PUNCT", "ADV", "ADP", "DET", "PRON"})) continue;
+    std::vector<lex::Analysis> an;
+    lx.lookup(text::en_key(t.lower), an);
+    bool verb3 = false;
+    for (const lex::Analysis& a : an) {
+      const feat::Features f = feat::unpack(lx.feature(a.feat));
+      if (lx.lemma(a.lemma).pos == feat::Verb && f.person == 3 && f.number == feat::Sg) verb3 = true;
+    }
+    if (!verb3) continue;
+    t.upos = "VERB";
+    t.feats = nlp::morph::fromString("Number=Sing|Person=3|Tense=Pres|VerbForm=Fin|Mood=Ind");
+    changed = true;
+  }
   // a capitalised word the lexicon does not know, before a verb or inside the sentence, is a name ("Grimbly ate the
   // cake."): kept as written (names_la.tsv policy: indeclinable, Check)
   for (int i = 0; i < n; ++i) {
@@ -265,6 +310,19 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
       if (r.noun) {
         t.upos = "NOUN";
         t.feats = nlp::morph::fromString(t.lower.size() > 3 && t.lower.back() == 's' && r.nounInflected ? "Number=Plur" : "Number=Sing");
+        changed = true;
+        continue;
+      }
+    }
+    // C19: a predicate after "be" without a determiner that the lexicon knows as an adjective ("a person who is kind",
+    // "The night was cold"): an adjective, not a noun (kind -> genus)
+    if (t.upos == "NOUN" && i > 0 && isIn(tk[(size_t)i - 1].lower, {"is", "are", "was", "were", "am", "be", "been", "very",
+                                                                     "so", "too", "quite"}) &&
+        (i + 1 >= n || isIn(tk[(size_t)i + 1].upos, {"PUNCT", "CCONJ"}) || tk[(size_t)i + 1].lower == "to")) {
+      const Reading r = readingOf(lx, t.lower);
+      if (r.adj && !r.nounInflected) {
+        t.upos = "ADJ";
+        t.feats = 0;
         changed = true;
         continue;
       }
@@ -327,6 +385,28 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
       // C19: not after a possessive ("Where is my hat?": hat is no past of "hit") nor beside an auxiliary verb
       bool aux = false;
       for (const Token& x : tk) aux = aux || x.upos == "AUX";
+      // C19: a clause opened by a subordinator and closed by a comma ("When the sun rose, we went ...", "Before the
+      // sun set, ...") is a clause of its own: "rose" / "set" after its subject is its verb even when the main clause
+      // has one (the past of rise, not the flower; set as a past)
+      int segA = i, segB = i;
+      while (segA > 0 && tk[(size_t)segA - 1].text != ",") --segA;
+      while (segB + 1 < n && tk[(size_t)segB + 1].text != ",") ++segB;
+      bool segVerb = false;
+      for (int q = segA; q <= segB; ++q) segVerb = segVerb || tk[(size_t)q].upos == "VERB" || tk[(size_t)q].upos == "AUX";
+      const bool subClause = segA == 0 && segB + 1 < n && !segVerb && i == segB &&
+                             isIn(tk[0].lower, {"when", "after", "before", "while", "as", "until", "till", "once", "since",
+                                                "if", "because"}) &&
+                             (nominal(i - 1) || (i >= 2 && tk[(size_t)i - 1].upos == "ADV" && nominal(i - 2)));
+      if (subClause && (!r.pastOf.empty() || r.presentVerb) && !r.nounInflected) {
+        bool pastMain = false;
+        for (int q = segB + 1; q < n; ++q)
+          pastMain = pastMain || fget(tk[(size_t)q], nlp::morph::TenseShift) == nlp::morph::TensePast;
+        t.upos = "VERB";
+        t.feats = nlp::morph::fromString(!r.pastOf.empty() || pastMain ? "Tense=Past|VerbForm=Fin|Mood=Ind"
+                                                                        : "Number=Sing|Person=3|Tense=Pres|VerbForm=Fin|Mood=Ind");
+        changed = true;
+        continue;
+      }
       if (!anyVerb && !aux && !r.pastOf.empty() && r.finitePast && !r.presentVerb && !r.nounInflected &&
           !isIn(tk[(size_t)i - 1].lower, {"my", "your", "his", "her", "its", "our", "their"}) &&
           (nominal(i - 1) || (i >= 2 && tk[(size_t)i - 1].upos == "ADV" && nominal(i - 2)))) {

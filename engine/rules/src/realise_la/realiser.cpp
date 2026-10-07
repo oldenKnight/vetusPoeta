@@ -565,6 +565,7 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
 
   // ---- linearise ----
   std::vector<int> seq;
+  size_t subjEnd = 0;   // C19: words of the content up to the end of the subject (0: no subject first)
   auto addTemplate = [&](const std::vector<std::string>& t) {
     for (const std::string& n : t) {
       const int sl = slotOf(n);
@@ -695,6 +696,33 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
       auto ob = std::find(seq.begin(), seq.end(), kO);
       if (io != seq.end() && ob != seq.end() && io < ob) std::iter_swap(io, ob);
     }
+    // C19 order.heavy: an object or indirect object "is quī ..." (pronoun + relative clause) follows the verb group
+    // ("Nēmō audēbit nocēre eī quem Saga ōsculāta est", "Amāmus eōs quī honestī sunt"); a modal then precedes its
+    // infinitive
+    if ((c.type == ClauseType::Decl || c.type == ClauseType::Wh) && ctx.main && !ctx.relative && !ctx.accInf && !ctx.apposition &&
+        !c.plainQuestion && !s[kV].empty())
+      for (int sl : {kIO, kO}) {
+        const bool has = sl == kO ? c.hasObject : c.hasIndirect;
+        const LaNP& hn = sl == kO ? c.object : c.indirect;
+        // only the pronoun antecedent "is quī" (a noun with its relative stays before the verb: "Librum quem legis
+        // habeō", "Sex rēs quae fierī nōn possunt ... crēdō")
+        if (!has || hn.relative.empty() || s[sl].empty() || hn.interrogative != kNone || !hn.isPronoun ||
+            hn.pron.person != 3)
+          continue;
+        if (c.type == ClauseType::Wh && (c.wh.role == Role::Object || c.wh.role == Role::IndirectObject)) continue;
+        auto it = std::find(seq.begin(), seq.end(), sl);
+        if (it == seq.end()) continue;
+        seq.erase(it);
+        auto end = std::find(seq.begin(), seq.end(), kEND);
+        seq.insert(end, sl);
+        auto inf = std::find(seq.begin(), seq.end(), kINF), v = std::find(seq.begin(), seq.end(), kV);
+        if (inf != seq.end() && v != seq.end() && inf < v && !s[kINF].empty()) {
+          seq.erase(inf);
+          v = std::find(seq.begin(), seq.end(), kV);
+          seq.insert(v + 1, kINF);
+        }
+        orderRule = "order.heavy";
+      }
     // yes/no questions: nōnne / num first; otherwise -ne on the verb (or the focused word), moved first
     if (c.type == ClauseType::Yn && !nonne && c.bias != YnBias::ExpectNo) {
       const int host = focus >= 0 && !s[focus].empty() ? focus : !s[kV].empty() ? kV : -1;
@@ -706,8 +734,11 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
         s[host][0].rule = "order.yn";
       }
     }
-    for (int sl : seq)
+    for (int sl : seq) {
+      const bool subjHere = sl == kS && !s[kS].empty();
       if (sl >= 0 && sl < kSlotCount) append(content, s[sl]);
+      if (subjHere) subjEnd = content.size();
+    }
   }
   if (c.type == ClauseType::Yn && (nonne || c.bias == YnBias::ExpectNo)) {
     Word w;
@@ -735,6 +766,7 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
   for (const LaAdj& pa : c.predAdj) partLast = partLast && pa.participle != 0;
   if (partLast)
     std::stable_partition(content.begin(), content.end(), [](const Word& w) { return std::string(w.rule) != "order.copula"; });
+  const size_t contentAt = clauseWords.size();
   append(clauseWords, content);
   if (!clauseWords.empty() && !clauseWords.back().rule[0]) clauseWords.back().rule = orderRule;
   if (!c.politeness.empty() && !clauseWords.empty()) {
@@ -792,6 +824,13 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
       if (!sw.empty()) sw.back().punctAfter = ",";
       append(before, sw);
     } else {
+      if (sub.rel == SubRel::Apposition && sub.afterSubject && subjEnd > 0 && contentAt + subjEnd < clauseWords.size() &&
+          !sw.empty()) {   // C19: "Pāstor, lupum vidēns, fūgit"
+        clauseWords[contentAt + subjEnd - 1].punctAfter = ",";
+        sw.back().punctAfter = ",";
+        clauseWords.insert(clauseWords.begin() + (long)(contentAt + subjEnd), sw.begin(), sw.end());
+        continue;
+      }
       if (sub.rel == SubRel::Apposition) {
         if (!after.empty()) after.back().punctAfter = ",";
         else if (!clauseWords.empty()) clauseWords.back().punctAfter = ",";

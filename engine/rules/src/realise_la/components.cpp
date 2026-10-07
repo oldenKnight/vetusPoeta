@@ -88,8 +88,13 @@ uint8_t Agreement::nounGender(const LaNP& np, const curated::CuratedData& cd) co
   const lex::Lemma l = lx_.lemma(np.head);
   if (l.gender == MN && l.key.size() > 2) {
     const bool um = l.key.compare(l.key.size() - 2, 2, "um") == 0;
-    if (np.number == Pl) return M;   // caelī, locī: the lexicon's plural cells are the masculine ones
-    return um ? N : M;
+    // C19: a plural in -a is neuter (papāver, papāvera: "Papāvera rubra sunt"); so is its singular unless it ends in -us
+    std::string pl;
+    const bool plA = morph::generate(lx_, np.head, morph::nounForm(Nom, Pl), pl, false) &&
+                     !text::latin_key(pl).empty() && text::latin_key(pl).back() == 'a';
+    const bool us = l.key.compare(l.key.size() - 2, 2, "us") == 0;
+    if (np.number == Pl) return plA ? N : M;   // caelī, locī: the lexicon's plural cells are the masculine ones
+    return um || (plA && !us) ? N : M;
   }
   return simpleGender(l.gender);
 }
