@@ -268,3 +268,5 @@ late	sērō	1	answer	a bare "late" repeated after "I am late" ("late, late!")
 upside down	pedibus sursum versīs	2	tail	"The bat hangs upside down." -> pedibus sursum versīs (with the feet turned up)
 of late	nūper	1	adv	"He had of late been ill." -> nūper
 lately	nūper	1	adv	
+i am late for {NP} again	iterum ad {1:acc} sērō veniō	1	state	"I am late for the bus again." -> Iterum ad raedam sērō veniō.
+very much	valdē	1	adv	"She loved it very much." -> valdē (not valdē multum)

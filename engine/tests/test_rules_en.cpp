@@ -2006,7 +2006,7 @@ TEST_CASE("rules-f: passives (transitive Latin verb, agents, born, intransitive 
       {"The wolf was seen by the hunter.", "Lupus ā vēnātōre vīsus est."},
       {"The princess was saved by a knight.", "Rēgīna ā mīlite servāta est."},
       // be born -> nāscor
-      {"She was born in a small village.", "In rūre parvō nāta est."},
+      {"She was born in a small village.", "In vīcō parvō nāta est."},   // C22: village -> vīcus (tiers_la.tsv)
       {"The puppies were born yesterday.", "Catulī heri nātī sunt."},
       // a Latin verb without passive forms says the passive actively (never a missing form)
       {"The snow melted.", "Nix licuit."},
@@ -2331,4 +2331,263 @@ TEST_CASE("rules-g: fixes after the blind check (own sentences of children's dia
       {"She said that the boys had helped her.", "Dīxit puerōs sē adiūvisse."},
   });
   CHECK(run({"I said that the girl had seen him."})[0].text.find(" sē ") == std::string::npos);
+}
+
+// ================================================================================================================
+// C22 (RULES-H, acceptance loop 1). Generalisation guard: every rule below has at least two sentences of our own
+// (never lines of the acceptance file), written before the rule was run on that file (docs/rules_en_notes.md
+// "Acceptance loop 1 (C22)").
+namespace {
+bool hasBracket(const std::string& s) { return s.find('[') != std::string::npos; }
+}  // namespace
+
+TEST_CASE("rules-h: no cue is emptied or swallowed by the next one (quotes, ellipsis, stray bar)") {
+  NEED_REAL();
+  {
+    const std::vector<Out> o = run({"- \"The farmer's dog at first was... \"", "Mary."});
+    REQUIRE(o.size() == 2);
+    CHECK(o[1].text == "Marīa.");
+    CHECK(o[0].text.find("Marīa") == std::string::npos);
+  }
+  {
+    const std::vector<Out> o = run({"\"The baker had been sleeping for... \"", "Lucy!"});
+    REQUIRE(o.size() == 2);
+    CHECK(o[1].text == "Lūcia!");
+    CHECK_FALSE(o[0].text.empty());
+  }
+  {
+    const std::vector<Out> o = run({"The dog was sleeping.|", "Goodbye, Tom. Goodbye!"});
+    REQUIRE(o.size() == 2);
+    CHECK(o[0].text == "Canis dormiēbat.");
+    CHECK(o[1].text.rfind("Valē", 0) == 0);
+  }
+  // every cue of a multi-cue sentence keeps Latin words of its own
+  for (const auto& seq : std::vector<std::vector<std::string>>{
+           {"\"The old king, the father of the prince,", "gave him a horse and a sword. \""},
+           {"We walked to the river and", "sat under a tree."}}) {
+    const std::vector<Out> o = run(seq);
+    for (size_t i = 0; i < o.size(); ++i) CHECK_MESSAGE(!o[i].text.empty(), seq[i]);
+  }
+}
+
+TEST_CASE("rules-h: names of the table, places of two words, titles before a name (work item a)") {
+  NEED_REAL();
+  expectEach({
+      {"Lucy in the garden", "Lūcia in hortō"},
+      {"We live in Wonderland.", "In Terrā Mīrābilī habitāmus."},
+      {"Where is the bridge over the river?", "Ubi est pōns super flūmen?"},
+      {"Because my garden would be a Wonderland", "Quia hortus meus Terra Mīrābilis esset"},
+      {"The moon goes round the Earth.", "Lūna circum Terram it."},
+      {"Mr. Fox, wait!", "Vulpēs, manē!"},
+      {"Yes, Miss Lucy.", "Ita, Lūcia."},
+      {"Mr. Bear!", "Urse!"},
+  });
+  // "Mr." is never written in the Latin, a known name never in brackets
+  for (const char* s : {"Mr. Fox. Wait!", "Lucy!", "Good morning, Mr. Bear."}) {
+    const std::vector<Out> o = run({s});
+    CHECK_MESSAGE(o[0].text.find("Mr") == std::string::npos, s << " -> " << o[0].text);
+    CHECK_MESSAGE(!hasBracket(o[0].text), s << " -> " << o[0].text);
+  }
+}
+
+TEST_CASE("rules-h: function words, greetings and table words never in brackets (work item b)") {
+  NEED_REAL();
+  expectEach({
+      {"I am lonely.", "Sōla sum."},
+      {"The old man was very lonely.", "Vir vetus valdē sōlus erat."},
+      {"She bought a dozen apples.", "Duodecim māla ēmit."},
+      {"I saw two dozen eggs.", "Vīgintī quattuor ōva vīdī."},
+      {"That is nonsense.", "Nūgae sunt."},
+      {"What nonsense, Tom!", "Quae nūgae, Tom!"},
+      {"Contrariwise, the dog was happy.", "Contrā canis laetus erat."},
+      {"The man wore a red waistcoat.", "Vir subūculam rubram portāvit."},
+      {"Within the castle we were safe.", "Intrā castrum tūtae erāmus."},
+      {"Under the table or here or there", "Sub mēnsā aut hīc aut illīc"},
+      {"Over the bridge or here or there", "Super pontem aut hīc aut illīc"},
+      {"Say hello to grandmother.", "Salūtā aviam."},
+      {"We said goodbye to our friends.", "Amīcīs nostrīs valedīximus."},
+      {"The bear has thick fur.", "Ursus pellem crassam habet."},
+      {"I have a watch.", "Hōrologium habeō."},
+  });
+  for (const char* s : {"She said hello to me.", "I must say goodbye.", "The how-do-you-do frogs sang.",
+                        "Each child would have a dozen bluebirds and a cake.", "We saw three bluebirds in the tree.", "I'm overdue."}) {
+    const std::vector<Out> o = run({s});
+    CHECK_MESSAGE(!hasBracket(o[0].text), s << " -> " << o[0].text);
+  }
+}
+
+TEST_CASE("rules-h: unreal conditions and would: imperfect subjunctive throughout (work item c)") {
+  NEED_REAL();
+  expectEach({
+      {"If I had a dog, I would be happy.", "Sī canem habērem, laeta essem."},
+      {"I would be happy if I had a dog.", "Laeta essem sī canem habērem."},
+      {"If we had wings, we would fly to the moon.", "Sī ālās habērēmus, ad lūnam volārēmus."},
+      {"The mice would sit and drink with us.", "Mūrēs sedērent et nōbīscum biberent."},
+      {"He will come and help us.", "Veniet et nōs adiuvābit."},
+      {"There'd be flowers everywhere.", "Ubīque essent flōrēs."},
+      {"There would be new flowers", "Essent flōrēs novī"},
+      {"There will be cake for everyone.", "Omnibus erit placenta."},
+  });
+  // "you would" alone stands for the verb before it (a guess: Check)
+  {
+    const std::vector<Out> o = run({"She would not sing.", "But he would."});
+    CHECK(o[1].text == "Sed caneret.");
+    CHECK(o[1].conf != rules::Confidence::Ok);
+  }
+  {
+    const std::vector<Out> o = run({"She will not come.", "But he will."});
+    CHECK(o[1].text == "Sed veniet.");
+  }
+  // a song line "And + bare verb" goes on with the line before it
+  {
+    const std::vector<Out> o = run({"\xE2\x99\xAA The dogs would sit by the fire", "\xE2\x99\xAA And sing all night"});
+    CHECK(o[1].text == "\xE2\x99\xAA Et tōtam noctem canerent");
+  }
+  {
+    const std::vector<Out> o = run({"\xE2\x99\xAA We could climb the mountain", "\xE2\x99\xAA And see the sea"});
+    CHECK(o[1].text == "\xE2\x99\xAA Et mare vidēre poterāmus");
+  }
+  {
+    const std::vector<Out> o = run({"\xE2\x99\xAA The frogs would live in tiny boats", "\xE2\x99\xAA And be fed with honey and cake"});
+    CHECK(o[1].text == "\xE2\x99\xAA Et melle et placentā alerentur");
+  }
+  // subject and predicate noun of a copula need not share the gender (no A3 Fix)
+  for (const char* s : {"Because my house would be a palace", "The world would be a garden.",
+                        "Then everything would be toys."})
+    CHECK_MESSAGE(run({s})[0].conf != rules::Confidence::Fix, s);
+  expectEach({
+      {"The boys promised to wash the dog and feed the cat.", "Puerī canem lavāre prōmīsērunt et fēlem alere prōmīsērunt."},
+      {"Robert agreed to meet the king and give him the ring.", "Rōbertus rēgī occurrere cōnsēnsit et ānulum eī dare cōnsēnsit."},
+      {"She wants to sing and dance.", "Canere vult et saltāre vult."},
+      {"I wish it was always summer.", "Optō ut semper aestās esset."},
+      {"She wishes that he would come.", "Optat ut venīret."},
+      {"I wish I could fly.", "Optō ut volāre possem."},
+  });
+}
+
+TEST_CASE("rules-h: idioms and phrases of children's dialogue (work item d)") {
+  NEED_REAL();
+  expectEach({
+      {"Pay attention to the teacher!", "Attende animum ad magistrum!"},
+      {"You must pay attention to your book.", "Animum ad librum tuum attendere dēbēs."},
+      {"I'm late for dinner.", "Ad cēnam sērō veniō."},
+      {"We are late for school.", "Ad lūdum sērō venīmus."},
+      {"We're late, late, late!", "Sērō venīmus, sērō, sērō!"},
+      {"Oh, I'm in a stew!", "Ō, perturbāta sum!"},
+      {"That's it, children.", "Ita est, puerī."},
+      {"Read it once more, from the beginning.", "Lege id rūrsus, ab initiō."},
+      {"After all, he is only a boy.", "Nam, puer tantum est."},
+      {"I keep wishing for snow.", "Semper nivem volō."},
+      {"I want a house of my own.", "Domum meam volō."},
+      {"She has a room of her own.", "Cubiculum suum habet."},
+      {"We played in a garden of our own.", "In hortō nostrō lūsimus."},
+      {"She lives in a little room of her own.", "In cubiculō parvō suō habitat."},
+      {"He sings just like a bird.", "Sīcut avis canit."},
+      {"She is like her mother.", "Mātrī suae similis est."},
+      {"And all the other children, too.", "Et cēterī puerī quoque."},
+      {"And the cats, too.", "Et fēlēs quoque."},
+      {"I want some cake, too.", "Placentam quoque volō."},
+      {"This letter is very important.", "Haec epistula maximī mōmentī est."},
+      {"The king has an important letter.", "Rēx epistulam magnī mōmentī habet."},
+      {"My ears and paws!", "Ō aurēs et pedēs meōs!"},
+      {"My poor cat!", "Ō fēlem pauperem meam!"},
+      {"The road was...", "Via erat..."},
+      {"At first the dog was...", "Prīmō canis erat..."},
+      {"She thinks nothing of swimming in the lake.", "Nihil cūrat in lacū nāre."},
+      {"What a strange place to build a house!", "Quam mīrus locus domūs aedificandae!"},
+  });
+    CHECK(run({"The letter must be awfully important."})[0].text == "Epistula maximī mōmentī esse dēbet.");
+  CHECK(run({"Sing it once more."})[0].text.find("rūrsus") != std::string::npos);
+}
+
+TEST_CASE("rules-h: adjective after the copula, said once; too = quoque; generic one (work item f)") {
+  NEED_REAL();
+  expectEach({
+      {"That's silly.", "Id stultum est."},
+      {"This is very silly.", "Hoc valdē stultum est."},
+      {"She has very extra special shoes.", "Calceōs valdē praecipuōs habet."},
+      {"How can one read in the dark?", "Quōmodo homo in tenebrīs legere potest?"},
+      {"This is my cat.", "Haec fēlēs mea est."},
+      {"That is a big dog.", "Canis magnus est."},
+      {"What a big house!", "Quam magna domus!"},
+  });
+  for (const char* s : {"I want some cake, too.", "And the cats, too."})
+    CHECK_MESSAGE(run({s})[0].text.find("nimis") == std::string::npos, s);
+  CHECK(run({"One must eat to live."})[0].text.rfind("Homo", 0) == 0);
+}
+
+TEST_CASE("rules-h: the person addressed: a feminine name in the cue or the cue before (work item g)") {
+  NEED_REAL();
+  {
+    const std::vector<Out> o = run({"Lucy.", "My dear child, you are tired."});
+    CHECK(o[1].text == "Puella cāra mea, fessa es.");
+  }
+  {
+    const std::vector<Out> o = run({"Lucy.", "My dear child, you are tired."}, 'm');
+    CHECK(o[1].text == "Puella cāra mea, fessa es.");   // the name decides, not the speaker setting
+  }
+  expectEach({
+      {"Are you tired, Lucy?", "Fessa es, Lūcia?"},
+      {"You are very clever, Mary!", "Valdē callida es, Marīa!"},
+  });
+  CHECK(run({"You are very clever, Mary!"}, 'm')[0].text == "Valdē callida es, Marīa!");
+  // without a name the gender of "you" is a guess: never OK
+  CHECK(run({"You are very kind."})[0].conf != rules::Confidence::Ok);
+  CHECK(run({"You are very clever!"})[0].conf != rules::Confidence::Ok);
+  CHECK(run({"You were wrong."})[0].conf == rules::Confidence::Ok);   // errābās: no gender to guess
+}
+
+TEST_CASE("rules-h: song lines and quoted narrative (work items e, h)") {
+  NEED_REAL();
+  expectEach({
+      {"Under the moon and over the sea", "Sub lūnā et super mare"},
+      {"In the garden and in the house.", "In hortō et in domō."},
+      {"When the boats go sailing by", "Ubi nāvēs nāvigant"},
+      {"The boats go sailing by.", "Nāvēs nāvigant."},
+      {"Anna, the daughter of the baker, wanted to help us.", "Anna, fīlia pānificis, nōs adiuvāre voluit."},
+      {"We met Tom, the son of the baker.", "Tom, fīliō pānificis, occurrimus."},
+      {"The two brothers, the sons of the miller, fought for the king.", "Duo frātrēs, fīliī molīnāriī, prō rēge pugnāvērunt."},
+      {"In my dream the trees were nothing but flowers.", "In somniō meō arborēs nihil erant nisi flōrēs."},
+      {"In our town the houses would be nothing but castles.", "Domūs in oppidō nostrō nihil essent nisi castra."},
+      {"He eats nothing but bread.", "Nihil nisi pānem edit."},
+      {"He came with no shoes.", "Sine calceīs vēnit."},
+      {"It's only a cat with a bell.", "Fēlēs tantum est cum tintinnābulō."},
+      {"It is only a fox with a hat and a stick.", "Vulpēs tantum est cum pilleō et baculō."},
+      {"Will you kindly close the window, Tom.", "Claude fenestram, quaesō, Tom."},
+      {"Would you please sit down?", "Cōnsīde, quaesō."},
+      {"What if it rains tomorrow?", "Quid sī crās pluat?"},
+      {"What if we should lose the key?", "Quid sī clāvem āmittāmus?"},
+  });
+  // a when-line without its main clause and a past verb without its subject are fragments: never OK, never orders
+  CHECK(run({"When the boats go sailing by"})[0].conf != rules::Confidence::Ok);
+  {
+    const std::vector<Out> o = run({"... wanted more bread."});
+    CHECK(o[0].text.find("voluit") != std::string::npos);
+    CHECK(o[0].conf != rules::Confidence::Ok);
+  }
+}
+
+TEST_CASE("rules-h: fixes after the blind check (own sentences, C22)") {
+  NEED_REAL();
+  expectEach({
+      // an order to a person: the adjective agrees with the person addressed, never neuter
+      {"Don't be lazy, Mary.", "Ignāva nōlī esse, Marīa."},
+      {"Don't be silly!", "Stultus nōlī esse!"},
+      // an unreal condition with "could": imperfect subjunctive of possum
+      {"If the cat could fly, it would catch birds.", "Sī fēlēs volāre posset, avēs caperet."},
+      {"If I could swim, I would go to the island.", "Sī nāre possem, ad īnsulam īrem."},
+      // "every morning / evening" in the past is a habit: imperfect
+      {"Every evening she sang to the children.", "Omnī vespere puerīs canēbat."},
+      {"Every day they played in the garden.", "Omnī diē in hortō lūdēbant."},
+      // late for X again; very much
+      {"I am late for the bus again.", "Iterum ad lāophorīum sērō veniō."},
+      {"He loved his dog very much.", "Canem suum valdē amābat."},
+  });
+  CHECK(run({"Don't be silly!"})[0].conf != rules::Confidence::Ok);   // the gender of the person is a guess
+  // "with no X in it": in it repeats the noun; a teacher's tier-1 noun is a noun for the checker (mundus world)
+  expectEach({
+      {"Who wants a box with no toys in it?", "Quis arcam sine lūdibriīs vult?"},
+      {"In our world the books are nothing but songs.", "In mundō nostrō librī nihil sunt nisi carmina."},
+  });
+  CHECK(run({"Our world is a garden."})[0].conf != rules::Confidence::Fix);
 }

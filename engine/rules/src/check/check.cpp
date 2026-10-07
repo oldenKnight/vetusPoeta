@@ -496,6 +496,11 @@ struct LatinChecker::Impl {
       if (!isHead(r)) continue;
       if (r.lpos == Pron) return true;
       const uint8_t nounTier = r.tier ? r.tier : 3;
+      // C22: a noun the teacher lists as a tier-1 noun is a word of its own ("mundus" world vs mundus "clean")
+      if (r.lpos == Noun) {
+        const curated::TierEntry* te = cd.tier(r.key, Noun);
+        if (te && te->pos == "noun" && te->tier == 1 && te->source == "teacher") return true;
+      }
       bool twin = false;
       for (const Reading& a : rd[i]) {
         if (!isModifier(a) || a.lemma == r.lemma) continue;
@@ -548,6 +553,16 @@ struct LatinChecker::Impl {
         bool partNom = false;
         for (const Reading& r : rd[i]) partNom = partNom || ((r.f.mood == ParticipleMood || r.lpos == Participle) && r.f.case_ == Nom);
         if (partNom) continue;
+      }
+      // C22: a word governed by its preposition that has a noun reading in that case is the preposition's noun ("in
+      // mundō meō": mundus world, not mundus "clean")
+      if (governed[i]) {
+        bool govNoun = false;
+        for (const Reading& r : rd[i])
+          if (r.lpos == Noun && (r.f.case_ == Abl || r.f.case_ == Acc) &&
+              cd.effectiveTier(r.key, r.lpos, r.tier ? r.tier : 3) <= 1)
+            govNoun = true;
+        if (govNoun) continue;
       }
       // C22: a preposition that governs the next word ("ultrā collēs", "suprā mēnsam") is no adjective
       if (i + 1 < n && governed[i + 1]) {
@@ -642,6 +657,14 @@ struct LatinChecker::Impl {
         bool nounLike = false;
         if (strongHead(i))
           for (const Reading& r : rd[i]) nounLike = nounLike || (isHead(r) && r.f.case_ == Nom);
+        {   // a noun of its own, at least as common as the adjective homograph ("mundus" world / clean)
+          uint8_t nounTier = 9, adjTier = 9;
+          for (const Reading& r : rd[i]) {
+            if (r.lpos == Noun && r.f.case_ == Nom) nounTier = std::min<uint8_t>(nounTier, cd.effectiveTier(r.key, r.lpos, r.tier ? r.tier : 3));
+            if (isModifier(r)) adjTier = std::min<uint8_t>(adjTier, cd.effectiveTier(r.key, r.lpos, r.tier ? r.tier : 3));
+          }
+          if (nounTier < adjTier) nounLike = true;
+        }
         for (const Reading& r : rd[i])
           nounLike = nounLike || (isModifier(r) && r.f.case_ == Nom && r.f.number == Pl && r.f.gender == N &&
                                   (r.key == "omnis" || r.key == "multus" || r.key == "ceterus" || r.key == "hic" ||

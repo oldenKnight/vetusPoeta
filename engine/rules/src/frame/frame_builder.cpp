@@ -3088,6 +3088,20 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     f.object = SemNP{};
   }
 
+  // C22: "in a world of my own" with "of my own" hung on the clause: the possessive of the noun before it ("in mundō
+  // meō", not "dē propriō meō")
+  if (en)
+    for (size_t i = 1; i < f.obliques.size(); ++i) {
+      SemOblique& o = f.obliques[i];
+      if (o.prep != "of" || text::lower(o.np.head) != "own" || o.np.possessor.empty()) continue;
+      SemOblique& p = f.obliques[i - 1];
+      if (!p.np.possessor.empty() || p.np.isPronoun) continue;
+      p.np.possessor = o.np.possessor;
+      for (int t : o.np.tokens) c.drop(t, Drop::Phrase);
+      if (o.token >= 0) c.drop(o.token, Drop::Phrase);
+      f.obliques.erase(f.obliques.begin() + (long)i);
+      break;
+    }
   // C22: "say hello (to X)" -> salūtāre (X in the accusative), "say goodbye (to X)" -> valedīcere (X in the dative):
   // the greeting is the verb, never a bracketed word
   if (en && f.hasPred && f.pred.lemma == "say" && f.hasObject && f.pred.fixedLatin.empty() &&

@@ -843,3 +843,122 @@ tagged amod without a verb form is a participle; the "retag" repair also for int
   dēbēs; "tomorrow" was read as a noun (prōcrāstinātiō) when the sentence has a future verb: crās; "secret" (noun)
   -> sēcrētum / arcānum; "Give the children something to drink." mixes the cases (puerīs aliquid ad bibendum dā);
   "Whose book is this?" -> Cuius est hic liber?; "without finding" -> sine + gerund or nec ... invēnimus.
+
+## Acceptance loop 1 (C22, 2026-10-07)
+Material: the owner's partial acceptance file (82 cues, data/acceptance/, gitignored; copyrighted: no line of it is
+quoted here, in the tests or in the tables' examples), the main agent's first-run review (STATUS E5), the owner's own
+free Latin version as the reference for register and word choice (his correct choices adopted, his slips not: see the
+coordinator's instruction in STATUS C22), tests/regression (own_dialogue EN / ES, oz_sample), tests/samples/sample.en.srt.
+tests/heldout/, tests/eval_gold/ and data/work/eval/heldout-* were not opened. Generalisation guard: every rule below
+has at least two sentences of our own in `engine/tests/test_rules_en.cpp` (test cases "rules-h: ..."); 20 blind
+sentences of the file's registers (children's dialogue, short nonsense song lines, quoted narrative sentences; none
+from the film) were written at 13:21 UTC before any change and run once at the end.
+
+### Before / after
+| file | start of C22 | end of C22 |
+|---|---|---|
+| acceptance file, implementer's own expert count (every cue read; any grammar, meaning or vocabulary fault = wrong) | 65 / 82 wrong (main agent, E5) | **24 / 82 wrong** (58 right): song 8 / 31 wrong, quoted narrative 5 / 9, dialogue 11 / 42; wrong among the 16 OK cues 0; automatic errors 25 -> 3 (OK 9 -> 16, Check 48 -> 60, Fix 25 -> 6); output identical over two runs; sheet data/work/eval/alice-c22-after/review_c22_implementer.tsv (gitignored) |
+| oz_sample EN (100) | 78 / 100, ok 26, wrong among OK 0 | 78 / 100 (#23 and #13 changed, still unmatched), ok 26 / check 68 / fix 6, wrong among OK 0 |
+| own_dialogue EN (114) | 114 / 114, ok 65 | 114 / 114, ok 64 (#112 "You are very kind." is Check now: the gender of "you" is a guess) |
+| own_dialogue ES (100) | 100 / 100, ok 81 | 100 / 100, ok 80 (the same sentence in Spanish) |
+| sample.en.srt 12, la2x 201, orberg 60 | 12, 201, 60 | unchanged |
+| Greek EN->GRC / ES->GRC / GRC->EN, ES / C18 review | 114 / 114, 39 / 40, 40 / 40, 13 / 13 | unchanged |
+| blind check (20 own sentences) | first run **11 / 20** acceptable (one sentence replaced before the run, see below) | 14 / 20 after the fixes |
+
+### What changed (C22)
+- (1) No cue is emptied or swallowed (sentences.cpp, engine.cpp). Root cause: a closing quote after a space ("was... \"")
+  was a chunk of its own, so the sentence stayed open and took the next cue. Closers after spaces now belong to the
+  chunk; `endsSentence` skips the space; a stray "|" after a period is a closer. Guard: when a sentence spanning cues
+  leaves any cue without Latin words, each cue's part is translated as a sentence of its own (flag `cue-split`, Check).
+- (a) Names: a capitalised word of names_la.tsv that the tagger read as a noun / adjective / interjection is the name
+  ("Lucy!", "Lucy in the garden"); two-word names are declined as noun + adjective (a nominative adjective reading that
+  agrees with the head wins over a genitive homograph: Terra Mīrābilis / in Terrā Mīrābilī, "Potestās Malī" stays);
+  titles Mr. / Mrs. / Miss / Ms. before a capitalised word are dropped and a common noun after them is that noun
+  ("Mr. Fox, wait!" -> "Vulpēs, manē!"; alone, "Mr. Bear!" -> "Urse!", vocative).
+- (b) Words that reached a bracket: adjectives in -ly after "be / feel / look ..." (lonely -> sōlus), a noun-only
+  predicate tagged as an adjective (nonsense -> nūgae, also through a noun fallback in the transfer), "say hello / say
+  goodbye (to X)" -> salūtāre X / valedīcere X-dat, a dozen / two dozen -> duodecim / vīgintī quattuor (the noun is the
+  head), within -> intrā, round -> circum, here / there coordinated in a fragment -> aut hīc aut illīc, a greeting used
+  as an adjective (how-do-you-do) -> salūtāns (derived-word, Check), colour + noun compounds (bluebird -> avis
+  caerulea, a colour is an adjective, not a genitive), "by / past" as aspect particles.
+- (c) Counterfactuals: an "if" clause in the past (or with "could") under a "would" main clause is in the imperfect
+  subjunctive (pluperfect for "had had"); a bare second verb shares the first one's auxiliary ("will come and help" ->
+  veniet et adiuvābit; "would sit and eat" -> sedērent et ederent); a second verb coordinated with a catenative
+  complement is a second complement ("agreed to meet ... and give ..."); "But you would." / "But he will." take the
+  previous clause's verb (ellipsis, Check); "There'd be X" / "There would be X" are statements; "I wish (that) ..." ->
+  optō ut + subjunctive (imperfect for an unreal wish), never an accusative + infinitive ("Volō semper aestātem
+  fuisse" was OK and wrong); song lines "And + bare verb" (also a passive) continue the
+  previous song line's clause (subject, tense, mood, modal; Check): "The frogs would live in tiny boats" + "And be fed with honey and cake" -> "Et melle et placentā alerentur".
+- (d) Idioms and phrases (phrasebook / states / valency rows): pay attention to -> animum attendere ad + acc (valency
+  ad + acc now beats "to + person = dative"); I am late for X (again) -> (iterum) ad X sērō veniō; no time to say
+  hello / goodbye (both greetings) -> the teacher's "nōn possum salūtāre neque valēre iubēre"; in a stew -> perturbātus; that's it ->
+  ita est; what nonsense -> quae nūgae; once more -> rūrsus (the teacher's choice), from the beginning -> ab initiō;
+  after all -> nam (not tamen); at first -> prīmō (one-word adverb rows take the adverb reading); of late -> nūper;
+  very much -> valdē; keep + -ing -> semper + verb; go + -ing -> the -ing verb; think nothing of X -> X nihil cūrāre;
+  a house of my own -> domus mea (also when "of my own" hangs on the clause); just like / like X -> sīcut + nominative;
+  be like X -> similis + dative ("She is like her mother." was "Māter sua est.", OK and wrong); all the other X ->
+  cēterī X (the other X stays alius); X, too -> X quoque; important -> genitive of quality magnī / maximī mōmentī;
+  "My X and Y!" -> ō + accusative; history (attribute) -> rērum gestārum (the teacher's lēctiō rērum gestārum);
+  "with no X" -> sine X ("in it" after it is not translated); "nothing but X" -> nihil nisi X; "X with a Y" (a thing
+  describing a noun) -> cum + ablative after the noun; "just / only X" with a predicate noun -> X tantum; "What if
+  ...?" -> Quid sī + present subjunctive; "Will / would / could you kindly / please ...?" -> imperative + quaesō (the
+  "?" becomes "."); a noun + to-infinitive with its own object -> the genitive of the gerundive (locus domūs
+  aedificandae); "Every morning he walked" -> imperfect (a habit); upside down -> pedibus sursum versīs.
+- (e) Quoted narrative: appositions between commas are a new structure (`SemNP::apposition`, `LaNP::apposition`,
+  realised between commas in the case of the noun: "Duo frātrēs, fīliī molīnāriī, prō rēge pugnāvērunt"); a name read
+  as a vocative root before its apposition is the subject; an unfinished sentence ending in "was..." keeps its verb;
+  a subjectless past verb continuing a quotation is a statement without its subject, never an imperative ("...
+  wanted more bread." was "Quaere pānem.", OK and wrong; now Check); a fronted prepositional phrase read as the root
+  noun is the clause's oblique; a "when" line without a question mark is a time clause (ubi, Check).
+- (f) Adverb vs adjective after the copula ("That's silly." -> stultum), two English adjectives with the same Latin
+  word said once ("very extra special" -> valdē praecipuus), sentence-final ", too" -> quoque (the comma is dropped
+  before the parse when the clause has a verb; a verbless fragment takes it as its adverb), generic "one" with a modal
+  -> homō; a demonstrative subject agrees with the predicate noun ("This is my cat." -> Haec fēlēs mea est, it was
+  hoc and OK), "that / it" + predicate noun is dropped ("That is nonsense." -> Nūgae sunt.).
+- (g) The person addressed: a feminine (masculine) name of names_la.tsv in the cue or the previous cue sets the gender
+  of "you" and of a child addressed (`Memory::addresseeGender`): "Lucy." + "My dear child, you are tired." -> "Puella
+  cāra mea, fessa es." whatever the speaker setting; without a name, a predicate adjective of "you" whose masculine and
+  feminine differ is flagged `addressee-gender` (Check), and an order "Don't be silly!" agrees with the person (never
+  the neuter).
+- (h) Song lines: a fragment of coordinated prepositional phrases keeps each preposition ("Under the moon and over the
+  sea" -> "Sub lūnā et super mare", "over" was lost); a phrase after a subject noun in a where-question stays after it
+  ("Ubi est pōns super flūmen?").
+- Checker (false alarms that made correct Latin Fix): gerunds after a noun / preposition ("tempus salūtandī"), a
+  substantive adjective in the dative / ablative in a copula clause ("Omnibus erit placenta"), subject and predicate
+  noun of different gender ("omnia lūdibria essent", "hortus meus Terra Mīrābilis esset"; a teacher's tier-1 noun is a
+  head even when an adjective homograph exists), a preposition governing the next word is no adjective ("ultrā
+  collēs"), a noun governed by its preposition is no modifier ("in mundō meō", mundus "world" vs "clean"). The corruption test stays 200 / 200.
+- Tagger repairs (english.cpp): "be (just) like X" (like is the preposition), a noun after my / your / our ("My ears!"),
+  a verb-tagged adjective before a noun after "has" ("has thick fur"), a bare word after "and" coordinated with a modal
+  or "to" verb ("would sing and dance", "wants to sing and dance"), "dep" verbs with their own "and" are conjuncts.
+
+Rows: names_la.tsv +9 (Wonderland, the Latin name written in an English text, Earth, Edwin, Morcar, Stigand, Mercia,
+Northumbria, Canterbury); tiers_la.tsv +34 rows and 10 notes edited (listed in the diff; rūrsus "once more", vīcus
+"village", mundus "world" tier 1, vigilia tier 3 so that a watch is hōrologium); phrasebook_en_la.tsv +25 / 1 changed
+(after all -> nam); states_en_la.tsv +1 (pay attention); verbprep_en_la.tsv +2 (fight for, declare for -> prō + abl);
+preps_en_la.tsv +2 (within, round); valency_la.tsv +2 (attendō ad + acc, valedīcō dat).
+
+API changes (additive): frame.h `SemNP::apposition`; realise_la.h `LaNP::apposition`; transfer.h
+`Memory::addresseeGender`, `Memory::songLine / prevSong / prevValid / prevPerson / prevNumber / prevTense / prevMood /
+prevModal`; english.h `en::colourWord`. New flags (Check): `cue-split`, `addressee-gender`; doubt `polite-request`
+(no Check). Phrasebook patterns may contain punctuation words (", "). Changed test expectation: "She was born in a
+small village." -> "In vīcō parvō nāta est." (vīcus row). The frame changes are shared with Greek; the Greek suite is
+unchanged.
+
+### Blind check
+20 own sentences written at the start (13:21 UTC). One of them was seen by accident while probing the conditional rule
+(a girl's "If I were a king ..."), so it was replaced before the run by a new unseen sentence. First run: **11 / 20**
+acceptable (lines 1, 2, 6, 9, 13, 15, 16, 17, 18, 19, 20). Wrong: "so early" (māne tam), "We have no time to play now,
+Mother is waiting" (relative clause, et), "Don't be silly" (neuter stultum), "If my dog could talk" (poterat), "Hop
+and skip and away we go" (no parse), a quoted miller sentence (purpose guess, "by the river"), "Every morning he
+walked ... his bread" (perfect, eius), "princess" -> rēgīna and "valdē multum", "I'm late for school again" (prō
+lūdō). Fixed with own sentences ("rules-h: fixes after the blind check"): order to a person agrees with the person,
+unreal condition with could, habitual "every" in the past, late for X again, very much. After: **14 / 20**.
+
+### Open points
+- Cues still wrong by my count: lines the parser cannot build (a long quoted sentence split over two cues, a
+  wh-question with a stranded "for", a "think nothing of" clause interrupted by an ellipsis), the nonsense
+  philosophy lines (free relatives "what it is" with negations), a relative clause that continues the previous song line, a quoted
+  onomatopoeia dropped, "date" (appointment) has no Latin noun in the library, "babbling" as a noun, "understand" is
+  simplified to sciō by periphrasis_la.tsv, cue splits that move a coordinated verb or a phrase into the neighbour cue.
+- "Hop and skip and away we go!" and other nonsense song lines without a subject still fail the parser.

@@ -2106,6 +2106,12 @@ bool Transfer::obliqueInto(const frame::SemOblique& ob, Ctx& c, LaClause& cl) co
       return true;
     }
   }
+  // C22: "a book with no pictures in it": "in it" repeats the noun (liber sine pictūrīs): not translated
+  if (c.st.lang == frame::SrcLang::En && prep == "in" && n.isPronoun && (n.pronLemma == "it" || n.pronLemma == "them") && c.frame) {
+    bool withNo = false;
+    for (const frame::SemOblique& o2 : c.frame->obliques) withNo = withNo || (o2.prep == "with" && o2.np.determiner == "no");
+    if (withNo) { c.cover(n.tokens); c.cover(n.token); return true; }
+  }
   // C22: "with no pictures", "with no shoes" -> sine pictūrīs, sine calceīs (not "nūllīs pictūrīs")
   if (c.st.lang == frame::SrcLang::En && prep == "with" && n.determiner == "no" && latin("sine", Prep) != kNone) {
     SemNP m = n;
@@ -2766,11 +2772,16 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     for (const frame::SemOblique& o : f.obliques) lightVerb = lightVerb || o.prep == "for";
   const bool state = (!lightVerb && tables::stateVerb(la_.lemma(p.modal != kNone ? p.modal : p.lemma).key)) || sp.habitual ||
                      cl.pred.lemma == latin("sum", Verb);
+  // C22: "Every morning he walked to the village": a habit in the past (imperfect)
+  bool everyTime = false;
+  if (c.st.lang == frame::SrcLang::En)
+    for (const frame::SemOblique& o : f.obliques)
+      everyTime = everyTime || ((o.np.determiner == "every" || o.np.determiner == "each") && (o.prep.empty() || o.prep == "-"));
   uint8_t tense = Present;
   if (sp.tense == frame::Tense::Future) tense = Future;
   else if (sp.tense == frame::Tense::Past) {
     if (sp.aspect == frame::Aspect::Perfect) tense = Pluperfect;
-    else if (sp.aspect == frame::Aspect::Progressive || state || sp.pastModal) tense = Imperfect;
+    else if (sp.aspect == frame::Aspect::Progressive || state || sp.pastModal || everyTime) tense = Imperfect;
     else tense = Perfect;
   } else {
     if (sp.aspect == frame::Aspect::Perfect) tense = Perfect;
@@ -3430,7 +3441,21 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
       }
     const bool itSubj = f.hasSubject && f.subject.isPronoun && (f.subject.pronLemma == "it" || f.subject.pronLemma == "ello");
     const bool impersAdj = f.predAdj.size() == 1 && tables::impersonalAdjective(f.predAdj[0].lemma);
-    if (!cl.predAdj.empty() && (!f.hasSubject || f.pred.impersonal || (itSubj && (impersAdj || !c.mem.lastGender)))) {
+    // C22: an order "Don't be silly!" / "Be careful!" speaks to a person: the addressee's gender (masculine when no
+    // name tells it, a guess: Check), never the neuter of "it is silly"
+    if (!cl.predAdj.empty() && f.type == Kind::Imp && !f.hasSubject) {
+      cl.predGender = c.mem.addresseeGender ? c.mem.addresseeGender : (uint8_t)M;
+      cl.predNumber = f.imperativePlural || c.mem.addresseePlural ? (uint8_t)Pl : (uint8_t)Sg;
+      if (!c.mem.addresseeGender)
+        for (const LaAdj& pa : cl.predAdj) {
+          std::string fm, ff;
+          if (pa.lemma != kNone && morph::generate(la_, pa.lemma, morph::adjForm(Nom, Sg, M), fm, false) &&
+              morph::generate(la_, pa.lemma, morph::adjForm(Nom, Sg, F), ff, false) && fm != ff) {
+            c.out.flags.push_back("addressee-gender");
+            break;
+          }
+        }
+    } else if (!cl.predAdj.empty() && (!f.hasSubject || f.pred.impersonal || (itSubj && (impersAdj || !c.mem.lastGender)))) {
       cl.predGender = N;
       if (itSubj) { cl.subject.pron.gender = N; cl.subject.gender = N; }
     }
@@ -3635,8 +3660,8 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
     }
     // C17: "I am only a Scarecrow" -> Terriculum tantum sum: "only" restricting the predicate noun follows it
     // C22: also "just" ("It's just a rabbit." -> Cunīculus tantum est; "just" was dropped silently)
-    if ((a.lemma == "only" || a.lemma == "just") && c.st.lang == frame::SrcLang::En && f.copula && cl.predicative.size() == 1 &&
-        cl.predicative[0].head != kNone) {
+    if ((a.lemma == "only" || (a.lemma == "just" && cl.predicative.size() == 1 && cl.predicative[0].head != kNone)) &&
+        c.st.lang == frame::SrcLang::En && f.copula && cl.predicative.size() == 1) {
       const uint32_t tantum = latin("tantum", Adv);
       if (tantum != kNone) {
         LaAdj t;
@@ -3928,7 +3953,7 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
         // clause in the past goes into the subjunctive of the main clause's tense (imperfect; pluperfect for "had
         // had" / "would have")
         if (c.st.lang == frame::SrcLang::En && cl.pred.mood == Subjunctive && f.pred.mood == frame::SrcMood::Conditional &&
-            sc.pred.modal == kNone && (sf.pred.tense == frame::Tense::Past || sf.pred.mood == frame::SrcMood::Subjunctive)) {
+            (sf.pred.tense == frame::Tense::Past || sf.pred.mood == frame::SrcMood::Subjunctive || sf.pred.pastModal)) {
           sc.pred.mood = Subjunctive;
           sc.pred.tense = sf.pred.aspect == frame::Aspect::Perfect || cl.pred.tense == Pluperfect ? (uint8_t)Pluperfect
                                                                                                  : (uint8_t)Imperfect;
@@ -4295,9 +4320,12 @@ void Transfer::clause(const SemFrame& f0, const SemSentence& s, const Settings& 
   }
   // C22: a song line "And + bare verb" (no subject) continues the previous line's clause instead of being an order
   // ("And hear a song ..." after "I could listen to the river" -> et carmen audīre possem)
-  if (st.lang == frame::SrcLang::En && mem.songLine && mem.prevSong && mem.prevValid && f.type == Kind::Imp &&
+  if (st.lang == frame::SrcLang::En && mem.songLine && mem.prevSong && mem.prevValid &&
+      (f.type == Kind::Imp || (f.type == Kind::Decl && f.hasPred && f.pred.tense == frame::Tense::Present &&
+                               f.pred.auxTokens.size() <= 1)) &&
       !f.hasSubject && f.vocatives.empty() && !f.connectors.empty() &&
-      (f.connectors[0] == "and" || f.connectors[0] == "or") && oc.type == realise::ClauseType::Imp) {
+      (f.connectors[0] == "and" || f.connectors[0] == "or") &&
+      (oc.type == realise::ClauseType::Imp || oc.type == realise::ClauseType::Decl)) {
     oc.type = realise::ClauseType::Decl;
     oc.pred.person = mem.prevPerson;
     oc.pred.number = mem.prevNumber;
