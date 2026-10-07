@@ -1,5 +1,6 @@
 # Orbergise fixture, second batch (task C14): 20 own sentences written after the rewriter existed and run once before
 # any change (first run 20/20). Same columns as sentences.tsv: id	ceiling	latin	expected	english	what
+# C27: #71 expects spectāvit ("looked at", syn row aspiciō spectō) instead of vīdit ("saw").
 61	1	Nāve vīsā, nautae clāmāvērunt.	Postquam nāvis vīsa est, nautae clāmāvērunt.	When the ship had been seen, the sailors shouted.	ablabs perfect (blind)
 62	1	Puellā cantante, omnēs tacēbant.	Dum puella cantat, omnēs tacēbant.	While the girl was singing, everyone was silent.	ablabs present (blind)
 63	1	Rēge mortuō, rēgīna flēvit.	Postquam rēx mortuus est, rēgīna flēvit.	When the king had died, the queen wept.	ablabs deponent (blind)
@@ -10,7 +11,7 @@
 68	1	Cum magister intrāvisset, discipulī surrēxērunt.	Postquam magister intrāvit, discipulī surrēxērunt.	When the teacher had come in, the pupils stood up.	cum + pluperfect subjunctive (blind)
 69	1	Cum puella dormīret, māter cantābat.	Dum puella dormit, māter cantābat.	While the girl was sleeping, the mother was singing.	cum + imperfect subjunctive (blind)
 70	1	Haud procul ā vīllā est silva.	Nōn procul ā vīllā est silva.	Not far from the house there is a forest.	haud (blind)
-71	1	Fīlius patrem aspexit.	Fīlius patrem vīdit.	The son looked at his father.	vocabulary (blind)
+71	1	Fīlius patrem aspexit.	Fīlius patrem spectāvit.	The son looked at his father.	vocabulary (blind)
 72	1	Agricola lupum metuēbat.	Agricola lupum timēbat.	The farmer feared the wolf.	vocabulary (blind)
 73	1	Nautae magnum ōceanum vīdērunt.	Nautae magnum mare vīdērunt.	The sailors saw the great ocean.	vocabulary with adjective (blind)
 74	1	Puella parvula flōrem tenet.	Puella parva flōrem tenet.	The little girl is holding a flower.	vocabulary (blind)

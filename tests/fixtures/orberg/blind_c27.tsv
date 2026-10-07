@@ -1,0 +1,26 @@
+# Orbergise blind check of C27: 20 own Latin sentences in the register of the real material (simple classical prose,
+# a few ecclesiastical idioms, emoji after nouns, no macrons but one sentence), written and run ONCE at tier 1 through
+# the engine (one document, pair la-la) BEFORE any C27 change, the output sealed and judged only at the end:
+# first run 11/20 acceptable (column first_run). Expected = the output after the C27 fixes (all judged acceptable;
+# #3 proficīscor -> abeō is a periphrasis row: right in sense but Check).
+# Columns: id	latin	expected	english	first_run
+1	Puella 👧🏽 ad fontem ⛲ properat et aquam haurit.	Puella 👧🏽 ad fontem ⛲ celeriter it et aquam haurit.	The girl hurries to the fountain and draws water.	no: fōns -> aqua narrows the sense; emoji split
+2	Magister 👨🏻‍🏫 discipulis gratias agit quod diligenter laboraverunt.	Magister 👨🏻‍🏫 discipulis gratias agit quod diligenter laboraverunt.	The teacher thanks the pupils because they worked carefully.	yes: unchanged
+3	Pater filium valere iubet et ad urbem 🏙️ proficiscitur.	Pater filium valere iubet et ad urbem 🏙️ abit.	The father says goodbye to his son and sets out for the city.	no: emoji split
+4	Nautae ⛵ in portum redeunt, quia tempestas 🌩️ appropinquat.	Nautae ⛵ in portum redeunt, quia tempestas 🌩️ prope venit.	The sailors return to the harbour because a storm is coming.	no: emoji split
+5	Deo gratias! Navis incolumis advenit.	Deo gratias! Navis incolumis venit.	Thanks be to God! The ship arrives safe.	yes: adveniō -> veniō
+6	Rex 🤴 res gestas maiorum suorum narrat.	Rex 🤴 res gestas maiorum suorum narrat.	The king tells the deeds of his ancestors.	no: rēs portātae
+7	Canis 🐕 per silvam 🌲 currit et leporem 🐇 quaerit.	Canis 🐕 per silvam 🌲 currit et leporem 🐇 quaerit.	The dog runs through the forest and looks for a hare.	yes: unchanged
+8	Mater 👩‍👧 infantem in bracchiis tenet et cantat.	Mater 👩‍👧 infantem in bracchiis tenet et cantat.	The mother holds the baby in her arms and sings.	yes: unchanged
+9	Pax tecum, amice! Quid hodie agis?	Pax tecum, amice! Quid hodie agis?	Peace be with you, friend! How are you today?	yes: unchanged
+10	Agricola 👨🏾‍🌾 agrum arat, dum uxor panem 🍞 coquit.	Agricola 👨🏾‍🌾 agrum arat, dum uxor panem 🍞 coquit.	The farmer ploughs the field while his wife bakes bread.	yes: unchanged
+11	Milites ⚔️ castra muniunt et hostes exspectant.	Milites ⚔️ castra muniunt et hostes exspectant.	The soldiers fortify the camp and wait for the enemy.	yes: unchanged
+12	Puer librum 📖 aperit, sed legere non vult.	Puer librum 📖 aperit, sed legere non vult.	The boy opens the book but does not want to read.	yes: unchanged
+13	Nubes ☁️ moventur et sol ☀️ iterum lucet.	Nubes ☁️ moventur et sol ☀️ iterum lucet.	The clouds move and the sun shines again.	no: moventur -> mūtantur; emoji split
+14	Domine, miserere nobis!	Domine, miserere nobis!	Lord, have mercy on us!	yes: unchanged
+15	Discipuli e schola 🏫 discedunt et domum ambulant.	Discipuli e schola 🏫 abeunt et domum ambulant.	The pupils leave the school and walk home.	no: discēdunt -> dēsinunt
+16	Senex 👴🏼 in horto sedet et flores 🌸 aspicit.	Senex 👴🏼 in horto sedet et flores 🌸 spectat.	The old man sits in the garden and looks at the flowers.	no: emoji split (aspicit -> videt marginal)
+17	Avis 🐦 ramos ad aedificandum colligit.	Avis 🐦 ramos ad aedificandum colligit.	The bird gathers branches to build.	no: colligit -> legit (marginal: reads as 'reads')
+18	Ancilla cenam parat ut dominus cum amicis edat.	Ancilla cenam parat ut dominus cum amicis edat.	The maid prepares dinner so that the master may eat with his friends.	yes: unchanged
+19	Fratres ad mare 🌊 vadunt ut piscentur.	Fratres ad mare 🌊 eunt ut piscentur.	The brothers go to the sea to fish.	no: vādunt -> redeunt
+20	Lupus 🐺 ovem rapuit, sed pāstor 🧑‍🌾 eam servāvit.	Lupus 🐺 ovem rapuit, sed pāstor 🧑‍🌾 eam servāvit.	The wolf seized a sheep, but the shepherd saved it.	yes: unchanged

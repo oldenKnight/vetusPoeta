@@ -1,10 +1,12 @@
 // Orbergise resources: simplify_la.tsv loader, tier / participle / lemma helpers, the vocabulary-swap search and small
 // text helpers (internal.h). Deterministic: ties broken by tier, overlap, score, frequency rank, lemma id.
 #include <algorithm>
+#include <cstdlib>
 #include <fstream>
 #include <sstream>
 
 #include "internal.h"
+#include "vp/la2x.h"
 #include "vp/morph.h"
 #include "vp/text.h"
 
@@ -102,6 +104,56 @@ Result<std::unique_ptr<Resources>> Resources::create(const lex::Lexicon& la, con
         R.pairs.push_back(std::move(p));
       } else if (kind == "keep") {
         R.keep.push_back(detail::KeepRow{text::latin_key(c[1]), c[2]});
+      } else if (kind == "syn") {
+        detail::SynRow y;
+        y.key = text::latin_key(c[1]);
+        y.to = text::nfc(c[2]);
+        y.pos = c.size() > 3 && !c[3].empty() ? c[3] : "-";
+        if (c.size() > 4) y.note = c[4];
+        if (y.key.empty() || words(y.to).empty()) { warn("empty syn row"); continue; }
+        R.syn.push_back(std::move(y));
+      } else if (kind == "fixed") {
+        detail::FixedRow f;
+        for (const std::string& w : words(c[1])) {
+          std::vector<std::string> alts;
+          size_t a = 0;
+          for (;;) {
+            const size_t b = w.find('|', a);
+            const std::string x = w.substr(a, b == std::string::npos ? std::string::npos : b - a);
+            if (!x.empty()) alts.push_back(x == "GER" ? x : text::latin_key(x));
+            if (b == std::string::npos) break;
+            a = b + 1;
+          }
+          if (!alts.empty()) f.elems.push_back(std::move(alts));
+        }
+        f.name = c[2];
+        if (c.size() > 3) {
+          std::stringstream ss(c[3]);
+          std::string kv;
+          while (std::getline(ss, kv, ';')) {
+            if (kv.compare(0, 4, "gap=") == 0) f.gap = std::max(0, std::min(4, std::atoi(kv.c_str() + 4)));
+            if (kv == "order=any") f.anyOrder = true;
+          }
+        }
+        if (c.size() > 4) f.note = c[4];
+        if (f.elems.size() < 2) { warn("a fixed phrase needs two elements"); continue; }
+        R.fixed.push_back(std::move(f));
+      } else if (kind == "class") {
+        detail::ClassRow k;
+        k.name = c[1];
+        size_t a = 0;
+        const std::string& v = c[2];
+        for (;;) {
+          const size_t b = v.find('|', a);
+          std::string x = v.substr(a, b == std::string::npos ? std::string::npos : b - a);
+          for (const std::string& ph : detail::glossPhrases(x, false, 1)) k.phrases.push_back(ph);
+          if (b == std::string::npos) break;
+          a = b + 1;
+        }
+        if (c.size() > 3 && c[3].compare(0, 6, "never=") == 0) k.never = words(c[3].substr(6));
+        std::sort(k.phrases.begin(), k.phrases.end());
+        if (k.name.empty() || k.phrases.empty()) { warn("empty class row"); continue; }
+        R.classes.push_back(std::move(k));
       } else {
         warn("unknown kind '" + kind + "'");
       }
@@ -195,7 +247,162 @@ uint8_t Resources::Impl::wordTier(uint32_t lemma) {
   return tier(lemma);
 }
 
-detail::Swap Resources::Impl::swapFor(uint32_t lemma, int ceiling, bool keepNames) {
+namespace {
+
+constexpr uint16_t kGlossEsPivot = 1u << 8;   // LEMM flag: the Spanish gloss came through English
+constexpr uint16_t kTagTransitive = 1u << 0, kTagIntransitive = 1u << 1;
+
+bool hasPhrase(const std::vector<std::string>& v, const std::string& p) {
+  return !p.empty() && std::find(v.begin(), v.end(), p) != v.end();
+}
+void addAll(std::vector<std::string>& to, const std::vector<std::string>& from) {
+  for (const std::string& x : from)
+    if (!hasPhrase(to, x)) to.push_back(x);
+}
+
+// English words of an original-language cue match a gloss word with a little inflection slack (go: goes, going).
+bool evidenceHas(const std::vector<std::string>& ev, const std::string& w) {
+  if (w.size() < 2) return false;
+  for (const std::string& e : ev) {
+    if (e == w) return true;
+    if (e.size() > w.size() && e.compare(0, w.size(), w) == 0) {
+      const std::string suf = e.substr(w.size());
+      if (suf == "s" || suf == "es" || suf == "ed" || suf == "d" || suf == "ing" || suf == "ly") return true;
+    }
+  }
+  return false;
+}
+
+}  // namespace
+
+// English (or Spanish) gloss phrases of the lexicon's first sense plus the la2x curated gloss.
+struct SenseView {
+  std::vector<std::string> en, es;   // en[0] = the lexicon's first meaning
+  std::vector<std::string> enCur;    // la2x curated / interlinear English gloss phrases
+  bool esReal = false;               // a Spanish gloss that did not come through English
+  uint16_t tags = 0;
+};
+
+static SenseView senseView(const lex::Lexicon& la, uint32_t id, const la2x::Translator* tr, std::vector<lex::Sense>& buf) {
+  SenseView v;
+  const lex::Lemma l = la.lemma(id);
+  buf.clear();
+  la.senses(id, buf);
+  const std::string_view en0 = !buf.empty() ? buf[0].glossEn : l.glossEn;
+  v.en = detail::glossPhrases(en0, true, 4);
+  if (!buf.empty()) v.tags = buf[0].tags;
+  if (tr) v.enCur = detail::glossPhrases(tr->gloss(id, la2x::Target::En), true, 3);
+  if (!(l.flags & kGlossEsPivot)) {
+    v.es = detail::glossPhrases(!buf.empty() && !buf[0].glossEs.empty() ? buf[0].glossEs : l.glossEs, false, 4);
+    if (tr) {
+      bool pivot = false;
+      const std::string g = tr->gloss(id, la2x::Target::Es, &pivot);
+      if (!pivot) addAll(v.es, detail::glossPhrases(g, false, 3));
+    }
+    v.esReal = !v.es.empty();
+  }
+  return v;
+}
+
+std::vector<std::string> Resources::Impl::classesOf(uint32_t lemma, const la2x::Translator* tr) {
+  std::vector<std::string> out;
+  if (classes.empty() || lemma == kNone || lemma >= la.lemmaCount()) return out;
+  const SenseView v = senseView(la, lemma, tr, senseBuf2);
+  std::vector<std::string> all = v.en;
+  addAll(all, v.enCur);
+  addAll(all, v.es);
+  if (tr) {   // pivot Spanish glosses still name the class ("cambiar")
+    const lex::Lemma l = la.lemma(lemma);
+    addAll(all, detail::glossPhrases(l.glossEs, false, 3));
+  }
+  for (const detail::ClassRow& c : classes)
+    for (const std::string& p : all)
+      if (std::binary_search(c.phrases.begin(), c.phrases.end(), p)) {
+        if (!hasPhrase(out, c.name)) out.push_back(c.name);
+        break;
+      }
+  return out;
+}
+
+bool Resources::Impl::sameSense(uint32_t word, uint32_t cand, const la2x::Translator* tr, std::string* why) {
+  if (word == kNone || cand == kNone || word >= la.lemmaCount() || cand >= la.lemmaCount()) return false;
+  const SenseView w = senseView(la, word, tr, senseBuf);
+  const SenseView c = senseView(la, cand, tr, senseBuf2);
+  if (w.en.empty() || c.en.empty()) return false;
+  std::vector<std::string> ws = w.en, cs = c.en;
+  addAll(ws, w.enCur);
+  addAll(cs, c.enCur);
+  // the candidate's first meaning is one of the word's, or the word's first meaning is one of the candidate's
+  const bool a = hasPhrase(ws, c.en[0]) || (!c.enCur.empty() && hasPhrase(ws, c.enCur[0]));
+  const bool b = hasPhrase(cs, w.en[0]) || (!w.enCur.empty() && hasPhrase(cs, w.enCur[0]));
+  if (!a && !b) return false;
+  // Spanish: an independent witness of the sense when both glosses are real
+  bool es = false;
+  if (w.esReal && c.esReal) {
+    for (const std::string& p : w.es) es = es || hasPhrase(c.es, p);
+    if (!es) return false;
+    // a word whose Spanish gloss has sense groups (";": tempestās "tiempo, época; tempestad, tormenta") is swapped only
+    // for a word that covers every group: the first sense alone may not be the one the text means
+    const lex::Lemma lw = la.lemma(word);
+    senseBuf.clear();
+    la.senses(word, senseBuf);
+    const std::string_view esw = !senseBuf.empty() && !senseBuf[0].glossEs.empty() ? senseBuf[0].glossEs : lw.glossEs;
+    size_t a0 = 0;
+    while (a0 < esw.size()) {
+      size_t b0 = esw.find(';', a0);
+      if (b0 == std::string_view::npos) b0 = esw.size();
+      bool covered = false;
+      for (const std::string& p : detail::glossPhrases(esw.substr(a0, b0 - a0), false, 6)) covered = covered || hasPhrase(c.es, p);
+      if (!covered && b0 > a0 + 1) return false;
+      a0 = b0 + 1;
+    }
+  } else if (!(a && b)) {
+    return false;   // English only: the first meanings must name each other
+  }
+  // sense classes: a verb of motion never becomes a verb of change, ceasing or returning
+  const std::vector<std::string> cw = classesOf(word, tr), cc = classesOf(cand, tr);
+  for (const detail::ClassRow& k : classes) {
+    if (!hasPhrase(cw, k.name)) continue;
+    for (const std::string& n : k.never)
+      if (hasPhrase(cc, n) && !hasPhrase(cw, n)) return false;
+  }
+  // transitivity of verbs (sense tags), when both are marked
+  if (la.lemma(word).pos == Verb) {
+    const uint16_t tw = w.tags & (kTagTransitive | kTagIntransitive), tc = c.tags & (kTagTransitive | kTagIntransitive);
+    if ((tw == kTagTransitive && tc == kTagIntransitive) || (tw == kTagIntransitive && tc == kTagTransitive)) return false;
+  }
+  if (why) {
+    std::string shared = a ? (hasPhrase(ws, c.en[0]) ? c.en[0] : c.enCur[0]) : (hasPhrase(cs, w.en[0]) ? w.en[0] : w.enCur[0]);
+    *why = shared;
+  }
+  return true;
+}
+
+bool Resources::Impl::glossSame(uint32_t a, uint32_t b, const la2x::Translator* tr) {
+  if (a == b) return true;
+  if (a == kNone || b == kNone || a >= la.lemmaCount() || b >= la.lemmaCount()) return false;
+  const SenseView x = senseView(la, a, tr, senseBuf);
+  const SenseView y = senseView(la, b, tr, senseBuf2);
+  std::vector<std::string> xs = x.enCur, ys = y.enCur;
+  for (size_t k = 0; k < x.en.size() && k < 3; ++k) addAll(xs, {x.en[k]});
+  for (size_t k = 0; k < y.en.size() && k < 3; ++k) addAll(ys, {y.en[k]});
+  bool en = false;
+  for (const std::string& p : xs) en = en || hasPhrase(ys, p);
+  bool es = false;   // real Spanish glosses are a second witness ("salir" for ēgredior and exeō)
+  if (x.esReal && y.esReal)
+    for (const std::string& p : x.es) es = es || hasPhrase(y.es, p);
+  if (!en && !es) return false;
+  const std::vector<std::string> ca = classesOf(a, tr), cb = classesOf(b, tr);
+  for (const detail::ClassRow& k : classes) {
+    if (!hasPhrase(ca, k.name)) continue;
+    for (const std::string& n : k.never)
+      if (hasPhrase(cb, n) && !hasPhrase(ca, n)) return false;
+  }
+  return true;
+}
+
+detail::Swap Resources::Impl::swapFor(uint32_t lemma, int ceiling, bool keepNames, const std::vector<std::string>* evidence,
+                                      const la2x::Translator* tr) {
   detail::Swap none;
   if (lemma == kNone || lemma >= la.lemmaCount()) return none;
   if (tier(lemma) <= ceiling) return none;
@@ -203,120 +410,145 @@ detail::Swap Resources::Impl::swapFor(uint32_t lemma, int ceiling, bool keepName
   if (keepNames && ((l.flags & lex::ProperName) || l.pos == Name)) return none;
   const uint64_t key = ((uint64_t)lemma << 8) | ((uint64_t)ceiling << 1) | (keepNames ? 1u : 0u);
   auto it = swaps.find(key);
-  if (it != swaps.end()) return it->second;
-  detail::Swap out;
-  // 1. periphrasis_la.tsv: the word of the row with the lemma's part of speech is inflected, the others are fixed
-  if (const curated::PeriphrasisEntry* pe = cd.periphrasis(l.key)) {
-    const std::vector<std::string> ws = words(pe->periphrasis);
-    int main = -1;
-    uint32_t mainLemma = kNone;
-    for (size_t i = 0; i < ws.size(); ++i) {
-      const uint32_t id = morph::findLemma(la, ws[i], l.pos);
-      if (id != kNone && la.lemma(id).pos == l.pos) { main = (int)i; mainLemma = id; }
-    }
-    if (main >= 0 && mainLemma != lemma && tier(mainLemma) <= ceiling) {
-      out.lemma = mainLemma;
-      for (int i = 0; i < main; ++i) out.before += (out.before.empty() ? "" : " ") + ws[(size_t)i];
-      for (size_t i = (size_t)main + 1; i < ws.size(); ++i) out.after += (out.after.empty() ? "" : " ") + ws[i];
-      out.rule = "periphrasis";
-      out.why = std::string(l.head) + " -> " + pe->periphrasis + " (periphrasis table)";
-    }
-  }
-  // 2. the lexicon's sense keywords (and the teacher's tier glosses), same part of speech, a core sense of the
-  //    candidate, overlap required
-  if (out.lemma == kNone && !keepLemma(lemma)) {
-    senseBuf.clear();
-    la.senses(lemma, senseBuf);
-    std::vector<std::string> kws;
-    if (!senseBuf.empty()) kws = words(senseBuf[0].keywords);
-    if (kws.size() > 6) kws.resize(6);
-    struct Cand { uint8_t tier; int ov; int first; int sameGender; int score; uint16_t rank; uint32_t id; std::string why; };
-    std::vector<Cand> cands;
-    auto consider = [&](uint32_t id, int score, const std::vector<std::string>& ckws, const char* src) {
-      if (id == kNone || id == lemma) return;
-      const lex::Lemma cl = la.lemma(id);
-      if (cl.pos != l.pos || (cl.flags & lex::ProperName)) return;
-      if ((l.pos == Noun || l.pos == Verb || l.pos == Adj) && !(cl.flags & lex::HasTable)) return;
-      const uint8_t t = tier(id);
-      if (t > ceiling) return;
-      int ov = 0;
-      std::string shared;
-      for (const std::string& k : kws)
-        if (std::find(ckws.begin(), ckws.end(), k) != ckws.end()) {
-          ++ov;
-          if (shared.size() < 40) shared += (shared.empty() ? "" : ", ") + k;
-        }
-      const int first = !kws.empty() && !ckws.empty() && kws[0] == ckws[0] ? 1 : 0;
-      // same sense: the candidate's sense names the word's first meaning, or the candidate's first meaning is one of
-      // the word's first two (alloquor "speak, address, greet" is not salūtō "greet")
-      const bool head = !kws.empty() && std::find(ckws.begin(), ckws.end(), kws[0]) != ckws.end();
-      const bool back = !ckws.empty() && std::find(kws.begin(), kws.begin() + std::min<size_t>(2, kws.size()), ckws[0]) !=
-                                             kws.begin() + std::min<size_t>(2, kws.size());
-      // nouns and adjectives: the candidate's own first meaning must be the word's (dux "leader" is not magister
-      // "teacher", although a teacher may lead)
-      const bool nominal = l.pos == Noun || l.pos == Adj;
-      if (std::string(src) != "teacher" && (nominal ? !(back && (ov >= 2 || first)) : (!head && !back))) return;
-      // valency: a verb that governs another case is not a synonym here
-      if (l.pos == Verb) {
-        const curated::Valency* va = cd.valency(l.key);
-        const curated::Valency* vb = cd.valency(cl.key);
-        auto oblique = [](const curated::Valency* v) {
-          if (!v || v->frames.empty()) return std::string("acc");
-          const curated::FrameKind k = v->frames[0].kind;
-          return std::string(k == curated::FrameKind::Dat ? "dat" : k == curated::FrameKind::Abl ? "abl"
-                             : k == curated::FrameKind::Gen ? "gen" : k == curated::FrameKind::Prep ? "prep"
-                             : k == curated::FrameKind::Intr ? "intr" : "acc");
-        };
-        if (oblique(va) != oblique(vb)) return;
-      }
-      const int sameGender = l.pos == Noun && cl.gender == l.gender ? 1 : 0;
-      cands.push_back(Cand{t, ov, first, sameGender, score, cl.freqRank ? cl.freqRank : (uint16_t)65535, id,
-                           std::string(src) + ": " + (shared.empty() ? std::string("teacher gloss") : shared)});
+  if (it == swaps.end()) {
+    std::vector<detail::Swap> list;
+    auto evidenceOf = [&](uint32_t id, detail::Swap& s) {
+      const SenseView v = senseView(la, id, tr, senseBuf2);
+      for (const std::vector<std::string>* ph : {&v.en, &v.enCur})
+        for (const std::string& p : *ph)
+          for (const std::string& w : words(p))
+            if (w.size() > 2 && !hasPhrase(s.evidence, w)) s.evidence.push_back(w);
     };
-    // teacher glosses (tiers_la.tsv notes)
-    for (size_t k = 0; k < kws.size() && k < 3; ++k) {
-      std::vector<const curated::TierEntry*> rows;
-      cd.glossTiers(kws[k], rows);
-      for (const curated::TierEntry* te : rows) {
-        if (te->tier == 0 || te->tier > ceiling) continue;
-        const uint32_t id = morph::findLemma(la, te->head, l.pos);
-        if (id == kNone) continue;
-        std::vector<std::string> ck;
-        senseBuf2.clear();
-        la.senses(id, senseBuf2);
-        if (!senseBuf2.empty()) ck = words(senseBuf2[0].keywords);
-        consider(id, 255, ck, "teacher");
+    // a row "before main after": the word of the row with the lemma's part of speech is inflected
+    auto fromRow = [&](const std::string& value, const char* rule, const std::string& why, bool confirmed) {
+      const std::vector<std::string> ws = words(value);
+      int main = -1;
+      uint32_t mainLemma = kNone;
+      for (size_t i = 0; i < ws.size(); ++i) {
+        const uint32_t id = morph::findLemma(la, ws[i], l.pos);
+        if (id != kNone && la.lemma(id).pos == l.pos) { main = (int)i; mainLemma = id; }
+      }
+      if (main < 0 || mainLemma == lemma || tier(mainLemma) > ceiling) return;
+      detail::Swap s;
+      s.lemma = mainLemma;
+      for (int i = 0; i < main; ++i) s.before += (s.before.empty() ? "" : " ") + ws[(size_t)i];
+      for (size_t i = (size_t)main + 1; i < ws.size(); ++i) s.after += (s.after.empty() ? "" : " ") + ws[i];
+      s.rule = rule;
+      s.why = why;
+      s.confirmed = confirmed;
+      evidenceOf(mainLemma, s);
+      for (const detail::Swap& x : list)
+        if (x.lemma == s.lemma && x.before == s.before && x.after == s.after) return;
+      list.push_back(std::move(s));
+    };
+    // 1. syn rows of simplify_la.tsv: confirmed same-sense pairs
+    const char* lp = curated::CuratedData::tierPos(l.pos);
+    for (const detail::SynRow& y : syn)
+      if (y.key == l.key && (y.pos == "-" || (lp && y.pos == lp)))
+        fromRow(y.to, "syn", std::string(l.head) + " -> " + y.to + " (same sense, confirmed pair)", true);
+    // 2. periphrasis_la.tsv
+    if (const curated::PeriphrasisEntry* pe = cd.periphrasis(l.key))
+      fromRow(pe->periphrasis, "periphrasis", std::string(l.head) + " -> " + pe->periphrasis + " (periphrasis table)",
+              false);
+    // 3. teacher glosses and the lexicon's senses: only the same sense
+    if (!keepLemma(lemma)) {
+      senseBuf.clear();
+      la.senses(lemma, senseBuf);
+      std::vector<std::string> kws;
+      if (!senseBuf.empty()) kws = words(senseBuf[0].keywords);
+      if (kws.size() > 6) kws.resize(6);
+      struct Cand { uint8_t tier; int ov; int first; int sameGender; int score; uint16_t rank; uint32_t id; std::string why; bool teacher; };
+      std::vector<Cand> cands;
+      auto consider = [&](uint32_t id, int score, const std::vector<std::string>& ckws, bool teacher) {
+        if (id == kNone || id == lemma) return;
+        for (const Cand& x : cands)
+          if (x.id == id) return;
+        const lex::Lemma cl = la.lemma(id);
+        if (cl.pos != l.pos || (cl.flags & lex::ProperName)) return;
+        if ((l.pos == Noun || l.pos == Verb || l.pos == Adj) && !(cl.flags & lex::HasTable)) return;
+        const uint8_t t = tier(id);
+        if (t > ceiling) return;
+        // nouns: masculine <-> feminine is a change of sex for persons (magistra is not doctor); a thing may change
+        // gender (nāvigium -> nāvis)
+        if (l.pos == Noun && ((l.gender == M && cl.gender == F) || (l.gender == F && cl.gender == M))) return;
+        // valency: a verb that governs another case is not a synonym here
+        if (l.pos == Verb) {
+          const curated::Valency* va = cd.valency(l.key);
+          const curated::Valency* vb = cd.valency(cl.key);
+          auto oblique = [](const curated::Valency* v) {
+            if (!v || v->frames.empty()) return std::string("acc");
+            const curated::FrameKind k = v->frames[0].kind;
+            return std::string(k == curated::FrameKind::Dat ? "dat" : k == curated::FrameKind::Abl ? "abl"
+                               : k == curated::FrameKind::Gen ? "gen" : k == curated::FrameKind::Prep ? "prep"
+                               : k == curated::FrameKind::Intr ? "intr" : "acc");
+          };
+          if (oblique(va) != oblique(vb)) return;
+        }
+        std::string shared;
+        if (!sameSense(lemma, id, tr, &shared)) return;
+        int ov = 0;
+        for (const std::string& k : kws)
+          if (std::find(ckws.begin(), ckws.end(), k) != ckws.end()) ++ov;
+        const int first = !kws.empty() && !ckws.empty() && kws[0] == ckws[0] ? 1 : 0;
+        const int sameGender = l.pos == Noun && cl.gender == l.gender ? 1 : 0;
+        cands.push_back(Cand{t, ov, first, sameGender, score, cl.freqRank ? cl.freqRank : (uint16_t)65535, id,
+                             std::string(teacher ? "teacher gloss, " : "") + "same sense: " + shared, teacher});
+      };
+      for (size_t k = 0; k < kws.size() && k < 3; ++k) {
+        std::vector<const curated::TierEntry*> rows;
+        cd.glossTiers(kws[k], rows);
+        for (const curated::TierEntry* te : rows) {
+          if (te->tier == 0 || te->tier > ceiling) continue;
+          const uint32_t id = morph::findLemma(la, te->head, l.pos);
+          if (id == kNone) continue;
+          std::vector<std::string> ck;
+          senseBuf2.clear();
+          la.senses(id, senseBuf2);
+          if (!senseBuf2.empty()) ck = words(senseBuf2[0].keywords);
+          consider(id, 255, ck, true);
+        }
+      }
+      for (size_t k = 0; k < kws.size() && k < 4; ++k) {
+        candBuf.clear();
+        la.reverse(kws[k], candBuf);
+        const std::vector<lex::Candidate> cb = candBuf;   // consider() reuses the lexicon buffers
+        for (const lex::Candidate& c : cb) {
+          if (c.sense > 1 || c.score < 100) continue;
+          senseBuf2.clear();
+          la.senses(c.lemma, senseBuf2);
+          if (c.sense >= senseBuf2.size()) continue;
+          consider(c.lemma, c.score, words(senseBuf2[c.sense].keywords), false);
+        }
+      }
+      std::sort(cands.begin(), cands.end(), [](const Cand& a, const Cand& b) {
+        if (a.tier != b.tier) return a.tier < b.tier;
+        if (a.ov != b.ov) return a.ov > b.ov;
+        if (a.first != b.first) return a.first > b.first;
+        if (a.sameGender != b.sameGender) return a.sameGender > b.sameGender;
+        if (a.score != b.score) return a.score > b.score;
+        if (a.rank != b.rank) return a.rank < b.rank;
+        return a.id < b.id;
+      });
+      for (const Cand& c : cands) {
+        detail::Swap s;
+        s.lemma = c.id;
+        s.rule = c.teacher ? "teacher" : "synonym";
+        s.why = std::string(l.head) + " -> " + std::string(la.lemma(c.id).head) + " (" + c.why + ")";
+        evidenceOf(c.id, s);
+        list.push_back(std::move(s));
       }
     }
-    for (size_t k = 0; k < kws.size() && k < 4; ++k) {
-      candBuf.clear();
-      la.reverse(kws[k], candBuf);
-      for (const lex::Candidate& c : candBuf) {
-        if (c.sense > 1 || c.score < 100) continue;
-        senseBuf2.clear();
-        la.senses(c.lemma, senseBuf2);
-        if (c.sense >= senseBuf2.size()) continue;
-        consider(c.lemma, c.score, words(senseBuf2[c.sense].keywords), "synonym");
-      }
-    }
-    std::sort(cands.begin(), cands.end(), [](const Cand& a, const Cand& b) {
-      if (a.tier != b.tier) return a.tier < b.tier;
-      if (a.ov != b.ov) return a.ov > b.ov;
-      if (a.first != b.first) return a.first > b.first;
-      if (a.sameGender != b.sameGender) return a.sameGender > b.sameGender;
-      if (a.score != b.score) return a.score > b.score;
-      if (a.rank != b.rank) return a.rank < b.rank;
-      return a.id < b.id;
-    });
-    if (!cands.empty()) {
-      out.lemma = cands[0].id;
-      out.rule = cands[0].why.compare(0, 7, "teacher") == 0 ? "teacher" : "synonym";
-      out.why = std::string(l.head) + " -> " + std::string(la.lemma(cands[0].id).head) + " (" + cands[0].why + ")";
-    }
+    if (swaps.size() >= kCacheCap) swaps.clear();
+    it = swaps.emplace(key, std::move(list)).first;
   }
-  if (swaps.size() >= kCacheCap) swaps.clear();
-  swaps.emplace(key, out);
-  return out;
+  const std::vector<detail::Swap>& list = it->second;
+  if (list.empty()) return none;
+  // the original-language cue as evidence: the first candidate whose gloss names one of its words
+  if (evidence && !evidence->empty())
+    for (const detail::Swap& s : list)
+      for (const std::string& w : s.evidence)
+        if (evidenceHas(*evidence, w)) return s;
+  return list[0];
 }
 
 }  // namespace vp::orberg
@@ -324,6 +556,68 @@ detail::Swap Resources::Impl::swapFor(uint32_t lemma, int ceiling, bool keepName
 namespace vp::orberg::detail {
 
 using namespace vp::feat;
+
+std::vector<std::string> glossPhrases(std::string_view gloss, bool english, size_t max) {
+  std::vector<std::string> out;
+  std::string g;
+  int depth = 0;
+  for (char c : gloss) {   // parenthesised remarks out
+    if (c == '(' || c == '[') { ++depth; continue; }
+    if (c == ')' || c == ']') { if (depth) --depth; continue; }
+    if (!depth) g += c;
+  }
+  size_t a = 0;
+  while (a <= g.size() && out.size() < max) {
+    size_t b = g.find_first_of(",;", a);
+    if (b == std::string::npos) b = g.size();
+    std::string p = text::lower(g.substr(a, b - a));
+    std::string q;
+    for (char c : p) {   // collapse spaces, drop dots and quotes
+      if (c == '.' || c == '"') continue;
+      if (c == ' ' || c == '\t') {
+        if (!q.empty() && q.back() != ' ') q += ' ';
+      } else {
+        q += c;
+      }
+    }
+    while (!q.empty() && q.back() == ' ') q.pop_back();
+    if (english) {
+      for (const char* art : {"to ", "a ", "an ", "the "}) {
+        const size_t n = std::char_traits<char>::length(art);
+        if (q.size() > n && q.compare(0, n, art) == 0) { q = q.substr(n); break; }
+      }
+      // "look at", "come to": the verb is the sense ("leave off", "give up" keep their particle)
+      for (const char* tail : {" at", " to", " upon", " towards"}) {
+        const size_t n = std::char_traits<char>::length(tail);
+        if (q.size() > n + 1 && q.compare(q.size() - n, n, tail) == 0) { q = q.substr(0, q.size() - n); break; }
+      }
+    }
+    if (!q.empty() && std::find(out.begin(), out.end(), q) == out.end()) out.push_back(q);
+    a = b + 1;
+  }
+  return out;
+}
+
+void bestContentLemmas(const la2x::Sentence& s, Resources::Impl& R, LemmaSet& out) {
+  for (const la2x::Token& t : s.tokens) {
+    if (t.kind != la2x::TokKind::Word || t.readings.empty()) continue;
+    const la2x::Reading& r = t.readings[0];
+    if (r.name || (r.lemma != kNone && (R.la.lemma(r.lemma).flags & lex::ProperName))) {
+      out.names.push_back(text::latin_key(r.lemma != kNone ? R.la.lemma(r.lemma).head : std::string_view(r.display)));
+      out.names.push_back(text::latin_key(t.text));
+    }
+    if (r.lemma == kNone) continue;
+    out.lemmas.push_back(r.lemma);
+    if (R.isParticipleLemma(r.lemma)) {
+      const uint32_t v = R.verbOf(r.lemma);
+      if (v != kNone) out.lemmas.push_back(v);
+    }
+  }
+  std::sort(out.lemmas.begin(), out.lemmas.end());
+  out.lemmas.erase(std::unique(out.lemmas.begin(), out.lemmas.end()), out.lemmas.end());
+  std::sort(out.names.begin(), out.names.end());
+  out.names.erase(std::unique(out.names.begin(), out.names.end()), out.names.end());
+}
 
 bool LemmaSet::has(uint32_t l) const { return std::binary_search(lemmas.begin(), lemmas.end(), l); }
 bool LemmaSet::hasName(const std::string& k) const { return std::binary_search(names.begin(), names.end(), k); }

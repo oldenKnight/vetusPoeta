@@ -56,6 +56,9 @@ struct Token {
   bool unknown = false;             // no reading at all (kept verbatim)
   bool nameGuess = false;           // capitalised unknown word read as a name (Check)
   bool fromRule = false;
+  bool symbol = false;              // an emoji / pictograph grapheme cluster (variation selectors, skin tones, ZWJ
+                                    // sequences, flags, keycaps: one token, copied byte for byte); kind Punct, no
+                                    // readings; left out of the disambiguation (C27, additive)
   std::vector<Reading> readings;    // after analyse(): best first
   int clause = 0;                   // clause index (Sentence::clauses)
   double confidence = 1.0;          // 1.0 unambiguous; lower with more surviving readings
@@ -90,7 +93,13 @@ class Analyser {
   Analyser(const Analyser&) = delete;
   Analyser& operator=(const Analyser&) = delete;
   // One sentence (or fragment). `glossary` names count as names (any case ending of the declension).
+  // Symbol tokens (emoji clusters) are transparent to the disambiguation and merged back into `out.tokens` in text
+  // order (kind Punct, symbol = true; Clause indices refer to the merged list).
   void analyse(std::string_view sentence, Sentence& out, const std::vector<rules::GlossaryEntry>* glossary = nullptr) const;
+  // The same analysis with the symbol tokens left out of `out.tokens` (offsets still into out.text): for callers that
+  // rebuild the text from the words and keep the symbols from the gaps (Orbergise). C27, additive.
+  void analyseWords(std::string_view sentence, Sentence& out,
+                    const std::vector<rules::GlossaryEntry>* glossary = nullptr) const;
   // Latin keys of nouns that denote persons (readable_en.tsv "person" rows): a bare ablative of a person is unlikely.
   void setPersonNouns(std::vector<std::string> keys);
 

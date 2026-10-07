@@ -6,12 +6,22 @@
 //    negatives, relative chains, long sentences), then vocabulary above the ceiling swapped for a core word of the
 //    same sense (periphrasis_la.tsv first, then the lexicon's sense keywords). Forms are regenerated with the
 //    morphology generator; words that already satisfy the ceiling and the structure rules are kept as written.
-//  * With the original (the aligned EN/ES cue): the original goes through the EN/ES -> LA pipeline (frame builder,
-//    transfer at fidelity 3, Latin realiser) supplied by the engine through EngineContext::fromOriginal, preferring
-//    the input's own core lemmas; that Latin is used when it is clean, else the rewrite above.
-//  * Every change carries "was -> now" with a reason (vocabulary | structure | order); the meaning check compares the
-//    content lemmas of the input (or of the original's transfer) with the output (periphrases count as what they
-//    replace); below 0.6 the cue is Check. Nothing is dropped silently: missing lemmas are listed.
+//  * With the original (the aligned EN/ES cue, C27): the original is EVIDENCE only. It ranks same-sense swap
+//    candidates (a candidate whose gloss names a word of the original first) and enters the meaning check (words of
+//    the original the input covers must stay covered); a cue is never replaced by a translation of the original.
+//  * Swaps keep the sense (C27): syn rows of simplify_la.tsv (confirmed, may stay OK), periphrasis_la.tsv rows, and
+//    lexicon / teacher-gloss candidates only when they share the word's sense (English and Spanish gloss phrases,
+//    sense classes: a verb of motion never becomes a verb of change or ceasing, valency). No such word: the word is
+//    kept and the cue is Check (flag tier-kept). Fixed phrases (rēs gestae, grātiās agere, valēre iubēre, ad +
+//    gerund ...) are never split. Every swap that is not a syn row is at most Check (flag synonym).
+//  * Never nonsense (C27): a rewritten sentence whose re-analysis adds an A1/A3/A4 fault or misreads a swapped word
+//    is discarded (vocabulary-only, then structure-only, then the sentence as written; flags rewrite-partial /
+//    rewrite-discarded, Check).
+//  * Every change carries "was -> now" with a reason (vocabulary | structure | order); the meaning check re-analyses
+//    the output with la2x and compares the content lemmas a reader reads (best readings) with the input's: a lemma
+//    is kept when it is there or was replaced by a curated row or a word whose glosses share its sense; losses are
+//    listed in `missing` ("moveō -> mūtō") and make the cue Check (below 0.6 also meaning-low).
+//  * Emoji clusters, spacing and the macron convention of the source are kept (no macrons added to a text without).
 // Deterministic; nothing here throws across the module boundary (orbergise() and cues() catch).
 #pragma once
 #include <cstdint>
@@ -40,6 +50,8 @@ struct OrbergOptions {
   bool simplify = true;      // structure rewrites; false = vocabulary swaps only
   bool hasOriginal = false;  // set by orbergise() when an original text is given
   bool macrons = true;       // new words carry length marks when the input does (never added to kept words)
+  int sourceMacrons = -1;    // C27: the document's convention: 1 written with macrons, 0 without (new words get none),
+                             // -1 unknown (decided per sentence from the words that show or omit their length marks)
 };
 
 // One "was -> now". tokenIndex: index of the first new word in OrbergResult::tokens (-1 for a pure deletion).
@@ -61,7 +73,7 @@ struct OrbergResult {
   std::vector<rules::Reason> reasons;        // kind "orbergise" {was, now, why} per change, plus notes
   std::vector<rules::Check> checks;          // A1 A2 A3 A4 A6 (participles count with their verb's tier), A7 meaning
   std::vector<std::string> flags;            // "orberg-original", "orberg-kept", "tier-exceeded", "meaning-low", ...
-  bool fromOriginal = false;                 // the output came from the original-language text
+  bool fromOriginal = false;                 // always false since C27 (the original is evidence, never the output)
 };
 
 // Latin made from the original-language text by the EN/ES -> LA pipeline (filled by the engine).
@@ -104,7 +116,7 @@ struct EngineContext {
   check::LatinChecker* checker = nullptr;    // A1-A4 on the output
   Resources* resources = nullptr;
   const std::vector<rules::GlossaryEntry>* glossary = nullptr;
-  OriginalFn fromOriginal;                   // may be empty: the original is then ignored (flag)
+  OriginalFn fromOriginal;                   // unused since C27 (kept for source compatibility)
   double cpsLimit = 17.0;                    // A8 for cues
   int maxLine = 42, maxLines = 2;
 };

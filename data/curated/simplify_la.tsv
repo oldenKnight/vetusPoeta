@@ -8,6 +8,15 @@
 #        fixed: the replacement is written as it is.
 #   keep	<lemma key>	<pos>	-	a lemma never swapped by the lexicon's sense keywords (their keywords mislead); a
 #        periphrasis_la.tsv row still applies.
+#   syn	<word head>	<core head or short periphrasis>	<pos or ->	a CONFIRMED same-sense pair (C27): tried first, and the only
+#        kind of vocabulary swap that may stay OK; every other swap (periphrasis_la.tsv, teacher glosses, lexicon senses)
+#        is at most Check. In a periphrasis the word with the part of speech of the replaced word is inflected.
+#   fixed	<elements>	<name>	gap=N;order=any	a fixed phrase or idiom that is never split or swapped (C27). Elements are
+#        lemma heads (alternatives with |) or GER (a gerund or gerundive); gap = other words allowed between two
+#        elements (default 0); order=any also matches the elements in reverse order.
+#   class	<name>	<phrase|phrase|...>	never=<names>	a sense class named by English or Spanish gloss phrases (C27): a word of
+#        the class is never swapped for a word of a class listed in never (a verb of motion never becomes a verb of
+#        change, ceasing or returning), whatever their keywords share.
 # Vocabulary swaps (tier 2/3 word -> core word) live in periphrasis_la.tsv; this file holds structures.
 rule	ablabs.perf	on	conj=postquam;voice=passive	ablative absolute with a perfect participle -> postquam + the noun in the nominative + perfect indicative (passive for transitive verbs, so no agent is guessed; deponents active). voice=active: active perfect with the main clause's subject (Check)
 rule	ablabs.pres	on	conj=dum	ablative absolute with a present participle -> dum + the noun in the nominative + present indicative
@@ -19,7 +28,7 @@ rule	cumsubj	on	plup=postquam;impf=dum	cum + pluperfect subjunctive -> postquam 
 rule	relchain	on		a relative clause inside a relative clause that ends the sentence -> a new sentence with the antecedent noun
 rule	split	on	words=12;conj=et sed nam atque	sentences longer than `words` words are split at et/sed/nam/atque between two finite clauses (et/atque dropped)
 rule	accinf	on		accusative + infinitive after verbs of saying and thinking: kept, marked with a note
-rule	original	on	prefer=rewrite	with the original-language cue: rewrite = the rewrite of the Latin itself when it is clean (no Fix, tier ceiling met, meaning >= 60 %, no construction left), else the original's translation (EN/ES -> LA at fidelity 3) when that one is clean; original = the original's translation first
+rule	original	on	use=evidence	with the original-language cue (C27): the original is evidence only (it ranks same-sense swap candidates and enters the meaning check); a cue is never replaced by a translation of the original
 pair	non nullus	aliquis	agree	"not none" = some
 pair	nonnullus	aliquis	agree	"some"
 pair	non numquam	saepe	fixed	"not never" = sometimes; saepe is the nearest tier 1 word
@@ -34,3 +43,42 @@ keep	curo	verb	-	"take care of": the keywords (see, look) would give videō
 keep	intereo	verb	-	"perish": the keywords (go) would give eō; periphrasis row morior
 keep	obeo	verb	-	"die / meet": the keywords (go) would give eō
 keep	alloquor	verb	-	"speak to, address" + accusative: dīcō / salūtō change the meaning
+syn	vestīmentum	vestis	noun	"garment, clothing" (C27)
+syn	forsitan	fortasse	adv	"perhaps" (C27)
+syn	adveniō	veniō	verb	"come, arrive" (C27)
+syn	festīnō	celeriter eō	verb	"hurry" = go quickly (C27)
+syn	properō	celeriter eō	verb	"hurry" = go quickly (C27)
+syn	magnificus	magnus	adj	"great" (C27)
+syn	probus	bonus	adj	"good" (C27)
+syn	vādō	eō	verb	"go" (C27; never redeō "go back")
+syn	discēdō	abeō	verb	"go away, depart" (C27; never dēsinō "leave off")
+syn	interficiō	necō	verb	"kill" (C27)
+syn	metuō	timeō	verb	"fear" (C27)
+syn	vereor	timeō	verb	"fear" (C27)
+syn	reperiō	inveniō	verb	"find" (C27)
+syn	maestus	trīstis	adj	"sad" (C27)
+syn	lacrimō	fleō	verb	"weep" (C27)
+syn	ēgredior	exeō	verb	"go out" (C27)
+syn	ingredior	intrō	verb	"enter" (C27)
+syn	exīstimō	putō	verb	"think" (C27)
+syn	arbitror	putō	verb	"think" (C27)
+syn	parvulus	parvus	adj	"small" (C27)
+syn	nāvigium	nāvis	noun	"ship, vessel" (C27)
+syn	cōnspiciō	videō	verb	"catch sight of, see" (C27)
+syn	aspiciō	spectō	verb	"look at" (C27; videō "see" of periphrasis_la.tsv is only near)
+fixed	rēs gerō	rēs gestae	gap=1;order=any	"deeds, history": never rēs portātae (C27)
+fixed	grātia agō	grātiās agere	gap=2;order=any	"thank" (C27)
+fixed	valeō iubeō	valēre iubēre	gap=2;order=any	"say goodbye" (C27)
+fixed	ad GER	ad + gerund	gap=0	purpose: ad loquendum (C27)
+fixed	Deus grātia	Deō grātiās	gap=0;order=any	"thanks be to God" (ecclesiastical, C27)
+fixed	habeō excūsō|excūsātus	habeās mē excūsātum	gap=2	"excuse me" (ecclesiastical, C27)
+fixed	pāx tēcum|tū|vōbīscum|vōs	pāx tēcum	gap=0	"peace be with you" (ecclesiastical, C27)
+fixed	misereor ego|nōs	miserēre nōbīs	gap=0	"have mercy on us" (ecclesiastical, C27)
+fixed	magnus mōmentum	magnī mōmentī	gap=0;order=any	"of great importance" (C27)
+fixed	orbis terra	orbis terrārum	gap=0	"the world" (C27)
+fixed	quis|quid agō	quid agis	gap=0	"how are you?" (C27)
+fixed	ōrō tē	ōrō tē	gap=0	"please" (C27)
+class	motion	go|come|walk|run|depart|leave|move|go away|hasten|hurry|rush|proceed|advance|travel|arrive|ir|venir|caminar|correr|andar|partir|salir|irse|marcharse|alejarse|avanzar|proceder|mover|moverse|apresurarse|llegar	never=change cease return	verbs of motion (C27: moveō -> mūtō, discēdō -> dēsinō, vādō -> redeō are impossible)
+class	change	change|alter|transform|modify|mutate|cambiar|transformar|alterar|mudar|modificar	never=motion	verbs of change
+class	cease	cease|stop|desist|leave off|give up|give over|end|dejar de|cesar|cesar de|parar|detenerse|terminar	never=motion	verbs of ceasing
+class	return	return|come back|go back|turn back|revert|volver|regresar|volver atrás	never=motion	verbs of returning

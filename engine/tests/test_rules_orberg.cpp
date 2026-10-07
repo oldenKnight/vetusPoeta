@@ -206,6 +206,8 @@ TEST_CASE("orberg: dump (dev)") {
                 << c.why << ")\n";
     for (const auto& c : r.checks)
       if (!c.ok) std::cout << "   " << c.id << " FAIL " << c.detail << "\n";
+    for (const auto& x : r.reasons)
+      if (x.data.empty() || x.text.find(" kept: ") != std::string::npos) std::cout << "   note: " << x.text << "\n";
   }
 }
 
@@ -370,57 +372,231 @@ TEST_CASE("orberg: options (simplify off, tier 2, names)") {
   CHECK(r.tokens[(size_t)r.changes[1].tokenIndex].text == "necāvit");
 }
 
+namespace {
+// Resources from simplify_la.tsv with extra rows written FIRST (tests that need a teacher's mistake).
+std::unique_ptr<orberg::Resources> resourcesWith(OWorld& W, const std::string& name, const std::string& rows) {
+  const stdfs::path tmp = stdfs::path(VP_TEST_TMP) / name;
+  std::error_code ec;
+  stdfs::create_directories(tmp, ec);
+  std::ifstream in(curatedDirO() / "simplify_la.tsv");
+  std::string all((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  {
+    std::ofstream o(tmp / "simplify_la.tsv");
+    o << rows << all;
+  }
+  auto r = orberg::Resources::create(W.la, *W.cd, {tmp});
+  if (!r.ok()) return nullptr;
+  return std::move(r.value());
+}
+bool hasFlag(const std::vector<std::string>& f, const char* x) { return std::find(f.begin(), f.end(), x) != f.end(); }
+bool hasNote(const std::vector<rules::Reason>& rs, const std::string& part) {
+  for (const rules::Reason& r : rs)
+    if (r.text.find(part) != std::string::npos) return true;
+  return false;
+}
+}  // namespace
+
 TEST_CASE("orberg: meaning check") {
   NEED_OWORLD();
   orberg::OrbergOptions o;
-  // periphrases count as the word they replace
+  // a confirmed periphrasis counts as the word it replaces; a syn row alone keeps the cue OK
   orberg::OrbergResult r = orberg::orbergise("Mercātor festīnat.", nullptr, rules::Lang::En, o, W.ctx);
   CHECK(r.text == "Mercātor celeriter it.");
   CHECK(r.meaning == doctest::Approx(1.0));
   CHECK(r.missing.empty());
-  // an original whose translation drops content words: the rewrite of "Eundum est." keeps a construction, so the
-  // original's Latin is used, and the meaning check against the original's lemmas flags what is missing
-  const uint32_t eo = morph::findLemma(W.la, "eō", feat::Verb), domus = morph::findLemma(W.la, "domus", feat::Noun),
-                 nunc = morph::findLemma(W.la, "nunc", feat::Adv);
-  REQUIRE(eo != lex::kNoLemma);
-  REQUIRE(domus != lex::kNoLemma);
-  REQUIRE(nunc != lex::kNoLemma);
+  CHECK(r.confidence == rules::Confidence::Ok);
+  // the check is real (C27): a wrong teacher row is reported as a loss, the cue is Check, A7 fails
+  auto bad = resourcesWith(W, "orberg_badsyn",
+                           "syn\tmoveō\tmūtō\tverb\twrong on purpose\nsyn\tmagnificus\tparvus\tadj\twrong on purpose\n"
+                           "syn\tdīligō\tnoceō\tverb\twrong on purpose\n");
+  REQUIRE(bad);
+  orberg::EngineContext ctx = W.ctx;
+  ctx.resources = bad.get();
+  r = orberg::orbergise("Folia in arbore moventur.", nullptr, rules::Lang::En, o, ctx);
+  CHECK(r.text == "Folia in arbore mūtantur.");
+  CHECK(r.meaning < 1.0);
+  CHECK(std::find(r.missing.begin(), r.missing.end(), "moveō -> mūtō") != r.missing.end());
+  CHECK(r.confidence == rules::Confidence::Check);
+  CHECK(hasFlag(r.flags, "meaning-lost"));
+  CHECK(!checkOk(r.checks, "A7"));
+  r = orberg::orbergise("Templum magnificum est.", nullptr, rules::Lang::En, o, ctx);
+  CHECK(r.text == "Templum parvum est.");
+  CHECK(std::find(r.missing.begin(), r.missing.end(), "magnificus -> parvus") != r.missing.end());
+  CHECK(r.meaning < 0.6);
+  CHECK(hasFlag(r.flags, "meaning-low"));
+  // with an original: a word of the original the input covered and the output lost is listed too
+  const std::string orig = "The temple is magnificent.";
+  r = orberg::orbergise("Templum magnificum est.", &orig, rules::Lang::En, o, ctx);
+  CHECK(std::find(r.missing.begin(), r.missing.end(), "\"magnificent\" (original)") != r.missing.end());
+  // never nonsense: a rewrite the checker rejects (noceō takes a dative) is discarded, the sentence stays as written
+  r = orberg::orbergise("Puer puellam dīligit.", nullptr, rules::Lang::En, o, ctx);
+  CHECK(r.text == "Puer puellam dīligit.");
+  CHECK(hasFlag(r.flags, "rewrite-discarded"));
+  CHECK(hasNote(r.reasons, "A4"));
+  CHECK(r.confidence == rules::Confidence::Check);
+  // the same sentence with the real tables: a lexicon synonym of the same sense, at most Check
+  r = orberg::orbergise("Puer puellam dīligit.", nullptr, rules::Lang::En, o, W.ctx);
+  CHECK(r.text == "Puer puellam amat.");
+  CHECK(hasFlag(r.flags, "synonym"));
+  CHECK(r.confidence == rules::Confidence::Check);
+  CHECK(r.missing.empty());
+}
+
+TEST_CASE("orberg: the original is evidence, never the output (C27)") {
+  NEED_OWORLD();
+  orberg::OrbergOptions o;
+  int calls = 0;
   orberg::EngineContext ctx = W.ctx;
   ctx.fromOriginal = [&](const std::string&, rules::Lang, int, const std::vector<uint32_t>&, orberg::OriginalLatin& out) {
-    out.text = "Īre dēbēmus.";               // a translation that lost "home" and "now"
-    out.lemmas = {eo, domus, nunc};
+    ++calls;
+    out.text = "Nunc domum īre dēbēmus.";
     return true;
   };
   const std::string orig = "We must go home now.";
-  r = orberg::orbergise("Eundum est.", &orig, rules::Lang::En, o, ctx);
-  CHECK(r.fromOriginal);
-  CHECK(r.text == "Īre dēbēmus.");
-  CHECK(r.meaning == doctest::Approx(1.0 / 3.0));
-  CHECK(r.confidence == rules::Confidence::Check);
-  CHECK(std::find(r.missing.begin(), r.missing.end(), "domus") != r.missing.end());
-  CHECK(std::find(r.missing.begin(), r.missing.end(), "nunc") != r.missing.end());
-  CHECK(std::find(r.flags.begin(), r.flags.end(), "meaning-low") != r.flags.end());
-  CHECK(!checkOk(r.checks, "A7"));
-  // the same original with all its content: OK
-  ctx.fromOriginal = [&](const std::string&, rules::Lang, int, const std::vector<uint32_t>&, orberg::OriginalLatin& out) {
-    out.text = "Nunc domum īre dēbēmus.";
-    out.lemmas = {eo, domus, nunc};
-    return true;
-  };
-  r = orberg::orbergise("Eundum est.", &orig, rules::Lang::En, o, ctx);
-  CHECK(r.text == "Nunc domum īre dēbēmus.");
-  CHECK(r.meaning == doctest::Approx(1.0));
-  CHECK(r.confidence == rules::Confidence::Ok);
-  // an original translation that fails the checks is not used
-  ctx.fromOriginal = [&](const std::string&, rules::Lang, int, const std::vector<uint32_t>&, orberg::OriginalLatin& out) {
-    out.text = "Īre dēbēmus frobnicāmus.";   // an unknown form: A1 fails
-    out.lemmas = {eo};
-    return true;
-  };
-  r = orberg::orbergise("Eundum est.", &orig, rules::Lang::En, o, ctx);
+  orberg::OrbergResult r = orberg::orbergise("Eundum est.", &orig, rules::Lang::En, o, ctx);
+  CHECK(calls == 0);
   CHECK(!r.fromOriginal);
+  CHECK(r.text == "Īre dēbēmus.");   // the original names the person of dēbeō; nothing else is taken from it
+  CHECK(hasFlag(r.flags, "original-evidence"));
+  CHECK(!hasFlag(r.flags, "orberg-original"));
+  // an original that says something else changes nothing but the evidence
+  const std::string other = "The girl reads a book.";
+  r = orberg::orbergise("Puella rosam amat.", &other, rules::Lang::En, o, ctx);
+  CHECK(r.text == "Puella rosam amat.");
+  CHECK(r.changes.empty());
+  CHECK(hasFlag(r.flags, "orberg-kept"));
+  // without a person in the original the gerund stays (Check)
+  const std::string none = "Going is necessary.";
+  r = orberg::orbergise("Eundum est.", &none, rules::Lang::En, o, ctx);
   CHECK(r.text == "Eundum est.");
-  CHECK(std::find(r.flags.begin(), r.flags.end(), "original-rejected") != r.flags.end());
+  CHECK(r.confidence == rules::Confidence::Check);
+}
+
+TEST_CASE("orberg: real-material fixes (C27): same sense, fixed phrases, never nonsense") {
+  NEED_OWORLD();
+  orberg::OrbergOptions o;
+  // (input, expected): our own sentences of the shapes found on real material; "=" means unchanged byte for byte
+  const std::vector<std::pair<std::string, std::string>> cases = {
+      // a verb of motion never becomes a verb of change, ceasing or returning; no same-sense core word: kept (Check)
+      {"Folia in arbore moventur.", "="},
+      {"Hospites discedunt.", "Hospites abeunt."},
+      {"Quo vadunt nautae?", "Quo eunt nautae?"},
+      {"Pater filium valere iubet et discedit.", "Pater filium valere iubet et abit."},
+      {"Testes pro amico testificati sunt.", "="},
+      {"Mercator pericula affert.", "="},
+      // fixed phrases are never split or swapped
+      {"Magister res gestas Romanorum narrat.", "="},
+      {"Puella matri gratias agit.", "="},
+      {"Deo gratias! Navis advenit.", "Deo gratias! Navis venit."},
+      {"Discipuli ad scribendum veniunt.", "="},
+      // never nonsense: a nominative with a participle after est is no ablative absolute; cum with an ablative and a
+      // purpose clause is the preposition; a form of a core word (meō is meus) is never swapped
+      {"Cur est porta clausa 🚪, serve?", "="},
+      {"Nunc est via relicta 🛤️, puer.", "="},
+      {"Mater venit ad cantandum🎶 cum filia ut eam doceret.", "="},
+      {"In horto🌳 meo omnia sunt pulchra.", "="},
+      {"Puer in horto meo ludit.", "="},
+      // emoji clusters (skin tone, ZWJ, variation selector) stay byte for byte where they were
+      {"Puer 👦🏽 et pater 👨‍👦 ad montem ⛰️ vadunt.", "Puer 👦🏽 et pater 👨‍👦 ad montem ⛰️ eunt."},
+      {"♪ et vestimenta👗👔 lavat", "♪ et vestes👗👔 lavat"},
+  };
+  for (const auto& c : cases) {
+    const orberg::OrbergResult r = orberg::orbergise(c.first, nullptr, rules::Lang::En, o, W.ctx);
+    const std::string want = c.second == "=" ? c.first : c.second;
+    CHECK_MESSAGE(r.text == want, c.first << " -> " << r.text);
+    for (const char* bad : {"mut", "desin", "dēsin", "rede", "red", "tul", "portat", "postquam", "Postquam", "dum "})
+    {
+      const bool clean = r.text.find(bad) == std::string::npos || c.first.find(bad) != std::string::npos;
+      CHECK_MESSAGE(clean, c.first << " -> " << r.text);
+    }
+    CHECK(r.missing.empty());
+    if (c.second == "=") CHECK(r.changes.empty());
+  }
+  // kept words are said and the cue is Check
+  orberg::OrbergResult r = orberg::orbergise("Folia in arbore moventur.", nullptr, rules::Lang::En, o, W.ctx);
+  CHECK(hasFlag(r.flags, "tier-kept"));
+  CHECK(hasNote(r.reasons, "moventur kept: no first-year word with the same sense"));
+  CHECK(r.confidence == rules::Confidence::Check);
+  r = orberg::orbergise("Magister res gestas Romanorum narrat.", nullptr, rules::Lang::En, o, W.ctx);
+  CHECK(hasNote(r.reasons, "fixed phrase rēs gestae"));
+  // a swap of a confirmed pair may stay OK; a periphrasis row or a lexicon synonym is at most Check
+  r = orberg::orbergise("Pueri ad urbem festinant.", nullptr, rules::Lang::En, o, W.ctx);
+  CHECK(r.text == "Pueri ad urbem celeriter eunt.");
+  CHECK(r.confidence == rules::Confidence::Ok);
+  r = orberg::orbergise("Hostis urbem oppugnat.", nullptr, rules::Lang::En, o, W.ctx);   // no same-sense word: kept
+  CHECK(r.text == "Hostis urbem oppugnat.");
+  CHECK(hasFlag(r.flags, "tier-kept"));
+  CHECK(r.confidence == rules::Confidence::Check);
+  r = orberg::orbergise("Nauta nāvem in ōceanō vīdit.", nullptr, rules::Lang::En, o, W.ctx);   // periphrasis row only
+  CHECK(r.text == "Nauta nāvem in marī vīdit.");
+  CHECK(r.confidence == rules::Confidence::Check);
+  CHECK(hasFlag(r.flags, "synonym"));
+  // nouns of persons keep their sex (magistra is not doctor at tier 2)
+  o.tierCeiling = 2;
+  r = orberg::orbergise("Magistra puerum laudat.", nullptr, rules::Lang::En, o, W.ctx);
+  CHECK(r.text.find("doctor") == std::string::npos);
+}
+
+TEST_CASE("orberg: blind check of C27 (20 own sentences, one document)") {
+  NEED_EWORLD();
+  const auto rows = readTsvO(repoDirO() / "tests" / "fixtures" / "orberg" / "blind_c27.tsv");
+  REQUIRE(rows.size() == 20);
+  std::vector<rules::CueInput> in;
+  for (const auto& row : rows) {
+    REQUIRE(row.size() >= 5);
+    rules::CueInput c;
+    c.index = (uint32_t)std::atoi(row[0].c_str());
+    c.sourceText = row[1];
+    in.push_back(c);
+  }
+  auto r = E.engine->translate(in, orbergOptions(), rules::Context{}, nullptr, nullptr);
+  REQUIRE(r.ok());
+  REQUIRE(r.value().size() == 20);
+  int match = 0, firstRun = 0;
+  for (size_t i = 0; i < rows.size(); ++i) {
+    const rules::CueOutput& o = r.value()[i];
+    const bool m = normO(o.target) == rows[i][2];
+    match += m ? 1 : 0;
+    firstRun += rows[i][4].compare(0, 3, "yes") == 0 ? 1 : 0;
+    if (!m) MESSAGE("#" << rows[i][0] << " expected: " << rows[i][2] << "\n     got: " << normO(o.target));
+    CHECK(o.meaningMissing.empty());
+    CHECK(o.confidence != rules::Confidence::Fix);
+  }
+  MESSAGE("Orbergise blind check C27: " << match << "/20 (first run before the fixes: " << firstRun << "/20)");
+  CHECK(match == 20);
+}
+
+TEST_CASE("orberg: macrons follow the source, unchanged cues keep their lines (C27, engine pair la-la)") {
+  NEED_EWORLD();
+  rules::CueInput a, b, c;
+  a.index = 0;
+  a.sourceText = "Aspice caelum, puella!";
+  b.index = 1;
+  b.sourceText = "Pueri ad urbem festinant.";
+  c.index = 2;
+  c.sourceText = "Puella in horto\nrosam amat.";
+  // a document without length marks: new words get none
+  auto r = E.engine->translate({a, b, c}, orbergOptions(), rules::Context{}, nullptr, nullptr);
+  REQUIRE(r.ok());
+  REQUIRE(r.value().size() == 3);
+  CHECK(normO(r.value()[0].target) == "Specta caelum, puella!");
+  CHECK(normO(r.value()[1].target) == "Pueri ad urbem celeriter eunt.");
+  CHECK(r.value()[2].target == "Puella in horto\nrosam amat.");   // byte for byte, line break included
+  // the same cue in a document written with macrons
+  rules::CueInput m;
+  m.index = 3;
+  m.sourceText = "Puella in hortō sedet.";
+  r = E.engine->translate({a, m}, orbergOptions(), rules::Context{}, nullptr, nullptr);
+  REQUIRE(r.ok());
+  CHECK(normO(r.value()[0].target) == "Spectā caelum, puella!");
+  // emoji clusters through the whole engine path
+  rules::CueInput e;
+  e.sourceText = "Puer 👦🏽 et pater 👨‍👦 ad montem ⛰️ vadunt.";
+  r = E.engine->translate({e}, orbergOptions(), rules::Context{}, nullptr, nullptr);
+  REQUIRE(r.ok());
+  CHECK(normO(r.value()[0].target) == "Puer 👦🏽 et pater 👨‍👦 ad montem ⛰️ eunt.");
+  for (const rules::TokenView& t : r.value()[0].tokens)
+    CHECK(r.value()[0].target.compare((size_t)t.start, (size_t)(t.end - t.start), t.text) == 0);
 }
 
 TEST_CASE("orberg: with the original (engine pair la-la)") {
@@ -443,8 +619,10 @@ TEST_CASE("orberg: with the original (engine pair la-la)") {
     match += m ? 1 : 0;
     if (row[1] == "en") { ++en; enMatch += m ? 1 : 0; }
     if (!m) MESSAGE("#" << row[0] << " (" << row[2] << ") expected: " << row[4] << "\n     got: " << normO(o.target));
-    const char* want = row[5] == "original" ? "orberg-original" : row[5] == "kept" ? "orberg-kept" : "orberg-latin";
+    const char* want = row[5] == "kept" ? "orberg-kept" : "orberg-latin";
     const bool p = std::find(o.flags.begin(), o.flags.end(), want) != o.flags.end();
+    CHECK(std::find(o.flags.begin(), o.flags.end(), "orberg-original") == o.flags.end());
+    CHECK(std::find(o.flags.begin(), o.flags.end(), "original-evidence") != o.flags.end());
     pathOk += p ? 1 : 0;
     CHECK_MESSAGE(p, "#" << row[0] << " path " << row[5]);
     CHECK(o.original == row[2]);
@@ -456,7 +634,8 @@ TEST_CASE("orberg: with the original (engine pair la-la)") {
   }
   MESSAGE("Orbergise with the original: " << match << "/" << rows.size() << " (English " << enMatch << "/" << en
                                           << "), path as expected " << pathOk << "/" << rows.size());
-  CHECK(enMatch >= 16);
+  CHECK(match == (int)rows.size());
+  CHECK(pathOk == (int)rows.size());
 }
 
 TEST_CASE("orberg: engine outputs (fields, reasons, options, empty cue)") {

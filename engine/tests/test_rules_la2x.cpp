@@ -279,6 +279,70 @@ TEST_CASE("rules-la2x: disambiguation by context") {
   CHECK(!wordAt(o, "puellae")->alternatives.empty());
 }
 
+TEST_CASE("rules-la2x: emoji clusters are one token, transparent to the analysis (C27)") {
+  NEED_WORLD();
+  // skin tone, ZWJ sequence, variation selector, flag, keycap: one symbol token each, bytes as written
+  const std::string s = "Puer\xF0\x9F\x91\xA6\xF0\x9F\x8F\xBD in horto\xF0\x9F\x8C\xB3 meo ludit "
+                        "\xF0\x9F\x91\xA8\xE2\x80\x8D\xF0\x9F\x91\xA6 \xE2\x9B\xB0\xEF\xB8\x8F "
+                        "\xF0\x9F\x87\xAE\xF0\x9F\x87\xB9 1\xEF\xB8\x8F\xE2\x83\xA3.";
+  la2x::Sentence a;
+  W.tr->analyser().analyse(s, a, nullptr);
+  std::vector<std::string> sym, words;
+  for (const la2x::Token& t : a.tokens) {
+    CHECK(a.text.compare((size_t)t.start, (size_t)(t.end - t.start), t.text) == 0);
+    if (t.symbol) {
+      CHECK(t.kind == la2x::TokKind::Punct);
+      CHECK(t.readings.empty());
+      sym.push_back(t.text);
+    } else if (t.kind == la2x::TokKind::Word) {
+      words.push_back(t.text);
+    }
+  }
+  REQUIRE(sym.size() == 6);
+  CHECK(sym[0] == "\xF0\x9F\x91\xA6\xF0\x9F\x8F\xBD");                        // boy, medium skin tone
+  CHECK(sym[1] == "\xF0\x9F\x8C\xB3");                                         // tree
+  CHECK(sym[2] == "\xF0\x9F\x91\xA8\xE2\x80\x8D\xF0\x9F\x91\xA6");               // man ZWJ boy
+  CHECK(sym[3] == "\xE2\x9B\xB0\xEF\xB8\x8F");                                   // mountain + VS16
+  CHECK(sym[4] == "\xF0\x9F\x87\xAE\xF0\x9F\x87\xB9");                           // flag (two regional indicators)
+  CHECK(sym[5] == "1\xEF\xB8\x8F\xE2\x83\xA3");                                   // keycap one
+  CHECK(words == std::vector<std::string>{"Puer", "in", "horto", "meo", "ludit"});
+  // the emoji between noun and adjective does not cut the agreement: meo is meus, not the verb meō
+  for (const la2x::Token& t : a.tokens)
+    if (t.text == "meo") {
+      REQUIRE(t.best());
+      CHECK(std::string(W.la.lemma(t.best()->lemma).head) == "meus");
+    }
+  // clause indices point at the merged token list
+  bool verbOk = false;
+  for (const la2x::Clause& c : a.clauses)
+    if (c.verb >= 0) verbOk = verbOk || a.tokens[(size_t)c.verb].text == "ludit";
+  CHECK(verbOk);
+  // analyseWords: the same readings without the symbol tokens
+  la2x::Sentence b;
+  W.tr->analyser().analyseWords(s, b, nullptr);
+  size_t k = 0;
+  for (const la2x::Token& t : b.tokens) {
+    CHECK(!t.symbol);
+    while (k < a.tokens.size() && a.tokens[k].symbol) ++k;
+    REQUIRE(k < a.tokens.size());
+    CHECK(t.text == a.tokens[k].text);
+    CHECK(t.start == a.tokens[k].start);
+    if (t.best() && a.tokens[k].best()) CHECK(t.best()->lemma == a.tokens[k].best()->lemma);
+    ++k;
+  }
+  // a music sign and a stray variation selector never break a word
+  la2x::Sentence c;
+  W.tr->analyser().analyse("\xE2\x99\xAA Puella cantat \xE2\x99\xAA", c, nullptr);
+  int w = 0;
+  for (const la2x::Token& t : c.tokens) w += t.kind == la2x::TokKind::Word ? 1 : 0;
+  CHECK(w == 2);
+  // the readable English is not disturbed by the emoji
+  la2x::SentenceOut o;
+  W.tr->resetDiscourse();
+  W.tr->sentence("In horto\xF0\x9F\x8C\xB3 meo...", la2x::Target::En, o);
+  CHECK(o.text.find("my garden") != std::string::npos);
+}
+
 TEST_CASE("rules-la2x: periphrases are one verb, both words noted (C11b)") {
   NEED_WORLD();
   const auto rows = readTsv(repoDir() / "tests" / "fixtures" / "la2x" / "sentences.tsv");

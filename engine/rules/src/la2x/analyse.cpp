@@ -35,6 +35,41 @@ bool isLetterCp(char32_t c) {
 }
 bool isDigitCp(char32_t c) { return c >= '0' && c <= '9'; }
 
+// Emoji and pictographs (C27): a symbol starts a grapheme cluster that is one token. Ranges: arrows, technical,
+// enclosed alphanumerics, box/geometric, miscellaneous symbols and dingbats (♪ ⛰ ✨ ❌ ⏰ ⬇), supplemental symbols and
+// pictographs, plus the few single emoji outside those blocks.
+bool isSymbolCp(char32_t c) {
+  return (c >= 0x2190 && c <= 0x2BFF) || (c >= 0x1F000 && c <= 0x1FAFF) || c == 0xA9 || c == 0xAE || c == 0x203C ||
+         c == 0x2049 || c == 0x2122 || c == 0x2139 || c == 0x3030 || c == 0x303D || c == 0x3297 || c == 0x3299;
+}
+// Code points that continue a cluster: variation selectors, skin-tone modifiers, the combining keycap, tag characters.
+bool isClusterExtend(char32_t c) {
+  return (c >= 0xFE00 && c <= 0xFE0F) || (c >= 0x1F3FB && c <= 0x1F3FF) || c == 0x20E3 || (c >= 0xE0020 && c <= 0xE007F);
+}
+bool isRegionalIndicator(char32_t c) { return c >= 0x1F1E6 && c <= 0x1F1FF; }
+// End of the grapheme cluster that starts with the symbol at [i, j) (j = after its first code point): extenders,
+// ZWJ + next code point (and its extenders), the second regional indicator of a flag.
+size_t clusterEnd(std::string_view s, size_t j, char32_t first) {
+  if (isRegionalIndicator(first) && j < s.size()) {
+    size_t m = j;
+    if (isRegionalIndicator(text::decodeUtf8(s, m))) j = m;
+  }
+  while (j < s.size()) {
+    size_t m = j;
+    const char32_t d = text::decodeUtf8(s, m);
+    if (isClusterExtend(d)) { j = m; continue; }
+    if (d == 0x200D && m < s.size()) {   // zero-width joiner: the next code point belongs to the cluster
+      size_t q = m;
+      const char32_t e = text::decodeUtf8(s, q);
+      if (e == ' ' || e == '\t' || e == '\n' || e == '\r') break;
+      j = q;
+      continue;
+    }
+    break;
+  }
+  return j;
+}
+
 bool hasLengthMark(std::string_view s) {
   const std::string d = text::nfd(s);
   return d.find("\xCC\x84") != std::string::npos;
@@ -232,9 +267,23 @@ struct Analyser::Impl {
           ++k;
         t.kind = TokKind::Number;
         j = k;
+        if (j == i + 1 && j < s.size()) {   // a keycap emoji (1️⃣): one symbol token
+          size_t m = j;
+          const char32_t d = text::decodeUtf8(s, m);
+          if (d == 0xFE0F || d == 0x20E3) {
+            t.kind = TokKind::Punct;
+            t.symbol = true;
+            j = clusterEnd(s, j, c);
+          }
+        }
+      } else if (isSymbolCp(c) || isRegionalIndicator(c)) {
+        t.kind = TokKind::Punct;   // one emoji cluster, copied byte for byte (C27)
+        t.symbol = true;
+        j = clusterEnd(s, j, c);
       } else {
         t.kind = TokKind::Punct;
         if (c == '.') while (j < s.size() && s[j] == '.') ++j;   // "..."
+        else j = clusterEnd(s, j, c);   // a stray variation selector / modifier stays with its mark
       }
       t.end = (int)j;
       t.text = std::string(s.substr(i, j - i));
@@ -1428,12 +1477,60 @@ void Analyser::setPersonNouns(std::vector<std::string> keys) {
   impl_->personNouns = std::move(keys);
 }
 
+void Analyser::analyseWords(std::string_view sentence, Sentence& out,
+                            const std::vector<rules::GlossaryEntry>* glossary) const {
+  out.clear();
+  out.text = text::nfc(sentence);
+  out.macrons = hasLengthMark(out.text);
+  impl_->tokenise(out.text, out.tokens);
+  out.tokens.erase(std::remove_if(out.tokens.begin(), out.tokens.end(), [](const Token& t) { return t.symbol; }),
+                   out.tokens.end());
+  impl_->run(out, glossary);
+}
+
 void Analyser::analyse(std::string_view sentence, Sentence& out, const std::vector<rules::GlossaryEntry>* glossary) const {
   out.clear();
   out.text = text::nfc(sentence);
   out.macrons = hasLengthMark(out.text);
   impl_->tokenise(out.text, out.tokens);
+  bool sym = false;
+  for (const Token& t : out.tokens) sym = sym || t.symbol;
+  if (!sym) {
+    impl_->run(out, glossary);
+    return;
+  }
+  // emoji clusters are transparent to the disambiguation (a noun and its adjective agree across "hortō🌳 meō"):
+  // analyse without them, then merge them back in text order and remap the clause indices
+  std::vector<Token> all;
+  all.swap(out.tokens);
+  std::vector<Token> symbols;
+  for (Token& t : all) (t.symbol ? symbols : out.tokens).push_back(std::move(t));
   impl_->run(out, glossary);
+  std::vector<Token> words;
+  words.swap(out.tokens);
+  std::vector<int> newIndex(words.size(), 0);
+  size_t w = 0, y = 0;
+  while (w < words.size() || y < symbols.size()) {
+    if (y >= symbols.size() || (w < words.size() && words[w].start < symbols[y].start)) {
+      newIndex[w] = (int)out.tokens.size();
+      out.tokens.push_back(std::move(words[w++]));
+    } else {
+      Token t = std::move(symbols[y++]);
+      t.clause = out.tokens.empty() ? 0 : out.tokens.back().clause;
+      out.tokens.push_back(std::move(t));
+    }
+  }
+  auto remap = [&](int& i) {
+    if (i >= 0 && (size_t)i < newIndex.size()) i = newIndex[(size_t)i];
+  };
+  for (Clause& c : out.clauses) {
+    const bool empty = c.last < c.first;
+    remap(c.first);
+    remap(c.last);
+    remap(c.marker);
+    remap(c.verb);
+    if (empty && c.last >= 0) c.last = c.first - 1;
+  }
 }
 
 std::vector<std::pair<size_t, size_t>> splitSentences(std::string_view t) {

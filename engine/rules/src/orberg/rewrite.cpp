@@ -1,7 +1,9 @@
-// The sentence rewriter of Orbergise (internal.h): la2x analysis -> output slots (one per input token) -> structure
-// rewrites of simplify_la.tsv -> vocabulary swaps above the tier ceiling -> text, changes and meaning bookkeeping.
-// Words that already satisfy the ceiling and the structure rules keep their written form; a sentence without any
-// change is returned byte for byte. Deterministic (fixed rule order, left to right, ties by lemma id).
+// The sentence rewriter of Orbergise (internal.h): la2x analysis (emoji clusters left out) -> output slots (one per
+// input token) -> fixed phrases protected (simplify_la.tsv "fixed") -> structure rewrites of simplify_la.tsv ->
+// vocabulary swaps above the tier ceiling (same sense only; else the word is kept and said) -> text, changes and
+// meaning bookkeeping. Words that already satisfy the ceiling and the structure rules keep their written form; the
+// source's spacing and emoji are copied from the gaps between its tokens; a sentence without any change is returned
+// byte for byte. Deterministic (fixed rule order, left to right, ties by lemma id).
 #include <algorithm>
 #include <cstdlib>
 
@@ -74,21 +76,25 @@ class Rewriter {
       : in_(in), R_(R), out_(out), la_(R.la), opt_(*in.opt), ceiling_(std::max(1, std::min(3, in.opt->tierCeiling))) {}
 
   void run() {
-    in_.ctx->la2x->analyser().analyse(in_.text, s_, in_.ctx->glossary);
-    // new words carry length marks unless the input is written without them (a word whose reading has a macron
-    // the text does not show)
+    // emoji clusters are left out of the analysis; finish() copies them back from the gaps of the source (C27)
+    in_.ctx->la2x->analyser().analyseWords(in_.text, s_, in_.ctx->glossary);
+    // the source's macron convention (C27): a document written without length marks gets none in new words. Unknown
+    // convention: new words carry length marks unless a word of the sentence visibly omits one its reading has.
     bool plain = false;
     if (!s_.macrons)
       for (const la2x::Token& t : s_.tokens)
-        if (t.kind == la2x::TokKind::Word && t.best() && t.best()->lemma != kNone &&
-            text::display_latin(t.best()->display, false) == text::nfc(t.text) &&
-            text::nfc(t.best()->display) != text::nfc(t.text) &&
-            text::latin_key(t.best()->display) == text::latin_key(t.text))
-          plain = true;
-    macrons_ = opt_.macrons && (s_.macrons || !plain);
+        if (t.kind == la2x::TokKind::Word && t.best() && t.best()->lemma != kNone) {
+          const std::string w = text::lower(text::nfc(t.text)), d = text::lower(text::nfc(t.best()->display));
+          if (text::nfd(d).find("\xCC\x86") != std::string::npos) continue;   // anceps (tibī̆): no evidence
+          if (text::display_latin(d, false) == w && d != w && text::latin_key(d) == text::latin_key(w)) plain = true;
+        }
+    if (opt_.sourceMacrons == 0) macrons_ = s_.macrons && opt_.macrons;
+    else if (opt_.sourceMacrons == 1) macrons_ = opt_.macrons;
+    else macrons_ = opt_.macrons && (s_.macrons || !plain);
     out_.macrons = macrons_;
     build();
     bookkeeping();
+    protectFixed();
     const bool simplify = opt_.simplify && !in_.simplifyOnly;
     if (simplify) {
       pairs();
@@ -102,7 +108,7 @@ class Rewriter {
       if (R_.on("split")) splitLong();
       if (R_.on("accinf")) accInfMark();
     }
-    vocabulary();
+    if (!in_.noVocab) vocabulary();
     finish();
   }
 
@@ -119,6 +125,9 @@ class Rewriter {
   std::vector<Slot> sl_;
   std::vector<Ch> ch_;
   std::vector<char> touched_;
+  std::vector<std::string> fixedName_;   // per token: the fixed phrase it belongs to ("" none)
+  std::string lead_;                     // source text before the first token (emoji, music signs)
+  std::vector<std::string> gap_;         // per token: the source text up to the next token (spaces, emoji)
   int firstWord_ = -1;
 
   // ---- setup -----------------------------------------------------------------------------------------------------
@@ -159,6 +168,70 @@ class Rewriter {
       if (firstWord_ < 0 && x.word()) firstWord_ = (int)i;
     }
     touched_.assign(tk_.size(), 0);
+    fixedName_.assign(tk_.size(), std::string());
+    const std::string& st = s_.text;
+    gap_.assign(tk_.size(), std::string());
+    if (!s_.tokens.empty()) lead_ = st.substr(0, (size_t)s_.tokens[0].start);
+    else lead_ = st;
+    for (size_t i = 0; i < s_.tokens.size(); ++i) {
+      const size_t a = (size_t)s_.tokens[i].end;
+      const size_t b = i + 1 < s_.tokens.size() ? (size_t)s_.tokens[i + 1].start : st.size();
+      if (b > a && a <= st.size()) gap_[i] = st.substr(a, b - a);
+    }
+  }
+
+  // ---- fixed phrases (simplify_la.tsv "fixed"): never split, never swapped (C27) -------------------------------------
+  bool elemMatch(int i, const std::vector<std::string>& alts) {
+    if (i < 0 || i >= (int)tk_.size() || !tk_[(size_t)i].word()) return false;
+    const std::string tkey = textKey(i);
+    for (const std::string& a : alts) {
+      if (a == "GER") {
+        for (const Rd& r : tk_[(size_t)i].rd)
+          if ((r.f.pos == Verb && r.f.mood == Gerund) || partKind(r) == PGerundive) return true;
+        continue;
+      }
+      if (tkey == a) return true;
+      for (const Rd& r : tk_[(size_t)i].rd) {
+        if (r.key == a) return true;
+        if (r.lemma != kNone && R_.isParticipleLemma(r.lemma)) {   // gestās: the participle of gerō
+          const uint32_t v = R_.verbOf(r.lemma);
+          if (v != kNone && la_.lemma(v).key == a) return true;
+        }
+      }
+    }
+    return false;
+  }
+  // tokens of one occurrence of `elems` starting at token i (each next element within `gap` other words, no
+  // punctuation in between); empty when there is none
+  std::vector<int> matchAt(int i, const std::vector<std::vector<std::string>>& elems, int gap) {
+    std::vector<int> at;
+    if (!elemMatch(i, elems[0])) return at;
+    at.push_back(i);
+    int j = i;
+    for (size_t e = 1; e < elems.size(); ++e) {
+      bool found = false;
+      int skipped = 0;
+      for (int k = j + 1; k < (int)tk_.size(); ++k) {
+        if (tk_[(size_t)k].punct()) break;
+        if (elemMatch(k, elems[e])) { at.push_back(k); j = k; found = true; break; }
+        if (tk_[(size_t)k].word() && ++skipped > gap) break;
+      }
+      if (!found) return {};
+    }
+    return at;
+  }
+  void protectFixed() {
+    for (const FixedRow& f : R_.fixed) {
+      std::vector<std::vector<std::string>> rev(f.elems.rbegin(), f.elems.rend());
+      for (int i = 0; i < (int)tk_.size(); ++i) {
+        std::vector<int> at = matchAt(i, f.elems, f.gap);
+        if (at.empty() && f.anyOrder) at = matchAt(i, rev, f.gap);
+        for (int k : at) {
+          touched_[(size_t)k] = 1;
+          if (fixedName_[(size_t)k].empty()) fixedName_[(size_t)k] = f.name;
+        }
+      }
+    }
   }
 
   uint32_t contentLemma(const Rd& r) {
@@ -269,9 +342,10 @@ class Rewriter {
   // A core lemma for a verb above the ceiling (rules generate verbs through this); the swap is recorded.
   uint32_t pick(uint32_t v, int ch, std::string* why = nullptr) {
     if (v == kNone || R_.tier(v) <= ceiling_) return v;
-    const Swap s = R_.swapFor(v, ceiling_, opt_.keepNames);
+    const Swap s = R_.swapFor(v, ceiling_, opt_.keepNames, in_.evidence, in_.ctx->la2x);
     if (s.lemma == kNone || !s.before.empty() || !s.after.empty()) return v;
-    out_.mapped.emplace_back(v, s.lemma);
+    out_.mapped.push_back(MapEntry{v, s.lemma, mapKind(s)});
+    if (!s.confirmed) out_.unconfirmed = true;
     if (why) *why = s.why;
     (void)ch;
     return s.lemma;
@@ -282,7 +356,7 @@ class Rewriter {
     const Rd* b = tk_[(size_t)src].best();
     if (!b) return;
     const uint32_t from = contentLemma(*b), to = contentLemma(used);
-    if (from != kNone && to != kNone && from != to) out_.mapped.emplace_back(from, to);
+    if (from != kNone && to != kNone && from != to) out_.mapped.push_back(MapEntry{from, to, MapKind::Reading});
   }
 
   // ---- edits -----------------------------------------------------------------------------------------------------
@@ -478,7 +552,7 @@ class Rewriter {
         const int ch = newChange("structure", "pair", from + " -> " + w + (p.note.empty() ? "" : " (" + p.note + ")"));
         for (size_t k = 0; k + 1 < at.size(); ++k) del(at[k], ch);
         set(last, w, ch);
-        if (lr && to != kNone) out_.mapped.emplace_back(contentLemma(*lr), to);
+        if (lr && to != kNone) out_.mapped.push_back(MapEntry{contentLemma(*lr), to, MapKind::Phrase});
         break;
       }
     }
@@ -514,6 +588,13 @@ class Rewriter {
           if (nr) { n = p - 3; agentFrom = p - 2; }
         }
         if (n < 0) continue;
+        // the noun must be read as an ablative (C27): without macrons "porta clausa" after est is the subject, not an
+        // ablative absolute; a noun that can be a nominative counts only when the analyser chose the ablative
+        {
+          bool nomReading = false;
+          for (const Rd& r : tk_[(size_t)n].rd) nomReading = nomReading || r.f.case_ == Nom || r.f.case_ == Voc;
+          if (tk_[(size_t)n].rd[0].f.case_ != Abl && nomReading) continue;
+        }
         std::vector<std::pair<int, const Rd*>> np = npOf(n, *nr);
         if (agentFrom >= 0)
           np.erase(std::remove_if(np.begin(), np.end(),
@@ -567,7 +648,6 @@ class Rewriter {
         // a fronted clause is closed by a comma before the main clause
         if (b + 1 < (int)tk_.size() && tk_[(size_t)(b + 1)].word() && mv > b) insert(b, true, {","}, ch, true);
         if (active) out_.flags.push_back("agent-guess");
-        if (v2 != v) out_.mapped.emplace_back(v, v2);
         break;
       }
     }
@@ -669,6 +749,13 @@ class Rewriter {
         Features mf = morph::verbForm(P3, pnum(*snr), sr.f.tense, sr.f.mood, Active);
         if (!gen(debeo, mf, modal)) continue;
         why = "gerundive of obligation -> dēbeō + passive infinitive (no agent named)";
+      } else if (in_.originalPerson && (gerund || sj < 0) && !deponent(v2) &&
+                 gen(v2, morph::infinitive(Present, Active), inf) &&
+                 gen(debeo, morph::verbForm(in_.originalPerson, in_.originalNumber ? in_.originalNumber : (uint8_t)Sg,
+                                            sr.f.tense, sr.f.mood, Active),
+                     modal)) {
+        // the original-language cue names who must act ("We must go."): evidence for the person of dēbeō (C27)
+        why = "gerund of obligation -> dēbeō + infinitive (the person from the original)";
       } else {
         if (std::find(out_.flags.begin(), out_.flags.end(), "structure-kept") == out_.flags.end())
           out_.flags.push_back("structure-kept");
@@ -685,7 +772,6 @@ class Rewriter {
       for (size_t q = 0; q < subjNP.size(); ++q) set(subjNP[q].first, agentForms[q], ch, subjNP[q].second->name);
       set(g, inf, ch);
       set(s, modal, ch);
-      if (v2 != v) out_.mapped.emplace_back(v, v2);
     }
   }
 
@@ -730,7 +816,6 @@ class Rewriter {
         set(f, inf, ch);
         set(s, m, ch);
       }
-      if (v2 != v) out_.mapped.emplace_back(v, v2);
     }
   }
 
@@ -781,7 +866,6 @@ class Rewriter {
       for (const std::string& x : split(w)) clause.push_back(x);
       del(u, ch);
       insert(m, true, clause, ch);
-      if (v2 != v) out_.mapped.emplace_back(v, v2);
     }
   }
 
@@ -795,6 +879,15 @@ class Rewriter {
       for (int j = c + 1; j < (int)tk_.size() && !tk_[(size_t)j].punct(); ++j)
         if (finiteBest(j)) { v = j; break; }
       if (v < 0 || touched_[(size_t)v]) continue;
+      // the verb belongs to cum only when no other subordinator or relative stands between (C27: "cum fīliā ut
+      // docēret" is the preposition and a purpose clause)
+      bool otherSub = false;
+      for (int j = c + 1; j < v; ++j) {
+        const std::string& k = key0(j);
+        otherSub = otherSub || k == "ut" || k == "ne" || k == "quod" || k == "quia" || k == "si" || k == "nisi" ||
+                   k == "dum" || k == "postquam" || k == "ubi" || k == "quam" || k == "cum" || relPron(j);
+      }
+      if (otherSub) continue;
       const Rd& vr = *tk_[(size_t)v].best();
       if (vr.f.mood != Subjunctive) continue;
       const uint8_t person = vr.f.person ? vr.f.person : (uint8_t)P3;
@@ -913,7 +1006,7 @@ class Rewriter {
           if (r2 > 0 && tk_[(size_t)(r2 - 1)].punct() && tk_[(size_t)(r2 - 1)].text == ",") del(r2 - 1, ch);
           set(r2, w, ch, nr.name);
           insert(r2, false, {"."}, ch, true);
-          if (nr.lemma != kNone) out_.mapped.emplace_back(nr.lemma, nr.lemma);
+          if (nr.lemma != kNone) out_.mapped.push_back(MapEntry{nr.lemma, nr.lemma, MapKind::Structure});
           return;
         }
       }
@@ -991,7 +1084,29 @@ class Rewriter {
   }
 
   // ---- vocabulary --------------------------------------------------------------------------------------------------------------
+  // A word above the ceiling that stays (C27): no same-sense core word, a fixed phrase, an uncertain reading. The
+  // cue is Check (flag tier-kept) and the note says why.
+  void keepWord(int i, const std::string& why) {
+    const std::string& w = tk_[(size_t)i].text;
+    if (std::find(out_.kept.begin(), out_.kept.end(), w) != out_.kept.end()) return;
+    out_.kept.push_back(w);
+    out_.notes.push_back(rules::Reason{-1, "orbergise", w + " kept: " + why,
+                                       "{\"was\":\"" + jsonEscape(w) + "\",\"now\":\"" + jsonEscape(w) +
+                                           "\",\"why\":\"" + jsonEscape("kept: " + why) + "\"}"});
+  }
+  bool aboveCeiling(int i) {
+    const Rd& r = tk_[(size_t)i].rd[0];
+    if (r.lemma == kNone || (r.name && opt_.keepNames)) return false;
+    for (const Rd& x : tk_[(size_t)i].rd)
+      if (x.lemma != kNone && R_.wordTier(x.lemma) <= ceiling_) return false;
+    return R_.wordTier(r.lemma) > (uint8_t)ceiling_;
+  }
+
   void vocabulary() {
+    // words of a fixed phrase above the ceiling stay as they are
+    for (int i = 0; i < (int)tk_.size(); ++i)
+      if (!fixedName_[(size_t)i].empty() && tk_[(size_t)i].word() && !tk_[(size_t)i].rd.empty() && aboveCeiling(i))
+        keepWord(i, "fixed phrase " + fixedName_[(size_t)i]);
     for (int i = 0; i < (int)tk_.size(); ++i) {
       if (!tk_[(size_t)i].word() || touched_[(size_t)i] || tk_[(size_t)i].rd.empty()) continue;
       if (periphrastic(i)) continue;
@@ -999,29 +1114,52 @@ class Rewriter {
       if (r.lemma == kNone) continue;
       if (r.name && opt_.keepNames) continue;
       if (R_.wordTier(r.lemma) <= ceiling_) continue;
-      // another reading of the same word is within the ceiling (the checker accepts the word): leave it
+      // a reading of the same written form is within the ceiling (whatever its part of speech: "meō" is also meus):
+      // the reader knows the form, it stays
       bool other = false;
       for (const Rd& x : tk_[(size_t)i].rd)
-        if (x.lemma != kNone && R_.wordTier(x.lemma) <= ceiling_ && x.lpos == r.lpos) other = true;
+        if (x.lemma != kNone && R_.wordTier(x.lemma) <= ceiling_) other = true;
       if (other) continue;
-      if (R_.isParticipleLemma(r.lemma)) { participleSwap(i, r); continue; }
-      const Swap s = R_.swapFor(r.lemma, ceiling_, opt_.keepNames);
-      if (s.lemma == kNone) continue;
+      // an uncertain reading is never the base of a swap (the swap would follow a guess): another lemma's reading is
+      // within reach of the best analysis
+      bool uncertain = false;
+      {
+        const la2x::Token& lt = s_.tokens[(size_t)i];
+        for (const la2x::Reading& x : lt.readings)
+          if (x.lemma != kNone && x.lemma != r.lemma && x.score >= lt.readings[0].score - 1.5 &&
+              la_.lemma(x.lemma).key != la_.lemma(r.lemma).key)
+            uncertain = true;
+      }
+      if (uncertain) {
+        keepWord(i, "the reading is uncertain (tier " + std::to_string(R_.wordTier(r.lemma)) + ")");
+        continue;
+      }
+      if (R_.isParticipleLemma(r.lemma)) {
+        if (!participleSwap(i, r)) keepWord(i, "no first-year word with the same sense (tier " +
+                                                   std::to_string(R_.wordTier(r.lemma)) + ")");
+        continue;
+      }
+      const Swap s = R_.swapFor(r.lemma, ceiling_, opt_.keepNames, in_.evidence, in_.ctx->la2x);
+      if (s.lemma == kNone) {
+        keepWord(i, "no first-year word with the same sense (tier " + std::to_string(R_.wordTier(r.lemma)) + ")");
+        continue;
+      }
+      const std::string noForm = "no form of the first-year word fits here";
       Features f = r.f;
       const bool depFrom = deponent(r.lemma), depTo = deponent(s.lemma);
       std::string w;
       if (r.f.pos == Verb || r.lpos == Verb) {
         if (depFrom) f.voice = Active;
-        else if (f.voice == Passive && depTo) continue;
+        else if (f.voice == Passive && depTo) { keepWord(i, noForm); continue; }
         if (f.mood == ParticipleMood) continue;   // handled with the participle lemma
-        if (!gen(s.lemma, f, w)) continue;
+        if (!gen(s.lemma, f, w)) { keepWord(i, noForm); continue; }
       } else if (r.lpos == Adv || r.f.pos == Adv || r.lpos == Conj || r.lpos == Prep || r.lpos == Intj ||
                  r.lpos == Particle) {
         w = head(s.lemma);
       } else {
         if (!f.number) f.number = Sg;
         f.case_ = caseOf(i, r);
-        if (!gen(s.lemma, f, w)) continue;
+        if (!gen(s.lemma, f, w)) { keepWord(i, noForm); continue; }
       }
       std::vector<std::pair<int, std::string>> mods;
       if (noun(r)) {
@@ -1036,35 +1174,40 @@ class Rewriter {
             if (m.second->lemma == kNone || !gen(m.second->lemma, mf, mw)) { ok = false; break; }
             mods.emplace_back(m.first, mw);
           }
-          if (!ok) continue;
+          if (!ok) { keepWord(i, noForm); continue; }
         }
       }
       std::string all = s.before.empty() ? w : s.before + " " + w;
       if (!s.after.empty()) all += " " + s.after;
       const int ch = newChange("vocabulary", s.rule.c_str(), s.why);
-      if (s.rule == "synonym" && std::find(out_.flags.begin(), out_.flags.end(), "synonym") == out_.flags.end())
-        out_.flags.push_back("synonym");   // a lexicon synonym (not a curated row): the teacher confirms (Check)
+      if (!s.confirmed) out_.unconfirmed = true;   // only a syn row of simplify_la.tsv may stay OK
       setWords(i, all, ch);
       for (const auto& m : mods) set(m.first, m.second, ch);
-      out_.mapped.emplace_back(r.lemma, s.lemma);
+      out_.mapped.push_back(MapEntry{r.lemma, s.lemma, mapKind(s)});
     }
+  }
+  static MapKind mapKind(const Swap& s) {
+    if (!s.before.empty() || !s.after.empty()) return MapKind::Phrase;
+    return s.rule == "syn" || s.rule == "periphrasis" ? MapKind::Curated : MapKind::Lexicon;
   }
 
   // A participle lemma above the ceiling: its verb swapped, the participle regenerated (same deponency only).
-  void participleSwap(int i, const Rd& r) {
+  bool participleSwap(int i, const Rd& r) {
     const uint32_t v = R_.verbOf(r.lemma);
-    if (v == kNone || R_.tier(v) <= ceiling_) return;
-    const Swap s = R_.swapFor(v, ceiling_, opt_.keepNames);
-    if (s.lemma == kNone || !s.before.empty() || !s.after.empty() || deponent(v) != deponent(s.lemma)) return;
+    if (v == kNone || R_.tier(v) <= ceiling_) return true;
+    const Swap s = R_.swapFor(v, ceiling_, opt_.keepNames, in_.evidence, in_.ctx->la2x);
+    if (s.lemma == kNone || !s.before.empty() || !s.after.empty() || deponent(v) != deponent(s.lemma)) return false;
     const PK k = partKind(r);
     Features f = morph::participle(k == PPres ? Present : k == PFut || k == PGerundive ? Future : Perfect,
                                    k == PGerundive || (k == PPerf && !deponent(v)) ? Passive : Active, pcase(r), pnum(r),
                                    r.gender() ? one(r.gender()) : (uint8_t)M);
     std::string w;
-    if (!gen(s.lemma, f, w)) return;
+    if (!gen(s.lemma, f, w)) return false;
     const int ch = newChange("vocabulary", s.rule.c_str(), s.why);
+    if (!s.confirmed) out_.unconfirmed = true;
     set(i, w, ch);
-    out_.mapped.emplace_back(v, s.lemma);
+    out_.mapped.push_back(MapEntry{v, s.lemma, mapKind(s)});
+    return true;
   }
 
   // Perfect participle + sum (perfect passive, deponent perfect) with a verb above the ceiling: regenerated from the
@@ -1080,10 +1223,11 @@ class Rewriter {
     const uint32_t v = verbOfRd(*pr);
     if (v == kNone) return false;
     if (R_.tier(v) <= ceiling_) return true;   // fine as it is (the participle counts with its verb)
-    const Swap s = R_.swapFor(v, ceiling_, opt_.keepNames);
-    if (s.lemma == kNone || !s.before.empty() || !s.after.empty()) return true;
+    const std::string keepWhy = "no first-year word with the same sense (tier " + std::to_string(R_.tier(v)) + ")";
+    const Swap s = R_.swapFor(v, ceiling_, opt_.keepNames, in_.evidence, in_.ctx->la2x);
+    if (s.lemma == kNone || !s.before.empty() || !s.after.empty()) { keepWord(i, keepWhy); return true; }
     const bool active = deponent(v);
-    if (!active && deponent(s.lemma)) return true;
+    if (!active && deponent(s.lemma)) { keepWord(i, keepWhy); return true; }
     const uint8_t t = sr->f.tense == Present ? Perfect : sr->f.tense == Imperfect ? Pluperfect
                       : sr->f.tense == Future ? FuturePerfect : 0;
     if (!t) return true;
@@ -1094,9 +1238,10 @@ class Rewriter {
     if (!gen(s.lemma, f, w)) return true;
     reinterpret(i, *pr);
     const int ch = newChange("vocabulary", s.rule.c_str(), s.why);
+    if (!s.confirmed) out_.unconfirmed = true;
     setWords(i, w, ch);
     del(i + 1, ch);
-    out_.mapped.emplace_back(v, s.lemma);
+    out_.mapped.push_back(MapEntry{v, s.lemma, mapKind(s)});
     return true;
   }
 
@@ -1113,6 +1258,15 @@ class Rewriter {
     return o;
   }
 
+  // the source text after token i up to the next token: its emoji part (kept with the word) and its spacing
+  std::string trail(int i) const {
+    if (i < 0 || i >= (int)gap_.size()) return std::string();
+    const std::string& g = gap_[(size_t)i];
+    size_t e = g.size();
+    while (e > 0 && (g[e - 1] == ' ' || g[e - 1] == '\t' || g[e - 1] == '\n' || g[e - 1] == '\r')) --e;
+    return g.substr(0, e);
+  }
+
   void finish() {
     if (ch_.empty()) {
       out_.text = in_.text;
@@ -1120,34 +1274,65 @@ class Rewriter {
       return;
     }
     out_.changed = true;
-    std::string text;
+    // spacing and emoji come from the source (C27): two source tokens that stay neighbours keep the exact text
+    // between them; an emoji cluster stays after its word; new words are joined with one space
+    std::string text = lead_;
     std::vector<int> startOf(sl_.size(), -1), endOf(sl_.size(), -1);
     bool sentenceStart = true, open = false;
+    // the first word keeps the source's case (a song line continuing in lower case stays so); a sentence made by a
+    // split starts with a capital
+    bool firstOfText = true;
+    const bool firstCap = firstWord_ < 0 || tk_[(size_t)firstWord_].cap;
+    int prevSrc = -2;   // source token of the previous emitted slot (-1: a new slot)
+    auto sep = [&](const Slot& s, bool punctAttach) {
+      if (text.empty() || text.size() == lead_.size()) return;
+      if (s.src >= 0 && prevSrc >= 0 && s.src == prevSrc + 1) {
+        const std::string& g = gap_[(size_t)prevSrc];
+        text += g.substr(trail(prevSrc).size());
+        return;
+      }
+      if (!open && !punctAttach) text += ' ';
+    };
     for (size_t k = 0; k < sl_.size(); ++k) {
       Slot& s = sl_[k];
-      if (s.del) continue;
+      if (s.del) {
+        const std::string t = s.src >= 0 ? trail(s.src) : std::string();
+        if (!t.empty()) {   // an emoji of a removed word stays where it was
+          size_t a = 0;
+          while (a < t.size() && t[a] == ' ') ++a;
+          if (!text.empty() && text.back() != ' ') text += ' ';
+          text += t.substr(a);
+          prevSrc = -1;
+        }
+        continue;
+      }
       if (s.punct) {
-        if (!text.empty() && !open && !attachLeft(s.text)) text += ' ';
+        sep(s, attachLeft(s.text));
         startOf[k] = (int)text.size();
         text += s.text;
         endOf[k] = (int)text.size();
+        if (s.src >= 0) text += trail(s.src);
         if (endsSent(s.text)) sentenceStart = true;
         open = opensRight(s.text);
+        prevSrc = s.src;
         continue;
       }
       std::string w = s.text;
-      if (sentenceStart) w = capitalise(w);
+      if (sentenceStart) w = firstOfText && !firstCap && !s.name ? decapitalise(w) : capitalise(w);
       else if (!s.name && (s.isNew || s.src == firstWord_)) {
         bool keepCap = false;
         if (s.src >= 0 && s.src != firstWord_) keepCap = tk_[(size_t)s.src].cap;
         if (!keepCap) w = decapitalise(w);
       }
-      if (!text.empty() && !open) text += ' ';
+      firstOfText = false;
+      sep(s, false);
       startOf[k] = (int)text.size();
       text += w;
       endOf[k] = (int)text.size();
+      if (s.src >= 0) text += trail(s.src);
       sentenceStart = false;
       open = false;
+      prevSrc = s.src;
     }
     out_.text = text;
     // changes: from = the source words of the span, to = the output between the first and last slot of the span

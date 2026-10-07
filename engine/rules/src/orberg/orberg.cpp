@@ -1,6 +1,7 @@
-// orbergise() and cues() (vp/orberg.h): the rewrite of a cue sentence by sentence, the original-language path, the
-// alignment that turns two texts into "was -> now" changes, the meaning check, the checks (A1-A4 from the Latin
-// checker, A6 with participles counted as their verbs, A7 = meaning) and the confidence.
+// orbergise() and cues() (vp/orberg.h): the rewrite of a cue sentence by sentence, the never-nonsense gate (a rewrite
+// that adds a grammar fault or misreads a swapped word is discarded), the meaning check (la2x re-analysis, gloss
+// comparison of substitutions, the original-language cue as evidence), the checks (A1-A4 from the Latin checker, A6
+// with participles counted as their verbs, A7 = meaning) and the confidence. The original never replaces the Latin.
 #include <algorithm>
 #include <cmath>
 #include <exception>
@@ -31,17 +32,96 @@ struct TextOut {
   std::vector<rules::Reason> notes;
   std::vector<std::string> flags;
   std::vector<std::pair<uint32_t, std::string>> content;
-  std::vector<std::pair<uint32_t, uint32_t>> mapped;
+  std::vector<detail::MapEntry> mapped;
   std::vector<uint32_t> inputLemmas;
-  bool changed = false, macrons = false;
+  std::vector<std::string> kept;
+  bool changed = false, macrons = false, unconfirmed = false;
 };
 
 void addFlag(std::vector<std::string>& f, const std::string& x) {
   if (std::find(f.begin(), f.end(), x) == f.end()) f.push_back(x);
 }
 
+// Never nonsense (C27): a rewritten sentence must not add an A1/A3/A4 fault the input did not have, every swapped word
+// must be read back as the word it was meant to be, and no unknown word may appear. `why` names the first failure.
+bool sound(const std::string& input, const detail::SentenceOut& so, const OrbergOptions& o, const EngineContext& ctx,
+           Resources::Impl& R, std::string& why) {
+  check::Options co;
+  co.tierCeiling = (uint8_t)o.tierCeiling;
+  co.glossary = ctx.glossary;
+  check::Report ri, ro;
+  ctx.checker->check(input, co, ri);
+  ctx.checker->check(so.text, co, ro);
+  auto ok = [](const check::Report& r, const char* id, std::string* detail) {
+    for (const rules::Check& c : r.checks)
+      if (c.id == id && !c.ok) {
+        if (detail) *detail = c.detail;
+        return false;
+      }
+    return true;
+  };
+  for (const char* id : {"A1", "A3", "A4"}) {
+    std::string d;
+    if (!ok(ro, id, &d) && ok(ri, id, nullptr)) {
+      why = std::string(id) + " fails on the rewrite" + (d.empty() ? std::string() : " (" + d + ")");
+      return false;
+    }
+  }
+  la2x::Sentence s;
+  ctx.la2x->analyser().analyseWords(so.text, s, ctx.glossary);
+  detail::LemmaSet best;
+  detail::bestContentLemmas(s, R, best);
+  std::vector<std::string> bestKeys;
+  for (uint32_t l : best.lemmas) bestKeys.push_back(std::string(R.la.lemma(l).key));
+  for (const detail::MapEntry& m : so.mapped) {
+    if (m.kind == detail::MapKind::Reading || m.kind == detail::MapKind::Structure) continue;
+    if (m.to == kNone || best.has(m.to)) continue;
+    const std::string k(R.la.lemma(m.to).key);
+    if (std::find(bestKeys.begin(), bestKeys.end(), k) != bestKeys.end()) continue;
+    // a fixed form (pair rows: aliquid) written as the lemma's own head and read with it among its readings
+    bool written = false;
+    for (const la2x::Token& t : s.tokens)
+      if (t.kind == la2x::TokKind::Word && text::latin_key(t.text) == k)
+        for (const la2x::Reading& r : t.readings) written = written || r.lemma == m.to;
+    if (written) continue;
+    why = "the new word " + std::string(R.la.lemma(m.to).head) + " would be read as another word";
+    return false;
+  }
+  const std::string inKey = " " + text::latin_key(input) + " ";
+  for (const la2x::Token& t : s.tokens)
+    if (t.kind == la2x::TokKind::Word && t.unknown && !t.nameGuess &&
+        inKey.find(" " + text::latin_key(t.text) + " ") == std::string::npos) {
+      why = "unknown word " + t.text;
+      return false;
+    }
+  return true;
+}
+
+// The subject person / number an original-language cue names (evidence for a gerund of obligation without an agent):
+// the first subject pronoun (English, Spanish) or a form of deber / tener que. 0 when none.
+std::pair<uint8_t, uint8_t> originalPerson(const std::vector<std::string>& w, Lang lang) {
+  static const std::pair<const char*, std::pair<uint8_t, uint8_t>> en[] = {
+      {"i", {P1, Sg}}, {"we", {P1, Pl}}, {"you", {P2, Sg}}, {"he", {P3, Sg}}, {"she", {P3, Sg}}, {"they", {P3, Pl}}};
+  static const std::pair<const char*, std::pair<uint8_t, uint8_t>> es[] = {
+      {"yo", {P1, Sg}}, {"nosotros", {P1, Pl}}, {"nosotras", {P1, Pl}}, {"tú", {P2, Sg}}, {"ustedes", {P2, Pl}},
+      {"él", {P3, Sg}}, {"ella", {P3, Sg}}, {"ellos", {P3, Pl}}, {"ellas", {P3, Pl}}, {"debo", {P1, Sg}},
+      {"debemos", {P1, Pl}}, {"debes", {P2, Sg}}, {"deben", {P3, Pl}}, {"tengo", {P1, Sg}}, {"tenemos", {P1, Pl}},
+      {"tienes", {P2, Sg}}, {"tienen", {P3, Pl}}};
+  for (const std::string& x : w) {
+    if (lang == Lang::Es) {
+      for (const auto& p : es)
+        if (x == p.first) return p.second;
+    } else {
+      for (const auto& p : en)
+        if (x == p.first) return p.second;
+    }
+  }
+  return {0, 0};
+}
+
 void rewriteText(const std::string& latin, const OrbergOptions& o, const EngineContext& ctx, Resources::Impl& R,
-                 bool vocabOnly, TextOut& out) {
+                 bool vocabOnly, TextOut& out, const std::vector<std::string>* evidence = nullptr,
+                 std::pair<uint8_t, uint8_t> person = {0, 0}) {
   const auto ranges = la2x::splitSentences(latin);
   size_t prev = 0;
   for (const auto& r : ranges) {
@@ -51,8 +131,45 @@ void rewriteText(const std::string& latin, const OrbergOptions& o, const EngineC
     in.opt = &o;
     in.ctx = &ctx;
     in.simplifyOnly = vocabOnly;
+    in.evidence = evidence;
+    if (ranges.size() == 1) {   // the person of a one-sentence cue only (no guess across sentences)
+      in.originalPerson = person.first;
+      in.originalNumber = person.second;
+    }
     detail::SentenceOut so;
     detail::rewriteSentence(in, R, so);
+    if (so.changed) {
+      std::string why;
+      if (!sound(in.text, so, o, ctx, R, why)) {
+        // fall back to the vocabulary alone, then to the structure alone, then to the sentence as written
+        bool used = false;
+        for (int variant = 0; variant < 2 && !used; ++variant) {
+          detail::SentenceIn v = in;
+          if (variant == 0) v.simplifyOnly = true;
+          else v.noVocab = true;
+          if (variant == 1 && vocabOnly) break;
+          detail::SentenceOut vo;
+          detail::rewriteSentence(v, R, vo);
+          std::string why2;
+          if (vo.changed && sound(in.text, vo, o, ctx, R, why2)) {
+            vo.notes.push_back(rules::Reason{-1, "orbergise", "part of the rewrite discarded: " + why, ""});
+            vo.flags.push_back("rewrite-partial");
+            so = std::move(vo);
+            used = true;
+          }
+        }
+        if (!used) {
+          detail::SentenceOut keep;
+          keep.text = in.text;
+          keep.content = so.content;
+          keep.inputLemmas = so.inputLemmas;
+          keep.macrons = so.macrons;
+          keep.notes.push_back(rules::Reason{-1, "orbergise", "rewrite discarded: " + why, ""});
+          keep.flags.push_back("rewrite-discarded");
+          so = std::move(keep);
+        }
+      }
+    }
     const int base = (int)out.text.size();
     for (Change c : so.changes) {
       if (c.tokenIndex >= 0) c.tokenIndex += base;
@@ -64,8 +181,10 @@ void rewriteText(const std::string& latin, const OrbergOptions& o, const EngineC
     out.content.insert(out.content.end(), so.content.begin(), so.content.end());
     out.mapped.insert(out.mapped.end(), so.mapped.begin(), so.mapped.end());
     out.inputLemmas.insert(out.inputLemmas.end(), so.inputLemmas.begin(), so.inputLemmas.end());
+    for (const std::string& k : so.kept) out.kept.push_back(k);
     out.changed = out.changed || so.changed;
     out.macrons = out.macrons || so.macrons;
+    out.unconfirmed = out.unconfirmed || so.unconfirmed;
     prev = r.second;
   }
   if (prev < latin.size()) out.text += latin.substr(prev);
@@ -79,7 +198,8 @@ struct Read {
 void readBack(const std::string& t, const EngineContext& ctx, Read& out) {
   for (const auto& r : la2x::splitSentences(t)) {
     out.sents.emplace_back();
-    ctx.la2x->analyser().analyse(std::string_view(t).substr(r.first, r.second - r.first), out.sents.back(), ctx.glossary);
+    ctx.la2x->analyser().analyseWords(std::string_view(t).substr(r.first, r.second - r.first), out.sents.back(),
+                                      ctx.glossary);
     out.offsets.push_back(r.first);
   }
 }
@@ -90,93 +210,14 @@ bool isName(const la2x::Token& t, const lex::Lexicon& la) {
   return t.nameGuess;
 }
 
-// Word-level key for the alignment: the content lemma (participles -> verb), a name key, or the written key.
-uint32_t alignKey(const la2x::Token& t, Resources::Impl& R) {
-  if (t.readings.empty()) return detail::nameId(text::latin_key(t.text));
-  const la2x::Reading& r = t.readings[0];
-  if (r.name || r.lemma == kNone) return detail::nameId(text::latin_key(t.text));
-  if (R.isParticipleLemma(r.lemma)) {
-    const uint32_t v = R.verbOf(r.lemma);
-    if (v != kNone) return v;
-  }
-  return r.lemma;
-}
-
-struct AWord { std::string text; uint32_t key = 0; int start = 0; uint8_t pos = 0; };
-std::vector<AWord> alignWords(const Read& rd, Resources::Impl& R) {
-  std::vector<AWord> w;
-  for (size_t s = 0; s < rd.sents.size(); ++s)
-    for (const la2x::Token& t : rd.sents[s].tokens) {
-      if (t.kind != la2x::TokKind::Word) continue;
-      AWord a;
-      a.text = t.text;
-      a.key = alignKey(t, R);
-      a.start = t.start + (int)rd.offsets[s];
-      a.pos = t.readings.empty() || t.readings[0].lemma == kNone ? 0 : R.la.lemma(t.readings[0].lemma).pos;
-      w.push_back(a);
-    }
-  return w;
-}
-
-// "was -> now" from two texts: longest common subsequence on the word keys; each gap is one change (vocabulary for a
-// one-word swap of the same part of speech, else structure), a kept lemma with another form is a structure change,
-// a lemma that leaves one gap and enters another is an order change.
-std::vector<Change> alignChanges(const std::vector<AWord>& a, const std::vector<AWord>& b) {
-  const size_t n = a.size(), m = b.size();
-  std::vector<std::vector<uint16_t>> L(n + 1, std::vector<uint16_t>(m + 1, 0));
-  for (size_t i = n; i-- > 0;)
-    for (size_t j = m; j-- > 0;)
-      L[i][j] = a[i].key == b[j].key ? (uint16_t)(L[i + 1][j + 1] + 1) : std::max(L[i + 1][j], L[i][j + 1]);
-  std::vector<Change> out;
-  size_t i = 0, j = 0;
-  auto flush = [&](size_t i0, size_t i1, size_t j0, size_t j1) {
-    if (i0 == i1 && j0 == j1) return;
-    Change c;
-    for (size_t k = i0; k < i1; ++k) c.from += (c.from.empty() ? "" : " ") + a[k].text;
-    for (size_t k = j0; k < j1; ++k) c.to += (c.to.empty() ? "" : " ") + b[k].text;
-    c.reason = (i1 - i0 == 1 && j1 - j0 == 1 && a[i0].pos == b[j0].pos) ? "vocabulary" : "structure";
-    c.rule = "original";
-    c.why = c.reason == "vocabulary" ? "word from the original's translation" : "structure from the original's translation";
-    c.tokenIndex = j1 > j0 ? b[j0].start : -1;
-    out.push_back(c);
-  };
-  size_t gi = 0, gj = 0;
-  while (i < n && j < m) {
-    if (a[i].key == b[j].key) {
-      flush(gi, i, gj, j);
-      if (text::latin_key(a[i].text) != text::latin_key(b[j].text)) {
-        Change c;
-        c.from = a[i].text;
-        c.to = b[j].text;
-        c.reason = "structure";
-        c.rule = "original";
-        c.why = "same word, another form";
-        c.tokenIndex = b[j].start;
-        out.push_back(c);
-      }
-      ++i;
-      ++j;
-      gi = i;
-      gj = j;
-    } else if (L[i + 1][j] >= L[i][j + 1]) {
-      ++i;
-    } else {
-      ++j;
-    }
-  }
-  flush(gi, n, gj, m);
-  // order: a word deleted in one change and inserted in another
-  for (size_t x = 0; x < out.size(); ++x)
-    for (size_t y = 0; y < out.size(); ++y) {
-      if (x == y || out[x].from.empty() || out[y].to.empty()) continue;
-      if (out[x].from == out[y].to) { out[x].reason = "order"; out[y].reason = "order"; out[y].why = "word order"; }
-    }
-  return out;
-}
-
+// The meaning check (C27): every content lemma of the input (best readings) must be read in the output, or be replaced
+// by the same written word read otherwise, a rule's regeneration, a teacher-edited row, or a word whose glosses (la2x
+// curated glosses and the lexicon's first sense, English and Spanish) share its sense. Losses are listed as
+// "head -> new head" (or the head alone when nothing replaced it).
 double meaningOf(const std::vector<std::pair<uint32_t, std::string>>& content0,
-                 const std::vector<std::pair<uint32_t, uint32_t>>& mapped, const detail::LemmaSet& outSet,
-                 std::vector<std::string>& missing) {
+                 const std::vector<detail::MapEntry>& mapped,
+                 const detail::LemmaSet& outSet, Resources::Impl& R, const la2x::Translator* tr,
+                 std::vector<std::string>& missing, size_t& total) {
   std::vector<std::pair<uint32_t, std::string>> content = content0;
   std::sort(content.begin(), content.end());
   content.erase(std::unique(content.begin(), content.end(),
@@ -184,28 +225,58 @@ double meaningOf(const std::vector<std::pair<uint32_t, std::string>>& content0,
                               return x.first == y.first;
                             }),
                 content.end());
+  total = content.size();
   if (content.empty()) return 1.0;
   size_t ok = 0;
   for (const auto& c : content) {
     bool found = false;
     if (c.first & 0x80000000u) found = outSet.hasName(text::latin_key(c.second));
     else found = outSet.has(c.first);
-    // substitutions (swaps, pairs, readings a rule chose), followed up to three steps
+    std::string lostTo;
     std::vector<uint32_t> frontier{c.first};
     for (int step = 0; step < 3 && !found && !frontier.empty(); ++step) {
       std::vector<uint32_t> next;
       for (uint32_t f : frontier)
-        for (const auto& m : mapped)
-          if (m.first == f && m.second != f) {
-            if (outSet.has(m.second)) found = true;
-            next.push_back(m.second);
+        for (const detail::MapEntry& m : mapped) {
+          if (m.from != f || m.to == f || m.to == kNone) continue;
+          const bool same = m.kind == detail::MapKind::Reading || m.kind == detail::MapKind::Structure ||
+                            m.kind == detail::MapKind::Phrase || R.glossSame(f, m.to, tr);
+          if (!same) {
+            if (lostTo.empty() && m.to < R.la.lemmaCount()) lostTo = std::string(R.la.lemma(m.to).head);
+            continue;
           }
+          if (outSet.has(m.to)) found = true;
+          next.push_back(m.to);
+        }
       frontier.swap(next);
     }
     if (found) ++ok;
-    else missing.push_back(c.second);
+    else missing.push_back(lostTo.empty() ? c.second : c.second + " -> " + lostTo);
   }
   return (double)ok / (double)content.size();
+}
+
+// Lower-case words of an original-language cue (sense evidence and the meaning check).
+std::vector<std::string> originalWords(const std::string& t) {
+  std::vector<std::string> out;
+  std::string w;
+  auto flush = [&]() {
+    if (w.size() >= 2 && std::find(out.begin(), out.end(), w) == out.end()) out.push_back(w);
+    w.clear();
+  };
+  size_t i = 0;
+  while (i < t.size()) {
+    const size_t a = i;
+    const char32_t c = text::decodeUtf8(t, i);
+    const bool letter =
+        (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= 0xC0 && c <= 0x24F && c != 0xD7 && c != 0xF7);
+    if (letter || (c == '\'' && !w.empty())) w += text::lower(t.substr(a, i - a));
+    else flush();
+  }
+  flush();
+  for (std::string& x : out)
+    if (!x.empty() && x.back() == '\'') x.pop_back();
+  return out;
 }
 
 std::string pct(double v) { return std::to_string((int)std::lround(v * 100.0)) + " %"; }
@@ -275,6 +346,14 @@ Verdict verdict(const std::string& t, const Read& rd, const OrbergOptions& o, co
   return v;
 }
 
+// The document's macron convention (C27): a length mark anywhere in the cues means a text written with macrons (1);
+// none means a text without them (0): new words get none either.
+int macronConvention(const std::vector<rules::CueInput>& in) {
+  for (const rules::CueInput& c : in)
+    if (text::nfd(c.sourceText).find("\xCC\x84") != std::string::npos) return 1;
+  return 0;
+}
+
 }  // namespace
 
 OrbergResult orbergise(const std::string& latin, const std::string* original, Lang originalLang,
@@ -290,102 +369,68 @@ OrbergResult orbergise(const std::string& latin, const std::string* original, La
     OrbergOptions opts = opts0;
     opts.tierCeiling = std::max(1, std::min(2, opts.tierCeiling));
     opts.hasOriginal = original && !original->empty();
+    // the original-language cue is evidence (C27): its words rank same-sense candidates (English originals) and enter
+    // the meaning check; it never replaces the Latin
+    std::vector<std::string> evidence;
+    if (opts.hasOriginal) evidence = originalWords(*original);
     TextOut rw;
-    rewriteText(latin, opts, ctx, R, false, rw);
-    std::string text = rw.text;
-    std::vector<Change> changes = rw.changes;
-    std::vector<std::pair<uint32_t, std::string>> content = rw.content;
-    std::vector<std::pair<uint32_t, uint32_t>> mapped = rw.mapped;
+    rewriteText(latin, opts, ctx, R, false, rw,
+                opts.hasOriginal && originalLang == Lang::En && !evidence.empty() ? &evidence : nullptr,
+                opts.hasOriginal ? originalPerson(evidence, originalLang) : std::pair<uint8_t, uint8_t>{0, 0});
+    const std::string& text = rw.text;
     std::vector<std::string> flags = rw.flags;
-    std::vector<rules::Reason> notes = rw.notes;
     Read rd;
     readBack(text, ctx, rd);
     Verdict vd = verdict(text, rd, opts, ctx, R);
 
-    // ---- meaning of the rewrite (content lemmas of the input vs the output) ----
-    auto meaningNow = [&](std::vector<std::string>& miss) {
-      detail::LemmaSet outSet;
-      for (const la2x::Sentence& s : rd.sents) detail::contentLemmas(s, R, outSet);
-      miss.clear();
-      const double m = meaningOf(content, mapped, outSet, miss);
-      std::sort(miss.begin(), miss.end());
-      miss.erase(std::unique(miss.begin(), miss.end()), miss.end());
-      return m;
-    };
+    // ---- meaning: the content lemmas a reader reads in the output (la2x best readings) against the input's ----
+    detail::LemmaSet outSet;
+    for (const la2x::Sentence& s : rd.sents) detail::bestContentLemmas(s, R, outSet);
     std::vector<std::string> missing;
-    res.meaning = meaningNow(missing);
-
-    // ---- with the original ----
-    // Policy (simplify_la.tsv "rule original prefer=..."): rewrite = the Latin's own rewrite when it is clean (no Fix,
-    // tier ceiling met, meaning >= 0.6, no construction left as it was), else the original's translation when that
-    // one is clean; original = the original's translation first (DESIGN §10.7 read literally).
+    size_t total = 0;
+    double meaning = meaningOf(rw.content, rw.mapped, outSet, R, ctx.la2x, missing, total);
     if (opts.hasOriginal) {
-      const bool preferO = R.param("original", "prefer", "rewrite") == "original";
-      const bool cleanR = !vd.fix && vd.a6 && res.meaning >= 0.6 &&
-                          std::find(flags.begin(), flags.end(), "structure-kept") == flags.end();
-      if (!rw.changed && cleanR) {
-        addFlag(flags, "orberg-kept");   // already beginner Latin: the input stays as it is
-      } else if (!ctx.fromOriginal) {
-        addFlag(flags, "original-unused");
-      } else if (cleanR && !preferO) {
-        addFlag(flags, "orberg-latin");   // the original was not needed
-      } else {
-        std::vector<uint32_t> prefer;
-        for (uint32_t l : rw.inputLemmas)
-          if (R.tier(l) <= opts.tierCeiling) prefer.push_back(l);
-        std::sort(prefer.begin(), prefer.end());
-        prefer.erase(std::unique(prefer.begin(), prefer.end()), prefer.end());
-        OriginalLatin ol;
-        bool ok = false;
-        try {
-          ok = ctx.fromOriginal(*original, originalLang, opts.tierCeiling, prefer, ol);
-        } catch (...) {
-          ok = false;
-        }
-        std::string why;
-        if (!ok || ol.text.empty()) why = "the original could not be translated";
-        else if (ol.unknown) why = "the original has words without a Latin lemma";
-        if (why.empty()) {
-          std::string cand = rw.macrons ? ol.text : text::display_latin(ol.text, false);
-          TextOut vo;   // vocabulary above the ceiling in the original's Latin
-          rewriteText(cand, opts, ctx, R, true, vo);
-          Read rd2;
-          readBack(vo.text, ctx, rd2);
-          Verdict vd2 = verdict(vo.text, rd2, opts, ctx, R);
-          if (vd2.fix) why = "the original's Latin did not pass the grammar checks";
-          else if (!vd2.a6) why = "the original's Latin is above the tier ceiling too";
-          if (why.empty()) {
-            Read rin;
-            readBack(latin, ctx, rin);
-            changes = alignChanges(alignWords(rin, R), alignWords(rd2, R));
-            // reference: the original's transferred lemmas
-            content.clear();
-            for (uint32_t l : ol.lemmas)
-              if (l != kNone && l < ctx.la->lemmaCount()) {
-                const lex::Lemma x = ctx.la->lemma(l);
-                if (x.key == "sum") continue;
-                content.emplace_back(l, std::string(x.head));
-              }
-            mapped = vo.mapped;
-            text = vo.text;
-            rd = std::move(rd2);
-            vd = std::move(vd2);
-            notes = vo.notes;
-            flags = vo.flags;
-            res.fromOriginal = true;
-            addFlag(flags, "orberg-original");
-            if (ol.fallback) addFlag(flags, "frame-fallback");
-            res.meaning = meaningNow(missing);
+      addFlag(flags, "original-evidence");
+      addFlag(flags, rw.changed ? "orberg-latin" : "orberg-kept");
+      // words of the original the input covers (through la2x glosses) must stay covered by the output
+      if (rw.changed && text != latin) {
+        const la2x::Target tl = originalLang == Lang::Es ? la2x::Target::Es : la2x::Target::En;
+        size_t lost = 0;
+        for (const std::string& w : evidence) {
+          // the word or a simple base form of it (hurries: hurry; went is left as it is) that the input covers
+          std::vector<std::string> forms{w};
+          if (tl == la2x::Target::En) {
+            auto cut = [&](const char* suf, const char* add) {
+              const size_t n = std::char_traits<char>::length(suf);
+              if (w.size() > n + 2 && w.compare(w.size() - n, n, suf) == 0)
+                forms.push_back(w.substr(0, w.size() - n) + add);
+            };
+            cut("ies", "y");
+            cut("es", "");
+            cut("s", "");
+            cut("ed", "");
+            cut("ed", "e");
+            cut("ing", "");
+            cut("ing", "e");
+          }
+          for (const std::string& f : forms) {
+            const std::vector<std::string> one{f};
+            if (ctx.la2x->roundTripOverlap(latin, one, tl) < 1.0) continue;
+            if (ctx.la2x->roundTripOverlap(text, one, tl) < 1.0) {
+              ++lost;
+              missing.push_back("\"" + w + "\" (original)");
+            }
+            break;
           }
         }
-        if (!why.empty()) {
-          addFlag(flags, "original-rejected");
-          notes.push_back(rules::Reason{-1, "orbergise", "rewritten from the Latin: " + why, ""});
-        }
+        if (lost) meaning = (meaning * (double)total) / (double)(total + lost);
       }
     }
+    std::sort(missing.begin(), missing.end());
+    missing.erase(std::unique(missing.begin(), missing.end()), missing.end());
+    res.meaning = meaning;
     res.missing = missing;
-    rules::Check a7{"A7", res.meaning >= 0.6, "meaning " + pct(res.meaning)};
+    rules::Check a7{"A7", res.meaning >= 0.6 && missing.empty(), "meaning " + pct(res.meaning)};
     if (!missing.empty()) {
       a7.detail += "; missing:";
       for (const std::string& m : missing) a7.detail += " " + m;
@@ -404,21 +449,29 @@ OrbergResult orbergise(const std::string& latin, const std::string* original, La
         if (res.tokens[k].start >= off) return (int)k;
       return -1;
     };
-    for (Change& c : changes) {
+    for (Change c : rw.changes) {
       c.tokenIndex = tokenAt(c.tokenIndex);
       res.reasons.push_back(rules::Reason{c.tokenIndex, "orbergise",
                                           (c.from.empty() ? std::string("(new)") : c.from) + " -> " +
                                               (c.to.empty() ? std::string("(removed)") : c.to) + " (" +
                                               (c.why.empty() ? c.reason : c.why) + ")",
                                           reasonData(c)});
+      res.changes.push_back(std::move(c));
     }
-    res.changes = changes;
-    for (rules::Reason& n : notes) res.reasons.push_back(std::move(n));
+    for (const rules::Reason& n : rw.notes) {
+      bool dup = false;   // the same note from two sentences of one cue ("Serus kept ...") once
+      for (const rules::Reason& x : res.reasons) dup = dup || (x.kind == n.kind && x.text == n.text);
+      if (!dup) res.reasons.push_back(n);
+    }
+    if (rw.unconfirmed) addFlag(flags, "synonym");   // a swap that is not a confirmed pair: the teacher checks it
+    if (!rw.kept.empty()) addFlag(flags, "tier-kept");
     if (res.meaning < 0.6) addFlag(flags, "meaning-low");
+    if (!missing.empty()) addFlag(flags, "meaning-lost");
     if (!vd.a6) addFlag(flags, "tier-exceeded");
     res.flags = flags;
-    bool check = !vd.a6 || res.meaning < 0.6;
-    for (const char* f : {"agent-guess", "structure-kept", "frame-fallback", "synonym"})
+    bool check = !vd.a6 || res.meaning < 0.6 || !missing.empty();
+    for (const char* f : {"agent-guess", "structure-kept", "frame-fallback", "synonym", "tier-kept", "rewrite-partial",
+                          "rewrite-discarded"})
       if (std::find(flags.begin(), flags.end(), f) != flags.end()) check = true;
     res.confidence = vd.fix ? Confidence::Fix : check ? Confidence::Check : Confidence::Ok;
     return res;
@@ -448,6 +501,7 @@ std::vector<rules::CueOutput> cues(const std::vector<rules::CueInput>& in, const
   o.keepNames = opt.orbergKeepNames;
   o.simplify = opt.orbergSimplify;
   o.macrons = opt.macrons;
+  o.sourceMacrons = macronConvention(in);
   for (size_t i = 0; i < in.size(); ++i) {
     if (cancelled && cancelled()) break;
     const rules::CueInput& c = in[i];
@@ -464,7 +518,8 @@ std::vector<rules::CueOutput> cues(const std::vector<rules::CueInput>& in, const
       } else {
         const OrbergResult r = orbergise(flat, c.originalText.empty() ? nullptr : &c.originalText, c.originalLang, o, ctx);
         const cue::Layout lay = cue::layout(r.text, ctx.maxLine, ctx.maxLines);
-        out.target = lay.joined;
+        // an unchanged cue keeps its own lines byte for byte (C27); a rewritten one is laid out again
+        out.target = r.text == flat ? c.sourceText : lay.joined;
         out.tokens = r.tokens;
         cue::relocate(out.target, out.tokens);
         out.reasons = r.reasons;
