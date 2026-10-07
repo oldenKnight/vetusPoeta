@@ -25,7 +25,7 @@ bool hasSongMark(std::string_view s) {
 bool closer(std::string_view s, size_t i, size_t& len) {
   if (i >= s.size()) return false;
   const char c = s[i];
-  if (c == '"' || c == '\'' || c == ')' || c == ']') { len = 1; return true; }
+  if (c == '"' || c == '\'' || c == ')' || c == ']' || c == '|') { len = 1; return true; }   // C22: a stray '|'
   if (s.compare(i, 3, "\xE2\x80\x9D") == 0 || s.compare(i, 3, "\xE2\x80\x99") == 0 || s.compare(i, 2, "\xC2\xBB") == 0) {
     len = s[i] == '\xC2' ? 2 : 3;
     return true;
@@ -150,6 +150,13 @@ void chunks(const std::string& s, std::vector<std::pair<size_t, size_t>>& out, b
       while (terminalAt(s, j, more)) j += more;
       size_t cl = 0;
       while (closer(s, j, cl)) j += cl;
+      // C22: closing quotes after a space ("... was... \"") belong to this chunk: a chunk made only of closers
+      // would be a sentence of its own that swallows the next cue
+      {
+        size_t k = j;
+        while (k < s.size() && (isSpace(s[k]) || closer(s, k, cl))) k += isSpace(s[k]) ? 1 : cl;
+        if (k >= s.size() && k > j && !trim(std::string_view(s).substr(j)).empty()) j = s.size();
+      }
       const bool atEnd = j >= s.size();
       const bool spaceAfter = !atEnd && isSpace(s[j]);
       const bool abbr = s[i] == '.' && tl == 1 && j == i + 1 && abbreviationBefore(s, i);
@@ -219,7 +226,11 @@ bool endsSentence(std::string_view text) {
     size_t cl = 0;
     size_t p = n - 1;
     while (p > 0 && (s[p] & 0xC0) == 0x80) --p;
-    if (closer(s, p, cl) && p + cl == n) { n = p; continue; }
+    if (closer(s, p, cl) && p + cl == n) {
+      n = p;
+      while (n > 0 && isSpace(s[n - 1])) --n;   // C22: "was... \"" (a space before the closing quote)
+      continue;
+    }
     break;
   }
   if (n == 0) return false;

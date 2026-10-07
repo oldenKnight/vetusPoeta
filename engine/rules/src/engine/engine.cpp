@@ -2,6 +2,7 @@
 // (frame/) -> LaClause (transfer/) -> Latin text (C1 realise_la) -> checks A1-A4/A6 (C1 check) + A5/A7/A8/A9 here ->
 // confidence (§10.4) -> pieces back on the cues (cue/). Every public entry point catches at the boundary.
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <exception>
@@ -275,7 +276,7 @@ class RulesEngine final : public Engine {
     for (const std::string& f : ls.flags) addFlag(flags, f);
   }
 
-  void tokenInfo(const std::string& word, rules::TokenView& t) const {
+  void tokenInfo(const std::string& word, rules::TokenView& t, bool preferAdverb = false) const {
     morph::Token mt;
     morph::analyseLatin(*la_, word, mt);
     t.text = word;
@@ -289,6 +290,12 @@ class RulesEngine final : public Engine {
         const uint8_t tr = cd_->effectiveTier(l.key, l.pos, l.tier);
         if (tr < bestTier) { bestTier = tr; best = i; }
       }
+      // C22: a one-word adverbial phrase of the phrasebook ("at first" -> prīmō) is the adverb, not prīmus
+      if (preferAdverb)
+        for (size_t i = 0; i < mt.analyses.size(); ++i) {
+          const uint8_t lp = la_->lemma(mt.analyses[i].lemma).pos;
+          if (lp == feat::Adv || lp == feat::Particle) { best = i; break; }
+        }
       const lex::Analysis& a = mt.analyses[best];
       t.lemmaId = a.lemma;
       t.hasLemma = true;
@@ -438,6 +445,21 @@ class RulesEngine final : public Engine {
             realise::LaAdj a;
             a.lemma = id;
             fc.predAdj.push_back(a);
+            // C22: the adjective agrees with the noun of the phrase ("What a big house!" -> Quam magna domus!)
+            for (const frame::PhraseSlot& ns : m.slots) {
+              if (ns.kind != frame::SlotKind::NP) continue;
+              transfer::ClauseOut scratch;
+              transfer::Memory mcopy = mem;
+              const realise::LaNP nx = xfer_->np(ns.np, s, st, mcopy, scratch);
+              uint8_t gg2 = nx.gender;
+              if (!gg2 && nx.head != lex::kNoLemma) {
+                const uint8_t lg = la_->lemma(nx.head).gender;
+                gg2 = (lg == feat::F || lg == feat::FN) ? (uint8_t)feat::F : lg == feat::N ? (uint8_t)feat::N : lg ? (uint8_t)feat::M : (uint8_t)0;
+              }
+              if (gg2) fc.predGender = gg2;
+              fc.predNumber = nx.number;
+              break;
+            }
             realiseClause(fc, opt, piece, pr, flags);
             if (!piece.tokens.empty()) {   // a slot inside a phrase: no sentence capital ("Quam mīrus hortus")
               std::vector<std::string> tx;
@@ -500,7 +522,8 @@ class RulesEngine final : public Engine {
       }
       cue::Latin one;
       rules::TokenView t;
-      tokenInfo(w, t);
+      tokenInfo(w, t, ws.size() == 1 && (m.reg == "adv" || m.reg == "tail" || m.reg == "answer" || m.reg == "conn" ||
+                                         m.reg == "lead"));
       one.text = t.text + punct;
       t.start = 0;
       t.end = (int)t.text.size();
@@ -1019,6 +1042,8 @@ class RulesEngine final : public Engine {
     if (fp.empty() && frame::endsSentence(text)) fp = ".";
     if (fp.empty() && !text.empty() && (text.back() == ',' || text.back() == ';')) fp = std::string(1, text.back());   // C15
     if (fp == "\xE2\x80\xA6") fp = "...";
+    // C22: "Would you please sit down?" is said as a request: "Cōnsīde, quaesō."
+    if (fp == "?" && std::find(s.doubts.begin(), s.doubts.end(), "polite-request") != s.doubts.end()) fp = ".";
     while (!L.text.empty() && endsWithAny(L.text, ",;:")) L.text.pop_back();
     L.text += fp;
     // C17: brackets back around the Latin of the editorial words (a contiguous run of tokens whose source word lies
@@ -1179,6 +1204,26 @@ class RulesEngine final : public Engine {
     }
   }
 
+  // C22: gender of the people named in a text (names_la.tsv rows with a gender, titles Miss / Mr included): F when a
+  // feminine name is there, M when only masculine ones, 0 when none
+  uint8_t namesGender(const std::string& t) const {
+    if (!cd_) return 0;
+    bool f = false, m = false;
+    size_t a = 0;
+    while (a < t.size()) {
+      while (a < t.size() && !std::isalpha((unsigned char)t[a])) ++a;
+      size_t b = a;
+      while (b < t.size() && std::isalpha((unsigned char)t[b])) ++b;
+      if (b > a && t[a] >= 'A' && t[a] <= 'Z') {
+        const curated::NameEntry* ne = cd_->nameByEnglish(t.substr(a, b - a));
+        if (ne && ne->gender == feat::F) f = true;
+        else if (ne && ne->gender == feat::M) m = true;
+      }
+      a = b;
+    }
+    return f ? (uint8_t)feat::F : m ? (uint8_t)feat::M : (uint8_t)0;
+  }
+
   static bool firstPersonAgreement(const SentOut& so) {
     for (const auto& t : so.latin.tokens)
       if ((t.features.pos == "adj" || t.features.mood == "participle") && !t.features.gender.empty()) return true;
@@ -1296,12 +1341,17 @@ class RulesEngine final : public Engine {
     for (const CueInput& c : cues) texts.push_back(c.sourceText);
     if (next) texts.push_back(cues.back().nextSource);
     const size_t off = prev ? 1 : 0;
-    const std::vector<SourceSentence> sents = frame::mapSentences(texts);
+    std::vector<SourceSentence> sents = frame::mapSentences(texts);
+    std::vector<char> cueSplit(sents.size(), 0);   // C22: re-split because a cue came out empty (Check)
 
     // which sentence finishes each cue
     std::vector<long> lastSentence(texts.size(), -1);
-    for (size_t si = 0; si < sents.size(); ++si)
-      for (const frame::CuePart& p : sents[si].parts) lastSentence[p.cue] = (long)si;
+    auto mapLast = [&]() {
+      std::fill(lastSentence.begin(), lastSentence.end(), -1);
+      for (size_t si = 0; si < sents.size(); ++si)
+        for (const frame::CuePart& p : sents[si].parts) lastSentence[p.cue] = (long)si;
+    };
+    mapLast();
 
     struct CueAcc {
       cue::Latin latin;
@@ -1370,6 +1420,15 @@ class RulesEngine final : public Engine {
         }
         mem.contCase = open ? mem.lastObjCase : 0;
       }
+      // C22: the person addressed: a name of names_la.tsv in this cue, else in the previous cue ("Alice", "Dinah" ->
+      // feminine: "puella cāra", "callida es")
+      if (lang == frame::SrcLang::En) {
+        uint8_t ag = firstCue >= 0 && (size_t)firstCue < texts.size() ? namesGender(texts[(size_t)firstCue]) : 0;
+        if (!ag && firstCue > 0) ag = namesGender(texts[(size_t)firstCue - 1]);
+        mem.addresseeGender = ag;
+      }
+      mem.songLine = ss.kind == frame::CueKind::Song;   // C22
+      if (ss.kind == frame::CueKind::Nonverbal) mem.prevValid = false;
       memBefore_ = mem;
       if (ss.kind == frame::CueKind::Nonverbal) {
         bool translated = false;
@@ -1404,6 +1463,43 @@ class RulesEngine final : public Engine {
       if (so.srcOffset.size() != so.latin.tokens.size()) so.srcOffset.assign(so.latin.tokens.size(), -1);
       if (ss.kind == frame::CueKind::Song) so.srcOffset.assign(so.latin.tokens.size(), -1);
       const std::vector<cue::Latin> pieces = cue::splitSentence(ss, so.latin, &so.srcOffset);
+      // C22: no cue may ever be emptied or swallowed by a neighbour. When a sentence spanning cues leaves one of them
+      // without Latin words (its words were merged into another cue's piece), each cue's part is translated as a
+      // sentence of its own (a fragment, Check).
+      if (ss.kind == frame::CueKind::Speech && ss.parts.size() > 1) {
+        bool empty = false;
+        for (size_t p = 0; p < ss.parts.size(); ++p) {
+          const std::string part = ss.text.substr((size_t)ss.parts[p].start,
+                                                  (size_t)std::max(0, ss.parts[p].end - ss.parts[p].start));
+          bool letters = false;
+          for (char ch : part) letters = letters || (unsigned char)ch >= 0x80 || std::isalpha((unsigned char)ch);
+          bool latinWords = false;
+          if (p < pieces.size())
+            for (char ch : pieces[p].text) latinWords = latinWords || (unsigned char)ch >= 0x80 || std::isalpha((unsigned char)ch);
+          if (letters && !latinWords) empty = true;
+        }
+        if (empty) {
+          std::vector<SourceSentence> one;
+          for (size_t p = 0; p < ss.parts.size(); ++p) {
+            SourceSentence x;
+            x.kind = frame::CueKind::Speech;
+            x.dash = ss.dash && p == 0;
+            x.text = ss.text.substr((size_t)ss.parts[p].start, (size_t)std::max(0, ss.parts[p].end - ss.parts[p].start));
+            x.parts.push_back(frame::CuePart{ss.parts[p].cue, 0, (int)x.text.size()});
+            one.push_back(std::move(x));
+          }
+          const size_t n = one.size();
+          sents.erase(sents.begin() + (long)si);
+          sents.insert(sents.begin() + (long)si, std::make_move_iterator(one.begin()), std::make_move_iterator(one.end()));
+          cueSplit.erase(cueSplit.begin() + (long)si);
+          cueSplit.insert(cueSplit.begin() + (long)si, n, (char)1);
+          mapLast();
+          mem = memBefore_;
+          --si;
+          continue;
+        }
+      }
+      if (cueSplit[si]) addFlag(so.flags, "cue-split");
       size_t tokBase = 0;
       for (size_t p = 0; p < pieces.size() && p < ss.parts.size(); ++p) {
         CueAcc& a = acc[ss.parts[p].cue];
@@ -1586,7 +1682,8 @@ class RulesEngine final : public Engine {
       for (const char* f : {"name-guessed", "from-rule", "addressee-guess", "missing-form", "merged", "frame-fallback",
                             "fragment", "contact-relative", "noun-infinitive", "purpose-guess", "light-verb",
                             "phrase-order", "participle-phrase", "ellipsis", "could-not-parse", "editorial",   // C17
-                            "derived-word"})   // C19
+                            "derived-word",   // C19
+                            "cue-split", "addressee-gender"})   // C22
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       // a tier 3 word chosen while a tier 1/2 word of the same sense existed (fidelity 1, a correction aside)
       for (const transfer::Choice& c : a.choices)

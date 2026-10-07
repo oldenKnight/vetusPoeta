@@ -72,6 +72,7 @@ struct LaNP {
   bool indefinite = false;        // C17: "I am a Scarecrow": a description, not the speaker's name (ego is dropped)
   std::string numeralLiteral;     // C19: a number Latin writes with numerals ("XXI ovēs"), before the noun
   uint32_t adGerund = kNone;      // C20: ad + the accusative gerund of this verb after the noun ("locum ad dormiendum")
+  std::vector<LaNP> apposition;   // C22: between commas after the NP and its coordination, in the same case
 };
 
 struct LaOblique {

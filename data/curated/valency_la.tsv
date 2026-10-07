@@ -131,3 +131,5 @@ volo2	intr	volāre, to fly	homograph of volō "want": key volo2 in tiers
 saluto	acc	
 vale	intr	imperative only: valē, valēte	
 contundo	acc	saxum contundit	C17: "badly dented" -> graviter contūsus
+attendo	acc;prep:ad+acc	animum ad magistrum attendit	C22: "pay attention to" -> animum attendere ad + acc (states_en_la.tsv)
+valedico	dat;intr	amīcō valedīcit	C22: "say goodbye to"

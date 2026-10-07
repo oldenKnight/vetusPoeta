@@ -165,7 +165,7 @@ fenestra	fenestra	noun	1	derived
 murus	mūrus	noun	1	derived	
 paries	pariēs	noun	1	derived	
 tectum	tēctum	noun	1	derived	
-cubiculum	cubiculum	noun	1	derived	
+cubiculum	cubiculum	noun	1	derived	room, bedroom
 atrium	ātrium	noun	1	derived	
 hortus	hortus	noun	1	derived	
 mensa	mēnsa	noun	1	derived	
@@ -291,7 +291,7 @@ paucus	paucus	adj	1	derived
 omnis	omnis	adj	1	derived	
 totus	tōtus	adj	1	derived	
 nullus	nūllus	adj	1	derived	
-solus	sōlus	adj	1	derived	
+solus	sōlus	adj	1	derived	alone, only, lonely
 alius	alius	adj	1	derived	other, another
 alter	alter	adj	1	derived	
 ceteri	cēterī	adj	1	derived	
@@ -333,7 +333,7 @@ gratus	grātus	adj	1	derived
 dulcis	dulcis	adj	1	derived	
 calidus	calidus	adj	1	derived	
 frigidus	frīgidus	adj	1	derived	
-mirus	mīrus	adj	1	derived	wonderful, strange
+mirus	mīrus	adj	1	derived	wonderful, strange, peculiar
 clarus	clārus	adj	1	derived	
 ego	ego	pron	1	derived	
 tu	tū	pron	1	derived	
@@ -414,7 +414,7 @@ sub	sub	prep	1	derived
 super	super	prep	1	derived	
 circum	circum	prep	1	derived	
 propter	propter	prep	1	derived	
-contra	contrā	prep	1	derived	
+contra	contrā	prep	1	derived	against, opposite
 trans	trāns	prep	1	derived	
 prope	prope	prep	1	derived	
 non	nōn	adv	1	derived	
@@ -456,7 +456,7 @@ quot	quot	adj	1	derived
 quantus	quantus	adj	1	derived	
 tam	tam	adv	1	derived	
 tantus	tantus	adj	1	derived	
-valde	valdē	adv	1	derived	
+valde	valdē	adv	1	derived	very, greatly, awfully, terribly
 bene	bene	adv	1	derived	
 male	male	adv	1	derived	
 multum	multum	adv	1	derived	
@@ -482,8 +482,8 @@ lente	lentē	adv	1	derived
 libenter	libenter	adv	1	derived	
 fere	ferē	adv	1	derived	
 vero	vērō	adv	1	derived	
-rursus	rūrsus	adv	1	derived	
-iterum	iterum	adv	1	derived	
+rursus	rūrsus	adv	1	derived	again, once more
+iterum	iterum	adv	1	derived	again
 salve	salvē	intj	1	derived	
 vale	valē	intj	1	derived	
 ecce	ecce	intj	1	derived	
@@ -498,7 +498,7 @@ hic	hīc	adv	1	derived	here
 eo	eō	adv	1	derived	thither
 cum	cum	prep	1	derived	
 carmen	carmen	noun	1	derived	song
-horologium	hōrologium	noun	2	derived	clock
+horologium	hōrologium	noun	2	derived	clock, watch
 fovea	fovea	noun	2	derived	hole, pit
 pallium	pallium	noun	2	derived	cloak, coat
 tenebrae	tenebrae	noun	1	derived	darkness, the dark (plural)
@@ -589,7 +589,7 @@ salio	saliō	verb	2	teacher	jump, leap, hop
 uxor	uxor	noun	1	teacher	wife
 # C19 (quality loop 4): cardinals and ordinals beyond ten (readers teach them with the first ten), interjections
 undecim	ūndecim	num	2	teacher	eleven
-duodecim	duodecim	num	2	teacher	twelve
+duodecim	duodecim	num	2	teacher	twelve, dozen
 tredecim	tredecim	num	2	teacher	thirteen
 quattuordecim	quattuordecim	num	2	teacher	fourteen
 quindecim	quīndecim	num	2	teacher	fifteen
@@ -648,3 +648,33 @@ millies	mīlliēs	adv	2	teacher	a thousand times
 aliquotiens	aliquotiēns	adv	2	teacher	several times
 donec	dōnec	conj	2	teacher	until, while
 amitto	āmittō	verb	2	teacher	lose, let slip, let go
+# C22 (acceptance loop 1): words of children's stories and songs that were unknown or rendered by a rare word
+serus	sērus	adj	2	teacher	late, overdue, too late
+nugae	nūgae	noun	2	teacher	nonsense, trifles, jokes
+contra	contrā	adv	2	teacher	contrariwise, on the contrary, opposite
+subucula	subūcula	noun	2	teacher	waistcoat, vest, undershirt
+saeta	saeta	noun	2	teacher	whisker, bristle
+pellis	pellis	noun	2	teacher	fur, skin, hide, pelt
+ceterus	cēterus	adj	2	teacher	the other, the rest
+opto	optō	verb	2	teacher	wish, wish for, choose
+attendo	attendō	verb	2	teacher	attend, pay attention, listen carefully
+momentum	mōmentum	noun	2	teacher	importance, moment, weight
+valedico	valedīcō	verb	2	teacher	say goodbye, bid farewell
+perturbatus	perturbātus	adj	2	teacher	upset, troubled, flustered
+intra	intrā	prep	2	teacher	within, inside
+molestia	molestia	noun	2	teacher	trouble, annoyance, nuisance
+arcanum	arcānum	noun	2	teacher	secret, mystery
+papae	papae	intj	2	teacher	wow, my
+collis	collis	noun	2	teacher	hill
+alicubi	alicubi	adv	2	teacher	somewhere
+lectio	lēctiō	noun	2	teacher	lesson, reading
+ursus	ursus	noun	2	teacher	bear
+consentio	cōnsentiō	verb	1	teacher	agree, consent
+episcopus	episcopus	noun	2	teacher	bishop
+archiepiscopus	archiepiscopus	noun	2	teacher	archbishop
+salto	saltō	verb	2	teacher	dance
+primo	prīmō	adv	2	teacher	at first, firstly
+benigne	benignē	adv	2	teacher	kindly
+bellus	bellus	adj	2	teacher	nice, pretty, lovely
+medium	medium	noun	2	teacher	middle, centre, center
+vigilia	vigilia	noun	3	teacher	

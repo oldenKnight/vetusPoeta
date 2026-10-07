@@ -285,6 +285,16 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
     literal(n.coordConj, "et", w, "order.decl");
     out.insert(out.begin() + (long)start0, std::move(w));
   }
+  // C22: appositions between commas, in the case of the NP ("Eduinus et Paulus, ducēs Rōmae, ...")
+  for (const LaNP& ap : n.apposition) {
+    std::vector<Word> aw;
+    np(ap, case_, owner, o, aw);
+    if (aw.empty() || out.empty()) continue;
+    if (out.back().punctAfter.empty()) out.back().punctAfter = ",";
+    aw.back().punctAfter = ",";
+    for (Word& w : aw) if (w.rule == nullptr || !*w.rule) w.rule = "order.appos";
+    append(out, aw);
+  }
 }
 
 void LatinRealiser::verbGroup(const LaClause& c, const AgreeInfo& subj, std::vector<Word>& fin,
@@ -518,7 +528,7 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
   const bool isCopula = isSum && (!c.predicative.empty() || !c.predAdj.empty());
   const bool exist = isSum && c.existential && !isCopula;
   for (const LaNP& pn : c.predicative) {
-    np(pn, subjCase, &c, o, s[kPRED]);
+    np(pn, pn.case_ == Gen ? (uint8_t)Gen : subjCase, &c, o, s[kPRED]);   // C22: genitive of quality ("magnī mōmentī est")
     if (pn.interrogative != kNone) append(s[kWH], s[kPRED]);
   }
   if (!c.predAdj.empty()) {

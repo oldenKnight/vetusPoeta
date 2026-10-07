@@ -140,7 +140,7 @@ bool relationOf(SrcLang lang, const std::string& m, Relation& rel, std::string& 
 std::string canonConnector(SrcLang lang, const std::string& w) {
   if (lang == SrcLang::En) {
     if (in(w, {"and", "but", "or", "so", "then", "yet", "nor", "also", "therefore", "however", "for", "besides",
-               "still", "thus", "hence", "moreover"})) return w;
+               "still", "thus", "hence", "moreover", "what-if", "if"})) return w;   // C22: what-if, if (What if ...?)
     return "";
   }
   if (in(w, {"y", "e"})) return "and";
@@ -153,7 +153,7 @@ std::string canonConnector(SrcLang lang, const std::string& w) {
 }
 
 const char* const kParticles[] = {"away", "back", "up", "down", "off", "out", "in", "over", "on", "around",
-                                  "through", "along", "inside", "outside"};
+                                  "through", "along", "inside", "outside", "by", "past"};   // C22: by, past ("go rolling by")
 bool particleWord(const std::string& w) {
   for (const char* p : kParticles)
     if (w == p) return true;
@@ -971,6 +971,33 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
       return;
     }
   }
+  // C22: "a dozen apples", "two dozen eggs", "a dozen of the eggs": the noun is the head, the numeral twelve (times
+  // the number before dozen); the parser makes "dozen" the head or a numeral, never the noun's genitive
+  if (lang_ == SrcLang::En && (c.t(h).lower == "dozen" || c.t(h).lower == "dozens")) {
+    int noun = -1;
+    for (int k : c.kids[(size_t)h])
+      if (c.ok(k) && k > h && (c.t(k).upos == "NOUN" || c.t(k).upos == "PROPN") && noun < 0) noun = k;
+    if (noun >= 0) {
+      auto& hk = c.kids[(size_t)h];
+      hk.erase(std::remove(hk.begin(), hk.end(), noun), hk.end());
+      int mult = 1;
+      std::vector<int> extra;
+      for (int k : hk) {
+        if (!c.ok(k)) continue;
+        if (c.t(k).upos == "NUM" && numberValue(c.t(k).lower) > 0) mult = numberValue(c.t(k).lower);
+        extra.push_back(k);
+      }
+      for (int k : c.kids[(size_t)noun])   // "of" before the noun
+        if (c.ok(k) && k < noun && c.dep(k) == "case" && c.t(k).lower == "of") { c.take(k); c.drop(k, Drop::Marker); }
+      buildNP(c, noun, np);
+      for (int k : extra) { c.take(k); c.drop(k, Drop::Article); np.tokens.push_back(k); }
+      np.numeral = c.t(h).lower;
+      np.numeralValue = 12 * mult;
+      np.number = 2;
+      np.tokens.push_back(h);
+      return;
+    }
+  }
   const Token& ht = c.t(h);
   const std::string low = ht.lower;
   np.token = h;
@@ -1041,7 +1068,26 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
       }
     }
   }
-  if (!pron && en && (low == "one" || low == "ones") && ht.upos == "NOUN") {
+  // C22: generic "one" as the subject of a modal ("How can one read in the dark?", "One must eat."): a person in
+  // general (homō), not the numeral (ūnus homo) nor an anaphoric "this one"
+  if (!pron && en && low == "one" && c.dep(h) == "nsubj" && c.par[(size_t)h] >= 0) {
+    bool kids = false, modal = false;
+    for (int k : c.kids[(size_t)h]) kids = kids || c.ok(k);
+    for (int k : c.kids[(size_t)c.par[(size_t)h]])
+      modal = modal || (c.dep(k) == "aux" && in(c.t(k).lower, {"can", "could", "must", "should", "may", "might", "ought"}));
+    if (!kids && modal) {
+      np.isPronoun = true;
+      np.pronLemma = "one-generic";
+      np.pron.person = 3;
+      np.pron.number = 1;
+      np.number = 1;
+      pron = true;
+    }
+  }
+  if (!pron && en && (low == "one" || low == "ones") &&
+      (ht.upos == "NOUN" || (ht.upos == "NUM" && [&] {   // C22: a bare numeral "one" too ("I have one.")
+         for (int k : c.kids[(size_t)h]) if (c.ok(k) && c.dep(k) != "punct") return false;
+         return true; }()))) {
     np.isPronoun = true;
     np.pronLemma = low;
     np.pron.person = 3;
@@ -1309,6 +1355,19 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
     if (d == "nummod") {
       np.numeral = kl;
       np.numeralValue = numberValue(kl);
+      // C22: "two dozen eggs" (two hung on dozen): twenty-four; "a dozen eggs": twelve
+      if (en && (kl == "dozen" || kl == "dozens")) {
+        int mult = 1;
+        for (int q : c.kids[(size_t)k]) {
+          if (!c.ok(q)) continue;
+          if (numberValue(c.t(q).lower) > 0) mult = numberValue(c.t(q).lower);
+          np.tokens.push_back(q);
+          c.take(q);
+          c.drop(q, Drop::Article);
+        }
+        np.numeralValue = 12 * mult;
+        np.number = 2;
+      }
       np.tokens.push_back(k);
       if (np.head == "hour" && low == "o'clock") np.ordinal = true;
       continue;
@@ -1427,6 +1486,53 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
       np.relative.push_back(rf);
       np.tokens.insert(np.tokens.end(), rf.tokens.begin(), rf.tokens.end());
       continue;
+    }
+    // C22: "Edwin and Paul, the Dukes of Rome, fought ...", "Robert, the Bishop of London, agreed ...": a definite
+    // noun phrase after a comma without its own conjunction is an apposition, not a further conjunct
+    if (en && (d == "appos" || d == "conj") && (kt.upos == "NOUN" || kt.upos == "PROPN") && k > h) {
+      bool the = false, cc = false, commaKid = false;
+      int first = k;
+      for (int x : c.kids[(size_t)k]) {
+        if (!c.ok(x)) continue;
+        if (c.dep(x) == "det" && c.t(x).lower == "the") the = true;
+        if (c.dep(x) == "cc") cc = true;
+        if (c.t(x).text == "," && x < k) { commaKid = true; continue; }
+        if (x < first) first = x;
+      }
+      const bool comma = commaKid || (first > 0 && c.t(first - 1).text == ",");
+      if ((d == "appos" || (the && comma)) && !cc) {
+        // "of" phrases the parser hung on the head after the apposition belong to the apposition ("Edwin, the Duke
+        // of Rome,")
+        std::vector<int> moved;
+        for (int x : c.kids[(size_t)h])
+          if (x > k && c.ok(x) && c.dep(x) == "nmod") moved.push_back(x);
+        for (int x : moved) c.kids[(size_t)k].push_back(x);
+        std::sort(c.kids[(size_t)k].begin(), c.kids[(size_t)k].end());
+        // a capitalised common noun after "the" is a title, not a name ("the Bishop of London" -> episcopus)
+        nlp::Token& at = c.s.tokens[(size_t)k];
+        if (at.upos == "PROPN" && lex_ && !cd_.nameByEnglish(at.text)) {
+          std::vector<lex::Analysis> an;
+          lex_->lookup(text::en_key(nlp::normalise(at.text)), an);
+          bool noun = false, plural = false;
+          for (const lex::Analysis& a : an)
+            if (lex_->lemma(a.lemma).pos == feat::Noun) {
+              noun = true;
+              plural = plural || feat::unpack(lex_->feature(a.feat)).number == feat::Pl;
+            }
+          if (noun) {
+            at.upos = "NOUN";
+            at.lower = nlp::normalise(at.text);
+            at.feats = nlp::morph::fromString(plural ? "Number=Plur" : "Number=Sing");
+            at.lemma = lemmaOf(at);
+          }
+        }
+        SemNP g;
+        buildNP(c, k, g);
+        for (int x : moved) c.consumed[(size_t)x] = 1;   // built with the apposition: not again with the head
+        np.apposition.push_back(g);
+        np.tokens.insert(np.tokens.end(), g.tokens.begin(), g.tokens.end());
+        continue;
+      }
     }
     if (d == "conj") {
       if (en && (kt.upos == "VERB" || kt.upos == "AUX")) c.s.doubt("participle-phrase");   // C15: a verb hung on a noun
@@ -1557,6 +1663,8 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     const std::string d = c.dep(k);
     if (d == "cop" && cop < 0) cop = k;
     else if (d == "aux") auxes.push_back(k);
+    // C22: "There would be new birds": "there" parsed as the subject of a copula is the expletive
+    else if (d == "nsubj" && nsubj < 0 && lang_ == SrcLang::En && c.t(k).lower == "there" && k < h) expl = k;
     else if ((d == "nsubj" || d == "csubj") && nsubj < 0) nsubj = k;
     else if (d == "obj" && obj < 0) obj = k;
     else if (d == "iobj" && iobj < 0) iobj = k;
@@ -1770,6 +1878,20 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
             object = true;
         if (object) f.pred.lemma = "do";
         else f.pred.ellipsis = true;
+      }
+      // C22: "But you would." / "But he will.": a bare would / will stands for the previous clause's verb, in the
+      // conditional / the future ("Sed dīcerēs.")
+      if (en && in(c.t(h).lower, {"would", "'d", "will", "'ll", "shall"})) {
+        bool more = false;
+        for (int k : c.kids[(size_t)h])
+          if (c.ok(k) && in(c.dep(k), {"obj", "xcomp", "ccomp", "cop", "obl"})) more = true;
+        if (!more) {
+          f.pred.ellipsis = true;
+          f.pred.lemma = "do";
+          c.s.doubt("ellipsis");   // the verb is taken from the previous clause: a guess (Check)
+          if (in(c.t(h).lower, {"would", "'d"})) f.pred.mood = SrcMood::Conditional;
+          else f.pred.tense = Tense::Future;
+        }
       }
       if (in(hl, {"can", "could", "poder"})) { f.pred.lemma = "can"; f.pred.pastModal = hl == "could"; }
       if (in(hl, {"must", "should"})) { f.pred.lemma = "be"; f.pred.modality = Modality::Must; }
@@ -2039,10 +2161,26 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       g.token = h;
       f.adverbs.push_back(g);
       c.drop(h, Drop::Aux);
+    } else if (en && hl == "go" && obj < 0 && c.t(xcomp).lower.size() > 4 &&
+               c.t(xcomp).lower.compare(c.t(xcomp).lower.size() - 3, 3, "ing") == 0 && !goParticle) {
+      // C22: "go + -ing" ("The clouds go rolling by", "We went fishing"): the -ing verb is the clause's verb
+      f.pred.lemma = xl;
+      f.pred.token = xcomp;
+      c.drop(h, Drop::Aux);
+    } else if (en && hl == "keep" && obj < 0 && c.t(xcomp).lower.size() > 4 &&
+               c.t(xcomp).lower.compare(c.t(xcomp).lower.size() - 3, 3, "ing") == 0) {
+      // C22: "I keep wishing", "The baby keeps crying" -> semper optō, semper flet (keep + -ing = again and again)
+      f.pred.lemma = xl;
+      f.pred.token = xcomp;
+      SemAdverb g;
+      g.lemma = "always";
+      g.token = h;
+      f.adverbs.push_back(g);
+      c.drop(h, Drop::Aux);
     } else if (in(hl, {"try", "begin", "start", "know", "like", "love", "learn", "forget", "hope", "decide", "seem",
                        "dare", "prefer", "continue", "stop", "saber", "intentar", "empezar", "comenzar"}) ||
                (en && obj < 0 && in(hl, {"help", "refuse", "promise", "fail", "manage", "hate", "fear", "cease",
-                                         "intend", "plan", "attempt", "deserve", "mean"}))) {   // C15: "help to keep away"
+                                         "intend", "plan", "attempt", "deserve", "mean", "agree"}))) {   // C15: "help to keep away"; C22: agree
       f.pred.complementVerb = xl;
       f.pred.complementToken = xcomp;
     } else {
@@ -2100,7 +2238,7 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       if (c.ok(g) && c.dep(g) == "case") hasCase = true;
     SemNP s;
     buildNP(c, nsubj, s);
-    if (hasCase && (hu == "NOUN" || hu == "PROPN") && cop >= 0) {
+    if (hasCase && (hu == "NOUN" || hu == "PROPN" || (en && hu == "PRON")) && cop >= 0) {   // C22: PRON too
       std::string prep;
       for (int g : c.kids[(size_t)nsubj])
         if (c.ok(g) && c.dep(g) == "case") prep = prep.empty() ? c.t(g).lower : prep + " " + c.t(g).lower;
@@ -2110,6 +2248,17 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       o.token = nsubj;
       o.front = nsubj < h;
       f.obliques.push_back(o);
+      // C22: "In my dream the trees were nothing but flowers": a second subject after the phrase is the subject and
+      // the root stays the predicate
+      int second = -1;
+      for (int k : c.kids[(size_t)h])
+        if (c.ok(k) && k != nsubj && c.dep(k) == "nsubj" && k > nsubj) { second = k; break; }
+      if (en && second >= 0) {
+        SemNP s2;
+        buildNP(c, second, s2);
+        f.hasSubject = true;
+        f.subject = s2;
+      } else {
       SemNP subj;
       buildNP(c, h, subj);
       f.hasSubject = true;
@@ -2117,6 +2266,7 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       f.existential = false;
       f.copula = false;
       f.pred.lemma = "be";
+      }
     } else if (!f.hasSubject) {
       f.hasSubject = true;
       f.subject = s;
@@ -2130,7 +2280,8 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
   }
 
   // ---- predicate of copula clauses -----------------------------------------------------------------------------------
-  if (!en && f.copula && f.existential && cop >= 0 && !f.hasSubject && (hu == "NOUN" || hu == "PROPN" || hu == "PRON")) {
+  // C22: English too: "There will be cake for everyone." (the noun is the root with the copula)
+  if (f.copula && f.existential && cop >= 0 && !f.hasSubject && (hu == "NOUN" || hu == "PROPN" || (!en && hu == "PRON"))) {
     SemNP p;   // "Había una niña": the noun is what there is
     buildNP(c, h, p);
     f.hasSubject = true;
@@ -2141,7 +2292,7 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
   int predCase = -1;
   if (f.copula && !f.existential && en && (hu == "NOUN" || hu == "PROPN" || hu == "PRON"))
     for (int g : c.kids[(size_t)h])
-      if (c.ok(g) && c.dep(g) == "case" && g < h && c.t(g).upos == "ADP" && !in(c.t(g).lower, {"'s", "of", "like", "than", "as"}))
+      if (c.ok(g) && c.dep(g) == "case" && g < h && c.t(g).upos == "ADP" && !in(c.t(g).lower, {"'s", "of", "than", "as"}))
         { predCase = g; break; }
   if (predCase >= 0) {
     std::string prep;
@@ -2183,7 +2334,7 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       for (int k : c.kids[(size_t)h])
         if (c.ok(k) && c.dep(k) == "advmod" && in(c.t(k).lower, {"very", "too", "so", "quite", "rather", "really",
                                                                   "extremely", "muy", "demasiado", "tan", "bastante",
-                                                                  "as"})) {
+                                                                  "as", "awfully", "terribly"})) {   // C22
           a.adverbs.push_back(c.t(k).lower);
           a.advTokens.push_back(k);
           c.take(k);
@@ -2287,8 +2438,83 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
         for (int x : c.kids[(size_t)g])
           if (c.ok(x) && c.dep(x) == "fixed") prep += " " + c.t(x).lower;
       }
+      // C22: "Under the moon and over the sea": a conjunct with its own preposition is a second prepositional phrase
+      // (et super mare), not a second noun of the first one ("Sub lūnā et marī" lost "over")
+      std::vector<std::pair<int, std::string>> ppConj;
+      if (en && !prep.empty())
+        for (int k : c.kids[(size_t)h]) {
+          if (!c.ok(k) || c.dep(k) != "conj" || k < h) continue;
+          std::string p2;
+          for (int g : c.kids[(size_t)k])
+            if (c.ok(g) && c.dep(g) == "case" && g < k && c.t(g).upos == "ADP") p2 = p2.empty() ? c.t(g).lower : p2 + " " + c.t(g).lower;
+          if (!p2.empty()) ppConj.emplace_back(k, p2);
+        }
+      // C22: "Over the hill or here or there": conjuncts that are place adverbs are coordinated adverbs (aut hīc aut
+      // illīc), never nouns of the phrase ("[here]")
+      std::vector<int> advConj;
+      if (en)
+        for (int k : c.kids[(size_t)h])
+          if (c.ok(k) && c.dep(k) == "conj" && k > h && c.t(k).upos == "ADV" &&
+              in(c.t(k).lower, {"here", "there", "everywhere", "somewhere", "nowhere", "anywhere", "home"}))
+            advConj.push_back(k);
+      // the conj chain: "or here or there" hangs "there" on "here"
+      for (size_t q = 0; q < advConj.size(); ++q)
+        for (int k : c.kids[(size_t)advConj[q]])
+          if (c.ok(k) && c.dep(k) == "conj" && c.t(k).upos == "ADV" &&
+              in(c.t(k).lower, {"here", "there", "everywhere", "somewhere", "nowhere", "anywhere", "home"}))
+            advConj.push_back(k);
+      std::sort(advConj.begin(), advConj.end());
+      for (const auto& pc : ppConj) {
+        auto& hk = c.kids[(size_t)h];
+        hk.erase(std::remove(hk.begin(), hk.end(), pc.first), hk.end());
+      }
+      for (int k : advConj) {
+        auto& hk = c.kids[(size_t)h];
+        hk.erase(std::remove(hk.begin(), hk.end(), k), hk.end());
+        for (auto& kk : c.kids) kk.erase(std::remove(kk.begin(), kk.end(), k), kk.end());
+      }
       SemNP p;
       buildNP(c, h, p);
+      for (const auto& pc : ppConj) {
+        SemSub sb;
+        sb.relation = Relation::Coord;
+        for (int g : c.kids[(size_t)pc.first])
+          if (c.ok(g) && c.dep(g) == "cc" && sb.marker.empty()) { sb.marker = canonConnector(lang_, c.t(g).lower); c.drop(g, Drop::Marker); c.take(g); }
+        if (sb.marker.empty()) sb.marker = "and";
+        for (int g : c.kids[(size_t)pc.first])
+          if (c.ok(g) && c.dep(g) == "case" && g < pc.first && c.t(g).upos == "ADP") { c.drop(g, Drop::Marker); c.take(g); }
+        SemFrame cf;
+        cf.type = Kind::Frag;
+        SemOblique o2;
+        o2.prep = canonPrep(lang_, pc.second);
+        buildNP(c, pc.first, o2.np);
+        o2.token = pc.first;
+        cf.obliques.push_back(o2);
+        cf.tokens = o2.np.tokens;
+        sb.frame.push_back(cf);
+        f.subordinate.push_back(sb);
+      }
+      bool hereToo = false;
+      for (int k : advConj) hereToo = hereToo || c.t(k).lower == "here";
+      for (int k : advConj) {
+        SemSub sb;
+        sb.relation = Relation::Coord;
+        int cc = -1;
+        for (int g = k - 1; g > h && cc < 0; --g)
+          if (c.t(g).upos == "CCONJ") cc = g;
+        if (cc >= 0 && c.ok(cc)) { sb.marker = canonConnector(lang_, c.t(cc).lower); c.drop(cc, Drop::Marker); c.take(cc); }
+        if (sb.marker.empty()) sb.marker = "and";
+        SemFrame cf;
+        cf.type = Kind::Frag;
+        SemAdverb a;
+        a.lemma = c.t(k).lower == "there" && hereToo ? "there-contrast" : c.t(k).lower;
+        a.token = k;
+        cf.adverbs.push_back(a);
+        cf.tokens.push_back(k);
+        c.take(k);
+        sb.frame.push_back(cf);
+        f.subordinate.push_back(sb);
+      }
       if (p.determiner == "what" && !c.question) {   // "What a strange garden!"
         f.type = Kind::Excl;
         f.exclQuam = true;
@@ -2595,6 +2821,35 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       if (s.marker.empty()) s.marker = "and";
       SemFrame cf;
       buildClause(c, k, cf);
+      // C22: a second verb coordinated with a catenative complement ("agreed to meet him and give him the crown",
+      // "wants to sing and dance") is a second complement of the same verb, not a finite verb of its own
+      if (en && f.hasPred && cf.hasPred && !cf.hasSubject && hidden >= 0 && c.par[(size_t)k] == hidden &&
+          cf.type == Kind::Decl && cf.pred.auxTokens.empty()) {
+        if (!f.pred.complementVerb.empty()) {
+          cf.pred.complementVerb = cf.pred.lemma;
+          cf.pred.complementToken = cf.pred.token;
+          cf.pred.lemma = f.pred.lemma;
+        }
+        cf.pred.modality = f.pred.modality;
+        cf.pred.tense = f.pred.tense;
+        cf.pred.mood = f.pred.mood;
+        cf.pred.pastModal = f.pred.pastModal;
+        cf.pred.aspect = f.pred.aspect;
+      }
+      // C22: a bare second verb shares the first one's auxiliary ("He will come and help us." -> veniet et nōs
+      // adiuvābit; "They would sit and talk" -> sedērent et loquerentur): tense, mood and modality
+      if (en && f.hasPred && cf.hasPred && !cf.hasSubject && cf.pred.auxTokens.empty() && !f.pred.auxTokens.empty() &&
+          cf.type == Kind::Decl && (f.type == Kind::Decl || f.type == Kind::Yn || f.type == Kind::Wh)) {
+        const uint32_t vf = fget(kt, nlp::morph::VerbFormShift), tt = fget(kt, nlp::morph::TenseShift);
+        const bool bare = vf == nlp::morph::VfInf || (tt == 0 && vf != nlp::morph::VfPart && vf != nlp::morph::VfGer);
+        if (bare) {
+          cf.pred.tense = f.pred.tense;
+          cf.pred.mood = f.pred.mood;
+          cf.pred.modality = f.pred.modality;
+          cf.pred.pastModal = f.pred.pastModal;
+          if (f.pred.aspect == Aspect::Perfect) cf.pred.aspect = Aspect::Perfect;
+        }
+      }
       if (f.type == Kind::Imp && cf.type == Kind::Decl && !cf.hasSubject) cf.type = Kind::Imp;
       // C15: the second verb of a question shares the question ("Why don't you run and jump?" -> ... et salīs?)
       if (cf.type == Kind::Yn && !cf.hasSubject) cf.type = Kind::Decl;
@@ -2833,11 +3088,32 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     f.object = SemNP{};
   }
 
+  // C22: "say hello (to X)" -> salūtāre (X in the accusative), "say goodbye (to X)" -> valedīcere (X in the dative):
+  // the greeting is the verb, never a bracketed word
+  if (en && f.hasPred && f.pred.lemma == "say" && f.hasObject && f.pred.fixedLatin.empty() &&
+      in(text::lower(f.object.head), {"hello", "hi", "goodbye", "bye", "farewell", "good-bye", "goodnight"})) {
+    const bool hello = in(text::lower(f.object.head), {"hello", "hi"});
+    f.pred.lemma = hello ? "greet" : "say goodbye";
+    for (int k : f.object.tokens) c.drop(k, Drop::Phrase);
+    f.hasObject = false;
+    f.object = SemNP{};
+    for (size_t i = 0; i < f.obliques.size(); ++i)
+      if (f.obliques[i].prep == "to") {
+        if (hello) { f.object = f.obliques[i].np; f.hasObject = true; }
+        else { f.indirectObject = f.obliques[i].np; f.hasIndirect = true; }
+        if (f.obliques[i].token >= 0) c.drop(f.obliques[i].token, Drop::Marker);
+        f.obliques.erase(f.obliques.begin() + (long)i);
+        break;
+      }
+  }
+
   // ---- clause type -----------------------------------------------------------------------------------------------------
   // questions: "?" or aux/copula before the subject
   if (f.type != Kind::Wh && f.type != Kind::Excl && f.hasPred) {
     // English inversion marks a question; Spanish verb-subject order does not ("Son todos muy groseros.") (C13)
     bool inverted = en && nsubj >= 0 && ((cop >= 0 && cop < nsubj) || (!auxes.empty() && auxes.front() < nsubj));
+    // C22: "There'd be flowers everywhere." / "There will be cake.": "there" before the auxiliary is no inversion
+    if (inverted && expl >= 0 && !auxes.empty() && expl < auxes.front() && !c.question) inverted = false;
     // C15: "nor do I know ...", "never have I seen ...": inversion after a negative word is not a question
     if (inverted && !c.question)
       for (int i : f.tokens)
@@ -2867,6 +3143,61 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     }
   }
   if (f.type == Kind::Yn && f.negative && auxes.size() && auxes.front() < nsubj) f.expectYes = true;
+  // C22: a "when" clause that is no question (a line of a song or a clause cut at a cue end: "When the clouds roll
+  // by") is a time clause: cum + the verb, not "Quandō ...?"
+  if (en && f.type == Kind::Wh && f.wh.word == "when" && !c.question && f.wh.token == first) {
+    bool qmark = false;
+    for (int t : sub) qmark = qmark || c.t(t).text == "?";
+    if (!qmark) {
+      f.type = Kind::Decl;
+      if (f.wh.token >= 0) c.drop(f.wh.token, Drop::Marker);
+      f.wh = SemWh{};
+      f.connectors.insert(f.connectors.begin(), "when-time");
+      c.s.doubt("fragment");   // a time clause without its main clause: Check
+      f.punct.clear();
+    }
+  }
+  // C22: "What if I should fall ...?" -> Quid sī ... cadam? (a condition in the present subjunctive, no -ne)
+  if (en && std::find(f.connectors.begin(), f.connectors.end(), "what-if") != f.connectors.end()) {
+    if (f.type == Kind::Yn) f.type = Kind::Decl;
+    if (f.pred.modality == Modality::Should || f.pred.modality == Modality::Will) f.pred.modality = Modality::None;
+    f.pred.mood = SrcMood::Subjunctive;
+    if (f.pred.tense == Tense::Future) f.pred.tense = Tense::Present;
+    for (SemSub& sb : f.subordinate)
+      if (sb.relation == Relation::Coord && !sb.frame.empty() && !sb.frame[0].hasSubject && sb.frame[0].hasPred) {
+        sb.frame[0].pred.mood = SrcMood::Subjunctive;
+        sb.frame[0].pred.modality = f.pred.modality;
+        sb.frame[0].pred.tense = f.pred.tense;
+        if (sb.frame[0].type == Kind::Imp) sb.frame[0].type = Kind::Decl;
+      }
+  }
+  // C22: "Will you kindly pay attention ...", "Would you please sit down?", "Could you kindly ...": a polite request
+  // is an imperative with quaesō, not a question about the future
+  if (en && f.type == Kind::Yn && !f.negative && f.hasSubject && f.subject.isPronoun && f.subject.pron.person == 2 &&
+      !auxes.empty() && in(c.t(auxes.front()).lower, {"will", "would", "could", "can"}) && f.pred.modality != Modality::Want) {
+    bool polite = std::find(f.discourse.begin(), f.discourse.end(), "please") != f.discourse.end();
+    for (size_t q = 0; q < f.adverbs.size(); ++q)
+      if (in(f.adverbs[q].lemma, {"kindly", "please"})) {
+        polite = true;
+        if (f.adverbs[q].token >= 0) c.drop(f.adverbs[q].token, Drop::Discourse);
+        f.adverbs.erase(f.adverbs.begin() + (long)q);
+        --q;
+      }
+    if (polite) {
+      f.type = Kind::Imp;
+      f.imperativePlural = f.subject.pron.number == 2;
+      for (int t : f.subject.tokens) c.drop(t, Drop::Marker);
+      if (f.subject.token >= 0) c.drop(f.subject.token, Drop::Marker);
+      f.hasSubject = false;
+      f.subject = SemNP{};
+      f.pred.tense = Tense::Present;
+      f.pred.modality = Modality::None;
+      f.pred.mood = SrcMood::Indicative;
+      f.pred.pastModal = false;
+      if (std::find(f.discourse.begin(), f.discourse.end(), "please") == f.discourse.end()) f.discourse.push_back("please");
+      c.s.doubt("polite-request");   // the engine writes "." for the "?" of the request
+    }
+  }
   // imperative: base verb at the start with no subject (or Mood=Imp), not a question
   if (f.hasPred && f.type == Kind::Decl && !c.question) {
     const Token& vt = c.t(f.pred.token >= 0 ? f.pred.token : h);
@@ -2899,7 +3230,11 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     const bool lexImp = md == nlp::morph::MoodImp;
     const bool bare = tt == 0 && fget(vt, nlp::morph::VerbFormShift) != nlp::morph::VfPart &&
                       fget(vt, nlp::morph::VerbFormShift) != nlp::morph::VfGer;
-    if (en && topLevel && ((lead == vtok || (lead >= 0 && cop >= 0 && lead == cop)) && (lexImp || bare || !f.hasSubject) &&
+    // C22: a past form is never an imperative ("... wanted more bread." continues a sentence whose subject came
+    // before: a statement without its subject, Check)
+    const bool pastForm = en && !lexImp && tt == nlp::morph::TensePast && f.pred.modality == Modality::None;
+    if (pastForm && topLevel && !f.hasSubject && lead == vtok) c.s.doubt("fragment");
+    if (en && topLevel && !pastForm && ((lead == vtok || (lead >= 0 && cop >= 0 && lead == cop)) && (lexImp || bare || !f.hasSubject) &&
                subjOk && f.pred.modality != Modality::Let && f.pred.tense != Tense::Future)) {
       bool doNot = false;
       for (int a : auxes)
@@ -3351,6 +3686,24 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
       }
     }
   }
+  // C22: a verbless fragment followed by ", too." ("And the other children, too."): "too" is "also" (quoque) of the
+  // fragment, not a unit of its own (nimis)
+  if (lang_ == SrcLang::En && s.units.size() >= 2) {
+    Unit& lu = s.units.back();
+    Unit& pu = s.units[s.units.size() - 2];
+    const SemFrame& lf = lu.frame;
+    if (lu.type == Unit::Clause && pu.type == Unit::Clause && lf.type == Kind::Frag && !lf.hasPred && !lf.hasSubject &&
+        !lf.hasObject && lf.predAdj.empty() && lf.predicative.empty() && lf.obliques.empty() && lf.adverbs.size() == 1 &&
+        (lf.adverbs[0].lemma == "too" || lf.adverbs[0].lemma == "also")) {
+      SemAdverb a = lf.adverbs[0];
+      a.lemma = "also";
+      pu.frame.adverbs.push_back(a);
+      pu.frame.tokens.push_back(a.token);
+      pu.vocative = false;   // "And the other children, too." is no address
+      pu.last = lu.last;
+      s.units.pop_back();
+    }
+  }
   // separators and final punctuation of clause units
   for (size_t ui = 0; ui < s.units.size(); ++ui) {
     Unit& u = s.units[ui];
@@ -3668,6 +4021,129 @@ void FrameBuilder::repairTree(SemSentence& s) const {
       return tk[(size_t)i].deprel == "obl" || tk[(size_t)i].deprel == "advmod" || tk[(size_t)i].deprel == "case" ||
              tk[(size_t)i].deprel == "compound";
     };
+    // C22: "a dog with a hat and a stick": a noun coordinated after the noun's "with" phrase belongs to that phrase
+    // (the dog has both), not to the dog
+    for (int h = 0; h < n; ++h) {
+      if (tk[(size_t)h].upos != "NOUN") continue;
+      int w = -1;
+      for (int q = h + 1; q < n; ++q)
+        if (tk[(size_t)q].head == h + 1 && tk[(size_t)q].deprel == "nmod" && tk[(size_t)q].upos == "NOUN") {
+          bool with = false;
+          for (int g = h + 1; g < q; ++g) with = with || (tk[(size_t)g].head == q + 1 && tk[(size_t)g].lower == "with");
+          if (with) { w = q; break; }
+        }
+      if (w < 0) continue;
+      for (int k = w + 1; k < n; ++k)
+        if (tk[(size_t)k].head == h + 1 && tk[(size_t)k].deprel == "conj" && tk[(size_t)k].upos == "NOUN") tk[(size_t)k].head = w + 1;
+    }
+    // C22: a verb the parser left as "dep" with its own "and" before it is a coordinated verb ("... and come out the
+    // other side")
+    for (int v = 0; v < n; ++v) {
+      if (tk[(size_t)v].deprel != "dep" || tk[(size_t)v].upos != "VERB") continue;
+      bool cc = false;
+      for (int q = 0; q < v; ++q) cc = cc || (tk[(size_t)q].head == v + 1 && tk[(size_t)q].deprel == "cc");
+      if (cc) tk[(size_t)v].deprel = "conj";
+    }
+    // C22: "What if I should fall ...?": the clause after "if" is the root, "what if" opens it (Quid sī ...?)
+    if (n > 3 && tk[0].lower == "what" && tk[1].lower == "if" && tk[0].head == 0) {
+      const int v = tk[1].head - 1;
+      if (v > 1 && v < n && tk[(size_t)v].head == 1) {
+        tk[(size_t)v].head = 0;
+        tk[(size_t)v].deprel = "root";
+        for (int q = 0; q < n; ++q)
+          if (q != v && tk[(size_t)q].head == 1) tk[(size_t)q].head = v + 1;
+        tk[0].head = v + 1;
+        tk[0].deprel = "cc";
+        tk[0].upos = "CCONJ";
+        tk[0].lemma = "what-if";
+        tk[0].lower = "what-if";
+        tk[1].deprel = "cc";
+        tk[1].upos = "CCONJ";
+        s.repairs.emplace_back("reroot");
+      }
+    }
+    // C22: an unfinished sentence that stops at its verb ("The king's answer at first was..."): the last word, a form
+    // of "be" hung on the root noun, is the verb and the noun its subject (the verb was lost)
+    {
+      int last = n - 1;
+      while (last > 0 && in(tk[(size_t)last].upos, {"PUNCT"})) --last;
+      const int r = last >= 0 ? tk[(size_t)last].head - 1 : -1;
+      if (last > 1 && in(tk[(size_t)last].lower, {"was", "is", "were", "are", "be"}) &&
+          !in(tk[(size_t)last].deprel, {"cop", "aux", "root"}) && r >= 0 && r < last && tk[(size_t)r].head == 0 &&
+          in(tk[(size_t)r].upos, {"NOUN", "PROPN", "PRON"})) {
+        bool kids = false;
+        for (int q = 0; q < n; ++q)
+          kids = kids || (tk[(size_t)q].head == last + 1 && in(tk[(size_t)q].deprel, {"nsubj", "obj", "cop", "xcomp", "ccomp", "expl"}));
+        if (!kids) {
+          tk[(size_t)last].head = 0;
+          tk[(size_t)last].deprel = "root";
+          tk[(size_t)last].upos = "VERB";
+          tk[(size_t)r].head = last + 1;
+          tk[(size_t)r].deprel = "nsubj";
+          for (int q = 0; q < n; ++q)
+            if (q != r && tk[(size_t)q].head == r + 1 && (tk[(size_t)q].upos == "PUNCT" || tk[(size_t)q].deprel == "advmod" || tk[(size_t)q].deprel == "obl"))
+              tk[(size_t)q].head = last + 1;
+          s.repairs.emplace_back("reroot");
+        }
+      }
+    }
+    // C22: "Robert, the Bishop of London, agreed ...": a name read as a vocative root and the apposition as the
+    // subject: the name is the subject, the noun phrase its apposition
+    for (int r = 0; r + 3 < n; ++r) {
+      if (tk[(size_t)r].head != 0 || tk[(size_t)r].upos != "PROPN" || tk[(size_t)r + 1].text != ",") continue;
+      bool lead = true;
+      for (int q = 0; q < r; ++q) lead = lead && in(tk[(size_t)q].upos, {"PUNCT", "CCONJ", "ADV"});
+      if (!lead) break;
+      int j = -1;
+      for (int q = r + 2; q < n; ++q)
+        if (tk[(size_t)q].deprel == "nsubj" && in(tk[(size_t)q].upos, {"NOUN", "PROPN"})) { j = q; break; }
+      if (j < 0) break;
+      const int v = tk[(size_t)j].head - 1;
+      bool the = false;
+      for (int q = r + 2; q < j; ++q) the = the || (tk[(size_t)q].lower == "the" && tk[(size_t)q].head == j + 1);
+      bool commaBeforeVerb = false;
+      for (int q = j + 1; q < v; ++q) commaBeforeVerb = commaBeforeVerb || tk[(size_t)q].text == ",";
+      if (!the || v <= j || !commaBeforeVerb || tk[(size_t)v].upos != "VERB") break;
+      tk[(size_t)r].head = v + 1;
+      tk[(size_t)r].deprel = "nsubj";
+      tk[(size_t)j].head = r + 1;
+      tk[(size_t)j].deprel = "appos";
+      tk[(size_t)v].head = 0;
+      tk[(size_t)v].deprel = "root";
+      for (int q = 0; q < n; ++q)
+        if (q != r && q < r && tk[(size_t)q].head == r + 1 && tk[(size_t)q].deprel != "punct") tk[(size_t)q].head = v + 1;
+      s.repairs.emplace_back("reroot");
+      break;
+    }
+    // C22: a fronted prepositional phrase read as the root noun with the clause hung on it ("Within the castle we
+    // were safe." -> castle + acl): the clause is the root, the phrase its oblique
+    for (int r = 0; r < n; ++r) {
+      if (tk[(size_t)r].head != 0 || !in(tk[(size_t)r].upos, {"NOUN", "PROPN", "PRON"})) continue;
+      bool cased = false;
+      for (int j = 0; j < r; ++j)
+        if (tk[(size_t)j].head == r + 1 && tk[(size_t)j].deprel == "case" && tk[(size_t)j].upos == "ADP") cased = true;
+      if (!cased) break;
+      for (int k = r + 1; k < n; ++k) {
+        if (tk[(size_t)k].head != r + 1 || !in(tk[(size_t)k].deprel, {"acl", "acl:relcl", "ccomp", "advcl", "parataxis"})) continue;
+        bool subj = false, rel = false;
+        for (int g = r + 1; g < k; ++g) {
+          if (tk[(size_t)g].head != k + 1) continue;
+          if (tk[(size_t)g].deprel == "nsubj" && tk[(size_t)g].upos == "PRON" &&
+              !in(tk[(size_t)g].lower, {"that", "which", "who", "what"})) subj = true;
+          if (in(tk[(size_t)g].lower, {"that", "which", "who", "whom", "whose", "where", "when"})) rel = true;
+        }
+        if (!subj || rel) continue;
+        tk[(size_t)k].head = 0;
+        tk[(size_t)k].deprel = "root";
+        tk[(size_t)r].head = k + 1;
+        tk[(size_t)r].deprel = "obl";
+        for (int j = k + 1; j < n; ++j)
+          if (tk[(size_t)j].head == r + 1 && tk[(size_t)j].deprel == "punct") tk[(size_t)j].head = k + 1;
+        s.repairs.emplace_back("reroot");
+        break;
+      }
+      break;
+    }
     // C15: "the Great Wizard I told you of." / "a man I know": a noun read as the subject of a verb that has a
     // pronoun subject right after it is the antecedent of a contact relative clause
     for (int v = 0; v < n; ++v) {
@@ -4016,6 +4492,20 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
   out.drop.assign(out.tokens.size(), Drop::No);
   if (out.tokens.empty()) return;
   if (nlp_) nlp_->analyse(out.tokens);
+  // C22: "<clause>, too." at the end: the comma is dropped so the parser hangs "too" on the clause (it is "also",
+  // quoque) instead of a fragment "too" of its own (nimis); a verbless fragment keeps it (merged in buildUnits)
+  if (nlp_ && lang_ == SrcLang::En && out.tokens.size() >= 4) {
+    std::vector<nlp::Token>& t0 = out.tokens;
+    size_t last = t0.size() - 1;
+    while (last > 0 && (t0[last].text == "." || t0[last].text == "!" || t0[last].text == "?")) --last;
+    bool verb = false;
+    for (size_t q = 0; q + 2 < last; ++q) verb = verb || t0[q].upos == "VERB" || t0[q].upos == "AUX";
+    if (verb && last >= 2 && text::lower(t0[last].text) == "too" && t0[last - 1].text == ",") {
+      t0.erase(t0.begin() + (long)last - 1);
+      out.drop.assign(out.tokens.size(), Drop::No);
+      nlp_->analyse(out.tokens);
+    }
+  }
   std::vector<nlp::Token>& tk = out.tokens;
   const int n = (int)tk.size();
   // C17: forms the tagger misread, corrected from english.vpl (irregular pasts, a past read as a noun, an adjective
@@ -4039,6 +4529,29 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
         tk[(size_t)i + 1].feats = 0;
         again = true;
       }
+    // C22: a greeting after "say" ("say hello to grandmother", "said goodbye") is the object of "say" (rebuilt as
+    // salūtāre / valedīcere by the clause builder), not an interjection or a clause
+    for (size_t ti = 0; ti + 1 < tk.size(); ++ti)
+      if (in(tk[ti].lower, {"say", "says", "said", "saying"}) &&
+          in(tk[ti + 1].lower, {"hello", "hi", "goodbye", "bye", "farewell", "good-bye"}) && tk[ti + 1].upos != "NOUN") {
+        tk[ti + 1].upos = "NOUN";
+        tk[ti + 1].feats = nlp::morph::fromString("Number=Sing");
+        again = true;
+      }
+    // C22: a capitalised word of names_la.tsv (a person or a place, not a title row) that the tagger read as a common
+    // noun, an adjective or an interjection ("Lucy!", "Mary in the garden") is the name
+    for (size_t ti = 0; ti < tk.size(); ++ti) {
+      nlp::Token& t = tk[ti];
+      if (t.text.empty() || !(t.text[0] >= 'A' && t.text[0] <= 'Z') || t.upos == "PROPN") continue;
+      const curated::NameEntry* ne = cd_.nameByEnglish(t.text);
+      if (!ne || ne->policy == curated::NamePolicy::Translate) continue;
+      bool first = true;   // "Mark the page.": a sentence-initial verb stays a verb
+      for (size_t q = 0; q < ti; ++q) first = first && tk[q].upos == "PUNCT";
+      if (!in(t.upos, {"NOUN", "ADJ", "INTJ", "X"}) && !(!first && in(t.upos, {"VERB", "ADV"}))) continue;
+      t.upos = "PROPN";
+      t.feats = nlp::morph::fromString("Number=Sing");
+      again = true;
+    }
     if (again) nlp_->parser().parse(tk);
   }
   // no verb at all in a sentence of three or more words: the tagger probably missed one; retag and re-parse
@@ -4114,7 +4627,8 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
         for (int i = 1; i + 1 < n && fix < 0; ++i) {
           const std::string& w = tk[(size_t)i].lower;
           if ((tk[(size_t)i].upos == "NOUN" || tk[(size_t)i].upos == "ADJ") && w.size() > 3 && w.back() == 's' &&
-              nounLike(i - 1) && verbReading(tk[(size_t)i])) {
+              nounLike(i - 1) && verbReading(tk[(size_t)i]) &&
+              !in(tk[(size_t)i - 1].lower, {"my", "your", "our", "their", "its", "his"})) {   // C22: "My ears!" 
             fix = i;
             feats = nlp::morph::fromString("Number=Sing|Person=3|Tense=Pres|VerbForm=Fin|Mood=Ind");
           }
@@ -4271,6 +4785,50 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
       if (en::verbOfForm(*lex_, t.lower, &present) == t.lemma)
         t.feats = nlp::morph::fromString(present ? "Tense=Pres|VerbForm=Part" : "Tense=Past|VerbForm=Part");
     }
+  }
+  // C22: a title before a capitalised word ("Mr. Fox", "Miss Lucy", "Mrs. Goose") is not translated as a separate
+  // name or a genitive ("Vulpēs Mr.", "Bear Dominī"): the title is dropped (as an article) and the word is the name;
+  // a word english.vpl knows as a common noun is that noun ("Mr. Rabbit" -> cunīcule)
+  if (lang_ == SrcLang::En && lex_)
+    for (int i = 0; i + 1 < n; ++i) {
+      nlp::Token& t = tk[(size_t)i];
+      std::string tl = t.lower;
+      if (!tl.empty() && tl.back() == '.') tl.pop_back();
+      if (!in(tl, {"mr", "mrs", "ms", "miss", "mister", "missus"}) || t.text.empty() || !(t.text[0] >= 'A' && t.text[0] <= 'Z'))
+        continue;
+      nlp::Token& w = tk[(size_t)i + 1];
+      if (w.text.empty() || !(w.text[0] >= 'A' && w.text[0] <= 'Z') || w.upos == "PUNCT") continue;
+      // the word takes the title's place in the tree
+      if (w.head == i + 1) { w.head = t.head; w.deprel = t.deprel; }
+      for (int k = 0; k < n; ++k)
+        if (k != i + 1 && tk[(size_t)k].head == i + 1) tk[(size_t)k].head = i + 2;
+      if (w.head == i + 2) { w.head = 0; w.deprel = "root"; }
+      t.head = i + 2;
+      t.deprel = "det";
+      t.upos = "DET";
+      t.lemma = "the";
+      t.lower = "the";
+      const curated::NameEntry* ne = cd_.nameByEnglish(w.text);
+      if (!ne) {
+        std::vector<lex::Analysis> an;
+        lex_->lookup(text::en_key(nlp::normalise(w.text)), an);
+        bool noun = false;
+        for (const lex::Analysis& a : an) noun = noun || lex_->lemma(a.lemma).pos == feat::Noun;
+        if (noun) {
+          w.upos = "NOUN";
+          w.lower = nlp::normalise(w.text);
+          w.lemma = lemmaOf(w);
+          w.feats = nlp::morph::fromString("Number=Sing");
+        }
+      }
+    }
+  // C22: a clause-final "too" that modifies no adjective or adverb is "also" (quoque): "I want some cake too."
+  if (lang_ == SrcLang::En && n >= 2) {
+    int last = n - 1;
+    while (last > 0 && tk[(size_t)last].upos == "PUNCT") --last;
+    nlp::Token& t = tk[(size_t)last];
+    const int hd = t.head - 1;
+    if (t.lower == "too" && !(hd >= 0 && hd < n && in(tk[(size_t)hd].upos, {"ADJ", "ADV"}) && hd > last)) t.lemma = "also";
   }
   if (lang_ == SrcLang::Es && nlp_) es::normalise(out, lex_, cd_);   // C13: clitics, personal "a", "por qué" ...
   // "six o'clock": the clock word heads the numeral and stands for "hour" (RULE time.hour)

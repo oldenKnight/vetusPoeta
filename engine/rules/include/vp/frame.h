@@ -98,6 +98,8 @@ struct SemNP {
   bool literalUnknown = false;   // could not be analysed (kept verbatim)
   uint8_t srcGender = 0;         // grammatical gender of the source noun (Spanish), vp::feat::Gender M/F, 0 unknown
   std::vector<int> tokens;       // all tokens of the NP
+  // C22: an apposition between commas ("Edwin and Paul, the Dukes of Rome, fought ..."): same case, after the NP
+  std::vector<SemNP> apposition;
 };
 
 struct SemOblique { std::string prep; SemNP np; int token = -1; bool front = false; };

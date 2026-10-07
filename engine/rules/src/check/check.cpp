@@ -549,6 +549,12 @@ struct LatinChecker::Impl {
         for (const Reading& r : rd[i]) partNom = partNom || ((r.f.mood == ParticipleMood || r.lpos == Participle) && r.f.case_ == Nom);
         if (partNom) continue;
       }
+      // C22: a preposition that governs the next word ("ultrā collēs", "suprā mēnsam") is no adjective
+      if (i + 1 < n && governed[i + 1]) {
+        bool prep = false;
+        for (const Reading& r : rd[i]) prep = prep || r.lpos == Prep;
+        if (prep) continue;
+      }
       // C19: "quam prīmum" (as soon as possible): an adverb after quam, not an adjective
       if (i > 0 && text::latin_key(rep.tokens[i - 1].text) == "quam") {
         bool adv = false;
@@ -589,6 +595,14 @@ struct LatinChecker::Impl {
         if (neutAcc && !accHead) continue;
       }
 
+      // C22: a gerund ("tempus salūtandī et valedīcendī", "ad dormiendum") is a verb form, not a gerundive to agree
+      bool gerund = false;
+      for (const Reading& r : rd[i]) gerund = gerund || (r.lpos == Verb && r.f.mood == Gerund);
+      if (gerund && !cand.empty()) {
+        bool genHead = false;   // after a noun (genitive) or a preposition (accusative / ablative)
+        for (const Reading& r : rd[i]) genHead = genHead || (r.lpos == Verb && r.f.mood == Gerund && (r.f.case_ == Gen || r.f.case_ == Acc || r.f.case_ == Abl));
+        if (genHead) continue;
+      }
       bool copula = false;
       for (size_t j = b; j < e; ++j) copula = copula || (isVerb[j] && isCopula(j));
       if (copula && predicateOk(i, b, e)) continue;
@@ -599,7 +613,10 @@ struct LatinChecker::Impl {
         for (const Reading& r : rd[j]) esse = esse || (isInfinitive(r) && r.key == "sum");
       if (esse && !copula && predicateOk(i, b, e)) continue;
       if (cand.empty()) {
-        if (copula) issue("A3", (int)i, "predicate '" + T(i) + "' does not agree with the subject / verb");
+        // C22: a substantive adjective in an oblique case is no predicate ("Omnibus erit placenta": dative)
+        bool oblique = false;
+        for (const Reading& r : rd[i]) oblique = oblique || (isModifier(r) && (r.f.case_ == Dat || r.f.case_ == Abl));
+        if (copula && !oblique) issue("A3", (int)i, "predicate '" + T(i) + "' does not agree with the subject / verb");
         continue;
       }
       // a quantity noun before a partitive genitive ("paulum thēae", "satis aquae"): the noun reading heads (C13)
@@ -617,6 +634,22 @@ struct LatinChecker::Impl {
           gen = gen && h > i && g;
         }
         if (gen) continue;
+      }
+      // C22: subject and predicate noun of a copula need not share the gender ("omnia nūgae essent", "mundus meus
+      // Terra Mīrābilis esset"): a word that can stand as a noun (or a neuter plural substantive) next to a
+      // nominative noun in a copula segment is no modifier slip
+      if (copula) {
+        bool nounLike = false;
+        if (strongHead(i))
+          for (const Reading& r : rd[i]) nounLike = nounLike || (isHead(r) && r.f.case_ == Nom);
+        for (const Reading& r : rd[i])
+          nounLike = nounLike || (isModifier(r) && r.f.case_ == Nom && r.f.number == Pl && r.f.gender == N &&
+                                  (r.key == "omnis" || r.key == "multus" || r.key == "ceterus" || r.key == "hic" ||
+                                   r.key == "ille" || r.key == "is" || r.key == "cunctus"));
+        bool headNom = false;
+        for (size_t h : cand)
+          for (const Reading& r : rd[h]) headNom = headNom || (isHead(r) && r.f.case_ == Nom);
+        if (nounLike && headNom) continue;
       }
       bool partial = false;
       for (size_t h : cand) partial = partial || partialPair(i, h);

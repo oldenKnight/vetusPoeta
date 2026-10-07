@@ -91,3 +91,14 @@ Witch of the North	Saga Septentriōnis	-	f	-	translate
 Golden Cap	Pilleus Aureus	-	m	-	translate	
 Power of Evil	Potestās Malī	-	f	-	translate	
 King of Beasts	Rēx Bēstiārum	-	m	-	translate	
+# C22 (acceptance loop 1): places and people of a children's story and of an English history lesson. Two-word Latin
+# names are declined as noun + adjective ("ad Terram Mīrābilem", "in Terrā Mīrābilī").
+Wonderland	Terra Mīrābilis	-	f	-	translate	place: noun + adjective, both declined
+Terra Mirabilis	Terra Mīrābilis	-	f	-	translate	the Latin name written in an English text
+Earth	Terra	Terrae	f	1	decline	the planet ("the centre of the Earth" -> medium Terrae)
+Edwin	Eduinus	Eduinī	m	2	decline	
+Morcar	Morcarus	Morcarī	m	2	decline	
+Stigand	Stigandus	Stigandī	m	2	decline	
+Mercia	Mercia	Merciae	f	1	decline	
+Northumbria	Northumbria	Northumbriae	f	1	decline	
+Canterbury	Cantuāria	Cantuāriae	f	1	decline	"archbishop of Canterbury" -> archiepiscopus Cantuāriae

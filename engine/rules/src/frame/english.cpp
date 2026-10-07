@@ -199,6 +199,127 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
       changed = true;
     }
   }
+  // C22: after a form of "be" (or "feel", "seem", "look", "get", "become"), a word in -ly that english.vpl knows only as an
+  // adjective ("I am lonely", "She looks lovely") is the adjective, and a word it knows only as a noun ("That is
+  // nonsense") is a noun; the tagger read them as an adverb / an adjective
+  for (int i = 1; i < n; ++i) {
+    Token& t = tk[(size_t)i];
+    int p = i - 1;
+    while (p > 0 && isIn(tk[(size_t)p].lower, {"so", "very", "too", "really", "quite", "awfully", "rather", "not", "n't"})) --p;
+    const std::string& pl = tk[(size_t)p].lower;
+    const bool copula = isIn(pl, {"am", "is", "are", "was", "were", "be", "been", "being", "'m", "'s", "'re", "feel",
+                                  "feels", "felt", "seem", "seems", "seemed", "look", "looks", "looked", "become",
+                                  "became", "get", "got", "gets"});
+    if (!copula) continue;
+    if (t.upos == "ADV" && endsWith(t.lower, "ly")) {
+      const Reading r = readingOf(lx, t.lower);
+      // closing the clause right after the copula ("That's silly.", "It is lovely."): the adjective
+      const bool closing = i + 1 >= n || isIn(tk[(size_t)i + 1].upos, {"PUNCT", "CCONJ"});
+      if (r.adj && closing && p == i - 1 && isIn(pl, {"am", "is", "are", "was", "were", "be", "been", "'m", "'s", "'re"})) {
+        t.upos = "ADJ";
+        t.feats = 0;
+        changed = true;
+      } else if (r.adj && !r.noun && !r.verb) {
+        bool advReading = false;
+        std::vector<lex::Analysis> an;
+        lx.lookup(text::en_key(t.lower), an);
+        for (const lex::Analysis& a : an) advReading = advReading || lx.lemma(a.lemma).pos == feat::Adv;
+        if (!advReading) { t.upos = "ADJ"; t.feats = 0; changed = true; }
+      }
+    } else if (t.upos == "ADJ" && (i + 1 >= n || isIn(tk[(size_t)i + 1].upos, {"PUNCT", "CCONJ"}))) {
+      const Reading r = readingOf(lx, t.lower);
+      if (r.noun && !r.adj && !r.verb) { t.upos = "NOUN"; t.feats = nlp::morph::fromString("Number=Sing"); changed = true; }
+    }
+  }
+  // C22: a word tagged as a verb that english.vpl knows only as an adjective ("The bear has thick fur": "has thick"
+  // read as a perfect) is the adjective, and the "have" before it the main verb
+  for (int i = 1; i + 1 < n; ++i) {
+    Token& t = tk[(size_t)i];
+    if (t.upos != "VERB") continue;
+    const Reading r = readingOf(lx, t.lower);
+    if (!r.adj) continue;
+    if (!isIn(tk[(size_t)i + 1].upos, {"NOUN", "PROPN"})) continue;
+    if (r.verb) {   // a verb reading too: only when it cannot be a participle after have ("has thick fur")
+      if (!isIn(tk[(size_t)i - 1].lower, {"has", "have", "had"})) continue;
+      bool part = false;
+      std::vector<lex::Analysis> an;
+      lx.lookup(text::en_key(t.lower), an);
+      for (const lex::Analysis& a : an) {
+        const feat::Features f = feat::unpack(lx.feature(a.feat));
+        part = part || (lx.lemma(a.lemma).pos == feat::Verb && (f.tense == feat::Perfect || f.mood == feat::ParticipleMood));
+      }
+      if (part || endsWith(t.lower, "ed")) continue;
+    }
+    t.upos = "ADJ";
+    t.feats = 0;
+    Token& p = tk[(size_t)i - 1];
+    if (p.upos == "AUX" && isIn(p.lower, {"has", "have", "had"})) {
+      p.upos = "VERB";
+      p.feats = nlp::morph::fromString(p.lower == "had" ? "Tense=Past|VerbForm=Fin|Mood=Ind"
+                                                       : p.lower == "has" ? "Number=Sing|Person=3|Tense=Pres|VerbForm=Fin|Mood=Ind"
+                                                                          : "Tense=Pres|VerbForm=Fin|Mood=Ind");
+    }
+    changed = true;
+  }
+  // C22: a word right after my / your / our / their / its tagged as a verb that english.vpl knows as a plural or
+  // singular noun is that noun ("My ears and whiskers!")
+  for (int i = 1; i < n; ++i) {
+    Token& t = tk[(size_t)i];
+    if (t.upos != "VERB" || !isIn(tk[(size_t)i - 1].lower, {"my", "your", "our", "their", "its"})) continue;
+    const Reading r = readingOf(lx, t.lower);
+    if (!r.noun) continue;
+    bool plural = false;
+    std::vector<lex::Analysis> an;
+    lx.lookup(text::en_key(t.lower), an);
+    for (const lex::Analysis& a : an)
+      if (lx.lemma(a.lemma).pos == feat::Noun && feat::unpack(lx.feature(a.feat)).number == feat::Pl) plural = true;
+    t.upos = "NOUN";
+    t.feats = nlp::morph::fromString(plural ? "Number=Plur" : "Number=Sing");
+    changed = true;
+  }
+  // C22: "be (just) like X": "like" after a form of "be" is the preposition, never the verb ("You'd be just like
+  // people" had "like" as the root verb)
+  for (int i = 1; i + 1 < n; ++i) {
+    Token& t = tk[(size_t)i];
+    if (t.lower != "like" || t.upos != "VERB") continue;
+    int p = i - 1;
+    while (p > 0 && isIn(tk[(size_t)p].lower, {"just", "exactly", "so", "very", "much", "rather", "quite", "a", "bit", "little", "not", "n't"})) --p;
+    if (!isIn(tk[(size_t)p].lower, {"be", "is", "am", "are", "was", "were", "been", "being", "'s", "'re", "'m"})) continue;
+    t.upos = "ADP";
+    t.feats = 0;
+    changed = true;
+  }
+  // C22: a bare word after "and / or" coordinated with a verb that has a modal ("Dogs would sing and dance all day"):
+  // the second verb, not a noun ("dance" was the subject of a fragment)
+  for (int i = 2; i < n; ++i) {
+    Token& t = tk[(size_t)i];
+    if (t.upos != "NOUN" || t.deprel != "conj" || t.head <= 0 || !isIn(tk[(size_t)i - 1].lower, {"and", "or"})) continue;
+    const int v = t.head - 1;
+    if (v < 0 || v >= i || tk[(size_t)v].upos != "VERB") continue;
+    bool modal = false, det = false;
+    for (int j = 0; j < n; ++j) {
+      if (tk[(size_t)j].head == v + 1 && tk[(size_t)j].deprel == "aux" &&
+          isIn(tk[(size_t)j].lower, {"would", "will", "can", "could", "should", "must", "may", "might", "shall", "'d", "'ll"}))
+        modal = true;
+      if (tk[(size_t)j].head == v + 1 && j < v && tk[(size_t)j].lower == "to" && isIn(tk[(size_t)j].deprel, {"mark", "aux"}))
+        modal = true;   // "wants to sing and dance
+      if (tk[(size_t)j].head == i + 1 && (tk[(size_t)j].deprel == "det" || tk[(size_t)j].deprel == "amod")) det = true;
+    }
+    if (!modal || det) continue;
+    bool base = false;   // a verb whose headword is this very form ("dance", "sing")
+    {
+      std::vector<lex::Analysis> an;
+      lx.lookup(text::en_key(t.lower), an);
+      for (const lex::Analysis& a : an) {
+        const lex::Lemma l = lx.lemma(a.lemma);
+        base = base || (l.pos == feat::Verb && text::lower(std::string(l.head)) == t.lower);
+      }
+    }
+    if (!base) continue;
+    t.upos = "VERB";
+    t.feats = nlp::morph::fromString("VerbForm=Inf");
+    changed = true;
+  }
   bool anyVerb = false;
   for (const Token& t : tk) anyVerb = anyVerb || t.upos == "VERB";
   auto nominal = [&](int i) { return i >= 0 && isIn(tk[(size_t)i].upos, {"NOUN", "PROPN", "PRON"}); };
@@ -454,6 +575,11 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
     }
   }
   return changed;
+}
+
+bool colourWord(const std::string& w) {
+  return isIn(w, {"blue", "black", "white", "red", "green", "yellow", "grey", "gray", "brown", "golden", "silver",
+                  "pink"});
 }
 
 }  // namespace vp::frame::en

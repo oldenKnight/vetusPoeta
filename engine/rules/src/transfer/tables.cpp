@@ -68,6 +68,8 @@ bool personalPronoun(const std::string& w) {
 const char* adverb(const std::string& l, bool motion) {
   if (l == "here") return motion ? "hūc" : "hīc";
   if (l == "there") return motion ? "illūc" : "ibi";
+  if (l == "there-contrast") return motion ? "illūc" : "illīc";   // C22: "here or there" -> hīc aut illīc
+  if (l == "nothing-adv") return "nihil";   // C22: "think nothing of it" -> id nihil cūrāre
   if (l == "inside" || l == "in") return motion ? "intrō" : "intus";
   if (l == "home") return motion ? "domum" : "domī";
   static const std::pair<const char*, const char*> kAdv[] = {
@@ -187,7 +189,8 @@ const char* connector(const std::string& w, bool afterFirst) {
   static const std::pair<const char*, const char*> kC[] = {
       {"and", "et"},       {"but", "sed"},        {"or", "aut"},          {"so", "itaque"},   {"because", "quia"},
       {"if", "sī"},        {"nor", "neque"},      {"also", "quoque"},     {"yet", "tamen"},   {"therefore", "itaque"},
-      {"however", "tamen"}, {"when", "cum"},      {"although", "quamquam"}, {"while", "dum"},  {"unless", "nisi"},
+      {"however", "tamen"}, {"when", "cum"}, {"when-time", "ubi"},   // C22: a when-clause standing alone (ubi)
+      {"what-if", "quid"},   // C22: "What if ...?" -> Quid sī ...?      {"although", "quamquam"}, {"while", "dum"},  {"unless", "nisi"},
       {"for", "nam"},      {"besides", "praetereā"}, {"moreover", "praetereā"}, {"still", "tamen"}, {"thus", "ita"},
       {"hence", "itaque"}};
   return lookup(kC, w);

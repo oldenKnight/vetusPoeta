@@ -38,4 +38,8 @@ std::string knownBase(const lex::Lexicon& lx, const std::string& lower, const st
 // the singular head; false when no split fits (never "kit" + "ten").
 bool compoundParts(const lex::Lexicon& lx, const std::string& lower, std::string& first, std::string& head);
 
+// C22: a colour adjective (blue, black, white, red, green, yellow, grey/gray, brown, golden, silver, pink): the first
+// part of a compound that is an adjective ("bluebird" -> avis caerulea), not a genitive.
+bool colourWord(const std::string& lower);
+
 }  // namespace vp::frame::en

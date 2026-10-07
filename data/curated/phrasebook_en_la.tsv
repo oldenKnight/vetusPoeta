@@ -138,7 +138,7 @@ of course	certē	1	adv
 by the way	cēterum	1	adv	
 for example	exemplī grātiā	2	adv	
 in fact	rē vērā	1	adv	
-after all	tamen	1	adv	
+after all	nam	1	adv	C22: gives a reason ("After all, he is only a boy." -> Nam puer tantum est.); not tamen
 first of all	prīmum	1	adv	
 so what	quid tum	1	q	
 what for	cūr	1	q	
@@ -245,3 +245,26 @@ before dark	ante noctem	1	tail	"We must be home before dark." -> ante noctem
 let me {VP}	sine mē {1}	1	stmt	"Let me see." -> Sine mē vidēre. (C19)
 how have you been	quōmodo valuistī	1	q	"How have you been?" (C19)
 how old are you	quot annōs nātus es/quot annōs nāta es	1	q	"How old are you?" (C19; gender of the person asked: the speaker glossary)
+# C22 (acceptance loop 1): idioms of children's dialogue. Our own example sentences in the notes.
+i am late for {NP}	ad {1:acc} sērō veniō	1	state	"I'm late for dinner." -> Ad cēnam sērō veniō.
+we are late for {NP}	ad {1:acc} sērō venīmus	1	state	"We are late for school." -> Ad lūdum sērō venīmus.
+no time to say hello , goodbye	nōn possum salūtāre neque valēre iubēre	1	stmt	the teacher's rendering: "I cannot greet nor bid farewell"
+no time to say goodbye , hello	nōn possum valēre iubēre neque salūtāre	1	stmt	
+no time to say hello	nōn possum salūtāre	1	stmt	
+no time to say goodbye	nōn possum valēre iubēre	1	stmt	
+there is no time to {VP}	nōn est tempus {1:inf}	1	stmt	"There is no time to play." -> Nōn est tempus lūdere.
+no time to {VP}	nōn est tempus {1:inf}	1	stmt	
+i am in a stew	perturbātus/perturbāta sum	1	state	idiom: upset, flustered
+i am really in a stew	valdē perturbātus/perturbāta sum	1	state	
+that's it	ita est	1	answer	"That's it, Tom." -> Ita est, Tom.
+that is it	ita est	1	answer	
+what nonsense	quae nūgae	1	excl	
+once more	rūrsus	1	adv	"Sing it once more." -> Rūrsus id cane. (the teacher's choice)
+once again	iterum	1	adv	
+from the beginning	ab initiō	1	tail	"Once more, from the beginning." -> Iterum, ab initiō.
+my	papae	1	excl	"My!" alone as surprise (a possessive never matches: the word must stand alone)
+at first	prīmō	1	adv	"At first the dog was shy." -> Prīmō canis timidus erat.
+late	sērō	1	answer	a bare "late" repeated after "I am late" ("late, late!")
+upside down	pedibus sursum versīs	2	tail	"The bat hangs upside down." -> pedibus sursum versīs (with the feet turned up)
+of late	nūper	1	adv	"He had of late been ill." -> nūper
+lately	nūper	1	adv	

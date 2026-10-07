@@ -120,9 +120,12 @@ bool Phrasebook::matchFrom(const std::vector<nlp::Token>& toks, const Pattern& p
   const Elem& e = p.elems[ei];
   const int n = (int)toks.size();
   if (e.slot < 0) {
-    if (at < n && !isPunct(toks[(size_t)at]))
+    // C22: a pattern word that is itself punctuation (",") matches that punctuation token ("hello , goodbye")
+    if (at < n)
       for (const std::string& w : e.words)
-        if (tokenIs(toks[(size_t)at], w) && matchFrom(toks, p, ei + 1, at + 1, slots, end)) return true;
+        if ((!isPunct(toks[(size_t)at]) || toks[(size_t)at].text == w) && tokenIs(toks[(size_t)at], w) &&
+            matchFrom(toks, p, ei + 1, at + 1, slots, end))
+          return true;
     if (e.optional) return matchFrom(toks, p, ei + 1, at, slots, end);
     return false;
   }

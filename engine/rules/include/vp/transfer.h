@@ -53,6 +53,15 @@ struct Memory {
   // translated (0 = none); the engine sets `contCase` from it for the next sentence of the same speaker when the
   // previous one ended open (, ; : or a dash), and a fragment "and the queen." then takes that case ("Et rēgīnam.").
   uint8_t lastObjCase = 0, contCase = 0;
+  // C22: the gender of the person addressed, from a name of names_la.tsv in this cue or the previous one (the engine
+  // sets it: "Alice", "Dinah" -> F); 0 = unknown. "you" and a child addressed take it ("puella cāra", "callida es").
+  uint8_t addresseeGender = 0;
+  // C22: song lines: a line "And + bare verb" continues the previous line's clause (its subject, tense, mood and
+  // modal: "They would sit by the fire" + "And sing all night" -> et tōtam noctem canerent). The engine sets songLine
+  // per sentence; the transfer keeps the last main clause's verb features (prev*).
+  bool songLine = false, prevSong = false, prevValid = false;
+  uint8_t prevPerson = 0, prevNumber = 0, prevTense = 0, prevMood = 0;
+  uint32_t prevModal = kNone;
 };
 
 struct Settings {
