@@ -73,7 +73,7 @@ struct LaNP {
   std::string numeralLiteral;     // C19: a number Latin writes with numerals ("XXI ovēs"), before the noun
   uint32_t adGerund = kNone;      // C20: ad + the accusative gerund of this verb after the noun ("locum ad dormiendum")
   std::vector<LaNP> apposition;   // C22: between commas after the NP and its coordination, in the same case
-  bool elideHead = false;         // C24: the antecedent is understood (a free relative "quod est" for "what it is"):
+  bool elideHead = false;         // C24: the antecedent is understood (a free relative: "quod vidētur" for "what it seems"):
                                   // the head is not written, the relative clause agrees with it
 };
 

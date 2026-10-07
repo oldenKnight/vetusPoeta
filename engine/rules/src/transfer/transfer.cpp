@@ -200,7 +200,7 @@ LaNP momentNP(const Transfer& t, bool very) {
 }
 }  // namespace
 
-// C24: an invented English word made of a preposition and a known noun ("underland" = under + land, "overcloud"):
+// C24: an invented English word made of a preposition and a known noun ("overcloud" = over + cloud, "underbridge"):
 // the Latin preposition, the noun and its case; the choices are recorded and the flag derived-word (Check) is set.
 // False when no such reading exists.
 bool inventedPrep(const Transfer& t, const std::string& low, const Settings& st, const std::vector<std::string>& context,
@@ -1157,6 +1157,16 @@ void Transfer::relativeInto(const SemNP& n, Ctx& c, LaNP& o) const {
       role = realise::Role::Object;
     }
     rc.relRole = role;
+    // C24: "(I could) hear a song that I could understand": a relative clause with "can / could" inside a clause of
+    // the same modal is a clause of character (subjunctive: quod intellegere possem), not a second "poteram"
+    {
+      const uint32_t possum = latin("possum", Verb);
+      const bool mainCan = (c.frame && c.frame->pred.modality == Modality::Can) ||
+                           (c.mem.songLine && c.mem.prevValid && c.mem.prevModal == possum);
+      if (c.st.lang == frame::SrcLang::En && possum != kNone && rc.pred.modal == possum && rc.pred.mood == Indicative &&
+          mainCan && c.frame != &rf)
+        rc.pred.mood = Subjunctive;
+    }
     // C19: a second relative clause coordinated inside the first ("those who are not honest, or who approach him"):
     // its "who" is the relative pronoun again (aut quī ... accēdunt), agreeing with the antecedent
     for (size_t q = 0; q < rc.subs.size() && q < rf.subordinate.size(); ++q) {
@@ -1382,7 +1392,7 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
       }
       return;
     }
-    // C24: a free relative ("what it is", "what I see"): the neuter antecedent is understood, quod + the clause
+    // C24: a free relative ("what the sky is", "what I see"): the neuter antecedent is understood, quod + the clause
     if (c.st.lang == frame::SrcLang::En && p == "what" && !n.relative.empty() && latin("is", Pron) != kNone) {
       o = LaNP{};
       o.head = latin("is", Pron);
@@ -1398,7 +1408,7 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
       o.emphasis = front;
       c.cover(n.token);
       relativeInto(n, c, o);
-      // "everything would be what it isn't": "it" stands for the clause's subject: its number (omnia ... quod nōn sunt)
+      // "everything is what it seems": "it" stands for the clause's subject: its number (omnia ... quod videntur)
       const frame::SemNP& rs = n.relative[0].subject;
       if (!o.relative.empty() && n.relative[0].hasSubject && rs.isPronoun &&
           (rs.pronLemma == "it" || text::lower(rs.head) == "it") && c.frame && c.frame->hasSubject &&
@@ -1709,7 +1719,7 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
         }
       }
     }
-    // C24: an invented word made of a preposition and a known noun ("underland", "overcloud"): the nearest reading,
+    // C24: an invented word made of a preposition and a known noun ("overcloud", "underbridge"): the nearest reading,
     // the preposition with that noun ("sub terrā", "super nūbem"), written as fixed words and marked derived (Check)
     if (id == kNone && c.st.lang == frame::SrcLang::En && n.determiner.empty() && n.adjectives.empty()) {
       uint32_t prep = kNone, noun = kNone;
@@ -1804,7 +1814,11 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
             if (k.token == n.token || std::find(k.tokens.begin(), k.tokens.end(), n.token) != k.tokens.end()) return true;
           return false;
         };
-        if (c.frame && c.frame->hasSubject && c.subjPerson == 3 && c.frame->subject.token != n.token &&
+        // C24: a coordinated verb without its own subject shares the first clause's subject ("... and said goodbye
+        // to his mother" -> mātrī suae)
+        const bool sharedSubj = c.frame && !c.frame->hasSubject && c.frame->hasPred && c.frame->type == frame::Kind::Decl &&
+                                c.st.lang == frame::SrcLang::En;
+        if (c.frame && (c.frame->hasSubject || sharedSubj) && c.subjPerson == 3 && c.frame->subject.token != n.token &&
             !inSubject() && (c.frame->hasPred || c.frame->type != frame::Kind::Frag) &&
             c.subjNumber == (num == Pl ? 2 : 1) && (pg == 0 || c.subjGender == 0 || pg == c.subjGender ||
                                                     num == Pl)) {
@@ -2005,7 +2019,7 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
   // "of" attributes (one genitive)
   for (const SemNP& g : n.genitive) {
     LaNP x;
-    // C24: an -ing word before its noun read as a noun compound ("a babbling brook", "a roaring lion"): the present
+    // C24: an -ing word before its noun read as a noun compound ("the babbling water", "a roaring lion"): the present
     // participle of its verb (rīvus murmurāns, leō rugiēns) when English has no noun of that form or Latin only a rare
     // one (stultiloquium); "a dining room" with a common Latin noun stays a genitive
     if (c.st.lang == frame::SrcLang::En && c.st.srcLex && g.token >= 0 && g.token < n.token &&
@@ -2137,6 +2151,22 @@ bool Transfer::obliqueInto(const frame::SemOblique& ob, Ctx& c, LaClause& cl) co
     }
   }
   const bool time = tables::timeNoun(head) || tables::weekday(head) != nullptr;
+  // C24: "they ran the other road": a place noun without a preposition after a verb of motion is the goal (in + acc)
+  int npFirst = n.token;
+  for (int t : n.tokens) if (t >= 0 && t < npFirst) npFirst = t;
+  // a path word before the noun ("ran down the hill", "walked along the road") is its preposition, not a goal
+  bool afterParticle = false;
+  if (npFirst > 0 && (size_t)npFirst <= c.s.tokens.size()) {
+    const std::string pw = c.s.tokens[(size_t)npFirst - 1].lower;
+    afterParticle = pw == "down" || pw == "up" || pw == "along" || pw == "across" || pw == "through" || pw == "over" ||
+                    pw == "past" || pw == "around" || pw == "round" || pw == "by";
+  }
+  if (c.st.lang == frame::SrcLang::En && (prep.empty() || prep == "-") && c.motion && !time && !n.isPronoun && !afterParticle &&
+      !n.isName && n.numeral.empty() && head != "home" && head != "way" && n.determiner != "every" && n.determiner != "all") {
+    frame::SemOblique o2 = ob;
+    o2.prep = "into";
+    return obliqueInto(o2, c, cl);
+  }
   auto bare = [&](uint8_t cs) {
     LaOblique o;
     o.case_ = cs;
@@ -2636,6 +2666,7 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
   const char* withPrep = nullptr;
   for (const frame::SemOblique& o : f.obliques)
     if (const curated::VerbPrepEntry* e = cd_.verbPrep(sp.lemma, o.prep)) {
+      if (e->frame == "obj" && f.hasObject && e->latin != "-") continue;   // C24: "put the book on the table" is no "put on"
       if (e->latin != "-") withPrep = e->latin.c_str();
       if (!e->latinPrep.empty()) { c.prepOverride = o.prep; c.prepOverrideLatin = e->latinPrep; c.prepOverrideCase = e->prepCase; }
       if (withPrep || !e->latinPrep.empty()) break;
@@ -3024,6 +3055,37 @@ bool Transfer::deponentActive(const SemFrame& in, Ctx& c, SemFrame& out) const {
 
 // ---- clauses --------------------------------------------------------------------------------------------------------
 void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
+  // C24: "she likes him" -> is eī placet: the thing or person liked is the Latin subject, the one who likes it the
+  // dative (never "eī placet" with the roles turned round); "like to + verb" and questions about the object stay
+  if (c.st.lang == frame::SrcLang::En && f0.hasPred && f0.pred.lemma == "like" && f0.hasSubject && f0.hasObject &&
+      !f0.hasIndirect && f0.pred.complementVerb.empty() && f0.pred.prepVerb.empty() && !f0.object.interrogative &&
+      f0.object.relative.empty() && latin("placeō", Verb) != kNone &&
+      [&] {   // only when the dictionary choice for "like" here is placeō (amō keeps the English roles)
+        Choice probe;
+        probe.token = f0.pred.token;
+        return select("like", Verb, c.context, true, animate(f0.object), c.st, probe) == latin("placeō", Verb);
+      }()) {
+    SemFrame g = f0;
+    g.subject = f0.object;
+    g.indirectObject = f0.subject;
+    g.hasIndirect = true;
+    g.hasObject = false;
+    g.object = SemNP{};
+    g.pred.lemma = "please";
+    const uint32_t keep = c.forcedVerb;
+    c.forcedVerb = latin("placeō", Verb);
+    Choice ch;
+    ch.token = f0.pred.token;
+    ch.source = "like";
+    ch.lemma = c.forcedVerb;
+    ch.kind = "table";
+    ch.note = "like: X mihi placet (valency_la.tsv)";
+    c.out.choices.push_back(ch);
+    c.cover(f0.pred.token);
+    clauseInto(g, c, cl);
+    c.forcedVerb = keep;
+    return;
+  }
   // C24: "be late for X" with a person or animal as the subject: sērō venīre ad X ("What is the dog late for?" ->
   // Ad quid canis sērō venit?), as the phrasebook's "I am late for X"
   if (c.st.lang == frame::SrcLang::En && f0.copula && f0.predAdj.size() == 1 && f0.predAdj[0].lemma == "late" &&
@@ -3810,8 +3872,8 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
       ch.kind = "table";
       ch.note = "elliptical indirect question";
       c.out.choices.push_back(ch);
-      // C24: "I wonder where." / "I don't know where." (a place, no motion): the indirect question with its verb
-      // understood, "ubi sit" (subjunctive of sum by the sequence of tenses): "Mīror ubi sit."
+      // C24: "I don't know where." / "She doesn't know where." (a place, no motion): the indirect question with its verb
+      // understood, "ubi sit" (subjunctive of sum by the sequence of tenses): "Nesciō ubi sit."
       const uint32_t sumL = latin("sum", Verb);
       if (std::string(w) == "ubi" && sumL != kNone && c.st.lang == frame::SrcLang::En) {
         realise::LaSub sb;
@@ -4172,6 +4234,12 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
           sc.pred.mood = Subjunctive;
           sc.pred.tense = sf.pred.aspect == frame::Aspect::Perfect || cl.pred.tense == Pluperfect ? (uint8_t)Pluperfect
                                                                                                  : (uint8_t)Imperfect;
+          // C24: a second condition joined by "and" ("If dogs could talk and cats could sing") is unreal too
+          for (realise::LaSub& cs2 : sc.subs)
+            if (cs2.rel == realise::SubRel::Coord && !cs2.clause.empty() && cs2.clause[0].pred.mood == Indicative) {
+              cs2.clause[0].pred.mood = Subjunctive;
+              cs2.clause[0].pred.tense = sc.pred.tense;
+            }
         }
         break;
       case Relation::Purpose:
@@ -4366,7 +4434,10 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
           }
         }
         // ", or you would not ..." = otherwise: "; aliter ..." with the conditional's subjunctive
-        if (sb.marker == "or" && sf.pred.mood == frame::SrcMood::Conditional) {
+        // C24: also after a command or a "must" ("We must run, or the bus will leave." -> ...; aliter ... exībit)
+        if (sb.marker == "or" && (sf.pred.mood == frame::SrcMood::Conditional ||
+                                  (sf.pred.tense == frame::Tense::Future &&
+                                   (f.type == Kind::Imp || f.pred.modality == Modality::Must || f.pred.modality == Modality::Should)))) {
           const uint32_t aliter = latin("aliter", Adv);
           if (aliter != kNone) {
             ls.conj = aliter;

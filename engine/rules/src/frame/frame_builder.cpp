@@ -397,7 +397,7 @@ bool flatClause(std::vector<Token>& tk, int v) {
 }
 
 
-// C24: free relatives with "what" ("Nothing would be what it is.", "What it seems, it isn't.", "I like what I see."):
+// C24: free relatives with "what" ("The sea would be what the sky is.", "What you have, you keep.", "I like what I see."):
 // the parser hangs these clauses in many wrong ways, so a sentence made only of such clauses gets its tree from a
 // small grammar. "what" heads its relative clause (acl) and takes the role of the clause it stands in: the predicate
 // of "be" (the copula hangs on it) or the object of a verb. Shapes (CONJ, ADV and commas around):
@@ -601,7 +601,7 @@ bool sentence(std::vector<nlp::Token>& tk, bool apply) {
   return true;
 }
 
-// C24: a noun with its relative clause and nothing else ("the sea that sailors cannot find", "the girls who sing"):
+// C24: a noun with its relative clause and nothing else ("a boat that carries me", "the girls who sing"):
 // the parser reads the relative clause as the main clause; the noun is the fragment's head, the clause its relative
 // clause (the relative word the object when the clause has its own subject, else the subject)
 bool nounRelative(std::vector<nlp::Token>& tk, bool apply) {
@@ -641,8 +641,8 @@ bool nounRelative(std::vector<nlp::Token>& tk, bool apply) {
 }
 }  // namespace fr
 
-// C24: "What it wouldn't do, it would." / "What it isn't, it would be.": an elliptic verb group whose object is a free
-// relative takes the relative clause's verb; with "be" the free relative is the predicate ("Quod nōn esset, esset.")
+// C24: "What the cat won't eat, the dog will.": an elliptic verb group whose object is a free relative takes the
+// relative clause's verb; with "be" the free relative is the predicate
 void freeRelativeEllipsis(SemFrame& f) {
   for (SemSub& sb : f.subordinate)
     for (SemFrame& x : sb.frame) freeRelativeEllipsis(x);
@@ -1334,7 +1334,7 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
         np.negative = in(w, {"nobody", "nothing", "none"});
         np.interrogative = in(w, {"who", "what", "which"}) && (c.question || fget(ht, nlp::morph::PronTypeShift) ==
                                                                                  nlp::morph::PtInt);
-        // C24: "what" heading its own relative clause is a free relative ("quod est"), not a question word
+        // C24: "what" heading its own relative clause is a free relative ("quod vidētur"), not a question word
         if (w == "what" && en)
           for (int k : c.kids[(size_t)h])
             if (c.ok(k) && c.dep(k) == "acl" && c.t(k).upos == "VERB") np.interrogative = false;
@@ -3113,7 +3113,8 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       }
       // C22: a bare second verb shares the first one's auxiliary ("He will come and help us." -> veniet et nōs
       // adiuvābit; "They would sit and talk" -> sedērent et loquerentur): tense, mood and modality
-      if (en && f.hasPred && cf.hasPred && !cf.hasSubject && cf.pred.auxTokens.empty() && !f.pred.auxTokens.empty() &&
+      if (en && f.hasPred && cf.hasPred && !cf.hasSubject && cf.pred.auxTokens.empty() &&
+          (!f.pred.auxTokens.empty() || f.pred.modality != Modality::None) &&   // C24: "May we go out and play?"
           cf.type == Kind::Decl && (f.type == Kind::Decl || f.type == Kind::Yn || f.type == Kind::Wh)) {
         const uint32_t vf = fget(kt, nlp::morph::VerbFormShift), tt = fget(kt, nlp::morph::TenseShift);
         const bool bare = vf == nlp::morph::VfInf || (tt == 0 && vf != nlp::morph::VfPart && vf != nlp::morph::VfGer);
@@ -4060,7 +4061,22 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
 void FrameBuilder::repairTree(SemSentence& s) const {
   std::vector<nlp::Token>& tk = s.tokens;
   const int n = (int)tk.size();
-  // C24: "What could a fox possibly want?", "What are you afraid of?", "What could a dog be late for?": in a question
+  // C24: "After this he will ...": "after" + "this" before the subject is a time phrase (post hoc), not a
+  // subordinator with a second subject
+  if (lang_ == SrcLang::En && n >= 4 && in(tk[0].lower, {"after", "before"}) && in(tk[1].lower, {"this", "that"}) &&
+      tk[1].deprel == "nsubj") {
+    const int h = tk[1].head - 1;
+    bool other = false;
+    for (int j = 2; j < n; ++j) other = other || (tk[(size_t)j].head == h + 1 && tk[(size_t)j].deprel == "nsubj");
+    if (other) {
+      tk[1].deprel = "obl";
+      tk[1].upos = "PRON";
+      tk[0].head = 2;
+      tk[0].deprel = "case";
+      tk[0].upos = "ADP";
+    }
+  }
+  // C24: "What could a fox possibly want?", "What are you afraid of?", "What would the old king say?": in a question
   // "what" + auxiliaries + a noun phrase, the noun phrase is the subject (the parser sometimes made "what" a second
   // subject or the noun an oblique); "what" is the object of the preposition stranded at the end, else the object
   if (lang_ == SrcLang::En && n >= 4 && tk[0].lower == "what" && tk[0].upos == "PRON" && tk[0].head > 0) {
@@ -4106,19 +4122,62 @@ void FrameBuilder::repairTree(SemSentence& s) const {
       }
     }
   }
-  // C24: "... the other side where trees grow": a "where" clause right after a noun of the verb (its object or
-  // oblique) is a relative clause of that noun ("ubi", "in quō"), not a time clause of the verb
+  // C24: "the town where my uncle works": "where" after a noun of the clause, followed by a subject and a verb,
+  // opens a relative clause of that noun ("ubi", "in quō"), not a time clause or a question; the noun belongs to the
+  // verb before it
   if (lang_ == SrcLang::En)
-    for (int k = 1; k + 2 < n; ++k) {
-      if (tk[(size_t)k].lower != "where" || tk[(size_t)k].upos != "ADV") continue;
-      const int v = tk[(size_t)k].head - 1;
-      if (v <= k || v >= n || tk[(size_t)v].deprel != "advcl") continue;
+    for (int k = 2; k + 2 < n; ++k) {
+      if (tk[(size_t)k].lower != "where" || !in(tk[(size_t)k - 1].upos, {"NOUN", "PROPN"})) continue;
       const int noun = k - 1;
-      if (!in(tk[(size_t)noun].upos, {"NOUN", "PROPN"}) || tk[(size_t)v].head - 1 != tk[(size_t)noun].head - 1 ||
-          !in(tk[(size_t)noun].deprel, {"obl", "obj", "nmod"}))
-        continue;
+      int sh = -1, q = k + 1;
+      if (tk[(size_t)q].upos == "PRON" && in(tk[(size_t)q].lower, {"i", "you", "he", "she", "it", "we", "they"})) sh = q;
+      else {
+        if (tk[(size_t)q].upos == "DET" || in(tk[(size_t)q].lower, {"my", "your", "his", "her", "our", "their", "its"})) ++q;
+        while (q < n && tk[(size_t)q].upos == "ADJ") ++q;
+        if (q < n && in(tk[(size_t)q].upos, {"NOUN", "PROPN"})) sh = q;
+      }
+      if (sh < 0) continue;
+      int v = sh + 1;
+      while (v < n && (tk[(size_t)v].upos == "AUX" || in(tk[(size_t)v].lower, {"not", "n't", "never", "always"}))) ++v;
+      // "where my grandmother lives": a present form read as a plural noun (lives) is the verb
+      if (v < n && tk[(size_t)v].upos == "NOUN" && lex_ && tk[(size_t)v].lower.size() > 2 && tk[(size_t)v].lower.back() == 's') {
+        std::vector<lex::Analysis> an;
+        lex_->lookup(text::en_key(tk[(size_t)v].lower), an);
+        for (const lex::Analysis& a : an) {
+          const lex::Lemma l = lex_->lemma(a.lemma);
+          if (l.pos == feat::Verb) {
+            tk[(size_t)v].upos = "VERB";
+            tk[(size_t)v].lemma = text::lower(std::string(l.head));
+            tk[(size_t)v].feats = nlp::morph::fromString("Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin");
+            break;
+          }
+        }
+      }
+      if (v >= n || tk[(size_t)v].upos != "VERB") continue;
+      int mv = -1;   // the verb of the clause the noun belongs to
+      for (int j = noun - 1; j >= 0 && mv < 0; --j)
+        if (tk[(size_t)j].upos == "VERB") mv = j;
+      if (mv < 0) continue;
+      auto inRel = [&](int x) { return x == k || x == sh || x == v || (x > k && x < v); };
+      // dependents of the relative words that lie outside the relative clause (after the verb's phrase) stay as they are
+      if (inRel(tk[(size_t)noun].head - 1) || tk[(size_t)noun].head == 0) { tk[(size_t)noun].head = mv + 1; }
+      if (!in(tk[(size_t)noun].deprel, {"obl", "obj", "nmod"})) tk[(size_t)noun].deprel = "obl";
+      if (tk[(size_t)mv].head - 1 == v) { tk[(size_t)mv].head = tk[(size_t)v].head; tk[(size_t)mv].deprel = tk[(size_t)v].deprel; }
+      for (int x = 0; x < n; ++x)   // what hung on the relative verb before the noun (the main clause) goes to mv
+        if (x < noun && x != mv && tk[(size_t)x].head == v + 1) tk[(size_t)x].head = mv + 1;
+      if (tk[(size_t)mv].head == mv + 1 || tk[(size_t)mv].head == v + 1) { tk[(size_t)mv].head = 0; tk[(size_t)mv].deprel = "root"; }
       tk[(size_t)v].head = noun + 1;
       tk[(size_t)v].deprel = "acl";
+      tk[(size_t)k].head = v + 1;
+      tk[(size_t)k].deprel = "advmod";
+      tk[(size_t)k].upos = "ADV";
+      tk[(size_t)sh].head = v + 1;
+      tk[(size_t)sh].deprel = "nsubj";
+      for (int x = k + 1; x < sh; ++x) { tk[(size_t)x].head = sh + 1; tk[(size_t)x].deprel = tk[(size_t)x].upos == "ADJ" ? "amod" : "det"; }
+      for (int x = sh + 1; x < v; ++x) { tk[(size_t)x].head = v + 1; tk[(size_t)x].deprel = tk[(size_t)x].upos == "AUX" ? "aux" : "advmod"; }
+      for (int x = 0; x < n; ++x)   // the noun's own words
+        if (x < noun && tk[(size_t)x].head == v + 1 && in(tk[(size_t)x].upos, {"DET", "ADJ"})) tk[(size_t)x].head = noun + 1;
+      break;
     }
   // C24: "Cats say it and dogs say it.": a clause complement that opens with its own "and" / "but" / "or" is the
   // second clause of a coordination (conj), not the content of the first verb
@@ -4135,19 +4194,21 @@ void FrameBuilder::repairTree(SemSentence& s) const {
           tk[(size_t)k].head - 1 < lm)
         tk[(size_t)k].deprel = "conj";
     }
-  // C24: "fell down the stairs", "rolled down the hill": "down" read as the verb's particle while the noun after it
+  // C24: "fell down the steps", "rolled down the hill": "down" read as the verb's particle while the noun after it
   // hangs on the verb without a preposition: "down" is that noun's preposition (dē scālīs)
   if (lang_ == SrcLang::En)
     for (int k = 0; k + 1 < n; ++k) {
       nlp::Token& t = tk[(size_t)k];
-      if (t.lower != "down" || t.upos != "ADP" || (t.deprel != "compound" && t.deprel != "compound:prt")) continue;
+      if (t.lower != "down" || (t.upos != "ADP" && t.upos != "ADV") ||
+          (t.deprel != "compound" && t.deprel != "compound:prt" && t.deprel != "advmod"))
+        continue;
       const int h = t.head - 1;
       if (h < 0 || h >= k) continue;
       int g = -1;
       for (int j = k + 1; j < n; ++j) {
         const std::string& u = tk[(size_t)j].upos;
         if (u == "DET" || u == "ADJ" || u == "NUM" || (u == "PRON" && tk[(size_t)j].deprel == "nmod:poss")) continue;
-        // an object only after a verb of motion ("Don't fall down the stairs!"); "put down the book" keeps it
+        // an object only after a verb of motion ("Don't fall down the steps!"); "put down the book" keeps it
         const bool motion = in(text::lower(tk[(size_t)h].lemma.empty() ? tk[(size_t)h].lower : tk[(size_t)h].lemma),
                                {"fall", "tumble", "roll", "slide", "slip", "run", "walk", "go", "come", "climb", "hurry",
                                 "jump", "float", "fly", "ride", "sail", "swim", "rush", "crawl", "hop", "skip"});
@@ -4164,6 +4225,7 @@ void FrameBuilder::repairTree(SemSentence& s) const {
       if (hasCase) continue;
       t.head = g + 1;
       t.deprel = "case";
+      t.upos = "ADP";
     }
   // C19: "Where were you?" (where read as the subject of "you") and "Where have you been?" ("been" hung on "where"
   // as a clause): the wh adverb is the place predicate of "be", the pronoun its subject, as in "Where is the ball?"
@@ -4980,6 +5042,16 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
     // C19: a sentence-initial word the tagger took for a name and the lexicon gives back as a verb or a common noun
     // ("Hurry, ...", "Grandmother, ..."): a repaired analysis (Check), as every rebuilt structure
     if (!tk.empty() && (firstTag == "PROPN" || firstTag == "INTJ") && tk[0].upos != firstTag) out.repairs.emplace_back("retag");
+    // C24: "After this he will ...", "Before that, we ...": the preposition and the pronoun "this" / "that" (an
+    // oblique of time), not a subordinator and a subject
+    if (n >= 4 && in(tk[0].lower, {"after", "before"}) && in(tk[1].lower, {"this", "that"}) &&
+        (tk[2].text == "," || in(tk[2].upos, {"PRON", "PROPN", "NOUN", "DET"}))) {
+      if (tk[0].upos != "ADP" || tk[1].upos != "PRON") again = true;
+      tk[0].upos = "ADP";
+      tk[0].feats = 0;
+      tk[1].upos = "PRON";
+      tk[1].feats = nlp::morph::fromString("Number=Sing|PronType=Dem");
+    }
     // "so that" + clause (purpose): both words are the subordinator, not "so" + the pronoun "that"
     for (int i = 0; i + 2 < n; ++i)
       if (tk[(size_t)i].lower == "so" && tk[(size_t)i + 1].lower == "that" &&

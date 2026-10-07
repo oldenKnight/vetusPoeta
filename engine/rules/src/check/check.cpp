@@ -768,7 +768,7 @@ struct LatinChecker::Impl {
         for (const Reading& h : rd[a])
           if (relOk(r) && isHead(h) && numberCompat(r.f.number, h.f.number) && genderCompat(r.f.gender, headGender(h)))
             ok = true;
-      // C24: a free relative with its antecedent understood ("Amō quod videō", "Nihil esset quod est"): a neuter
+      // C24: a free relative with its antecedent understood ("Amō quod videō", "Mare esset quod caelum est"): a neuter
       // singular nominative / accusative relative after a word that is no noun phrase (a verb)
       if (!ok && (!any(a, [](const Reading& h) { return isNominal(h); }) || any(a, [](const Reading& h) { return h.lpos == Verb && h.f.person != 0; })))
         for (const Reading& r : rd[i])

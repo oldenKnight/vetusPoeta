@@ -744,7 +744,7 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
     // C19 order.heavy: an object or indirect object "is quī ..." (pronoun + relative clause) follows the verb group
     // ("Nēmō audēbit nocēre eī quem Saga ōsculāta est", "Amāmus eōs quī honestī sunt"); a modal then precedes its
     // infinitive
-    // C24: a free relative is also moved in a subordinate clause ("quia omnia essent quod nōn sunt")
+    // C24: a free relative is also moved in a subordinate clause ("quia nēmō est quod dīcit")
     const bool subFree = (c.hasObject && c.object.elideHead && !c.object.emphasis) ||
                          (!c.predicative.empty() && c.predicative[0].elideHead && !c.predicative[0].emphasis);
     if ((c.type == ClauseType::Decl || c.type == ClauseType::Wh) && (ctx.main || subFree) && !ctx.relative && !ctx.accInf &&
@@ -754,7 +754,7 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
         const LaNP& hn = sl == kO ? c.object : sl == kIO ? c.indirect : c.predicative.empty() ? c.object : c.predicative[0];
         // only the pronoun antecedent "is quī" (a noun with its relative stays before the verb: "Librum quem legis
         // habeō", "Sex rēs quae fierī nōn possunt ... crēdō"); C24: a free relative with its antecedent understood
-        // ("Nihil esset quod est") unless the source put it first (emphasis: "Quod habēs, tenē")
+        // ("Mare esset quod caelum est") unless the source put it first (emphasis: "Quod habēs, tenē")
         const bool freeRel = hn.elideHead && !hn.emphasis;
         if (!has || hn.relative.empty() || s[sl].empty() || hn.interrogative != kNone ||
             (!freeRel && (sl == kPRED || !hn.isPronoun || hn.pron.person != 3)))

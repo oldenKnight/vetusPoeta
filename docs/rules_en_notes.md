@@ -1018,3 +1018,117 @@ Owner decision D18: Medieval and ecclesiastical Latin are accepted behind the se
   the register; Greek is untouched (Byzantine "medieval" tags are not compensated). docs/DESIGN.md §9.1 says "SENS tag
   bit5" for the register: in the SENS tags it is bit 6 (medieval) / bit 7 (New Latin); bit 5 is the ANAL flag
   LateLatin of forms (and SENS "poetic").
+
+## Acceptance loop 2 (C24, 2026-10-07)
+Material: the owner's partial acceptance file (82 cues, data/acceptance/, gitignored, copyrighted: no line of it, of
+the owner's Latin or of a close paraphrase appears here, in the tests, in the tables or in a commit; cues are named by
+number and by the fault category of the main agent's sheet data/work/eval/alice-c22-main/review_main_agent.tsv), the
+loop-1 output and review, tests/regression, tests/samples. tests/heldout/, tests/eval_gold/ and data/work/eval/heldout-*
+were not opened. Every rule below has two or more sentences of our own in engine/tests/test_rules_en.cpp (test cases
+"rules-j: ..."), written before the rule was run on the file. Blind check: 20 own sentences of the registers
+(children's dialogue, nonsense song lines, quoted narrative) written at 16:31 UTC before any change
+(data/work/eval/c24-blind/, gitignored), run once at 17:42 UTC.
+
+### Before / after
+| file | start of C24 | end of C24 |
+|---|---|---|
+| acceptance file, implementer's own count (every cue read; any grammar, meaning or vocabulary fault = wrong) | 22 / 82 wrong (main agent, E7) | **3 / 82 wrong** (cues 18 and 19: quoted fragment whose subject lies outside the file, singular verb and sense; cue 79: the "upside down" phrase stands after the main verb instead of inside the relative clause): song 9 -> 0 / 31, quoted narrative 5 -> 2 / 9, dialogue 8 -> 1 / 42; OK 16 -> 20, Check 62, Fix 4 -> 0, automatic errors 3 -> 0; wrong among OK 0 by my count |
+| oz_sample EN (100) | 78 / 100, ok 25, wrong among OK 0 | 78 / 100, ok 25, wrong among OK 0 (#30 and #80 still unmatched, Fix -> Check) |
+| own_dialogue EN (114) / ES (100) | 114 / 114, 100 / 100 | identical reports |
+| sample.en.srt 12, la2x 201, orberg 60 | 12, 201, 60 | unchanged (reports identical) |
+| Greek EN->GRC / ES->GRC / GRC->EN, ES / C18 review | 114 / 114, 39 / 40, 40 / 40, 13 / 13 | identical reports |
+| blind check (20 own sentences) | first run **7 / 20** acceptable | 11 / 20 after the fixes |
+
+### What changed (C24)
+- (a) The speaker of a reply. Per cue, the engine keeps the gender of the person addressed by name or title and
+  whether the cue's last sentence asks for an answer (a question, an order, or the address alone). A cue that answers
+  such a cue is spoken by that person, and so is a dash turn after such a turn in the same cue: "Grandfather, are you
+  tired?" + "Yes, I am very tired." -> "Ita, valdē fessus sum." with a feminine project speaker. When that gender
+  differs from the project setting and the Latin depends on it, the cue is Check (flags `speaker-gender` and
+  `speaker-reply`, a reason, and the setting's rendering as the first alternative). Gender of an address: the
+  project glossary's gender, names_la.tsv, a title (Mr., Sir / Mrs., Miss, Madam), or a short English list of nouns
+  that say the sex (father, mother, uncle, girl, king ...); "child", "friend" and animals give none. A goodbye does
+  not ask for an answer. The same gender sets "you" when no name did ("Mother, are you tired?" -> "esne fessa?").
+  Kinship words before a comma are nouns of address, not orders ("Grandfather, ..." was "Et, ... [grandfather]").
+  DESIGN §7 / §8 have no per-cue speaker field, so a user tag per cue is not possible: the heuristics use the Names
+  tab gender (Context.glossary) and names_la.tsv; a per-cue speaker field in cues.jsonl would be needed for more.
+  Phrasebook rows "valdē perturbātus/perturbāta sum": two sides of the same length alternate as wholes only when
+  they are parallel word by word (same first letters: "mī amīce/mea amīca"); else one word alternates (the old rule
+  lost "sum" or "valdē").
+- (b) Long quoted narrative: a name root with its apposition and a verb after the second comma hung on it as dep / acl
+  is rerooted (the verb is the root, the name its subject: "Even Paul, the Bishop of Rome, promised ...");
+  the cue split keeps a word without a source word of its own (a name, a pronoun, et, a preposition) with its
+  neighbour (a preposition with its noun, a pronoun with its verb). Before the word-by-word fallback (could-not-parse, Fix) the sentence
+  is cut at commas and and / but / or / because / when / while / so / then and translated clause by clause (flag
+  `clause-split`, Check) when at least one clause gives a Latin verb.
+- (c) Free relatives with "what": a small grammar gives the tree of sentences made only of "SUBJ VG what SUBJ VG",
+  "what SUBJ VG, SUBJ VG" and "what ... be what ..." clauses joined by because / since / and / but (flag
+  `free-relative`, Check): "what" heads its relative clause and is the predicate of "be" or the object; the Latin
+  antecedent id is understood (`LaNP::elideHead`): "The sea would be what the sky is." -> "Mare esset quod caelum est.",
+  "What you have, you keep." -> "Quod habēs tenēs." A verb group of auxiliaries only takes the relative clause's verb
+  ("What the cat won't eat, the dog will."); "it" in the relative clause takes the plural of
+  a plural main subject ("Everything is what it seems ..." -> omnia sunt quod videntur). The free relative follows the verb unless the source put it first;
+  the checker accepts a neuter quod after a verb. After know / wonder / ask / tell / see ... "what" stays an indirect
+  question. "seem" is the passive of videō (vidētur; it was "videt"), and predicate agreement counts videor / fīō as
+  copulas.
+- (d) Sequence of tenses after a verb of wishing: present optō -> present subjunctive ("Optō ut volāre possim"),
+  a past one -> imperfect. Changed expectations (C22 tests): "I wish it was always summer." -> Optō ut semper aestās
+  sit; "She wishes that he would come." -> Optat ut veniat; "I wish I could fly." -> Optō ut volāre possim.
+- (e) Word choices: roll by -> praetereō, roll away -> āvolō (phrasal rows); leave + object -> relinquō (phrasal row
+  "relinquō|-": without an object the verb's own word; a "-" alternative is the verb's own translation); an -ing
+  word before its noun read as a noun compound is the verb's present participle when English has no such noun or
+  Latin only a rare one (aqua murmurāns, leō rudēns; "babble" -> murmurō); understand -> intellegō (periphrasis row
+  removed: sciō changed the meaning); "down" before the noun of a verb of motion is dē + abl ("The children ran down the hill." -> Puerī dē colle cucurrērunt);
+  upside down -> capite deorsum; an adverbial phrase that is the predicate of "be" makes "be" the clause's verb and
+  stands before it ("He is in trouble." -> "In perīculō est."; it was "Es in perīculō."); afternoon rows (post
+  merīdiem, diē + adjective + post merīdiem: an ADJ slot may carry case and gender "{1:abl.m}"); a "tail" phrase may
+  open the sentence; "I don't know where." -> "Nesciō ubi sit."; a hesitation
+  inside a verb group ("must... be going") and a word repeated after an ellipsis ("in... in the lake") are read once;
+  "What could a fox possibly want?": the noun after the auxiliaries is the subject, "what" the object or the object
+  of the stranded preposition ("What are you afraid of?" -> "Quid timēs?"; it was "Quid timidum?", OK); "could" with
+  "possibly" in a question is present (potest); be late for X -> sērō venīre ad X; "After this he ..." -> post hoc.
+- (f) Relative clauses: a song line that opens with that / which / who after a line ending in a noun is that noun's
+  relative clause (analysed with the noun in front, the noun's Latin word taken out again; when the line ends in a
+  prepositional phrase the noun before it is the antecedent; flag `song-relative`); "where" + subject + verb after a
+  noun is a relative clause of that noun (in quō / in quā), and a place noun without a preposition after a verb of
+  motion is the goal (in + acc) unless a path word (down, along, across ...) stands before it; a "can" relative clause inside a "can" clause is in the subjunctive ("Librum quem
+  legere possem invenīre poteram").
+- (g) A sound word in quotes ("woof", "moo": one or two English interjections or unknown words, not yes / no /
+  hello ...) is kept as written: the parser reads "it" in its place (offsets kept) and the Latin pronoun is replaced
+  by the quoted word ("Canis \"woof\" dīcit."); a clause complement that opens with its own and / but / or is a
+  coordinated clause ("Cats say it and dogs say it." -> "... et canēs id dīcunt").
+- (h) An invented word of a preposition (under, over, beyond, behind, inside, outside) and a known noun is read as
+  that phrase, flag `derived-word` (Check): "underbridge" -> sub ponte, "overcloud" -> super nūbem (as an adverb an
+  oblique of its own).
+- After the blind check: put on (clothes) -> induō (verbprep row, only when the verb has no other object); ", or" after
+  a command or a "must" -> "; aliter"; a second "if" clause joined by "and" is unreal too; "like" chosen as placeō
+  turns the roles round (the thing liked is the subject, the one who likes it the dative: "I think she likes him." ->
+  "Putō eum eī placēre"; it was "eam eī", the reverse meaning); a coordinated verb without its own subject takes the
+  reflexive possessive (mātrem suam).
+
+Rows: tiers_la.tsv +6 (murmurō, scālae, āvolō, deorsum, merīdiēs, occupātus) and 1 note (pars "part, side, share");
+phrasal_en_la.tsv +3 (roll by, roll away, leave); phrasebook_en_la.tsv +5 (afternoon x4, at dawn) and 1 changed
+(upside down -> capite deorsum); preps_en_la.tsv +1 (down -> dē + abl); verbprep_en_la.tsv +1 (put on -> induō);
+periphrasis_la.tsv -1 (intellegō -> sciō).
+
+API changes (additive): realise_la.h `LaNP::elideHead`. New Check flags: `speaker-reply` (with `speaker-gender`),
+`free-relative`, `clause-split`, `song-relative`. Phrasebook ADJ slot "{n:case.gender}". No CLI or core change.
+
+### Blind check
+20 own sentences written at 16:31 UTC (before any change) and run once at 17:42 UTC: **7 / 20** acceptable (a
+kinship address, a why-question, an indirect "what" question, a comparison, a made-of sentence, a song line of
+genitives, a plain narrative line). Wrong: a coordinated infinitive under licet and the noun kitten, "he likes me"
+with the roles reversed, "tell X that ..." read as a relative clause, ", or" as aut, "too small to", "tired of
+waiting", a second unreal condition in the indicative, fronted PPs with a contact relative, "Round and round ...", a
+long sentence with an appositive relative clause (quis), "called them ... and asked", a "when" clause with an
+appositive pair, "put on his coat" and "his mother" (eius). Fixed with own sentences ("rules-j: fixes after the blind
+check"): the like / placeō roles, ", or" after must -> aliter, the second unreal condition, put on -> induō, the
+reflexive possessive of a coordinated verb. After: **11 / 20**.
+
+### Open points
+- Cues 18-19 (a quoted fragment whose subject is outside the file: the number of the verb is a guess) and cue 79 (a
+  closing phrase that belongs to the relative clause is placed after the main verb).
+- Long narrative sentences with appositive relative clauses and "when" clauses with apposed adjectives still parse
+  badly (blind lines 17-19); the clause split avoids the word-by-word Fix but the joins are rough.
+- "too ADJ to VP" (quam ut), "tell X that ..." (accusative and infinitive), "tired of + -ing", a coordinated infinitive
+  under licet are not handled.

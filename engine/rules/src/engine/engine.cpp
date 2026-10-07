@@ -927,6 +927,26 @@ class RulesEngine final : public Engine {
     return "the " + last;
   }
 
+  // C24: clause boundaries of a sentence the parser could not build: after a comma, and before and / but / or /
+  // because / when / while / so / then (never at the very start or end)
+  static std::vector<size_t> clausePoints(const std::string& t) {
+    std::vector<size_t> pts;
+    for (size_t i = 1; i + 2 < t.size(); ++i) {
+      if (t[i] == ',' && t[i + 1] == ' ') { pts.push_back(i + 2); continue; }
+      if (t[i] != ' ' || t[i - 1] == ',') continue;
+      size_t j = i + 1;
+      while (j < t.size() && std::isalpha((unsigned char)t[j])) ++j;
+      const std::string w = text::lower(t.substr(i + 1, j - i - 1));
+      if ((w == "and" || w == "but" || w == "or" || w == "because" || w == "when" || w == "while" || w == "so" ||
+           w == "then") && j < t.size() && t[j] == ' ')
+        pts.push_back(i + 1);
+    }
+    std::vector<size_t> out;
+    for (size_t p : pts)
+      if (p > 2 && p + 3 < t.size() && (out.empty() || p > out.back() + 2)) out.push_back(p);
+    return out;
+  }
+
   static void stutter(std::string& t) {
     auto wordAt = [&](size_t a) {
       size_t b = a;
@@ -945,7 +965,7 @@ class RulesEngine final : public Engine {
         while (p < t.size() && t[p] == ' ') ++p;
       }
       if (dots < 2 || p >= t.size()) continue;
-      // C24: a hesitation inside a verb group ("we shouldn't... be going", "you must... come"): the dots go
+      // C24: a hesitation inside a verb group ("we must... be going", "you must... come"): the dots go
       {
         const std::string prev = text::lower(t.substr(i, e - i));
         static const char* const kOpen[] = {"should", "shouldn't", "would", "wouldn't", "could", "couldn't", "can",
@@ -970,6 +990,7 @@ class RulesEngine final : public Engine {
               transfer::Memory& mem, const transfer::Settings& st, SentOut& so, bool alternatives,
               bool allowSplit = true) {
     SemSentence s;
+    const transfer::Memory memEntry = mem;   // C24: for the clause split before the word-by-word fallback
     // C17: editorial text in square brackets ("They are rusted [so badly] that ...") is analysed with the sentence
     // (the brackets read as spaces, so offsets stay) and its Latin words are put back in brackets at the end
     std::string parseText = text;
@@ -982,10 +1003,10 @@ class RulesEngine final : public Engine {
         parseText[a0] = ' ';
         parseText[b0] = ' ';
       }
-    // C24: a hesitation that repeats a word after an ellipsis ("think nothing of... of falling", "I... I know") is
+    // C24: a hesitation that repeats a word after an ellipsis ("swim in... in the lake", "I... I know") is
     // read once: the ellipsis and the repeated word become spaces (offsets stay)
     if (st.lang == frame::SrcLang::En) stutter(parseText);
-    // C24: a sound word in quotes ("woof", "meow") is kept as written, in its quotes: the parser reads the pronoun
+    // C24: a sound word in quotes ("woof", "moo") is kept as written, in its quotes: the parser reads the pronoun
     // "it" in its place (spaces keep the offsets) and the Latin word of that pronoun is replaced by the quoted word
     std::vector<std::pair<size_t, size_t>> soundSpans;
     if (st.lang == frame::SrcLang::En && en_) quotedSounds(parseText, soundSpans);
@@ -1387,6 +1408,27 @@ class RulesEngine final : public Engine {
       for (size_t i = 0; i < s.tokens.size(); ++i)
         if (s.tokens[i].upos == "VERB" && s.drop[i] == frame::Drop::No) srcVerb = true;
       for (const rules::TokenView& t : L.tokens) laVerb = laVerb || t.features.pos == "verb";
+      // C24: before the word-by-word fallback, the sentence is cut into clauses at commas and conjunctions and each
+      // clause translated on its own (Check, clause-split); used when at least one clause gives a Latin verb
+      if (srcVerb && !laVerb && allowSplit) {
+        const std::vector<size_t> pts = clausePoints(text);
+        if (!pts.empty()) {
+          transfer::Memory m2 = memEntry;
+          SentOut alt;
+          speechSplit(text, pts, fb, opt, ctx, m2, st, alt);
+          bool verb = false;
+          for (const rules::TokenView& t : alt.latin.tokens) verb = verb || t.features.pos == "verb";
+          if (verb) {
+            alt.flags.erase(std::remove(alt.flags.begin(), alt.flags.end(), std::string("frame-fallback")), alt.flags.end());
+            addFlag(alt.flags, "clause-split");
+            alt.reasons.push_back(Reason{-1, "form", "the sentence could not be analysed whole: it was translated clause by "
+                                                     "clause; check how the clauses join", ""});
+            so = std::move(alt);
+            mem = m2;
+            return;
+          }
+        }
+      }
       if (srcVerb && !laVerb) {
         literalRender(s, st, so, covered);
         flags.push_back("could-not-parse");
@@ -1923,7 +1965,7 @@ class RulesEngine final : public Engine {
         if (hinted) sts.speakerGender = turnHint;
         // C24: a song line that opens with a relative word ("That ...", "Where ...") after a line ending in a noun
         // without punctuation continues that line as its relative clause: it is analysed with the noun in front
-        // ("town that sailors cannot find") and the noun's Latin word is taken out again ("quod nautae ...")
+        // ("a boat that carries me") and the noun's Latin word is taken out again ("quae mē ...")
         std::string antecedent;
         if (lang == frame::SrcLang::En && ss.kind == frame::CueKind::Song && en_) antecedent = songAntecedent(prevSongText, ss.text);
         if (!antecedent.empty()) {
@@ -2251,7 +2293,7 @@ class RulesEngine final : public Engine {
                             "phrase-order", "participle-phrase", "ellipsis", "could-not-parse", "editorial",   // C17
                             "derived-word",   // C19
                             "cue-split", "addressee-gender",   // C22
-                            "speaker-reply", "free-relative"})   // C24
+                            "speaker-reply", "free-relative", "clause-split", "song-relative"})   // C24
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       // a tier 3 word chosen while a tier 1/2 word of the same sense existed (fidelity 1, a correction aside)
       for (const transfer::Choice& c : a.choices)

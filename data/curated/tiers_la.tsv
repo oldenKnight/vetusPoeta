@@ -265,7 +265,7 @@ dolor	dolor	noun	1	derived
 timor	timor	noun	1	derived	
 causa	causa	noun	1	derived	
 modus	modus	noun	1	derived	
-pars	pars	noun	1	derived	
+pars	pars	noun	1	derived	part, side, share
 numerus	numerus	noun	1	derived	
 exemplum	exemplum	noun	1	derived	
 fabula	fābula	noun	1	derived	
@@ -687,6 +687,6 @@ mundus	mundus	noun	1	teacher	world
 murmuro	murmurō	verb	2	teacher	murmur, babble, burble
 scalae	scālae	noun	2	teacher	stairs, staircase, steps
 avolo	āvolō	verb	2	teacher	fly away, fly off
-deorsum	deorsum	adv	2	teacher	downwards, down, upside down
+deorsum	deorsum	adv	2	teacher	downwards
 meridies	merīdiēs	noun	2	teacher	noon, midday
 occupatus	occupātus	adj	2	teacher	busy, occupied

@@ -2807,3 +2807,201 @@ TEST_CASE("rules-i: deterministic per mode (two fresh engines, byte-identical), 
   CHECK(w[3].text != c[3].text);
   CHECK(w[5].text == c[5].text);
 }
+
+// ================================================================================================================
+// C24 (RULES-J, acceptance loop 2). Generalisation guard: every rule below has at least two sentences of our own, of
+// the shape of the fault and unrelated in wording to the tuning file (docs/rules_en_notes.md "Acceptance loop 2").
+TEST_CASE("rules-j: the speaker of a reply is the person addressed in the cue before (work item a)") {
+  NEED_REAL();
+  {
+    const std::vector<Out> o = run({"Grandfather, are you tired?", "Yes, I am very tired."}, 'f');
+    CHECK(o[0].text == "Ave, esne fessus?");
+    CHECK(o[1].text == "Ita, valdē fessus sum.");
+    CHECK(hasFlag(o[1], "speaker-gender"));
+    CHECK(o[1].conf != rules::Confidence::Ok);
+  }
+  {
+    const std::vector<Out> o = run({"Are you angry, Paul?", "No, I am not angry."}, 'f');
+    CHECK(o[1].text == "Nōn, īrātus nōn sum.");
+    CHECK(hasFlag(o[1], "speaker-reply"));
+  }
+  {   // the other way round: a masculine project speaker answering for Mary
+    const std::vector<Out> o = run({"Are you tired, Mary?", "Yes, I am very tired."}, 'm');
+    CHECK(o[0].text == "Fessa es, Marīa?");
+    CHECK(o[1].text == "Ita, valdē fessa sum.");
+  }
+  // a dash turn after a turn that addressed someone
+  CHECK(run({"- Peter, are you ready? - Yes, I am ready."}, 'f')[0].text == "Petre, esne parātus? Ita, parātus sum.");
+  // no reply after a goodbye, and nothing to flag when the genders agree
+  CHECK(run({"Goodbye, Peter.", "I am tired now."}, 'f')[1].text == "Nunc fessa sum.");
+  {
+    const std::vector<Out> o = run({"That's it, Mary.", "I am so happy today."}, 'f');
+    CHECK(o[1].text == "Hodiē tam laeta sum.");
+    CHECK(!hasFlag(o[1], "speaker-gender"));
+  }
+  // a noun of address of known sex sets the gender of "you"; a kinship word before a comma is no verb
+  CHECK(run({"Mother, are you tired?"}, 'm')[0].text == "Māter, esne fessa?");
+  // whole-phrase m/f alternatives only when the two sides are parallel word by word
+  CHECK(run({"My friend, come here."}, 'm')[0].text == "Mī amīce, venī hūc.");
+  CHECK(run({"My friend, come here."}, 'f')[0].text == "Mea amīca, venī hūc.");
+}
+
+TEST_CASE("rules-j: long quoted narrative sentences: reroot, cue split, clause split (work item b)") {
+  NEED_REAL();
+  CHECK(run({"\"Even Paul, the Bishop of Rome, promised to visit the duke and bring him a horse.\""})[0].text ==
+        "Etiam Paulus, Episcopus Rōmae, ducem vīsitāre prōmīsit et equum eī ferre prōmīsit.");
+  {
+    const std::vector<Out> o = run({"\"Even Paul, the Bishop of Rome,", "promised to visit the duke and bring him a horse.\""});
+    CHECK(o[0].text == "Etiam Paulus, Episcopus Rōmae,");
+    CHECK(o[1].text == "ducem vīsitāre prōmīsit et equum eī ferre prōmīsit.");
+    for (const Out& x : o) CHECK(x.conf != rules::Confidence::Fix);
+  }
+  // a sentence the parser cannot build whole: clause by clause, never the word-by-word Fix
+  for (const char* s : {"Jump and run and away they go!", "Hop and skip and away we go!"}) {
+    const Out x = run({s})[0];
+    CHECK_MESSAGE(!hasFlag(x, "could-not-parse"), s);
+    CHECK_MESSAGE(hasFlag(x, "clause-split"), s);
+  }
+}
+
+TEST_CASE("rules-j: free relatives with what: quod + clause, the antecedent understood (work item c)") {
+  NEED_REAL();
+  expectEach({
+      {"Nothing is what it seems.", "Nihil est quod vidētur."},
+      {"The sea would be what the sky is.", "Mare esset quod caelum est."},
+      {"What he seems, he is not.", "Quod vidētur nōn est."},
+      {"I like what I see.", "Amō quod videō."},
+      {"What you have, you keep.", "Quod habēs tenēs."},
+      {"She does what she wants.", "Facit quod vult."},
+      {"What the cat won't eat, the dog will.", "Canis quod fēlēs nōn edet edet."},
+      {"Everything is what it seems because nobody is what he says.", "Omnia sunt quod videntur quia nēmō est quod dīcit."},
+      {"I know what you want.", "Sciō quid velīs."},   // after know: an indirect question, unchanged
+  });
+  CHECK(hasFlag(run({"Nothing is what it seems."})[0], "free-relative"));
+  // "seem" is the passive of videō
+  expectEach({{"The house seems big.", "Domus magna vidētur."}, {"You seem tired.", "Fessus vidēris."}});
+}
+
+TEST_CASE("rules-j: sequence of tenses after a verb of wishing (work item d)") {
+  NEED_REAL();
+  expectEach({
+      {"I wish I could fly.", "Optō ut volāre possim."},
+      {"She wishes that the snow could stay.", "Optat ut nix manēre possit."},
+      {"She wished that he would come.", "Optāvit ut venīret."},
+  });
+}
+
+TEST_CASE("rules-j: word choices of songs and stories (work item e)") {
+  NEED_REAL();
+  expectEach({
+      {"The weeks roll by.", "Septimānae praetereunt."},
+      {"The wheels roll by.", "Rotae praetereunt."},
+      {"The mist rolls away.", "Nebula āvolat."},
+      {"The birds leave the nest.", "Avēs nīdum relinquunt."},
+      {"Hurry, the ship is leaving!", "Festīnā, nāvis exit!"},
+      {"The babbling water is cold.", "Aqua murmurāns frīgida est."},
+      {"We heard a roaring lion.", "Leōnem rudentem audīvimus."},
+      {"Can you understand me?", "Potesne mē intellegere?"},
+      {"I do not understand the question.", "Rogātiōnem nōn intellegō."},
+      {"The boy fell down the steps.", "Puer dē gradibus cecidit."},
+      {"Don't run down the steps!", "Dē gradibus nōlī currere!"},
+      {"The children ran down the hill.", "Puerī dē colle cucurrērunt."},
+      {"The picture is upside down.", "Pictūra capite deorsum est."},
+      {"Bats sleep upside down.", "Vespertīliōnēs dormiunt capite deorsum."},
+      {"He is in trouble.", "In perīculō est."},
+      {"We play in the afternoon.", "Lūdimus post merīdiem."},
+      {"On a cold afternoon the cat slept.", "Diē frīgidō post merīdiem fēlēs dormīvit."},
+      {"I don't know where.", "Nesciō ubi sit."},
+      {"She doesn't know where.", "Nescit ubi sit."},
+      {"We must... be going now.", "Nunc īre dēbēmus."},
+      {"You should not... be sitting there.", "Ibi sedēre nōn dēbēs."},
+      {"Tomorrow we can swim in... in the lake.", "Crās in lacū nāre possumus."},
+      {"What are you afraid of?", "Quid timēs?"},
+      {"What is she afraid of?", "Quid timet?"},
+      {"What would the old king say?", "Quid rēx vetus dīceret?"},
+      {"The boy is late for school.", "Puer ad lūdum sērō venit."},
+  });
+  CHECK(run({"After this the king will need a new crown."})[0].text.rfind("Post hoc rēx", 0) == 0);
+}
+
+TEST_CASE("rules-j: relative clauses: across song lines, where after a noun, can inside can (work item f)") {
+  NEED_REAL();
+  CHECK(run({"\xE2\x99\xAA I dream about a little boat", "\xE2\x99\xAA That carries me to school"})[1].text ==
+        "\xE2\x99\xAA Quae mē ad lūdum portat");
+  CHECK(run({"\xE2\x99\xAA I know a garden by the river", "\xE2\x99\xAA That nobody has seen"})[1].text ==
+        "\xE2\x99\xAA Quod nēmō vīdit");
+  expectEach({
+      {"We walked to the old house where my grandmother lives.", "Ad domum veterem in quā avia mea habitat ambulāvimus."},
+      {"We visited the town where my uncle works.", "Oppidum in quō avunculus meus labōrat vīsitāvimus."},
+      {"I could find a book that I could read.", "Librum quem legere possem invenīre poteram."},
+      {"She can sing a song that I can understand.", "Carmen quod intellegere possim canere potest."},
+  });
+}
+
+TEST_CASE("rules-j: a sound word in quotes is kept as written (work item g)") {
+  NEED_REAL();
+  expectEach({
+      {"The dog says \"woof\".", "Canis \"woof\" dīcit."},
+      {"Cows say \"moo\" and dogs say \"woof\".", "Bovēs \"moo\" dīcunt et canēs \"woof\" dīcunt."},
+      {"She said \"yes\".", "Dīxit ita."},   // a word with a Latin answer is translated
+      {"Cats say it and dogs say it.", "Fēlēs id dīcunt et canēs id dīcunt."},
+  });
+}
+
+TEST_CASE("rules-j: an invented word of a preposition and a known noun (work item h)") {
+  NEED_REAL();
+  {
+    const Out x = run({"They flew overcloud."})[0];
+    CHECK(x.text == "Super nūbem volāvērunt.");
+    CHECK(hasFlag(x, "derived-word"));
+    CHECK(x.conf == rules::Confidence::Check);
+  }
+  CHECK(run({"The children hid underbridge."})[0].text.find("sub ponte") != std::string::npos);
+}
+
+TEST_CASE("rules-j: fixes after the blind check (own sentences, C24)") {
+  NEED_REAL();
+  expectEach({
+      {"The boy put on his hat and went out.", "Puer pilleum suum induit et exiit."},
+      {"She put the book on the table.", "Librum in mēnsā posuit."},
+      {"We must run, or the bus will leave.", "Currere dēbēmus; aliter lāophorīum exībit."},
+      {"I think she likes him.", "Putō eum eī placēre."},
+      {"I don't think she likes me.", "Nōn putō mē eī placēre."},
+      {"The boy took his hat and kissed his mother.", "Puer pilleum suum sūmpsit et mātrem suam ōsculātus est."},
+  });
+  CHECK(run({"If dogs could talk and cats could sing, the farm would be loud."})[0].text.find("et fēlēs canere possent") !=
+        std::string::npos);
+  CHECK(run({"I like red."})[0].text == "Rubrum amō.");
+}
+
+TEST_CASE("rules-j: deterministic with the new rules, in both latinity modes") {
+  NEED_REAL();
+  const std::vector<std::string> src = {"Grandfather, are you tired?", "Yes, I am very tired.",
+                                        "The sea would be what the sky is.", "The dog says \"woof\".",
+                                        "\xE2\x99\xAA I dream about a little boat", "\xE2\x99\xAA That carries me to school"};
+  for (rules::Latinity lt : {rules::Latinity::Wide, rules::Latinity::Classical}) {
+    std::string first;
+    for (int k = 0; k < 2; ++k) {
+      std::unique_ptr<rules::Engine> e = engine();
+      std::vector<rules::CueInput> in;
+      for (size_t i = 0; i < src.size(); ++i) {
+        rules::CueInput c;
+        c.index = (uint32_t)i;
+        c.sourceText = src[i];
+        c.startMs = (int64_t)i * 4000;
+        c.endMs = c.startMs + 3500;
+        in.push_back(c);
+      }
+      rules::Options o;
+      o.speakerGender = 'f';
+      o.latinity = lt;
+      auto r = e->translate(in, o, rules::Context{}, nullptr, nullptr);
+      REQUIRE(r.ok());
+      std::string all;
+      for (const auto& c : r.value()) all += c.target + "\n";
+      if (k == 0) first = all;
+      else CHECK(all == first);
+    }
+    CHECK(first.find("fessus sum") != std::string::npos);
+  }
+}
