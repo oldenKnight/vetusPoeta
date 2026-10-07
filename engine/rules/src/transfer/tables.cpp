@@ -88,7 +88,7 @@ const char* adverb(const std::string& l, bool motion) {
       {"loudly", "magnā vōce"}, {"truly", "vērē"},         {"together", "ūnā"},       {"up", "sursum"},
       {"down", "deorsum"},     {"forward", "porrō"},       {"why", "cūr"},            {"how", "quōmodo"},
       {"where", "ubi"},        {"when", "quandō"},        {"at last", "tandem"},     {"suddenly", "subitō"},
-      {"late", "sērō"},        {"early", "māne"}};
+      {"late", "sērō"},        {"early", "māne"},          {"twice", "bis"},          {"thrice", "ter"}};   // C20: twice
   const char* r = lookup(kAdv, l);
   if (r && std::strchr(r, ' ')) return nullptr;   // multi-word Latin: not an adverb lemma
   return r;

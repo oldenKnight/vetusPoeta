@@ -2203,3 +2203,132 @@ TEST_CASE("rules-f: those who, coordinated relatives, ablative of cause (fragmen
   const std::vector<Out> o = run({"We thanked those who were kind, or who helped us."});
   CHECK_MESSAGE(o[0].text.find("quis") == std::string::npos, o[0].text);
 }
+
+// ================================================================================================================
+// C20 (RULES-G, Latin pre-loop). Generalisation guard: every rule below has at least two sentences of our own, written
+// before the rule was run on the tuning sample (docs/rules_en_notes.md "Pre-loop C20").
+TEST_CASE("rules-g: standalone possessive pronouns agree with the noun they stand for (work item 1)") {
+  NEED_REAL();
+  expectEach({
+      {"My brother is taller than yours.", "Frāter meus altior est quam tuus."},
+      {"Your house is bigger than mine.", "Domus tua maior est quam mea."},
+      {"Their garden is smaller than ours.", "Hortus eōrum minor est quam noster."},
+      {"Our cat is faster than theirs.", "Fēlēs nostra celerior est quam eōrum."},
+      {"The red ball is his.", "Pila rubra eius est."},
+      {"This book is mine.", "Hic liber meus est."},
+  });
+  // never a bracketed source word; the compared object keeps its case
+  for (const char* s : {"My dog is older than hers.", "I lost my pen, can I use yours?", "Yours is bigger.",
+                        "I like your hat more than mine.", "Is this hat yours?"}) {
+    const std::vector<Out> o = run({s});
+    CHECK_MESSAGE(o[0].text.find('[') == std::string::npos, s << " -> " << o[0].text);
+  }
+  CHECK(run({"My dog is older than hers."})[0].text.find("quam eius") != std::string::npos);
+  CHECK(run({"I lost my pen, can I use yours?"})[0].text.find("tuō ūtī") != std::string::npos);
+  CHECK(run({"I like your hat more than mine."})[0].text.find("quam meum") != std::string::npos);
+}
+
+TEST_CASE("rules-g: an imperative, a comma and a statement keep the comma (asyndeton, work item 2)") {
+  NEED_REAL();
+  expectEach({
+      {"Run, the dragon is coming!", "Curre, dracō venit!"},
+      {"Come quickly, the bread is burning!", "Venī celeriter, pānis ārdet!"},
+      {"Hide, the witch is here!", "Latē, sāga hīc est!"},
+      {"Run and hide!", "Curre et latē!"},   // a real "and" stays et
+  });
+  CHECK(run({"Run, the dragon is coming!"})[0].conf == rules::Confidence::Ok);
+  // a word the tagger took for an interjection and the lexicon knows as a verb: repaired, so never OK
+  CHECK(run({"Hide, the witch is here!"})[0].conf != rules::Confidence::Ok);
+  // real interjections are untouched
+  CHECK(run({"Oh, the dragon is coming!"})[0].text == "Ō, dracō venit!");
+}
+
+TEST_CASE("rules-g: such / so + adjective, so many, so ... that (work item 3)") {
+  NEED_REAL();
+  expectEach({
+      {"I have never seen such a big dog.", "Numquam tantum canem vīdī."},
+      {"It was such a beautiful day.", "Tam pulcher diēs erat."},
+      {"I have never heard such a noise.", "Numquam tālem strepitum audīvī."},
+      {"There were so many apples on the tree.", "In arbore erant tot māla."},
+      {"We were so hungry that we ate everything.", "Tam ēsuriēbāmus ut omnia ederēmus."},
+      {"The night was so dark that we could not see the road.", "Nox tam obscūra erat ut viam vidēre nōn possēmus."},
+      {"She has so many friends that she is never alone.", "Tot amīcōs habet ut numquam sōla sit."},
+      {"It was such a big dog that everybody ran away.", "Tantus canis erat ut omnēs aufugerent."},
+      {"She ran so fast that nobody could catch her.", "Tam cito cucurrit ut nēmō eam capere posset."},
+      // an actual result after a perfect keeps the perfect subjunctive (C17)
+      {"He sang so badly that we laughed.", "Tam male cecinit ut rīserīmus."},
+  });
+  // the degree word is never dropped silently
+  for (const char* s : {"The giant had such a loud voice.", "There was so much water in the river.", "I was so afraid."}) {
+    const std::vector<Out> o = run({s});
+    const bool deg = o[0].text.find("tam") != std::string::npos || o[0].text.find("Tam") != std::string::npos ||
+                     o[0].text.find("tant") != std::string::npos || o[0].text.find("Tant") != std::string::npos;
+    CHECK_MESSAGE(deg, s << " -> " << o[0].text);
+  }
+}
+
+TEST_CASE("rules-g: a noun + to-infinitive is a gerundive or ad + gerund, not a relative clause (work item 4)") {
+  NEED_REAL();
+  expectEach({
+      {"Give me a book to read.", "Dā mihi librum legendum."},
+      {"I have a letter to write.", "Epistulam scrībendam habeō."},
+      {"They had no water to drink.", "Aquam bibendam nōn habēbant."},
+      {"She found some bread to eat.", "Pānem ad edendum invēnit."},
+  });
+  for (const char* s : {"We need a place to sleep.", "They brought us food to eat.", "He gave me a coat to wear."}) {
+    const std::vector<Out> o = run({s});
+    CHECK_MESSAGE(o[0].text.find(" ad ") != std::string::npos, s << " -> " << o[0].text);
+    CHECK_MESSAGE(o[0].text.find(" qu") == std::string::npos, s << " -> " << o[0].text);
+  }
+}
+
+TEST_CASE("rules-g: my child in address is mī fīlī / mea fīlia; my is never dropped (work item 5)") {
+  NEED_REAL();
+  expectEach({
+      {"Come here, my child.", "Venī hūc, mea fīlia."},
+      {"Don't cry, my child.", "Nōlī flēre, mea fīlia."},
+      {"My child, where are you?", "Mea fīlia, ubi es?"},
+      {"Come here, child.", "Venī hūc, puella."},
+      {"Good night, my son.", "Bene dormī, fīlī mī."},
+  });
+  CHECK(run({"Don't cry, my child."}, 'm')[0].text == "Nōlī flēre, mī fīlī.");
+  CHECK(run({"Where are you going, my child?"}, 'm')[0].text == "Quō īs, mī fīlī?");
+}
+
+TEST_CASE("rules-g: fixes after the blind check (own sentences of children's dialogue, C20)") {
+  NEED_REAL();
+  expectEach({
+      // "N times" -> numeral adverbs; twice -> bis
+      {"She read the book ten times.", "Librum deciēns lēgit."},
+      {"I have told you twice.", "Tibi bis dīxī."},
+      {"The wolf knocked on the door three times.", "Lupus iānuam ter pulsāvit."},
+      // knock on / at -> pulsō + the object (verbprep_en_la.tsv)
+      {"Someone is knocking at the gate.", "Aliquis portam pulsat."},
+      // "until" + a past event -> dōnec + perfect; the past form closing the clause is its verb (rose, not a rose)
+      {"We sang songs until the moon rose.", "Carmina cecinimus dōnec lūna orta est."},
+      {"Wait here until I come back.", "Manē hīc dum redeō."},
+      // something / anything + to-infinitive -> ad + gerund
+      {"Is there anything to drink?", "Estne aliquid ad bibendum?"},
+      // lost: the participle of āmittō (teacher gloss), also after a possessive and when tagged as a finite verb
+      {"The lost boy was crying.", "Puer āmissus flēbat."},
+      {"I lost my hat.", "Pilleum meum āmīsī."},
+      {"She found her lost ring.", "Ānulum āmissum suum invēnit."},
+  });
+  CHECK(run({"We played until the bell rang."})[0].text.find("dōnec") != std::string::npos);
+  CHECK(run({"Give me something to eat, please."})[0].text.find("aliquid ad edendum") != std::string::npos);
+  CHECK(run({"If you are good, you will get a present."})[0].text.find("dōnum") != std::string::npos);
+  CHECK(run({"Thank you for the lovely present."})[0].text.find("dōnō") != std::string::npos);
+  CHECK(run({"The old man knocked on the window."})[0].text.find("fenestram pulsāvit") != std::string::npos);
+  // a deponent's perfect participle is active: never the passive "stolen"
+  for (const char* s : {"The queen found her stolen crown.", "The stolen horse came back."})
+    CHECK_MESSAGE(run({s})[0].text.find("fūrāt") == std::string::npos, s);
+  // reported statements: the perfect passive infinitive agrees with its accusative subject; an object pronoun that is
+  // the speaker is the reflexive
+  expectEach({
+      {"I know that the gate was closed.", "Sciō portam clausam esse."},
+      {"The queen said that the letters were written.", "Rēgīna dīxit epistulās scrīptās esse."},
+      {"He said that the girl had followed him.", "Dīxit puellam sē secūtam esse."},
+      {"She said that the boys had helped her.", "Dīxit puerōs sē adiūvisse."},
+  });
+  CHECK(run({"I said that the girl had seen him."})[0].text.find(" sē ") == std::string::npos);
+}

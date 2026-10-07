@@ -40,6 +40,7 @@ struct LaAdj {
   uint8_t participle = 0;
   bool coord = false;             // C17: joined to the adjective before it by et ("canem magnum et foedum")
   bool after = false;             // C19: after the head whatever order.adj says ("nōs omnēs")
+  bool gerundive = false;         // C20: `lemma` is a verb: its gerundive agreeing with the noun ("librum legendum")
 };
 
 struct LaNP {
@@ -70,6 +71,7 @@ struct LaNP {
   bool nameWords = false;         // C15: a translated name of names_la.tsv ("Urbs Smaragdōrum"): every word is a name
   bool indefinite = false;        // C17: "I am a Scarecrow": a description, not the speaker's name (ego is dropped)
   std::string numeralLiteral;     // C19: a number Latin writes with numerals ("XXI ovēs"), before the noun
+  uint32_t adGerund = kNone;      // C20: ad + the accusative gerund of this verb after the noun ("locum ad dormiendum")
 };
 
 struct LaOblique {
@@ -93,6 +95,7 @@ struct LaSub {
   std::string sep;                 // punctuation between the main clause and a following sub ("; aliter ...") (C2b)
   std::vector<LaClause> clause;    // exactly one
   bool afterSubject = false;       // C19: Apposition right after the subject, between commas ("Pāstor, lupum vidēns, fūgit")
+  bool asyndeton = false;          // C20: Coord without a conjunction, after `sep` ("Curre, dracō venit!")
 };
 
 struct LaWh { uint32_t lemma = kNone; Role role = Role::None; uint8_t gender = 0; };

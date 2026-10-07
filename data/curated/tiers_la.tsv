@@ -231,7 +231,7 @@ calceus	calceus	noun	1	derived
 pecunia	pecūnia	noun	1	derived	
 nummus	nummus	noun	1	derived	
 pretium	pretium	noun	1	derived	
-donum	dōnum	noun	1	derived	
+donum	dōnum	noun	1	derived	gift, present
 cibus	cibus	noun	1	derived	
 panis	pānis	noun	1	derived	
 vinum	vīnum	noun	1	derived	
@@ -634,3 +634,17 @@ baculum	baculum	noun	1	teacher	stick, staff, walking stick
 funis	fūnis	noun	2	teacher	rope, cord
 papaver	papāver	noun	2	teacher	poppy
 occurro	occurrō	verb	2	teacher	meet, go to meet, run to meet
+bis	bis	adv	2	teacher	twice, two times
+ter	ter	adv	2	teacher	three times, thrice
+quater	quater	adv	2	teacher	four times
+quinquies	quīnquiēs	adv	2	teacher	five times
+sexies	sexiēs	adv	2	teacher	six times
+septies	septiēs	adv	2	teacher	seven times
+octies	octiēs	adv	2	teacher	eight times
+novies	noviēs	adv	2	teacher	nine times
+deciens	deciēns	adv	2	teacher	ten times
+centiens	centiēns	adv	2	teacher	a hundred times
+millies	mīlliēs	adv	2	teacher	a thousand times
+aliquotiens	aliquotiēns	adv	2	teacher	several times
+donec	dōnec	conj	2	teacher	until, while
+amitto	āmittō	verb	2	teacher	lose, let slip, let go

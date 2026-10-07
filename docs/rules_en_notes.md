@@ -717,3 +717,119 @@ C17's list, not from this blind set, but blind #2 uses it.
   agreeing with the compared noun; an imperative followed by a comma and a clause keeps the comma (asyndeton), never
   et; "such a big" -> tam magnus / tantus; "so hungry that" -> tam ēsuriēbāmus ut (tam was dropped); "a book to
   read" -> librum legendum / ad legendum, not quī legit.
+
+## Pre-loop C20 (2026-10-07)
+Material: the five faults of the main agent's review of loop 4 (standalone possessives, imperative + comma, such / so,
+noun + to-infinitive, "my child"), the speed regression of E4, own sentences, tests/regression/oz_sample.en.srt,
+own_dialogue EN / ES, tests/samples/sample.en.srt. tests/heldout/, tests/eval_gold/, data/work/eval/heldout-* and
+data/acceptance/ were not opened. Generalisation guard: every rule below has at least two sentences of our own in
+`engine/tests/test_rules_en.cpp` (test cases "rules-g: ..."), written at the start (before any change) and before the
+rule was run on the oz sample; 20 blind sentences of children's dialogue were written first (03:20 UTC) and run once
+after the changes.
+
+### Before / after
+| file | start of C20 | end of C20 |
+|---|---|---|
+| oz_sample EN (100) | 78 / 100, exact 50, ok 26 / check 68 / fix 6, wrong among OK 0 | 78 / 100 (unchanged; #23 and #47 changed but stay Check and unmatched), exact 50, ok 26 / check 68 / fix 6, wrong among OK 0 |
+| own_dialogue EN (114) | 114 / 114, ok 65 | 114 / 114, ok 65 (report byte-identical) |
+| own_dialogue ES (100) | 100 / 100, ok 81 | 100 / 100, ok 81 (report byte-identical) |
+| sample.en.srt (12), la2x 201, orberg 60 | 12, 201, 60 | unchanged |
+| Greek EN->GRC / ES->GRC / GRC->EN, ES / C18 review | 114 / 114, 39 / 40, 40 / 40, 13 / 13 | unchanged (reports byte-identical; also checked on HEAD + the C20 files only) |
+| 800 cues (proxy below), test harness | 24.4 s | 2.4 s (speed fix alone, output byte-identical), 2.6 s at the end of C20 |
+| blind check (20 own sentences) | first run **13 / 20** acceptable | 17 / 20 after the fixes below |
+
+No gold alternatives are proposed (no oz output became a correct non-matching rendering).
+
+### (6) Speed (done first, output unchanged)
+Profile: valgrind callgrind (no new dependency; perf is not installed) of one run of the 100 oz cues through the
+`rules-f: try` harness: 23.4 G instructions, 88 % inside `Transfer::select`, of which `text::nfc` 64 % and
+`morph::parsePrincipal` 37 %. Cause: the C17 coordinator add-on (lemmas with the same cleaned head, part of speech and
+principal parts are one candidate) built the signature of candidate j (cleanHead + parsePrincipal + four NFC
+normalisations) inside the inner loop of a pairwise comparison, i.e. O(n²) signatures per `select` call, and `select`
+runs for every content word, every derived base form, every missing-form retry and every two-part analysis. So the
+missing-form retries and two-part analyses of C19 were not slow in themselves: they multiplied the calls of a quadratic
+`select` (C17 25.8 s -> C19 37.5 s in E4). Fix: each signature is computed once per candidate (a vector beside the
+candidates); the comparison is unchanged. After: 3.3 G instructions for the same run, of which about two thirds is
+loading the tagger / parser models (SHA-256 of the .vpt files, twice in the test harness, not per cue); translation
+about 1.1 G. Timings on this machine (Release, test harness, incl. about 0.25 s of loading): oz 100 cues 3.61 s ->
+0.48 s; a proxy of 800 cues (oz_sample x 7 + 100 own_dialogue cues; the held-out files were not opened) 24.36 s ->
+2.36 s. Output check: VP_RULES_TRY dumps of oz, own_dialogue and the 800-cue proxy and all seven regression reports
+(EN, ES, oz, GRC, GRC ES, grc2x, la2x back-translation) compared with cmp before / after: byte-identical; the
+determinism tests pass. Expected E4 cost now: a few seconds for 800 cues (target < 30 s).
+
+### (1) Standalone possessive pronouns
+`Transfer::npInto`: mine / yours / ours / his / hers / theirs as a noun phrase of their own stand for a noun said
+before them: meus / tuus (vester for a plural addressee) / noster agreeing with that noun, the noun left out ("My
+brother is taller than yours." -> "Frāter meus altior est quam tuus.", "Domus tua maior est quam mea."); third person
+eius / eōrum ("The red ball is his." -> "Pila rubra eius est.", "quam eōrum"). The noun is the compared one after
+"than" (the subject of a predicate adjective, else the object, whose case the quam phrase then takes: "quam meum"),
+else the last noun mentioned (Memory::lastGender / lastNumber: "I lost my pen, can I use yours?" -> tuō ūtī). Never a
+bracket.
+
+### (2) Imperative, comma, statement
+An imperative followed by a comma and a statement with its own subject (parataxis, or a complement without "that" the
+parser made of it) is asyndeton: the comma stays, no et, no accusative + infinitive (`LaSub::asyndeton`): "Run, the
+dragon is coming!" -> "Curre, dracō venit!" (OK: nothing was repaired), "Come quickly, the bread is burning!" -> "Venī
+celeriter, pānis ārdet!". A real "and" keeps et ("Curre et latē!"). Frame (english.cpp): a sentence-initial word before
+a comma that the tagger took for an interjection and that the lexicon knows as a verb but not as an interjection is
+the imperative ("Hide, the witch is here!" lost "Hide" and was OK; now "Latē, sāga hīc est!", Check: repair "retag").
+
+### (3) such / so
+"such a" + adjective -> tam + adjective, before the noun ("Tam pulcher diēs erat."); "such a big / great X" ->
+tantus ("Numquam tantum canem vīdī."); "such a" + noun alone -> tālis ("tālem strepitum"); "so many" -> tot, "so
+much" -> tantus. "such" was covered silently (OK with the word dropped). A state adjective said by a verb keeps its
+degree words ("so hungry" -> tam ēsuriēbāmus, "very afraid" -> valdē timeō). "so ... that": the result clause also
+after "so fast" and after a such / so-many noun; a "that" clause the parser hung on such a noun as a relative clause
+with its own subject is the result clause ("She has so many friends that she is never alone." -> "Tot amīcōs habet ut
+numquam sōla sit."; it was "quōs numquam sōla est habet", OK and wrong; rebuilt in `Transfer::clause`). Sequence of
+tenses in result clauses: after an imperfect / pluperfect the imperfect subjunctive ("Tam ēsuriēbāmus ut omnia
+ederēmus"); after a perfect the perfect subjunctive of an actual result stays ("Tam male cecinit ut rīserīmus", C17)
+and a present becomes imperfect.
+
+### (4) Noun + to-infinitive
+`Transfer::relativeInto`: a bare to-infinitive on a noun is not a relative clause: the gerundive agreeing with the noun
+when the Latin verb's chosen sense is transitive and the noun is its object ("Dā mihi librum legendum.", "Epistulam
+scrībendam habeō.", "Aquam bibendam nōn habēbant."), else ad + the gerund ("Locum ad dormiendum", "Pānem ad
+edendum", "aliquid ad edendum" for something / anything / nothing). New `LaAdj::gerundive`, `LaNP::adGerund`. The
+frame doubt noun-infinitive stays (Check): the relative clause of purpose (librum quem legam) is the other reading.
+
+### (5) "my child" in address
+"my child" / "my kid" addressed -> mī fīlī / mea fīlia (by the main character's gender, as "child" -> puer / puella;
+the possessive first); "my" was dropped silently on an OK cue. "child" alone keeps puer / puella.
+
+### (7) Blind check
+20 sentences of children's dialogue written at the start of C20, run once after items 1-6: **13 / 20** acceptable at
+the first run (1, 2, 3, 4, 5, 7, 8, 10, 11, 12, 13, 15, 20; 8 "eum" for the fox where a teacher would write eam is
+counted acceptable, 12 prōmptum for "ready" is borderline). Several blind sentences touch this loop's items (7, 8, 13,
+20), which favours the count. Wrong: #6 "the lost kitten" -> vapidum, #9 "something to eat" (dropped), #14 "all
+afternoon" (genitive tōtius vesperī), #16 "three times" -> tribus temporibus and "knock on" -> in iānuā, #17 "Whose
+shoes are these?", #18 "until the moon rose" (a rose), #19 "a present" -> praesentiam. Fixes (each with own test
+sentences, "rules-g: fixes after the blind check"): numeral adverbs for "N times" (bis, ter, quater ... deciēns,
+centiēns, mīlliēs; "many times" saepe, "several times" aliquotiēns; twice -> bis in the adverb table); verbprep rows
+knock on / at -> pulsō + object; a past form closing a sentence after "until / till / when / before / after / while /
+since + noun" is that clause's verb (english.cpp), "until" + a past event -> dōnec + perfect indicative (dum otherwise);
+something / anything / nothing + to-infinitive -> ad + gerund; dōnum note "gift, present" (teacher gloss); an
+adjective that is also a verb's past participle with only a weak Latin adjective takes the verb's perfect participle
+(lost -> āmissus with the teacher row āmittō "lose"), also when tagged as a finite verb before its noun ("the lost boy")
+or after a possessive ("her lost ring" was "Invēnit sē ānulum perdidisse"); a deponent is never the passive participle
+("the stolen crown" was fūrātam). After: **17 / 20**. Still wrong: #14 (the parser hangs "all afternoon" on "garden"),
+#17 (whose -> cuius and a wh question), #19 ("get" = receive is capiō since C19). Found while probing and fixed: the
+perfect passive infinitive of a reported statement agrees with its accusative subject ("Sciō portam clausam esse",
+was clausum: A3 Fix), and an object pronoun of a reported statement that is the speaker is the reflexive ("He said that
+the girl had followed him." -> "Dīxit puellam sē secūtam esse"; eum was OK and wrong).
+
+Rows: tiers_la.tsv +14 (bis, ter, quater, quīnquiēs, sexiēs, septiēs, octiēs, noviēs, deciēns, centiēns, mīlliēs,
+aliquotiēns, dōnec tier 2; āmittō tier 2 "lose, let slip, let go") and 1 note (dōnum "gift, present");
+verbprep_en_la.tsv +2 (knock on, knock at); transfer/tables.cpp adverbs twice -> bis, thrice -> ter.
+
+API changes (additive): realise_la.h `LaSub::asyndeton`, `LaAdj::gerundive`, `LaNP::adGerund`. Private: Transfer::Ctx
+`possRefGender / possRefNumber` (transfer.cpp). Frame (shared with Greek): english.cpp retags (interjection-tagged
+imperative before a comma, sentence-final time clause, possessive + past form + noun) and frame_builder.cpp (a verb
+tagged amod without a verb form is a participle; the "retag" repair also for interjections). Greek suite unchanged.
+
+### Open points
+- "I lost my pen, can I use yours?": a statement and a question joined by a comma become one yes/no question
+  ("Perdidīne ... et tuō ūtī possum?", Check).
+- "Is this hat yours?": the tagger reads hat as an adjective (Check).
+- "Whose shoes are these?" -> cuius + wh order needs a genitive interrogative in LaNP (Check now).
+- "all afternoon" hung on the previous noun (parser); "The dog that I saw was big." (relative misparse, Check).

@@ -241,17 +241,23 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
   // C19: a sentence-initial word before a comma that the lexicon knows as a verb (base form) and not as a name is an
   // imperative ("Hurry, the ship is leaving!", "Run, the bear is coming!"), never a name candidate; a common noun there
   // is the person addressed ("Grandmother, may we ...?")
-  if (n >= 3 && tk[0].upos == "PROPN" && tk[1].text == "," && !tk[0].text.empty()) {
+  // C20: also a word the tagger took for an interjection ("Hide, the witch is here!" lost "Hide" and was OK) when the
+  // lexicon has no interjection of that spelling
+  const bool intj0 = n >= 3 && tk[0].upos == "INTJ" && tk[1].text == ",";
+  if (n >= 3 && (tk[0].upos == "PROPN" || intj0) && tk[1].text == "," && !tk[0].text.empty()) {
     std::vector<lex::Analysis> an;
     lx.lookup(text::en_key(tk[0].lower), an);
-    bool verb = false, name = false, noun = false;
+    bool verb = false, name = false, noun = false, intj = false;
     for (const lex::Analysis& a : an) {
       const lex::Lemma l = lx.lemma(a.lemma);
       if (l.pos == feat::Name) name = true;
       if (l.pos == feat::Verb && text::lower(std::string(l.head)) == tk[0].lower) verb = true;
       if (l.pos == feat::Noun) noun = true;
+      if (l.pos == feat::Intj) intj = true;
     }
-    if (verb && !name) {
+    if (intj0 && (intj || !verb)) {
+      // a real interjection ("Oh,", "Hey,"): unchanged
+    } else if (verb && !name) {
       tk[0].upos = "VERB";
       tk[0].feats = nlp::morph::fromString("VerbForm=Fin|Mood=Imp");
       changed = true;
@@ -260,6 +266,18 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
       tk[0].feats = nlp::morph::fromString("Number=Sing");
       changed = true;
     }
+  }
+  // C20: a past form between a possessive and a noun ("She found her lost ring.", "He mended his broken toy.") is a
+  // participle used as an adjective, not the verb of a clause whose subject is "her"
+  for (int i = 1; i + 1 < n; ++i) {
+    Token& t = tk[(size_t)i];
+    if (t.upos != "VERB" || tk[(size_t)i + 1].upos != "NOUN") continue;
+    if (!isIn(tk[(size_t)i - 1].lower, {"my", "your", "his", "her", "its", "our", "their"})) continue;
+    const Reading r = readingOf(lx, t.lower);
+    if (r.pastOf.empty() || r.presentVerb) continue;
+    t.upos = "ADJ";
+    t.feats = nlp::morph::fromString("VerbForm=Part|Tense=Past");
+    changed = true;
   }
   // C19: "Nobody knows where the dragon lives.": an -s word after "wh / subordinator + the + noun" that the lexicon
   // knows as a verb is that clause's verb (lives, not the plural of life)
@@ -397,7 +415,16 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
                              isIn(tk[0].lower, {"when", "after", "before", "while", "as", "until", "till", "once", "since",
                                                 "if", "because"}) &&
                              (nominal(i - 1) || (i >= 2 && tk[(size_t)i - 1].upos == "ADV" && nominal(i - 2)));
-      if (subClause && (!r.pastOf.empty() || r.presentVerb) && !r.nounInflected) {
+      // C20: the same clause at the end of the sentence ("We sang songs until the moon rose.", "We waited till the sun
+      // set."): a subordinator inside the sentence, a noun, and a past form closing the sentence
+      bool tailClause = false;
+      if (!subClause && !r.pastOf.empty() && r.finitePast && !r.nounInflected && i + 1 < n && i >= 3 &&
+          tk[(size_t)i + 1].upos == "PUNCT" && (i + 2 == n || tk[(size_t)i + 1].text != ",") && nominal(i - 1)) {
+        int q = i - 1;
+        while (q > 0 && (nominal(q) || isIn(tk[(size_t)q].upos, {"DET", "ADJ", "NUM"}))) --q;
+        tailClause = q > 0 && q < i - 1 && isIn(tk[(size_t)q].lower, {"until", "till", "when", "after", "before", "while", "since"});
+      }
+      if ((subClause || tailClause) && (!r.pastOf.empty() || r.presentVerb) && !r.nounInflected) {
         bool pastMain = false;
         for (int q = segB + 1; q < n; ++q)
           pastMain = pastMain || fget(tk[(size_t)q], nlp::morph::TenseShift) == nlp::morph::TensePast;

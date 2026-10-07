@@ -166,9 +166,12 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
     }
   } else {
     // pre-head: determiner, interrogative, numeral, quantity / demonstrative adjectives, contrastive possessive
-    auto modifierWord = [&](uint32_t lemma, uint8_t degree, const char* rule, uint8_t participle = 0) {
+    auto modifierWord = [&](uint32_t lemma, uint8_t degree, const char* rule, uint8_t participle = 0, bool gerundive = false) {
       Word w;
-      forms_.select(lemma, participle ? participleFeatures(lx_, lemma, participle, a) : agree_.modifier(a, degree), w);
+      if (gerundive)   // C20: the gerundive ("librum legendum")
+        forms_.select(lemma, morph::participle(Future, Passive, a.case_, a.number, a.gender ? a.gender : (uint8_t)M), w);
+      else
+        forms_.select(lemma, participle ? participleFeatures(lx_, lemma, participle, a) : agree_.modifier(a, degree), w);
       w.rule = rule;
       return w;
     };
@@ -231,11 +234,25 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
       if (ad.coord && postAdj) { Word et; literal(k_.et, "et", et, "order.adj"); out.push_back(std::move(et)); }
       postAdj = true;
       for (uint32_t adv : ad.adverbs) { Word w; literal(adv, "?", w, "order.adv"); out.push_back(std::move(w)); }
-      out.push_back(modifierWord(ad.lemma, ad.degree, "order.adj", ad.participle));
+      out.push_back(modifierWord(ad.lemma, ad.degree, "order.adj", ad.participle, ad.gerundive));
       if (ad.capitalise) Punctuation::capitaliseFirst(out.back().form);
     }
     if (n.possessive != kNone && !n.possContrast) out.push_back(modifierWord(n.possessive, 0, "order.poss"));
     for (const LaNP& g : n.genitive) np(g, Gen, nullptr, o, out);
+    if (n.adGerund != kNone) {   // C20: "locum ad dormiendum"
+      const uint32_t ad = morph::findLemma(lx_, "ad", Prep);
+      Word p;
+      literal(ad, "ad", p, "order.prep");
+      out.push_back(std::move(p));
+      Features gf;
+      gf.pos = Verb;
+      gf.mood = Gerund;
+      gf.case_ = Acc;
+      Word g;
+      forms_.select(n.adGerund, gf, g);
+      g.rule = "order.prep";
+      out.push_back(std::move(g));
+    }
     for (const LaClause& rc : n.relative) {
       ClauseCtx rctx;
       rctx.main = false;
@@ -354,6 +371,20 @@ void LatinRealiser::verbGroup(const LaClause& c, const AgreeInfo& subj, std::vec
           morph::generate(lx_, p.lemma, pf, fp, true)) {
         push(fin, p.lemma, pf, "order.acc.inf");
         push(fin, k_.sum, morph::infinitive(Present, Active), "order.acc.inf");
+      } else if (infTense(p.tense) == Perfect && p.lemma != kNone && k_.sum != kNone &&
+                 (p.voice == Passive || (lx_.lemma(p.lemma).flags & lex::Deponent))) {
+        // C20: the perfect passive (or deponent) infinitive agrees with the accusative subject as well ("Sciō portam
+        // clausam esse"; the lexicon's cell "clausum esse" made A3 Fix)
+        const bool dep = (lx_.lemma(p.lemma).flags & lex::Deponent) != 0;
+        const Features pp = morph::participle(Perfect, dep ? (uint8_t)Active : (uint8_t)Passive, Acc,
+                                              subj.number ? subj.number : (uint8_t)Sg, subj.gender ? subj.gender : (uint8_t)M);
+        std::string probe;
+        if (morph::generate(lx_, p.lemma, pp, probe, true)) {
+          push(fin, p.lemma, pp, "order.acc.inf");
+          push(fin, k_.sum, morph::infinitive(Present, Active), "order.acc.inf");
+        } else {
+          push(fin, p.lemma, morph::infinitive(infTense(p.tense), p.voice), "order.acc.inf");
+        }
       } else {
         push(fin, p.lemma, morph::infinitive(infTense(p.tense), p.voice), "order.acc.inf");
       }
@@ -783,7 +814,7 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
     std::vector<Word> sw;
     uint32_t conj = sub.conj;
     const bool neg = sc.polarity == Polarity::Neg;
-    if (conj == kNone) {
+    if (conj == kNone && !sub.asyndeton) {
       switch (sub.rel) {
         case SubRel::Cause: conj = k_.quia; break;
         case SubRel::Time: conj = k_.cumConj; break;

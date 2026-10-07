@@ -1217,7 +1217,10 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
     uint8_t participle = 0;
     if (en && (d == "amod" || d == "compound") && (kt.upos == "VERB" || kt.upos == "ADJ") && k < h) {
       const uint32_t vf = fget(kt, nlp::morph::VerbFormShift);
-      if (vf == nlp::morph::VfPart || vf == nlp::morph::VfGer) {
+      // C20: a verb tagged amod without a verb form ("the lost boy" read "lost" as a finite verb and made it a genitive
+      // noun "lose") is a participle as well
+      const bool bareAmod = d == "amod" && kt.upos == "VERB" && vf == 0 && kl != c.lem(k);
+      if (vf == nlp::morph::VfPart || vf == nlp::morph::VfGer || bareAmod) {
         bool bare = true;
         for (int g : c.kids[(size_t)k])
           if (c.ok(g) && c.dep(g) != "advmod") bare = false;
@@ -4024,7 +4027,7 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out) const {
     bool again = en::retagForms(tk, *lex_);
     // C19: a sentence-initial word the tagger took for a name and the lexicon gives back as a verb or a common noun
     // ("Hurry, ...", "Grandmother, ..."): a repaired analysis (Check), as every rebuilt structure
-    if (!tk.empty() && firstTag == "PROPN" && tk[0].upos != "PROPN") out.repairs.emplace_back("retag");
+    if (!tk.empty() && (firstTag == "PROPN" || firstTag == "INTJ") && tk[0].upos != firstTag) out.repairs.emplace_back("retag");
     // "so that" + clause (purpose): both words are the subordinator, not "so" + the pronoun "that"
     for (int i = 0; i + 2 < n; ++i)
       if (tk[(size_t)i].lower == "so" && tk[(size_t)i + 1].lower == "that" &&
