@@ -396,6 +396,211 @@ bool flatClause(std::vector<Token>& tk, int v) {
   return true;
 }
 
+
+// C24: free relatives with "what" ("Nothing would be what it is.", "What it seems, it isn't.", "I like what I see."):
+// the parser hangs these clauses in many wrong ways, so a sentence made only of such clauses gets its tree from a
+// small grammar. "what" heads its relative clause (acl) and takes the role of the clause it stands in: the predicate
+// of "be" (the copula hangs on it) or the object of a verb. Shapes (CONJ, ADV and commas around):
+//   SUBJ VG FR | FR , SUBJ VG | FR VG FR, clauses joined by because / since / and / but.
+// FR = what SUBJ VG; SUBJ = a pronoun, a name or [det] [adj] noun; VG = auxiliaries, not, a verb. A verb of knowing
+// or asking before "what" makes an indirect question (left to the parser). False when the sentence does not fit.
+namespace fr {
+bool beForm(const nlp::Token& t) {
+  return in(t.lower, {"be", "is", "are", "was", "were", "am", "'s", "'re", "'m", "been"});
+}
+bool auxWord(const nlp::Token& t) {
+  return t.upos == "AUX" || in(t.lower, {"would", "could", "should", "will", "shall", "can", "may", "might", "must",
+                                         "do", "does", "did", "'d", "'ll"});
+}
+bool negWord(const nlp::Token& t) { return in(t.lower, {"not", "n't", "never"}); }
+// subject at i: end (exclusive) and head, or -1
+int subject(const std::vector<nlp::Token>& tk, int i, int& head) {
+  const int n = (int)tk.size();
+  if (i >= n) return -1;
+  const nlp::Token& t = tk[(size_t)i];
+  if (t.upos == "PRON" && !in(t.lower, {"what", "which", "who", "whom", "that"})) { head = i; return i + 1; }
+  if (t.upos == "PROPN") { head = i; return i + 1; }
+  int j = i;
+  if (t.upos == "DET" || t.upos == "PRON") ++j;   // "the", "my"
+  while (j < n && tk[(size_t)j].upos == "ADJ") ++j;
+  if (j < n && tk[(size_t)j].upos == "NOUN") { head = j; return j + 1; }
+  return -1;
+}
+// verb group at i: end (exclusive), head (the verb, else a form of be, else the last auxiliary), whether it has a verb
+int verbGroup(const std::vector<nlp::Token>& tk, int i, int& head, bool& verb, bool& be) {
+  const int n = (int)tk.size();
+  int j = i;
+  head = -1;
+  verb = be = false;
+  int lastAux = -1, beTok = -1;
+  while (j < n) {
+    const nlp::Token& t = tk[(size_t)j];
+    if (t.upos == "VERB" && !beForm(t)) { if (verb) break; verb = true; head = j; ++j; continue; }
+    if (beForm(t)) { beTok = j; ++j; continue; }
+    if (auxWord(t)) { if (verb) break; lastAux = j; ++j; continue; }
+    if (negWord(t) || in(t.lower, {"really", "always", "just", "still", "also", "ever"})) { ++j; continue; }
+    break;
+  }
+  if (!verb) {
+    if (beTok >= 0) { head = beTok; be = true; }
+    else head = lastAux;
+  }
+  if (head < 0) return -1;
+  return j;
+}
+struct Clause { int head = -1; int end = -1; };
+
+void hang(std::vector<nlp::Token>& tk, int k, int head, const char* rel) {
+  tk[(size_t)k].head = head + 1;
+  tk[(size_t)k].deprel = rel;
+}
+
+// the relative clause of "what" at w: SUBJ VG after it; returns the end or -1
+int relative(std::vector<nlp::Token>& tk, int w, bool apply) {
+  int sh = -1, vh = -1;
+  bool verb = false, be = false;
+  const int e1 = subject(tk, w + 1, sh);
+  if (e1 < 0) return -1;
+  const int e2 = verbGroup(tk, e1, vh, verb, be);
+  if (e2 < 0) return -1;
+  if (!apply) return e2;
+  hang(tk, vh, w, "acl");
+  if (be) { tk[(size_t)vh].upos = "VERB"; tk[(size_t)vh].lemma = "be"; }
+  for (int k = w + 1; k < e1; ++k) hang(tk, k, k == sh ? vh : sh, k == sh ? "nsubj" : tk[(size_t)k].upos == "ADJ" ? "amod" : "det");
+  for (int k = e1; k < e2; ++k) {
+    if (k == vh) continue;
+    hang(tk, k, vh, negWord(tk[(size_t)k]) || tk[(size_t)k].upos == "ADV" || tk[(size_t)k].upos == "PART" ? "advmod" : "aux");
+  }
+  return e2;
+}
+
+// one clause at p (see the shapes above); apply = write the tree
+bool clause(std::vector<nlp::Token>& tk, int p, Clause& out, bool apply, bool& anyFr) {
+  const int n = (int)tk.size();
+  if (p >= n) return false;
+  // FR , SUBJ VG  (fronted)   and   FR VG FR
+  if (tk[(size_t)p].lower == "what") {
+    const int e1 = relative(tk, p, false);
+    if (e1 < 0) return false;
+    if (e1 < n && tk[(size_t)e1].text == ",") {
+      int sh = -1, vh = -1;
+      bool verb = false, be = false;
+      const int e2 = subject(tk, e1 + 1, sh);
+      if (e2 < 0) return false;
+      const int e3 = verbGroup(tk, e2, vh, verb, be);
+      if (e3 < 0) return false;
+      anyFr = true;
+      if (apply) {
+        relative(tk, p, true);
+        const int hd = verb ? vh : be ? p : vh;   // "it isn't": what is the predicate; "you keep": object
+        if (hd == p) {
+          hang(tk, sh, p, "nsubj");
+          for (int k = e2; k < e3; ++k)
+            hang(tk, k, p, k == vh ? "cop" : negWord(tk[(size_t)k]) || tk[(size_t)k].upos == "ADV" ? "advmod" : "aux");
+        } else {
+          if (!verb) tk[(size_t)vh].upos = "AUX";   // "it would": an elliptic verb group
+          hang(tk, sh, vh, "nsubj");
+          for (int k = e2; k < e3; ++k)
+            if (k != vh) hang(tk, k, vh, negWord(tk[(size_t)k]) || tk[(size_t)k].upos == "ADV" ? "advmod" : "aux");
+          hang(tk, p, vh, verb ? "obj" : "dep");
+        }
+        hang(tk, e1, hd, "punct");
+        for (int k = e1 + 1; k < e2; ++k)
+          if (k != sh) hang(tk, k, sh, tk[(size_t)k].upos == "ADJ" ? "amod" : "det");
+      }
+      out.head = verb ? vh : be ? p : vh;
+      out.end = e3;
+      return true;
+    }
+    int vh = -1;
+    bool verb = false, be = false;
+    const int e2 = verbGroup(tk, e1, vh, verb, be);
+    if (e2 < 0 || !be || verb || e2 >= n || tk[(size_t)e2].lower != "what") return false;
+    const int e3 = relative(tk, e2, false);
+    if (e3 < 0) return false;
+    anyFr = true;
+    if (apply) {
+      relative(tk, p, true);
+      relative(tk, e2, true);
+      hang(tk, p, e2, "nsubj");
+      for (int k = e1; k < e2; ++k)
+        hang(tk, k, e2, k == vh ? "cop" : negWord(tk[(size_t)k]) || tk[(size_t)k].upos == "ADV" ? "advmod" : "aux");
+    }
+    out.head = e2;
+    out.end = e3;
+    return true;
+  }
+  // SUBJ VG FR
+  int sh = -1, vh = -1;
+  bool verb = false, be = false;
+  const int e1 = subject(tk, p, sh);
+  if (e1 < 0) return false;
+  const int e2 = verbGroup(tk, e1, vh, verb, be);
+  if (e2 < 0 || e2 >= n || tk[(size_t)e2].lower != "what") return false;
+  if (verb && in(tk[(size_t)vh].lemma.empty() ? tk[(size_t)vh].lower : tk[(size_t)vh].lemma,
+                 {"know", "wonder", "ask", "tell", "see", "guess", "understand", "remember", "forget", "learn", "show",
+                  "explain", "decide", "care", "mind", "say", "think", "hear", "find", "notice", "imagine"}))
+    return false;   // an indirect question ("I know what you want")
+  if (!verb && !be) return false;
+  const int e3 = relative(tk, e2, false);
+  if (e3 < 0) return false;
+  anyFr = true;
+  if (apply) {
+    relative(tk, e2, true);
+    const int hd = verb ? vh : e2;
+    hang(tk, sh, hd, "nsubj");
+    for (int k = p; k < e1; ++k)
+      if (k != sh) hang(tk, k, sh, tk[(size_t)k].upos == "ADJ" ? "amod" : "det");
+    for (int k = e1; k < e2; ++k) {
+      if (k == hd) continue;
+      hang(tk, k, hd, (!verb && k == vh) ? "cop" : negWord(tk[(size_t)k]) || tk[(size_t)k].upos == "ADV" ? "advmod" : "aux");
+    }
+    if (verb) hang(tk, e2, vh, "obj");
+  }
+  out.head = verb ? vh : e2;
+  out.end = e3;
+  return true;
+}
+
+bool sentence(std::vector<nlp::Token>& tk, bool apply) {
+  const int n = (int)tk.size();
+  int p = 0;
+  std::vector<int> pre;   // leading and / but, adverbs, commas
+  while (p < n && (tk[(size_t)p].text == "," || (tk[(size_t)p].upos == "CCONJ" && pre.empty()) ||
+                   (tk[(size_t)p].upos == "ADV" && tk[(size_t)p].lower != "what")))
+    pre.push_back(p++);
+  bool anyFr = false;
+  Clause c1;
+  if (!clause(tk, p, c1, apply, anyFr)) return false;
+  int root = c1.head;
+  int q = c1.end;
+  std::vector<std::pair<int, int>> more;   // (connector token, clause head)
+  while (q < n && tk[(size_t)q].upos != "PUNCT") {
+    const nlp::Token& t = tk[(size_t)q];
+    if (!in(t.lower, {"because", "since", "and", "but"})) return false;
+    Clause c2;
+    if (!clause(tk, q + 1, c2, apply, anyFr)) return false;
+    more.emplace_back(q, c2.head);
+    q = c2.end;
+  }
+  std::vector<int> post;
+  while (q < n && tk[(size_t)q].upos == "PUNCT" && tk[(size_t)q].text != ",") post.push_back(q++);
+  if (q != n || !anyFr || post.empty()) return false;
+  if (!apply) return true;
+  tk[(size_t)root].head = 0;
+  tk[(size_t)root].deprel = "root";
+  for (int k : pre)
+    hang(tk, k, root, tk[(size_t)k].text == "," ? "punct" : tk[(size_t)k].upos == "CCONJ" ? "cc" : "advmod");
+  for (const auto& m : more) {
+    const bool sub = in(tk[(size_t)m.first].lower, {"because", "since"});
+    hang(tk, m.second, root, sub ? "advcl" : "conj");
+    hang(tk, m.first, m.second, sub ? "mark" : "cc");
+    if (sub) tk[(size_t)m.first].upos = "SCONJ";
+  }
+  for (int k : post) hang(tk, k, root, "punct");
+  return true;
+}
+}  // namespace fr
 }  // namespace
 
 // ---- names ---------------------------------------------------------------------------------------------------------
@@ -1063,6 +1268,10 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
         np.negative = in(w, {"nobody", "nothing", "none"});
         np.interrogative = in(w, {"who", "what", "which"}) && (c.question || fget(ht, nlp::morph::PronTypeShift) ==
                                                                                  nlp::morph::PtInt);
+        // C24: "what" heading its own relative clause is a free relative ("quod est"), not a question word
+        if (w == "what" && en)
+          for (int k : c.kids[(size_t)h])
+            if (c.ok(k) && c.dep(k) == "acl" && c.t(k).upos == "VERB") np.interrogative = false;
         if (np.interrogative) np.wh = np.pronLemma;
         pron = true;
       }
@@ -3578,7 +3787,8 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
         continue;
       }
       const std::string topDep = s.tokens[(size_t)top].deprel;
-      const bool prefixOk = e.reg == "adv" || e.reg == "narr" ||
+      // C24: a "tail" phrase may also open the sentence ("On a cold afternoon the cat slept.")
+      const bool prefixOk = e.reg == "adv" || e.reg == "narr" || (e.reg == "tail" && m.first == 0) ||
                             ((topDep == "advmod" || topDep == "discourse") &&
                              (e.reg == "answer" || e.reg == "excl" || e.reg == "polite"));
       // C15: register "tail": an adverbial phrase that closes a clause ("in my day", "as soon as you can")
@@ -3589,6 +3799,43 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
         m.reg = e.reg;
         m.note = e.note;
         m.tier = e.tier;
+        // C24: an adverbial phrase that is the predicate of "be" ("He is in trouble.", "The picture is upside down."):
+        // the parser hung the subject and the copula on a word of the phrase; the copula becomes the clause's verb
+        // (subject and copula a clause of their own, the phrase placed before the verb: "In perīculō est.")
+        if (lang_ == SrcLang::En && m.slots.empty() && (e.reg == "tail" || e.reg == "adv") && top >= 0) {
+          int cop = -1;
+          for (int k : c.kids[(size_t)top])
+            if ((k < m.first || k > m.last) && s.tokens[(size_t)k].deprel == "cop") cop = k;
+          if (cop >= 0 && cop < m.first) {
+            const int up = c.par[(size_t)top];
+            std::vector<int> moved;
+            for (int k : c.kids[(size_t)top])
+              if (k != cop && (k < m.first || k > m.last)) moved.push_back(k);
+            c.kids[(size_t)top].erase(std::remove_if(c.kids[(size_t)top].begin(), c.kids[(size_t)top].end(),
+                                                     [&](int k) { return k == cop || std::find(moved.begin(), moved.end(), k) != moved.end(); }),
+                                      c.kids[(size_t)top].end());
+            for (int k : moved) {
+              c.par[(size_t)k] = cop;
+              s.tokens[(size_t)k].head = cop + 1;
+              c.kids[(size_t)cop].push_back(k);
+            }
+            std::sort(c.kids[(size_t)cop].begin(), c.kids[(size_t)cop].end());
+            c.par[(size_t)cop] = up;
+            s.tokens[(size_t)cop].head = up + 1;
+            s.tokens[(size_t)cop].deprel = s.tokens[(size_t)top].deprel;
+            s.tokens[(size_t)cop].upos = "VERB";
+            if (up >= 0) {
+              auto& uk = c.kids[(size_t)up];
+              std::replace(uk.begin(), uk.end(), top, cop);
+            }
+            c.par[(size_t)top] = cop;
+            s.tokens[(size_t)top].head = cop + 1;
+            s.tokens[(size_t)top].deprel = "advmod";
+            c.kids[(size_t)cop].push_back(top);
+            std::sort(c.kids[(size_t)cop].begin(), c.kids[(size_t)cop].end());
+            m.reg = "adv";   // placed before the verb by the engine (an adverbial phrase that closes its clause)
+          }
+        }
         for (int k = m.first; k <= m.last; ++k) c.consumed[(size_t)k] = 1;
         phrases.push_back(std::move(m));
         i = phrases.back().last + 1;
@@ -3746,6 +3993,51 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
 void FrameBuilder::repairTree(SemSentence& s) const {
   std::vector<nlp::Token>& tk = s.tokens;
   const int n = (int)tk.size();
+  // C24: "Cats say it and dogs say it.": a clause complement that opens with its own "and" / "but" / "or" is the
+  // second clause of a coordination (conj), not the content of the first verb
+  if (lang_ == SrcLang::En)
+    for (int k = 0; k < n; ++k) {
+      if (tk[(size_t)k].deprel != "ccomp" || tk[(size_t)k].upos != "VERB") continue;
+      int lm = k;   // leftmost word of the clause's subtree
+      for (int j = 0; j < k; ++j) {
+        int x = j, guard = 0;
+        while (x >= 0 && x != k && guard++ < n) x = tk[(size_t)x].head - 1;
+        if (x == k) { lm = j; break; }
+      }
+      if (lm < k && tk[(size_t)lm].deprel == "cc" && in(tk[(size_t)lm].lower, {"and", "but", "or"}) &&
+          tk[(size_t)k].head - 1 < lm)
+        tk[(size_t)k].deprel = "conj";
+    }
+  // C24: "fell down the stairs", "rolled down the hill": "down" read as the verb's particle while the noun after it
+  // hangs on the verb without a preposition: "down" is that noun's preposition (dē scālīs)
+  if (lang_ == SrcLang::En)
+    for (int k = 0; k + 1 < n; ++k) {
+      nlp::Token& t = tk[(size_t)k];
+      if (t.lower != "down" || t.upos != "ADP" || (t.deprel != "compound" && t.deprel != "compound:prt")) continue;
+      const int h = t.head - 1;
+      if (h < 0 || h >= k) continue;
+      int g = -1;
+      for (int j = k + 1; j < n; ++j) {
+        const std::string& u = tk[(size_t)j].upos;
+        if (u == "DET" || u == "ADJ" || u == "NUM" || (u == "PRON" && tk[(size_t)j].deprel == "nmod:poss")) continue;
+        // an object only after a verb of motion ("Don't fall down the stairs!"); "put down the book" keeps it
+        const bool motion = in(text::lower(tk[(size_t)h].lemma.empty() ? tk[(size_t)h].lower : tk[(size_t)h].lemma),
+                               {"fall", "tumble", "roll", "slide", "slip", "run", "walk", "go", "come", "climb", "hurry",
+                                "jump", "float", "fly", "ride", "sail", "swim", "rush", "crawl", "hop", "skip"});
+        if ((u == "NOUN" || u == "PROPN") && tk[(size_t)j].head == h + 1 &&
+            (tk[(size_t)j].deprel == "obl" || (tk[(size_t)j].deprel == "obj" && motion)))
+          g = j;
+        break;
+      }
+      if (g < 0) continue;
+      tk[(size_t)g].deprel = "obl";
+      bool hasCase = false;
+      for (int j = 0; j < n; ++j)
+        if (tk[(size_t)j].head == g + 1 && tk[(size_t)j].deprel == "case") hasCase = true;
+      if (hasCase) continue;
+      t.head = g + 1;
+      t.deprel = "case";
+    }
   // C19: "Where were you?" (where read as the subject of "you") and "Where have you been?" ("been" hung on "where"
   // as a clause): the wh adverb is the place predicate of "be", the pronoun its subject, as in "Where is the ball?"
   if (lang_ == SrcLang::En && n >= 3) {
@@ -4864,6 +5156,15 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
     clk.lemma = "hour";
     num.head = i + 1;
     num.deprel = "nummod";
+  }
+  // C24: free relatives with "what" get their tree from a small grammar (see fr::sentence)
+  if (lang_ == SrcLang::En && nlp_) {
+    bool q = false;
+    for (const nlp::Token& t : tk) q = q || t.text == "?";
+    if (!(q && !tk.empty() && tk[0].lower == "what") && fr::sentence(tk, false)) {
+      fr::sentence(tk, true);
+      out.doubt("free-relative");
+    }
   }
   buildUnits(out);
 }

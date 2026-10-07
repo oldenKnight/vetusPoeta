@@ -270,8 +270,14 @@ from the beginning	ab initiō	1	tail	"Once more, from the beginning." -> Iterum,
 my	papae	1	excl	"My!" alone as surprise (a possessive never matches: the word must stand alone)
 at first	prīmō	1	adv	"At first the dog was shy." -> Prīmō canis timidus erat.
 late	sērō	1	answer	a bare "late" repeated after "I am late" ("late, late!")
-upside down	pedibus sursum versīs	2	tail	"The bat hangs upside down." -> pedibus sursum versīs (with the feet turned up)
+upside down	capite deorsum	2	tail	C24: "The bat hangs upside down." -> capite deorsum (head downwards); "The cup is upside down." -> Pōculum capite deorsum est.
 of late	nūper	1	adv	"He had of late been ill." -> nūper
 lately	nūper	1	adv	
 i am late for {NP} again	iterum ad {1:acc} sērō veniō	1	state	"I am late for the bus again." -> Iterum ad raedam sērō veniō.
 very much	valdē	1	adv	"She loved it very much." -> valdē (not valdē multum)
+# C24 (acceptance loop 2): time of day and other phrases of children's songs and stories. Our own example sentences.
+in the afternoon	post merīdiem	1	tail	"We play in the afternoon." -> Post merīdiem lūdimus.
+this afternoon	hodiē post merīdiem	1	adv	"Come back this afternoon." -> Hodiē post merīdiem redī.
+every afternoon	cotīdiē post merīdiem	1	adv	"Every afternoon we sleep." -> Cotīdiē post merīdiem dormīmus.
+in|on a|an {ADJ} afternoon	diē {1:abl.m} post merīdiem	1	tail	"On a cold afternoon the cat slept." -> Diē frīgidō post merīdiem fēlēs dormīvit.
+at dawn	prīmā lūce	1	tail	"We leave the town at dawn." -> Oppidum prīmā lūce relinquimus.

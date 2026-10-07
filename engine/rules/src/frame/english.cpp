@@ -166,9 +166,34 @@ bool compoundParts(const lex::Lexicon& lx, const std::string& w, std::string& fi
   return false;
 }
 
+// C24: kinship words and titles are nouns of address even when the lexicon also lists a verb ("to father")
+bool addressWord(const std::string& w) {
+  return isIn(w, {"grandfather", "grandmother", "grandpa", "grandma", "father", "mother", "uncle", "aunt", "brother",
+                  "sister", "son", "daughter", "master", "mistress", "doctor", "captain", "nurse", "cousin", "teacher",
+                  "boy", "girl", "friend", "children", "boys", "girls", "friends"});
+}
+
 bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
   bool changed = false;
   const int n = (int)tk.size();
+  // C24: a capitalised first word before a comma tagged as a verb that the lexicon knows only as a noun
+  // ("Grandfather, are you tired?"): the noun of address
+  if (n >= 3 && tk[0].upos == "VERB" && tk[1].text == "," && !tk[0].text.empty() && tk[0].text[0] >= 'A' &&
+      tk[0].text[0] <= 'Z') {
+    std::vector<lex::Analysis> an;
+    lx.lookup(text::en_key(tk[0].lower), an);
+    bool noun = false, verb = false;
+    for (const lex::Analysis& a : an) {
+      const uint8_t ps = lx.lemma(a.lemma).pos;
+      noun = noun || ps == feat::Noun;
+      verb = verb || ps == feat::Verb;
+    }
+    if (noun && (!verb || addressWord(tk[0].lower))) {
+      tk[0].upos = "NOUN";
+      tk[0].feats = nlp::morph::fromString("Number=Sing");
+      changed = true;
+    }
+  }
   // C19: a cue that starts with a preposition or a coordinator in lower case ("with a loud cry.", "to the little
   // house.", "and the queen's crown,"): the tagger reads the word as an imperative verb. A word of these closed lists
   // at the start (or right after a coordinator) before the start of a noun phrase is a preposition / coordinator.
@@ -378,7 +403,7 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
     }
     if (intj0 && (intj || !verb)) {
       // a real interjection ("Oh,", "Hey,"): unchanged
-    } else if (verb && !name) {
+    } else if (verb && !name && !(noun && addressWord(tk[0].lower))) {   // C24: "Grandfather, ..." is no order
       tk[0].upos = "VERB";
       tk[0].feats = nlp::morph::fromString("VerbForm=Fin|Mood=Imp");
       changed = true;

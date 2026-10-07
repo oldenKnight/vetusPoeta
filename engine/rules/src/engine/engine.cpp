@@ -125,6 +125,10 @@ struct SentOut {
   double minMargin = 1.0;
   bool nonverbal = false, song = false, copied = false;
   std::vector<Alternative> alternatives;   // whole-sentence alternatives
+  // C24: the gender of the person addressed by name or title in this sentence (feat::M / F, 0 = none) and whether the
+  // sentence asks for an answer (a question, an order, or an address alone): the next cue's speaker is then that person
+  uint8_t vocGender = 0;
+  bool invites = false;
 };
 
 void addFlag(std::vector<std::string>& f, const std::string& x) {
@@ -332,7 +336,26 @@ class RulesEngine final : public Engine {
       if (sl != std::string::npos && latin.find('/', sl + 1) == std::string::npos && latin.find('{') == std::string::npos) {
         const std::string right = latin.substr(sl + 1), left = latin.substr(0, sl);
         auto words = [](const std::string& x) { return std::count(x.begin(), x.end(), ' ') + 1; };
-        if (right.find(' ') != std::string::npos && words(left) == words(right)) {
+        // C24: the two sides are parallel word by word (same first letters: "mī amīce/mea amīca"); "valdē
+        // perturbātus/perturbāta sum" alternates one word only (whole sides lost "sum" or "valdē")
+        auto parallel = [&]() {
+          std::vector<std::string> a, b;
+          for (const std::string* side : {&left, &right}) {
+            std::vector<std::string>& v = side == &left ? a : b;
+            size_t i = 0;
+            while (i < side->size()) {
+              size_t j = side->find(' ', i);
+              if (j == std::string::npos) j = side->size();
+              if (j > i) v.push_back(text::latin_key(side->substr(i, j - i)));
+              i = j + 1;
+            }
+          }
+          if (a.size() != b.size()) return false;
+          for (size_t i = 0; i < a.size(); ++i)
+            if (a[i].empty() || b[i].empty() || a[i][0] != b[i][0]) return false;
+          return true;
+        };
+        if (right.find(' ') != std::string::npos && words(left) == words(right) && parallel()) {
           char gg = st.speakerGender;
           if (st.flipSpeakerGender) gg = gg == 'f' ? 'm' : 'f';
           latin = gg == 'f' ? right : latin.substr(0, sl);
@@ -439,7 +462,29 @@ class RulesEngine final : public Engine {
           const uint32_t id = xfer_->select(sl.adj.lemma, feat::Adj, {}, false, false, st, ch);
           co.choices.push_back(ch);
           co.covered.push_back(sl.adj.token);
-          if (id != lex::kNoLemma) {
+          if (id != lex::kNoLemma && !cs.empty()) {
+            // C24: an adjective slot with a case and gender ("{1:abl.m}"): it agrees with a noun written in the row
+            // ("diē {1:abl.m} post merīdiem" -> diē aprīcō post merīdiem)
+            const size_t dot = cs.find('.');
+            realise::LaNP x;
+            x.head = id;
+            x.case_ = curated::parseCase(cs.substr(0, dot));
+            if (!x.case_) x.case_ = feat::Nom;
+            const std::string gs = dot == std::string::npos ? std::string() : cs.substr(dot + 1);
+            x.gender = gs == "f" ? (uint8_t)feat::F : gs == "n" ? (uint8_t)feat::N : (uint8_t)feat::M;
+            realise::LaClause fc;
+            fc.type = realise::ClauseType::Frag;
+            fc.hasObject = true;
+            fc.object = x;
+            realiseClause(fc, opt, piece, pr, flags);
+            if (!piece.tokens.empty()) {
+              std::vector<std::string> tx;
+              for (const auto& t : piece.tokens) tx.push_back(t.text);
+              decapitalise(tx[0]);
+              rewriteTokens(piece, tx);
+              decapitalise(piece.tokens[0].display);
+            }
+          } else if (id != lex::kNoLemma) {
             realise::LaClause fc;
             fc.type = realise::ClauseType::Frag;
             realise::LaAdj a;
@@ -645,6 +690,8 @@ class RulesEngine final : public Engine {
       so.unknown.insert(so.unknown.end(), po.unknown.begin(), po.unknown.end());
       so.missing.insert(so.missing.end(), po.missing.begin(), po.missing.end());
       so.minMargin = std::min(so.minMargin, po.minMargin);
+      if (po.vocGender) so.vocGender = po.vocGender;   // C24
+      so.invites = po.invites;
     }
     addFlag(so.flags, "frame-fallback");
     so.reasons.push_back(Reason{-1, "form", "the sentence was analysed in pieces (parser fallback): check the structure", ""});
@@ -683,6 +730,171 @@ class RulesEngine final : public Engine {
     }
   }
 
+  // C24: the gender of a person addressed: a name of the project glossary or names_la.tsv, a title before it or as
+  // the address itself (Mr., Sir -> M; Mrs., Miss, Madam -> F), else the gender of the Latin noun chosen for it
+  // (puer, avus -> M; puella, avia -> F); neuter or unknown -> 0
+  uint8_t addressGender(const frame::SemNP& np, const SemSentence& s, const transfer::Settings& st,
+                        const transfer::Memory& mem, const Context& ctx) const {
+    if (np.isPronoun) return 0;
+    int first = np.token;
+    for (int t : np.tokens) if (t >= 0 && (first < 0 || t < first)) first = t;
+    // a title before the head, inside the NP ("Mr./DET") or just before it
+    for (int k = np.token - 1; k >= 0 && k >= first - 2; --k) {
+      if ((size_t)k >= s.tokens.size()) break;
+      std::string w = text::lower(s.tokens[(size_t)k].text);
+      if (!w.empty() && w.back() == '.') w.pop_back();
+      if (w == "mr" || w == "mister" || w == "sir") return feat::M;
+      if (w == "mrs" || w == "miss" || w == "ms" || w == "madam" || w == "missus" || w == "lady") return feat::F;
+      if (k < first && w != "." && w != ",") break;
+    }
+    std::string head = np.surface.empty() ? np.head : np.surface;
+    for (const rules::GlossaryEntry& g : ctx.glossary)
+      if (!g.gender.empty() && text::lower(g.name) == text::lower(head))
+        return g.gender[0] == 'f' || g.gender[0] == 'F' ? (uint8_t)feat::F : g.gender[0] == 'm' || g.gender[0] == 'M' ? (uint8_t)feat::M : (uint8_t)0;
+    if (!head.empty()) {
+      std::string cap = head;
+      if (cap[0] >= 'a' && cap[0] <= 'z') cap[0] = (char)(cap[0] - 'a' + 'A');
+      if (const curated::NameEntry* ne = cd_->nameByEnglish(cap))
+        return ne->gender == feat::F ? (uint8_t)feat::F : ne->gender == feat::M ? (uint8_t)feat::M : (uint8_t)0;
+    }
+    if (np.isName) return 0;
+    // a noun of address that says the sex ("Grandfather", "my girl"); "child", "friend", an animal: unknown
+    const std::string h = text::lower(np.head);
+    static const char* const kM[] = {"grandfather", "grandpa", "father", "dad", "daddy", "papa", "uncle", "brother",
+                                     "son", "master", "boy", "sir", "king", "prince", "lord", "gentleman", "man",
+                                     "lad", "mister", "grandson", "nephew", "husband"};
+    static const char* const kF[] = {"grandmother", "grandma", "mother", "mom", "mum", "mommy", "mummy", "mama", "aunt",
+                                     "auntie", "sister", "daughter", "mistress", "girl", "madam", "queen", "princess",
+                                     "lady", "woman", "granddaughter", "niece", "wife"};
+    for (const char* w : kM)
+      if (h == w) return feat::M;
+    for (const char* w : kF)
+      if (h == w) return feat::F;
+    (void)st;
+    (void)mem;
+    return 0;
+  }
+
+  // C24: SentOut::vocGender / invites from the analysed sentence
+  void addressInfo(const SemSentence& s, const transfer::Settings& st, const transfer::Memory& mem, const Context& ctx,
+                   SentOut& so) const {
+    bool imp = false, onlyAddress = !s.units.empty(), anyVoc = false;
+    for (const frame::Unit& u : s.units) {
+      if (u.type == frame::Unit::Phrase) {
+        const std::string pl = text::lower(u.phrase.pattern);
+        const bool leaving = pl.find("bye") != std::string::npos || pl.find("farewell") != std::string::npos ||
+                             pl.find("good night") != std::string::npos;
+        if (u.phrase.reg == "imp") imp = true;
+        if ((u.phrase.reg != "polite" && u.phrase.reg != "greet" && u.phrase.reg != "excl") || leaving) onlyAddress = false;
+        continue;
+      }
+      const frame::SemFrame& f = u.frame;
+      if (u.vocative) {
+        anyVoc = true;
+        if (const uint8_t g = addressGender(f.subject, s, st, mem, ctx)) so.vocGender = g;
+        continue;
+      }
+      if (f.type == frame::Kind::Imp) imp = true;
+      // a name alone ("Alice.", "Mr. Fox.") is a fragment holding the name
+      if (f.type == frame::Kind::Frag && f.hasSubject && !f.subject.isPronoun && !f.hasPred && f.predAdj.empty() &&
+          f.obliques.empty()) {
+        const uint8_t g = addressGender(f.subject, s, st, mem, ctx);
+        if (f.subject.isName || g) {
+          anyVoc = true;
+          if (g) so.vocGender = g;
+          continue;
+        }
+      }
+      for (const frame::SemNP& v : f.vocatives) {
+        anyVoc = true;
+        if (const uint8_t g = addressGender(v, s, st, mem, ctx)) so.vocGender = g;
+      }
+      onlyAddress = false;
+    }
+    so.invites = s.question || imp || (onlyAddress && anyVoc);
+  }
+
+  // C24: spans of quoted sound words: one or two words between straight or curly double quotes, each an English
+  // interjection (or a word english.vpl does not know) that is not a translatable answer word (yes, no, hello ...);
+  // the span (quotes included) is replaced by "it" and spaces
+  void quotedSounds(std::string& t, std::vector<std::pair<size_t, size_t>>& spans) const {
+    auto openAt = [&](size_t i, size_t& len) {
+      if (t[i] == '"') { len = 1; return true; }
+      if (i + 2 < t.size() && (unsigned char)t[i] == 0xE2 && (unsigned char)t[i + 1] == 0x80 &&
+          ((unsigned char)t[i + 2] == 0x9C || (unsigned char)t[i + 2] == 0x9D)) { len = 3; return true; }
+      return false;
+    };
+    for (size_t i = 0; i < t.size(); ++i) {
+      size_t ol = 0;
+      if (!openAt(i, ol)) continue;
+      size_t j = i + ol;
+      size_t cl = 0;
+      size_t e = j;
+      while (e < t.size() && !openAt(e, cl)) ++e;
+      if (e >= t.size()) break;
+      std::string inner = t.substr(j, e - j);
+      while (!inner.empty() && (inner.back() == ',' || inner.back() == '!' || inner.back() == '.' || inner.back() == '?')) inner.pop_back();
+      std::vector<std::string> ws;
+      bool okWords = !inner.empty() && inner.size() <= 24;
+      {
+        size_t a = 0;
+        while (a < inner.size() && okWords) {
+          size_t b = inner.find(' ', a);
+          if (b == std::string::npos) b = inner.size();
+          const std::string w = text::lower(inner.substr(a, b - a));
+          if (!w.empty()) ws.push_back(w);
+          for (char ch : w) okWords = okWords && (std::isalpha((unsigned char)ch) || ch == '-');
+          a = b + 1;
+        }
+      }
+      okWords = okWords && !ws.empty() && ws.size() <= 2;
+      for (const std::string& w : ws) {
+        if (!okWords) break;
+        static const char* const kWords[] = {"yes", "no", "hello", "hi", "goodbye", "bye", "oh", "ah", "please", "thanks",
+                                             "ok", "okay", "sorry", "help", "hooray", "alas", "well", "why", "what"};
+        for (const char* x : kWords) okWords = okWords && w != x;
+        std::vector<lex::Analysis> an;
+        en_->lookup(text::en_key(w), an);
+        bool intj = an.empty();
+        for (const lex::Analysis& a : an) intj = intj || en_->lemma(a.lemma).pos == feat::Intj;
+        okWords = okWords && intj;
+      }
+      if (okWords && e - i >= 2) {
+        const size_t end = e + cl;
+        spans.emplace_back(i, end);
+        for (size_t k = i; k < end; ++k) t[k] = ' ';
+        t[i] = 'i';
+        t[i + 1] = 't';
+      }
+      i = e + cl - 1;
+    }
+  }
+
+  static void stutter(std::string& t) {
+    auto wordAt = [&](size_t a) {
+      size_t b = a;
+      while (b < t.size() && (std::isalpha((unsigned char)t[b]) || t[b] == '\'')) ++b;
+      return b;
+    };
+    for (size_t i = 0; i < t.size(); ++i) {
+      if (!std::isalpha((unsigned char)t[i]) || (i > 0 && (std::isalpha((unsigned char)t[i - 1]) || t[i - 1] == '\''))) continue;
+      const size_t e = wordAt(i);
+      size_t p = e;
+      size_t dots = 0;
+      while (p < t.size() && (t[p] == '.' || t[p] == ' ' || t[p] == ',')) { dots += t[p] == '.'; ++p; }
+      if (p + 2 < t.size() && (unsigned char)t[p] == 0xE2 && (unsigned char)t[p + 1] == 0x80 && (unsigned char)t[p + 2] == 0xA6) {
+        dots = 3;
+        p += 3;
+        while (p < t.size() && t[p] == ' ') ++p;
+      }
+      if (dots < 2 || p >= t.size()) continue;
+      const size_t e2 = wordAt(p);
+      if (e2 - p != e - i || text::lower(t.substr(p, e2 - p)) != text::lower(t.substr(i, e - i))) continue;
+      for (size_t k = e; k < e2; ++k) t[k] = ' ';
+      i = e2;
+    }
+  }
+
   void speech(const std::string& text, const frame::FrameBuilder& fb, const Options& opt, const Context& ctx,
               transfer::Memory& mem, const transfer::Settings& st, SentOut& so, bool alternatives,
               bool allowSplit = true) {
@@ -699,6 +911,13 @@ class RulesEngine final : public Engine {
         parseText[a0] = ' ';
         parseText[b0] = ' ';
       }
+    // C24: a hesitation that repeats a word after an ellipsis ("think nothing of... of falling", "I... I know") is
+    // read once: the ellipsis and the repeated word become spaces (offsets stay)
+    if (st.lang == frame::SrcLang::En) stutter(parseText);
+    // C24: a sound word in quotes ("woof", "meow") is kept as written, in its quotes: the parser reads the pronoun
+    // "it" in its place (spaces keep the offsets) and the Latin word of that pronoun is replaced by the quoted word
+    std::vector<std::pair<size_t, size_t>> soundSpans;
+    if (st.lang == frame::SrcLang::En && en_) quotedSounds(parseText, soundSpans);
     fb.analyse(parseText, s, st.classical);
     swapPhrases(s, st);
     if (allowSplit && frame::FrameBuilder::troubled(s)) {
@@ -732,6 +951,12 @@ class RulesEngine final : public Engine {
         }
       }
       if (frame::FrameBuilder::troubled(s)) s.repairs.emplace_back("no-verb");
+    }
+    if (st.lang == frame::SrcLang::En) {
+      addressInfo(s, st, mem, ctx, so);
+      // C24: a person addressed by a noun of known gender ("Mother, are you tired?") sets the gender of "you" when no
+      // name did (C22 Memory::addresseeGender)
+      if (!mem.addresseeGender && so.vocGender) mem.addresseeGender = so.vocGender;
     }
     mem.sawFirst = false;
     std::vector<int> covered;
@@ -933,12 +1158,13 @@ class RulesEngine final : public Engine {
       UnitText& ph = units[i];
       UnitText& host = units[i - 1];
       if (ph.clause || ph.reg != "adv" || !host.clause || !host.sep.empty() || ph.latin.tokens.empty() ||
-          host.latin.tokens.size() < 2 || ph.first != host.last + 1)
+          host.latin.tokens.empty() || ph.first != host.last + 1)
         continue;
       cue::Latin& h = host.latin;
       size_t k = h.tokens.size();
       while (k > 0 && (h.tokens[k - 1].features.pos == "verb" || text::latin_key(h.tokens[k - 1].text) == "non")) --k;
-      if (k == h.tokens.size() || k == 0) continue;
+      // C24: a clause that is only its verb ("Est" + "in perīculō") takes the phrase first: "In perīculō est."
+      if (k == h.tokens.size() || (k == 0 && h.tokens.size() > 1)) continue;
       cue::Latin head, tail, merged;
       const size_t cut = (size_t)h.tokens[k].start;
       head.text = h.text.substr(0, cut > 0 ? cut - 1 : 0);
@@ -957,6 +1183,14 @@ class RulesEngine final : public Engine {
       rewriteTokens(pl, tx);
       decapitalise(pl.tokens[0].display);
       while (!pl.text.empty() && endsWithAny(pl.text, ",;:")) pl.text.pop_back();
+      if (k == 0 && !tail.tokens.empty() &&
+          !(tail.tokens[0].hasLemma && (la_->lemma(tail.tokens[0].lemmaId).flags & lex::ProperName))) {
+        std::vector<std::string> tt;
+        for (const auto& t : tail.tokens) tt.push_back(t.text);
+        decapitalise(tt[0]);
+        rewriteTokens(tail, tt);
+        decapitalise(tail.tokens[0].display);
+      }
       cue::append(merged, head);
       cue::append(merged, pl);
       cue::append(merged, tail);
@@ -1110,6 +1344,61 @@ class RulesEngine final : public Engine {
       const int ins1 = L.tokens[(size_t)b1].end;
       L.text.insert((size_t)ins1, "]");
       for (size_t k = (size_t)b1 + 1; k < L.tokens.size(); ++k) { L.tokens[k].start += 1; L.tokens[k].end += 1; }
+    }
+    // C24: the quoted sound words back in place of the pronoun read for them
+    // the Latin pronoun tokens (is, ea, id) in order; the n-th "it" of the parsed text is the n-th of them when the
+    // counts agree
+    std::vector<size_t> isTokens;
+    std::vector<size_t> itWords;
+    if (!soundSpans.empty()) {
+      const uint32_t isL = xfer_->latin("is");
+      for (size_t q = 0; q < L.tokens.size(); ++q)
+        if (L.tokens[q].hasLemma && L.tokens[q].lemmaId == isL && isL != lex::kNoLemma) isTokens.push_back(q);
+      for (size_t q = 0; q + 1 < parseText.size(); ++q)
+        if ((parseText[q] == 'i' || parseText[q] == 'I') && parseText[q + 1] == 't' &&
+            (q == 0 || !std::isalpha((unsigned char)parseText[q - 1])) &&
+            (q + 2 >= parseText.size() || !std::isalpha((unsigned char)parseText[q + 2])))
+          itWords.push_back(q);
+    }
+    for (const auto& sp : soundSpans) {
+      const std::string quoted = text.substr(sp.first, sp.second - sp.first);
+      long k = -1;
+      for (size_t q = 0; q < L.tokens.size() && q < so.srcOffset.size(); ++q)
+        if (so.srcOffset[q] >= (int)sp.first && so.srcOffset[q] < (int)sp.second) { k = (long)q; break; }
+      if (k < 0 && isTokens.size() == itWords.size())
+        for (size_t w = 0; w < itWords.size(); ++w)
+          if (itWords[w] == sp.first) k = (long)isTokens[w];
+      if (k >= 0) {
+        std::vector<std::string> tx;
+        for (const auto& t : L.tokens) tx.push_back(t.text);
+        tx[(size_t)k] = quoted;
+        rewriteTokens(L, tx);
+        rules::TokenView& t = L.tokens[(size_t)k];
+        t.display = quoted;
+        t.hasLemma = false;
+        t.lemmaId = 0;
+        t.features = rules::Features{};
+        t.tier = 0;
+        t.emoji.clear();
+        t.unknown = false;
+      } else {
+        // no place found: the quoted word before the final mark
+        std::string fpx;
+        while (!L.text.empty() && endsWithAny(L.text, ".!?")) { fpx.insert(fpx.begin(), L.text.back()); L.text.pop_back(); }
+        cue::Latin one;
+        rules::TokenView t;
+        t.text = t.display = quoted;
+        t.start = 0;
+        t.end = (int)quoted.size();
+        one.text = quoted;
+        one.tokens.push_back(t);
+        cue::append(L, one);
+        so.srcOffset.push_back((int)sp.first);
+        L.text += fpx;
+      }
+      for (size_t i = 0; i < s.tokens.size(); ++i)
+        if (s.tokens[i].start >= (int)sp.first && s.tokens[i].start < (int)sp.second) covered.push_back((int)i);
+      so.reasons.push_back(Reason{-1, "form", "a sound word in quotes is kept as it is written: " + quoted, ""});
     }
     for (const std::string& f : flags) addFlag(so.flags, f);
     // A7: source coverage
@@ -1439,11 +1728,27 @@ class RulesEngine final : public Engine {
     size_t doneCues = 0;   // real cues finished
     bool stopped = false;
     long lastCueSeen = -1;
+    // C24: per cue, the gender of the last person addressed and whether its last sentence asked for an answer
+    std::vector<uint8_t> cueVoc(texts.size(), 0);
+    std::vector<char> cueInv(texts.size(), 0);
+    char turnHint = 0;
+    uint8_t lastSentVoc = 0;
+    bool lastSentInv = false;
     for (size_t si = 0; si < sents.size(); ++si) {
       if (cancelled && cancelled()) { stopped = true; break; }
       const SourceSentence& ss = sents[si];
       // imperative number: a group addressed in the previous cue (imp.number)
       const long firstCue = ss.parts.empty() ? 0 : (long)ss.parts.front().cue;
+      // C24: the speaker of a reply. A cue that answers a cue which addressed someone of known gender by name or title
+      // and asked for an answer (a question, an order, the address alone: "Mr. Fox. Wait!") is spoken by that person;
+      // a dash turn after such a turn in the same cue too. The project's speaker setting stays the default.
+      if (firstCue != lastCueSeen) {
+        turnHint = 0;
+        if (firstCue > 0 && (size_t)firstCue - 1 < cueVoc.size() && cueInv[(size_t)firstCue - 1])
+          turnHint = cueVoc[(size_t)firstCue - 1] == feat::F ? 'f' : cueVoc[(size_t)firstCue - 1] == feat::M ? 'm' : 0;
+      } else if (ss.dash) {
+        turnHint = lastSentInv ? (lastSentVoc == feat::F ? 'f' : lastSentVoc == feat::M ? 'm' : 0) : 0;
+      }
       if (firstCue != lastCueSeen) {
         if (lastCueSeen >= 0) { mem.addresseePlural = mem.sawPlural; mem.sawPlural = false; }
         mem.addresseeGuess = false;
@@ -1511,9 +1816,32 @@ class RulesEngine final : public Engine {
         }
         addFlag(so.flags, "nonverbal");
       } else {
-        speech(ss.text, fb, opt, ctx, mem, st, so, true);
-        retryMissingForms(ss.text, fb, opt, ctx, mem, st, so);
-        if (opt.useModel && cfg_.advisors.chooseSense) askModel(ss.text, fb, opt, ctx, mem, st, so);
+        transfer::Settings sts = st;
+        const bool hinted = turnHint && lang == frame::SrcLang::En && ss.kind == frame::CueKind::Speech;
+        if (hinted) sts.speakerGender = turnHint;
+        speech(ss.text, fb, opt, ctx, mem, sts, so, true);
+        retryMissingForms(ss.text, fb, opt, ctx, mem, sts, so);
+        if (opt.useModel && cfg_.advisors.chooseSense) askModel(ss.text, fb, opt, ctx, mem, sts, so);
+        // C24: the reply's speaker differs from the project setting and the Latin depends on it (a first-person
+        // predicate): Check with the flag speaker-gender; the setting's rendering is offered as the alternative
+        if (hinted && turnHint != st.speakerGender) {
+          transfer::Memory m2 = memBefore_;
+          SentOut other;
+          speech(ss.text, fb, opt, ctx, m2, st, other, false);
+          cue::Latin a = so.latin, b = other.latin;
+          display(a, opt.macrons);
+          display(b, opt.macrons);
+          if (a.text != b.text) {
+            addFlag(so.flags, "speaker-gender");
+            addFlag(so.flags, "speaker-reply");
+            so.reasons.push_back(Reason{-1, "form", std::string("the speaker of this reply is taken to be the person addressed "
+                                                                "in the cue before (") + (turnHint == 'f' ? "feminine" : "masculine") +
+                                                        "): check it", ""});
+            so.alternatives.insert(so.alternatives.begin(), Alternative{b.text, std::string("speaker: ") +
+                                                                       (st.speakerGender == 'f' ? "feminine" : st.speakerGender == 'm' ? "masculine" : "unknown") +
+                                                                       " (project setting)", 0.5});
+          }
+        }
         display(so.latin, opt.macrons);
         if (ss.kind == frame::CueKind::Song) {
           so.song = true;
@@ -1596,6 +1924,18 @@ class RulesEngine final : public Engine {
           for (const Alternative& alt : so.alternatives) a.alternatives.push_back(alt);
         }
         if (mem.addresseeGuess) addFlag(a.flags, "addressee-guess");
+      }
+      if (!ss.parts.empty() && ss.kind == frame::CueKind::Speech) {   // C24
+        const size_t lc = ss.parts.back().cue;
+        if (lc < cueVoc.size()) {
+          if (so.vocGender) cueVoc[lc] = so.vocGender;
+          cueInv[lc] = so.invites;
+        }
+        lastSentVoc = so.vocGender;
+        lastSentInv = so.invites;
+      } else {
+        lastSentVoc = 0;
+        lastSentInv = false;
       }
       // progress: real cues whose last sentence is done
       while (doneCues < cues.size() && lastSentence[off + doneCues] <= (long)si) ++doneCues;
@@ -1752,7 +2092,8 @@ class RulesEngine final : public Engine {
                             "fragment", "contact-relative", "noun-infinitive", "purpose-guess", "light-verb",
                             "phrase-order", "participle-phrase", "ellipsis", "could-not-parse", "editorial",   // C17
                             "derived-word",   // C19
-                            "cue-split", "addressee-gender"})   // C22
+                            "cue-split", "addressee-gender",   // C22
+                            "speaker-reply"})   // C24
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       // a tier 3 word chosen while a tier 1/2 word of the same sense existed (fidelity 1, a correction aside)
       for (const transfer::Choice& c : a.choices)

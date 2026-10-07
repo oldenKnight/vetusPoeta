@@ -2459,9 +2459,9 @@ TEST_CASE("rules-h: unreal conditions and would: imperfect subjunctive throughou
       {"The boys promised to wash the dog and feed the cat.", "Puerī canem lavāre prōmīsērunt et fēlem alere prōmīsērunt."},
       {"Robert agreed to meet the king and give him the ring.", "Rōbertus rēgī occurrere cōnsēnsit et ānulum eī dare cōnsēnsit."},
       {"She wants to sing and dance.", "Canere vult et saltāre vult."},
-      {"I wish it was always summer.", "Optō ut semper aestās esset."},
-      {"She wishes that he would come.", "Optat ut venīret."},
-      {"I wish I could fly.", "Optō ut volāre possem."},
+      {"I wish it was always summer.", "Optō ut semper aestās sit."},   // C24: primary sequence after optō
+      {"She wishes that he would come.", "Optat ut veniat."},
+      {"I wish I could fly.", "Optō ut volāre possim."},
   });
 }
 

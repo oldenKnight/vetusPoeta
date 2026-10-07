@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 
 #include "frame/english.h"
 #include "tables.h"
@@ -198,6 +199,43 @@ LaNP momentNP(const Transfer& t, bool very) {
   return g;
 }
 }  // namespace
+
+// C24: an invented English word made of a preposition and a known noun ("underland" = under + land, "overcloud"):
+// the Latin preposition, the noun and its case; the choices are recorded and the flag derived-word (Check) is set.
+// False when no such reading exists.
+bool inventedPrep(const Transfer& t, const std::string& low, const Settings& st, const std::vector<std::string>& context,
+                  int token, ClauseOut& out, uint32_t& prep, uint32_t& noun, uint8_t& cs) {
+  if (st.lang != frame::SrcLang::En) return false;
+  struct Pre { const char* en; const char* la; uint8_t cs; };
+  static const Pre kPre[] = {{"under", "sub", Abl}, {"over", "super", Acc}, {"beyond", "ultrā", Acc},
+                             {"behind", "post", Acc}, {"inside", "intrā", Acc}, {"outside", "extrā", Acc}};
+  for (const Pre& p : kPre) {
+    const size_t pl = std::strlen(p.en);
+    if (low.size() < pl + 3 || low.compare(0, pl, p.en) != 0) continue;
+    const std::string rest = low.substr(pl);
+    Choice c2;
+    c2.token = token;
+    const uint32_t nid = t.select(rest, Noun, context, false, false, st, c2);
+    const uint32_t pid = t.latin(p.la, Prep);
+    if (nid == kNone || pid == kNone) continue;
+    c2.source = low;
+    c2.note = std::string("invented word read as \"") + p.en + " " + rest + "\"";
+    c2.kind = "table";
+    out.choices.push_back(c2);
+    Choice c3;
+    c3.token = token;
+    c3.source = p.en;
+    c3.lemma = pid;
+    c3.kind = "table";
+    out.choices.push_back(c3);
+    out.flags.push_back("derived-word");
+    prep = pid;
+    noun = nid;
+    cs = p.cs;
+    return true;
+  }
+  return false;
+}
 
 // ---- context ------------------------------------------------------------------------------------------------------
 struct Transfer::Ctx {
@@ -1646,6 +1684,20 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
         }
       }
     }
+    // C24: an invented word made of a preposition and a known noun ("underland", "overcloud"): the nearest reading,
+    // the preposition with that noun ("sub terrā", "super nūbem"), written as fixed words and marked derived (Check)
+    if (id == kNone && c.st.lang == frame::SrcLang::En && n.determiner.empty() && n.adjectives.empty()) {
+      uint32_t prep = kNone, noun = kNone;
+      uint8_t cs = 0;
+      const std::string low = text::lower(n.surface.empty() ? n.head : n.surface);
+      std::string form;
+      if (inventedPrep(*this, low, c.st, c.context, n.token, c.out, prep, noun, cs) &&
+          morph::generate(la_, noun, morph::nounForm(cs, Sg), form, true)) {
+        o.fixed = morph::displayForm(la_.lemma(prep).head, true) + " " + form;
+        c.cover(n.token);
+        return;
+      }
+    }
     c.out.choices.push_back(ch);
     if (id == kNone) {
       if (!n.head.empty() || n.numeral.empty()) {
@@ -1928,6 +1980,49 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
   // "of" attributes (one genitive)
   for (const SemNP& g : n.genitive) {
     LaNP x;
+    // C24: an -ing word before its noun read as a noun compound ("a babbling brook", "a roaring lion"): the present
+    // participle of its verb (rīvus murmurāns, leō rugiēns) when English has no noun of that form or Latin only a rare
+    // one (stultiloquium); "a dining room" with a common Latin noun stays a genitive
+    if (c.st.lang == frame::SrcLang::En && c.st.srcLex && g.token >= 0 && g.token < n.token &&
+        (size_t)g.token < c.s.tokens.size() && g.adjectives.empty() && g.possessor.empty() && g.genitive.empty() &&
+        g.determiner.empty() && !g.isName && !g.isPronoun && g.relative.empty()) {
+      const std::string low = c.s.tokens[(size_t)g.token].lower;
+      if (low.size() > 5 && low.compare(low.size() - 3, 3, "ing") == 0) {
+        std::vector<lex::Analysis> an;
+        c.st.srcLex->lookup(text::en_key(low), an);
+        std::string verb;
+        bool noun = false;
+        for (const lex::Analysis& z : an) {
+          const lex::Lemma zl = c.st.srcLex->lemma(z.lemma);
+          if (zl.pos == Noun) noun = true;
+          if (zl.pos == Verb && verb.empty()) verb = text::lower(std::string(zl.head));
+        }
+        bool participle = !verb.empty() && !noun;
+        if (!verb.empty() && noun) {
+          Choice probe;
+          probe.token = g.token;
+          const uint32_t nid = select(g.head, Noun, c.context, false, false, c.st, probe);
+          participle = nid == kNone || cd_.effectiveTier(la_.lemma(nid).key, la_.lemma(nid).pos, la_.lemma(nid).tier) >= 3;
+        }
+        if (participle) {
+          frame::SemAdj a;
+          a.lemma = verb;
+          a.token = g.token;
+          a.participle = 2;
+          Choice ch;
+          LaAdj la;
+          la.lemma = adjectiveInto(a, c, la, ch);
+          if (la.lemma != kNone) {
+            ch.note += "; an -ing word before its noun";
+            c.out.choices.push_back(ch);
+            c.cover(g.tokens);
+            c.cover(g.token);
+            o.adjectives.push_back(la);
+            continue;
+          }
+        }
+      }
+    }
     // C22: "history" as an attribute ("a history lesson", "the history book") -> rērum gestārum (the teacher's choice)
     if (c.st.lang == frame::SrcLang::En && text::lower(g.head) == "history" && g.adjectives.empty() && g.possessor.empty()) {
       c.cover(g.tokens);
@@ -2606,11 +2701,12 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     ch.note = "verb of the previous clause";
     c.out.choices.push_back(ch);
   } else if (ph && sp.complementVerb.empty() &&
-             (verb = latin([&] {   // C15: "arceō|absum": with an object the first verb, without one the second
-                       const size_t bar = ph->latin.find('|');
-                       if (bar == std::string::npos) return ph->latin;
-                       return hasObj ? ph->latin.substr(0, bar) : ph->latin.substr(bar + 1);
-                     }().c_str(), Verb)) != kNone) {
+             (verb = [&] {   // C15: "arceō|absum": with an object the first verb, without one the second
+                const size_t bar = ph->latin.find('|');
+                const std::string w = bar == std::string::npos ? ph->latin
+                                      : hasObj ? ph->latin.substr(0, bar) : ph->latin.substr(bar + 1);
+                return w == "-" || w.empty() ? kNone : latin(w.c_str(), Verb);   // C24: "-" = the verb's own word
+              }()) != kNone) {
     Choice ch;
     ch.token = sp.token;
     ch.source = sp.particle.empty() ? sp.lemma : sp.lemma + " " + sp.particle;
@@ -3660,6 +3756,26 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
       ch.kind = "table";
       ch.note = "elliptical indirect question";
       c.out.choices.push_back(ch);
+      // C24: "I wonder where." / "I don't know where." (a place, no motion): the indirect question with its verb
+      // understood, "ubi sit" (subjunctive of sum by the sequence of tenses): "Mīror ubi sit."
+      const uint32_t sumL = latin("sum", Verb);
+      if (std::string(w) == "ubi" && sumL != kNone && c.st.lang == frame::SrcLang::En) {
+        realise::LaSub sb;
+        sb.rel = realise::SubRel::IndirectQ;
+        LaClause q;
+        q.type = realise::ClauseType::Wh;
+        q.wh.lemma = la.lemma;
+        q.wh.role = realise::Role::Oblique;
+        q.pred.lemma = sumL;
+        q.pred.mood = Subjunctive;
+        const bool past = f.pred.tense == frame::Tense::Past;
+        q.pred.tense = past ? (uint8_t)Imperfect : (uint8_t)Present;
+        q.pred.person = 3;
+        q.pred.number = Sg;
+        sb.clause.push_back(q);
+        cl.subs.push_back(sb);
+        continue;
+      }
       cl.adverbs.push_back(la);
       continue;
     }
@@ -3737,6 +3853,25 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
           ch.kind = "table";
           c.out.choices.push_back(ch);
         }
+        continue;
+      }
+    }
+    // C24: an invented adverb made of a preposition and a noun ("They flew overcloud.") -> super nūbem
+    if (c.st.lang == frame::SrcLang::En && c.st.srcLex && a.token >= 0 && (size_t)a.token < c.s.tokens.size()) {
+      std::vector<lex::Analysis> an;
+      const std::string low = c.s.tokens[(size_t)a.token].lower;
+      c.st.srcLex->lookup(text::en_key(low), an);
+      uint32_t prep = kNone, noun = kNone;
+      uint8_t cs = 0;
+      if (an.empty() && inventedPrep(*this, low, c.st, c.context, a.token, c.out, prep, noun, cs)) {
+        LaOblique o;
+        o.prep = prep;
+        o.case_ = cs;
+        o.np.head = noun;
+        o.np.case_ = cs;
+        o.front = a.front;
+        cl.obliques.push_back(o);
+        c.cover(a.token);
         continue;
       }
     }
@@ -4040,9 +4175,11 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
           ls.rel = realise::SubRel::Purpose;
           ls.conj = latin("ut", Conj);
           sc.pred.mood = Subjunctive;
-          const bool unreal = sf.pred.tense == frame::Tense::Past || sf.pred.mood == frame::SrcMood::Conditional ||
-                              sf.pred.pastModal || sf.pred.modality == Modality::Will;
-          sc.pred.tense = unreal ? (uint8_t)Imperfect : (uint8_t)Present;
+          // C24: the sequence of tenses follows the verb of wishing: present optō -> present subjunctive ("Optō ut
+          // volāre possim", "optō ut ita sit"), a past one (optābam, optāvī) -> imperfect ("Optābat ut venīret")
+          const bool mainPast = cl.pred.tense == Perfect || cl.pred.tense == Imperfect || cl.pred.tense == Pluperfect ||
+                                f.pred.tense == frame::Tense::Past;
+          sc.pred.tense = mainPast ? (uint8_t)Imperfect : (uint8_t)Present;
           break;
         }
         // C15: "so tired that they cannot walk" -> tam fessī ut ambulāre nōn possint (result: ut + subjunctive)
