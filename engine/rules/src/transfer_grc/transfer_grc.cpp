@@ -743,7 +743,14 @@ void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
     uint32_t id = kNone;
     const LexRow* realia = gt_.find("realia", low);
     if (!realia) { const std::string en = english(n.head, c.st); if (!en.empty()) realia = gt_.find("realia", en); }
-    if (low == "hour" && n.ordinal) { id = greek("ὥρα", Noun); c.table(id, n.head, n.token); }
+    // C21 (lexical_en_grc.tsv kind noun): a fixed noun, used only when greek.vpl has the lemma (else the realia row)
+    const LexRow* fixedNoun = gt_.find("noun", low);
+    if (fixedNoun && lexRowLemma(fixedNoun, Noun) == kNone) fixedNoun = nullptr;
+    if (fixedNoun) {
+      id = lexRowLemma(fixedNoun, Noun);
+      c.table(id, n.head, n.token, "lexical_en_grc.tsv: noun");
+    }
+    else if (low == "hour" && n.ordinal) { id = greek("ὥρα", Noun); c.table(id, n.head, n.token); }
     else if ((low == "man" || low == "woman") && n.adjectives.size() == 1 && text::lower(n.adjectives[0].lemma) == "old" &&
              n.adjectives[0].adverbs.empty() && (id = greek(low == "man" ? "γέρων" : "γραῦς", Noun)) != kNone) {
       // C18: "old man" -> γέρων, "old woman" -> γραῦς (one Greek noun)
@@ -865,6 +872,34 @@ void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
   else if (d == "few") { quantAdj("ὀλίγος", d); o.number = Pl; }
   else if (d == "much") quantAdj("πολύς", d);
   else if (d == "another" || d == "other") quantAdj("ἄλλος", d);
+  // C21: "such a big dog" -> οὕτω μέγαν κύνα (the degree word goes with the adjective, below); "such a dog" ->
+  // τοιοῦτον κύνα; Spanish "tal" / "semejante" the same. The degree word is never dropped silently.
+  bool suchAdj = false;
+  // the frame builder sometimes leaves "such" out of the NP or makes it a genitive ("dogs of such"): found by its token
+  int suchTok = -1;
+  {
+    int first = n.token;
+    for (int t : n.tokens) if (t >= 0 && (first < 0 || t < first)) first = t;
+    for (const frame::SemAdj& a : n.adjectives) if (a.token >= 0 && (first < 0 || a.token < first)) first = a.token;
+    if (first > 0 && (size_t)first <= c.s.tokens.size() && c.s.tokens[(size_t)first - 1].lower == "such") suchTok = first - 1;
+    for (const SemNP& g : n.genitive)
+      if (text::lower(g.head) == "such") suchTok = g.token >= 0 ? g.token : suchTok >= 0 ? suchTok : -2;
+  }
+  if (d == "such" || d == "tal" || d == "semejante" || suchTok != -1) {
+    int dt = suchTok >= 0 ? suchTok : -1;
+    for (int t : n.tokens)
+      if (t >= 0 && (size_t)t < c.s.tokens.size() && in(c.s.tokens[(size_t)t].lower, {"such", "tal", "semejante"})) dt = t;
+    bool adjOk = false;
+    for (const frame::SemAdj& a : n.adjectives) adjOk = adjOk || (!a.lemma.empty() && a.adverbs.empty());
+    if (adjOk && !substAdj) {
+      suchAdj = true;
+    } else {
+      const size_t before = o.adjectives.size();
+      quantAdj("τοιοῦτος", d);
+      if (o.adjectives.size() > before) c.cover(dt);
+    }
+    if (suchAdj) c.cover(dt);
+  }
   if (o.dem != Demonstrative::None) o.definite = true;
   if (n.interrogative) {
     if (n.wh == "how many" || n.wh == "how much") o.interrogative = greek("πόσος", Adj);
@@ -926,6 +961,12 @@ void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
       const uint32_t av = adverb(a.adverbs[i], i < a.advTokens.size() ? a.advTokens[i] : -1, c, false);
       if (av != kNone) ga.adverbs.push_back(av);
     }
+    // C21: "such a big X" -> οὕτω(ς) on the first adjective (sandhi: οὕτω before a consonant)
+    if (suchAdj && ga.adverbs.empty()) {
+      const uint32_t so = greek("οὕτως", Adv) != kNone ? greek("οὕτως", Adv) : greek("οὕτως");
+      if (so != kNone) { ga.adverbs.push_back(so); c.table(so, "such", n.token, "\"such\" + adjective"); }
+      suchAdj = false;
+    }
     o.adjectives.push_back(ga);
   }
   // numerals
@@ -946,6 +987,7 @@ void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
   }
   // "of" attributes: a genitive with its own article when definite
   for (const SemNP& g : n.genitive) {
+    if (text::lower(g.head) == "such") continue;   // C21: "such" read as a genitive (handled above)
     GrcNP x;
     npInto(g, c, x);
     o.genitive.push_back(x);
@@ -1156,7 +1198,10 @@ void GreekTransfer::obliqueInto(const frame::SemOblique& ob, Ctx& c, GrcClause& 
   if (prep == "of" || prep == "about") { add("περί", Gen); return; }
   if (prep == "by") {
     if (c.frame && c.frame->pred.voice == frame::Voice::Passive && person) { add("ὑπό", Gen); return; }
-    if (!person) { add(nullptr, Dat); return; }
+    // C21: "by the fire / river / door" (a definite thing, an active verb) is a place: παρά + dative ("παρὰ τῷ πυρί");
+    // without the article it is the means ("by ship" -> dative)
+    const bool passive = c.frame && c.frame->pred.voice == frame::Voice::Passive;
+    if (!person && (passive || !n.definite || n.isPronoun)) { add(nullptr, Dat); return; }
     add("παρά", Dat);
     return;
   }
@@ -1247,7 +1292,7 @@ void GreekTransfer::predicateInto(const SemFrame& f, Ctx& c, GrcClause& cl) cons
         if (const LexRow* r = row("verb", s, "intr")) return r;
       if (const LexRow* r = row("verb", s, want)) return r;
       for (const LexRow& r : gt_.rows())
-        if (r.kind == "verb" && r.source == s && (r.frame.empty())) return &r;
+        if (r.kind == "verb" && r.source == s && (r.frame.empty() || r.frame == "impers")) return &r;
     }
     return nullptr;
   };
@@ -1286,6 +1331,8 @@ void GreekTransfer::predicateInto(const SemFrame& f, Ctx& c, GrcClause& cl) cons
       break;
     }
   }
+  bool midPresent = false;   // C21: subject row frame "mid-pres" (set below, applied once the tense is known)
+  bool rowVoice = false;     // C21: the subject row fixed the voice
   const bool seParticle = sp.particle == "se";   // Spanish pronominal verb ("irse", "inclinarse"): the Greek middle
   const LexRow* ph = nullptr;
   if (seParticle) ph = row("verb", lemma + "se");
@@ -1313,7 +1360,13 @@ void GreekTransfer::predicateInto(const SemFrame& f, Ctx& c, GrcClause& cl) cons
     // C18 (lexical_en_grc.tsv kind subject): the verb chosen by its subject ("the sun rose" -> ἀνέτειλεν)
     verb = lexRowLemma(sv, Verb);
     if (verb == kNone) verb = choose(lemma, sp.token, hasObj, personObj);
-    else c.table(verb, f.subject.head + " " + sp.lemma, sp.token, "lexical_en_grc.tsv: subject");
+    else {
+      c.table(verb, f.subject.head + " " + sp.lemma, sp.token, "lexical_en_grc.tsv: subject");
+      // C21: the voice of the row: "mid" = middle ("the rain stopped" -> ἐπαύσατο), "mid-pres" = middle in the
+      // present system only ("the sun is setting" -> δύεται; "the sun set" -> ἔδυ, the intransitive root aorist)
+      if (sv->frame == "mid") { cl.pred.voice = Middle; rowVoice = true; }
+      else if (sv->frame == "mid-pres") { midPresent = true; rowVoice = true; }
+    }
   } else if (vpr && vpr->greek != "-" && (verb = lexRowLemma(vpr, Verb)) != kNone) {
     c.table(verb, sp.lemma, sp.token, "verb with its preposition");
   } else if ((lemma == "have" || en == "have") && f.type == Kind::Imp && sp.complementVerb.empty()) {
@@ -1377,7 +1430,9 @@ void GreekTransfer::predicateInto(const SemFrame& f, Ctx& c, GrcClause& cl) cons
   } else if (sp.pastModal) {
     tense = Imperfect;
   }
-  if (sp.voice == frame::Voice::Passive) {
+  // C21: a subject row with its own voice ("mid", "mid-pres") decides: a Spanish "se" read as a passive is not one
+  // ("el sol se pone" -> δύεται, not the perfect δέδυκεν)
+  if (sp.voice == frame::Voice::Passive && !rowVoice) {
     p.voice = Passive;
     bool agent = false;
     for (const frame::SemOblique& o : f.obliques) agent = agent || o.prep == "by";
@@ -1389,6 +1444,11 @@ void GreekTransfer::predicateInto(const SemFrame& f, Ctx& c, GrcClause& cl) cons
           if (r.kind == "perfect" && text::greek_key(r.greek) == mk) { p.voice = 0; break; }
     }
   }
+  // C21: a Spanish imperfect ("soplaba", "cantaba") is a Greek imperfect (the frame keeps only "past")
+  if (tense == Aorist && c.st.lang == frame::SrcLang::Es && sp.auxTokens.empty() && sp.token >= 0 &&
+      (size_t)sp.token < c.s.tokens.size() &&
+      ((c.s.tokens[(size_t)sp.token].feats >> nlp::morph::TenseShift) & 7u) == nlp::morph::TenseImp)
+    tense = Imperfect;
   if (sp.deliberative) { tense = Aorist; p.mood = Subjunctive; }   // "τί ποιήσω;"
   // "would": no optative (style 1.2); C16: a counterfactual main clause takes ἄν + imperfect (present time) or aorist
   // (past time: "would have"): "οὐκ ἂν ἐνθάδε ἦσθα"
@@ -1423,6 +1483,8 @@ void GreekTransfer::predicateInto(const SemFrame& f, Ctx& c, GrcClause& cl) cons
     }
   }
   p.tense = tense;
+  if (midPresent)   // also over a Spanish "se" read as a passive ("el sol se puso" -> ἔδυ, not ἐδύθη)
+    p.voice = tense == Present || tense == Imperfect || tense == Future ? (uint8_t)Middle : (uint8_t)0;
   if (p.modal != kNone) {
     p.infTense = durative(sp.complementVerb.empty() ? sp.lemma : sp.complementVerb, p.lemma, c.st) ? (uint8_t)Present
                                                                                                      : (uint8_t)Aorist;
@@ -1491,6 +1553,26 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
     if (f.subject.determiner == "all" && f.subject.isPronoun) {
       cl.pred.person = f.subject.pron.person ? f.subject.pron.person : 3;
       cl.pred.number = Pl;
+    }
+    // C21: Spanish pro-drop: the person and number of the implicit subject are the verb's own ("¿Por qué no viniste
+    // ayer?" came as a 3rd singular): read from the verb token's features when they say 1st or 2nd person
+    if (f.implicitSubject && cl.subject.isPronoun && c.st.lang == frame::SrcLang::Es && f.pred.token >= 0 &&
+        (size_t)f.pred.token < c.s.tokens.size()) {
+      const uint32_t ft = c.s.tokens[(size_t)f.pred.token].feats;
+      uint32_t pe = (ft >> nlp::morph::PersonShift) & 3u, nu = (ft >> nlp::morph::NumberShift) & 3u;
+      // the preterite 2nd person in -ste / -steis is unambiguous (viniste, cantaste, comisteis); the tagger's
+      // features sometimes say 3rd
+      const std::string& vw = c.s.tokens[(size_t)f.pred.token].lower;
+      auto endsW = [&](const char* e) { const size_t n = std::strlen(e); return vw.size() > n + 2 && vw.compare(vw.size() - n, n, e) == 0; };
+      if (endsW("ste")) { pe = nlp::morph::Pers2; nu = nlp::morph::NumSing; }
+      else if (endsW("steis")) { pe = nlp::morph::Pers2; nu = nlp::morph::NumPlur; }
+      if ((pe == nlp::morph::Pers1 || pe == nlp::morph::Pers2) && cl.subject.pron.person == 3 && nu) {
+        cl.subject.pron.person = (uint8_t)pe;
+        cl.subject.pron.number = nu == nlp::morph::NumPlur ? (uint8_t)Pl : (uint8_t)Sg;
+        cl.subject.number = cl.subject.pron.number;
+        c.subjPerson = (uint8_t)pe;
+        c.subjNumber = nu == nlp::morph::NumPlur ? 2 : 1;
+      }
     }
     // a 3rd-person subject taken from the verb (Spanish pro-drop: "Es muy pequeño") stands for the last noun: its
     // Greek gender, not the Spanish adjective's (el gato -> ἡ γαλῆ)
@@ -1777,10 +1859,14 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
     }
     // C18: a two-word adverb group the frame keeps as one lemma ("so fast" -> οὕτω ταχέως)
     if (a.lemma.find(' ') != std::string::npos && !adverbTable(a.lemma, false)) {
-      for (const std::string& w : words(text::lower(a.lemma))) {
+      const std::vector<std::string> gw = words(text::lower(a.lemma));
+      for (const std::string& w : gw) {
         const uint32_t wid = adverb(w, a.token, c, c.motion);
         if (wid != kNone) cl.adverbs.push_back(GrcAdverb{wid, a.front ? AdvPos::Front : AdvPos::Auto});
       }
+      // C21: the group's other words are rendered too ("so fast": the token of "so" is accounted for)
+      for (size_t k = 1; k < gw.size() && a.token - (int)k >= 0; ++k)
+        if (tokenLower(c.s, a.token - (int)k) == gw[gw.size() - 1 - k]) c.cover(a.token - (int)k);
       continue;
     }
     const uint32_t id = adverb(a.lemma, a.token, c, c.motion);
@@ -2149,6 +2235,67 @@ namespace {
 // "API changes", as a wish for frame/): a sentence-initial "When X, Y." that is not a question comes as a wh question
 // "when" with Y coordinated; "Singing a song, the girl walked ..." comes as an imperative "sing" with the real clause
 // as a time clause after it. Both become the main clause Y with X as a time clause before it.
+// C21: three readings of a nature / weather clause that the frame builder gets wrong, recognised through the
+// lexical_en_grc.tsv rows (kind subject, verb rows with frame "impers"), so they hold only for the verbs listed there:
+// (1) "The sun set." built as a fragment NP "set (of the sun)": the subject row "sun set" makes it a clause, past for
+// the bare form after a singular subject ("set"), present for "sets"; (2) Spanish "Nieva." read as the imperative
+// (nieva = 3 sg / 2 sg imperative): an impersonal weather verb is a statement; (3) Spanish "Soplaba un viento frío."
+// (the subject after the verb read as the object, the subject implicit): the object is the subject when the subject
+// row "viento soplar" exists. True when `out` holds a rebuilt frame.
+bool repairNature(const SemFrame& f, const SemSentence& s, const GreekTables& gt, SemFrame& out) {
+  auto subjRow = [&](const std::string& subj, const std::string& verb) {
+    return gt.find("subject", text::lower(subj) + " " + text::lower(verb)) != nullptr;
+  };
+  if (f.type == Kind::Frag && !f.hasPred && f.hasSubject && !f.subject.isPronoun && f.subject.genitive.size() == 1 &&
+      f.subject.possessor.empty() && f.subject.adjectives.empty() && f.subordinate.empty() &&
+      f.subject.token >= 0 && (size_t)f.subject.token < s.tokens.size()) {
+    const SemNP& g = f.subject.genitive[0];
+    const std::string w = s.tokens[(size_t)f.subject.token].lower;
+    std::string verb = text::lower(f.subject.head);
+    // the head written after its "genitive" (no "of" between: "The sun set."), at the end of the sentence
+    bool after = g.token >= 0 && g.token < f.subject.token;
+    for (int t = g.token + 1; after && t < f.subject.token; ++t)
+      if (t >= 0 && (size_t)t < s.tokens.size() && s.tokens[(size_t)t].upos != "PUNCT") after = false;
+    if (after && !g.isPronoun && subjRow(g.head, verb)) {
+      out = SemFrame{};
+      out.type = Kind::Decl;
+      out.hasPred = true;
+      out.pred.lemma = verb;
+      out.pred.token = f.subject.token;
+      out.pred.tense = w == verb && g.number == 1 ? frame::Tense::Past : frame::Tense::Present;
+      out.hasSubject = true;
+      out.subject = g;
+      out.subject.definite = g.definite || f.subject.definite;   // "The sun set.": the article went with "set"
+      if (out.subject.determiner.empty()) out.subject.determiner = f.subject.determiner;
+      out.connectors = f.connectors;
+      out.adverbs = f.adverbs;
+      out.punct = f.punct;
+      return true;
+    }
+  }
+  auto impersonal = [&](const std::string& lemma) {
+    return gt.find("verb", text::lower(lemma), "impers") != nullptr;
+  };
+  if (f.type == Kind::Imp && f.hasPred && !f.hasSubject && !f.hasObject && f.vocatives.empty() && !f.negative &&
+      impersonal(f.pred.lemma)) {
+    out = f;
+    out.type = Kind::Decl;
+    out.implicitSubject = true;
+    return true;
+  }
+  if ((f.type == Kind::Decl || f.type == Kind::Wh) && f.hasPred && f.hasObject && !f.object.isPronoun &&
+      (!f.hasSubject || (f.implicitSubject && f.subject.isPronoun)) && subjRow(f.object.head, f.pred.lemma)) {
+    out = f;
+    out.hasSubject = true;
+    out.subject = f.object;
+    out.implicitSubject = false;
+    out.hasObject = false;
+    out.object = SemNP{};
+    return true;
+  }
+  return false;
+}
+
 bool repairFrontedTime(const SemFrame& f, const SemSentence& s, SemFrame& out) {
   // "Where is his dog?" left as a fragment "dog (his) + where" without its verb: the wh question with "be" (existential
   // order: ποῦ ἐστιν ὁ κύων αὐτοῦ;)
@@ -2267,13 +2414,17 @@ void GreekTransfer::clause(const SemFrame& f0, const SemSentence& s, const trans
   out.clear();
   SemFrame repaired;
   const bool rep = !subordinate && repairFrontedTime(f0, s, repaired);
-  const SemFrame& f = rep ? repaired : f0;
+  SemFrame natural;
+  const bool nat = !subordinate && repairNature(rep ? repaired : f0, s, gt_, natural);   // C21
+  const SemFrame& f = nat ? natural : rep ? repaired : f0;
   Ctx c(s, st, mem, out);
   c.depth = subordinate ? 1 : 0;
   if (rep) {   // the "when" of a repaired fronted time clause; a rebuilt structure is never OK
     c.cover(f0.wh.token);
     out.flags.push_back("clause-repair");
   }
+  if (nat && std::find(out.flags.begin(), out.flags.end(), "clause-repair") == out.flags.end())
+    out.flags.push_back("clause-repair");   // C21: a rebuilt weather / nature clause is never OK
   clauseInto(f, c, out.clause);
   // C16: a clause that starts with "if" and has no main clause ("Only if you believe it is.") is the condition
   // alone; "only if" = "not unless": εἰ μή ("εἰ μὴ πιστεύεις ὅτι ἔστιν")

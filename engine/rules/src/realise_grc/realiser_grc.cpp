@@ -102,6 +102,9 @@ GreekRealiser::GreekRealiser(const lex::Lexicon& lx, const curated::CuratedData&
   firstKeys_ = gd.conditionSet("order.conn.first");
   timeAdv_ = gd.orderingList("order.adv", "time adverbs");
   beforeNoun_ = gd.orderingList("order.adj", "before it");
+  negOut_ = gd.orderingList("neg.verb", "place adverbs");
+  if (negOut_.empty())
+    for (const char* k : {"χθέσ", "σήμερον", "αὔριον", "νῦν", "τότε", "ἐνθάδε", "ἐκεῖ", "οἴκοι", "οἴκαδε"}) negOut_.push_back(k);
   if (secondKeys_.empty()) secondKeys_ = {"δέ", "γάρ", "οὖν", "μέν", "γε", "δή", "τοίνυν", "δήπου", "τε"};
   if (timeAdv_.empty()) timeAdv_ = {"νῦν", "ἤδη", "ἀεί", "τότε", "ἔπειτα"};
   for (const char* k : {"οὐδείσ", "μηδείσ", "οὐδέν", "μηδέν", "οὐδέποτε", "μηδέποτε", "οὐδαμῶσ", "οὐκέτι", "μηκέτι",
@@ -172,6 +175,16 @@ void GreekRealiser::literal(uint32_t lemma, const char* fallback, GWord& w, cons
   const lex::Lemma l = lx_.lemma(lemma);
   if (lemma != kNone && l.id != kNone) {
     w.form = display(l.head);
+    // C21: the Attic spelling of an indeclinable word whose headword is the Ionic / common one, used only when the
+    // lexicon attests it for this lemma (πρωΐ -> πρῴ "early")
+    static const char* const kAttic[][2] = {{"πρωΐ", "πρῴ"}};
+    for (const auto& a : kAttic)
+      if (text::greek_bare(l.head) == text::greek_bare(a[0])) {
+        std::vector<lex::Analysis> an;
+        lx_.lookup(text::greek_key(a[1]), an);
+        for (const lex::Analysis& x : an)
+          if (x.lemma == lemma) { w.form = text::nfc(a[1]); break; }
+      }
     w.lemma = lemma;
     Features f; f.pos = l.pos;
     w.packed = pack(f);
@@ -702,6 +715,19 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
     else literal(k_.ou, "οὐ", w, yesBias ? "order.yn.ou" : "neg.ou");
     w.proclitic = !useMe;
     s[kNEG].push_back(std::move(w));
+    // C21 (neg.verb): οὐ / μή stands right before its verb; a time or place adverb does not come between them (it
+    // would be what is negated: "οὐ χθὲς ἦλθες" = "it was not yesterday that you came"): first in a statement, after
+    // the verb in a question with an interrogative word ("διὰ τί οὐκ ἦλθες χθές;")
+    if (!prohib) {
+      const bool whq = c.type == ClauseType::Wh || c.wh.lemma != kNone || !s[kWH].empty();
+      std::vector<GWord> keep;
+      for (GWord& a : s[kADV]) {
+        const lex::Lemma al = lx_.lemma(a.lemma);
+        if (al.id != kNone && inKeys(negOut_, al.key)) (whq ? s[kEND] : s[kFRONT]).push_back(std::move(a));
+        else keep.push_back(std::move(a));
+      }
+      s[kADV] = std::move(keep);
+    }
   }
 
   // C18: circumstantial participles: realised here, placed after the subject (or first when the subject is dropped)
@@ -841,6 +867,14 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
     if (content.size() >= 2 && content[1].lemma == k_.tis && k_.tis != kNone && lx_.lemma(content[0].lemma).pos == Prep)
       at = 2;
     for (size_t i = 0; i < conn2.size(); ++i) content.insert(content.begin() + (long)(at + i), std::move(conn2[i]));
+  }
+  // C21 (pron.encl): an enclitic personal pronoun never begins a sentence or follows a pause ("σε φιλῶ" was produced
+  // when the subject is dropped and the object comes first): it goes after the first word ("φιλῶ σε", "πάνυ σε φιλῶ")
+  if (ctx.main && s[kCONN].empty() && content.size() >= 2 && content[0].enclitic &&
+      (content[0].lemma == k_.ego || content[0].lemma == k_.su) && !content[1].enclitic) {
+    GWord e = std::move(content[0]);
+    content.erase(content.begin());
+    content.insert(content.begin() + 1, std::move(e));
   }
   std::vector<GWord> clauseWords;
   for (GWord& w : intj) w.punctAfter = ",";

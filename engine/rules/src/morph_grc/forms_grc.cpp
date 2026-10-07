@@ -452,7 +452,11 @@ bool allNonAttic(const lex::Lexicon& lx, uint32_t lemma, const std::string& form
 
 // Attic forms the lexicon attests through a form-page analysis but whose table cell holds another dialect's form.
 // Used only when the lexicon has an analysis of exactly this form for the lemma with these features.
-struct Override { const char* lemmaKey; uint8_t tense, mood, person, number; const char* form; bool nu = false; };
+// `anyDialect` (C21): the lexicon lists the form for this lemma and cell but flags it non-Attic by mistake (a root
+// aorist taken from an Epic table): accepted all the same.
+struct Override {
+  const char* lemmaKey; uint8_t tense, mood, person, number; const char* form; bool nu = false; bool anyDialect = false;
+};
 const Override kOverrides[] = {
     {"εἰμί", Imperfect, Indicative, P2, Sg, "ἦσθα"},   // the Attic table cell has ἦς
     {"πίνω", Aorist, Imperative, P2, Sg, "πῖθι"},      // the table cell has πίε
@@ -474,14 +478,20 @@ const Override kOverrides[] = {
     {"βούλομαι", Imperfect, Indicative, P2, Pl, "ἐβούλεσθε"},
     {"βούλομαι", Imperfect, Indicative, P3, Pl, "ἐβούλοντο"},
     {"οἴομαι", Imperfect, Indicative, P1, Sg, "ᾤμην"},   // the Attic-flagged cell ᾤομην is a table error
+    // C21: the intransitive root aorist of δύω "set, sink" (Xen. "ἐπεὶ δὲ ἥλιος ἔδυ"): the lexicon flags the cells
+    // non-Attic, so the generator took the middle ἐδύσατο
+    {"δύω", Aorist, Indicative, P1, Sg, "ἔδυν", false, true},
+    {"δύω", Aorist, Indicative, P2, Sg, "ἔδυς", false, true},
+    {"δύω", Aorist, Indicative, P3, Sg, "ἔδυ", false, true},
+    {"δύω", Aorist, Indicative, P3, Pl, "ἔδυσαν", false, true},
 };
 
-bool attested(const lex::Lexicon& lx, uint32_t lemma, const char* form, const Features& want) {
+bool attested(const lex::Lexicon& lx, uint32_t lemma, const char* form, const Features& want, bool anyDialect = false) {
   thread_local std::vector<lex::Analysis> an;
   an.clear();
   lx.lookup(text::greek_key(form), an);
   for (const lex::Analysis& a : an) {
-    if (a.lemma != lemma || (a.flags & lex::NonAttic)) continue;
+    if (a.lemma != lemma || ((a.flags & lex::NonAttic) && !anyDialect)) continue;
     const Features f = unpack(lx.feature(a.feat));
     if (f.tense == want.tense && f.mood == want.mood && f.person == want.person && f.number == want.number) return true;
   }
@@ -510,7 +520,7 @@ bool generate(const lex::Lexicon& lx, uint32_t lemma, const Features& want0, std
   }
   for (const Override& ov : kOverrides)
     if (l.key == ov.lemmaKey && want.tense == ov.tense && want.mood == ov.mood && want.person == ov.person &&
-        want.number == ov.number && (want.voice == 0 || want.voice == Active) && attested(lx, lemma, ov.form, want)) {
+        want.number == ov.number && (want.voice == 0 || want.voice == Active) && attested(lx, lemma, ov.form, want, ov.anyDialect)) {
       out = ov.form;
       gi.exact = gi.attic = true;
       gi.movableNu = ov.nu;
@@ -644,11 +654,68 @@ std::string masculinePlural(const std::string& m, const std::string& f) {
   return std::string();
 }
 
+// C21: a verb whose table files its present as a perfect (κάθημαι: καθήμενος tagged "plural perfect participle",
+// the feminine misaccented καθήμενη) while the lexicon has the participle as a lemma of its own with a full table
+// (καθήμενος, -η, -ον): that lemma, found through the verb's masculine participle cell. kNoLemma when there is none.
+uint32_t participleLemma(const lex::Lexicon& lx, uint32_t lemma) {
+  thread_local std::vector<std::pair<uint32_t, std::string_view>> cells;
+  cells.clear();
+  lx.cells(lemma, cells);
+  thread_local std::vector<lex::Analysis> an;
+  for (const auto& c : cells) {
+    const Features f = unpack(c.first);
+    if (f.mood != ParticipleMood || (f.gender && f.gender != M)) continue;
+    const std::string form = cleanCell(c.second);
+    if (form.empty()) continue;
+    an.clear();
+    lx.lookup(text::greek_key(form), an);
+    for (const lex::Analysis& a : an) {
+      const lex::Lemma pl = lx.lemma(a.lemma);
+      if (pl.id != lex::kNoLemma && pl.pos == Participle && (pl.flags & lex::HasTable) &&
+          pl.key == text::greek_key(form))
+        return pl.id;
+    }
+  }
+  return lex::kNoLemma;
+}
+
 }  // namespace
 
 bool participle(const lex::Lexicon& lx, uint32_t lemma, uint8_t tense, uint8_t voice, uint8_t case_, uint8_t number,
                 uint8_t gender, std::string& out, GenInfo* info) {
   if (case_ != Nom && case_ != Voc) return false;
+  // C21: the present participle from a participle lemma of its own when the verb's table has no present cell for it
+  if (tense == Present) {
+    Features pf;
+    pf.pos = Verb;
+    pf.mood = ParticipleMood;
+    pf.tense = Present;
+    pf.voice = voice;
+    pf.gender = gender == F || gender == N ? gender : (uint8_t)M;
+    pf.number = Sg;
+    std::string probe;
+    bool has = false;
+    {
+      GenInfo pg;
+      has = generate(lx, lemma, pf, probe, &pg) && !probe.empty() && unpack(pg.packed).tense == Present;
+    }
+    const uint32_t pl = has ? lex::kNoLemma : participleLemma(lx, lemma);
+    if (pl != lex::kNoLemma) {
+      Features af;
+      af.pos = Participle;
+      af.case_ = case_;
+      af.number = number == Pl ? (uint8_t)Pl : (uint8_t)Sg;
+      af.gender = pf.gender;
+      GenInfo ag;
+      if (generate(lx, pl, af, out, &ag) && !out.empty()) {
+        Features rf = unpack(ag.packed);
+        if (rf.case_ == case_ && rf.number == af.number && (!rf.gender || rf.gender == af.gender)) {
+          if (info) *info = ag;
+          return true;
+        }
+      }
+    }
+  }
   const uint8_t g = gender == F || gender == N ? gender : (uint8_t)M;
   auto cell = [&](uint8_t gg, std::string& o, GenInfo* gi) {
     Features f;

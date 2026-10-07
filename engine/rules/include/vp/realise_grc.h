@@ -280,6 +280,7 @@ class GreekRealiser {
   const GreekData& gd_;
   Closed k_;
   std::vector<std::string> secondKeys_, firstKeys_, timeAdv_, beforeNoun_, negKeys_;
+  std::vector<std::string> negOut_;   // C21 (neg.verb): adverbs that never stand between οὐ / μή and the verb
   std::vector<GWord> words_;
   std::vector<std::string> flags_;
   std::vector<SandhiWord> sw_;

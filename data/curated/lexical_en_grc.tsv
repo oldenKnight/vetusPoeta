@@ -267,3 +267,35 @@ durative	be hungry	πεινάω		state in the past: ἐπείνα
 verb	leave	ἀπέρχομαι	intr	C18: intransitive "leave" = depart ("we left early" -> ἀπήλθομεν); with an object λείπω
 subject	ship leave	ἀποπλέω		C18: "the ship is leaving" -> ἡ ναῦς ἀποπλεῖ
 subject	boat leave	ἀποπλέω		
+# C21 (Greek loop 4): weather and nature verbs (our own rows; Spanish mirrors after the English ones). Subject rows may
+# have frame "mid" (the middle voice: "the rain stopped" -> ὁ ὄμβρος ἐπαύσατο) or "mid-pres" (the middle in the present
+# system, the active elsewhere: "the sun is setting" -> δύεται, "the sun set" -> ἔδυ, the root aorist)
+subject	rain stop	παύω	mid	"the rain stopped" -> ὁ ὄμβρος ἐπαύσατο (not τὸ ὕδωρ ἔστησεν)
+subject	rain cease	παύω	mid	
+subject	storm stop	παύω	mid	
+subject	wind stop	παύω	mid	"the wind stopped" -> ὁ ἄνεμος ἐπαύσατο
+subject	sun set	δύω	mid-pres	"the sun set" -> ὁ ἥλιος ἔδυ; "the sun is setting" -> ὁ ἥλιος δύεται
+subject	moon set	δύω	mid-pres	
+subject	star set	δύω	mid-pres	
+subject	wind blow	πνέω		"the wind blows" -> ὁ ἄνεμος πνεῖ
+subject	lluvia parar	παύω	mid	"la lluvia paró" -> ὁ ὄμβρος ἐπαύσατο
+subject	lluvia cesar	παύω	mid	
+subject	lluvia detener	παύω	mid	
+subject	viento parar	παύω	mid	
+subject	sol poner	δύω	mid-pres	"el sol se puso" -> ὁ ἥλιος ἔδυ
+subject	luna poner	δύω	mid-pres	
+subject	viento soplar	πνέω		"el viento sopla" -> ὁ ἄνεμος πνεῖ
+subject	luna salir	ἀνατέλλω		"salió la luna"
+verb	rain	ὕω	impers	"it rained yesterday" -> χθὲς ὗσεν (impersonal: the subject "it" is dropped)
+verb	snow	νίφω	impers	"it is snowing" -> νίφει
+verb	llover	ὕω	impers	"llueve" -> ὕει
+verb	nevar	νίφω	impers	"nieva" -> νίφει
+verb	lose	ἀπόλλυμι		C21: "I lost my ring" -> τὸν δακτύλιόν μου ἀπώλεσα (the reverse index chose ἁμαρτάνω "miss")
+verb	perder	ἀπόλλυμι		
+durative	hurry	σπεύδω		C21: "Hurry, the ship is leaving!" -> σπεῦδε (present imperative, as Attic says it)
+# C21: nouns without a usable Greek word in greek.vpl. Kind noun = a fixed choice used only when greek.vpl has the
+# lemma (νεοττιά is in lexicon_supplement_grc.tsv for the next rebuild); until then the realia row below serves.
+noun	nest	νεοττιά		the Attic word for a bird's nest (Ar., Arist.)
+noun	nido	νεοττιά		
+realia	nest	καλιά		greek.vpl has no νεοττιά yet: καλιά "hut, nest" (Check) until the rebuild
+realia	nido	καλιά		

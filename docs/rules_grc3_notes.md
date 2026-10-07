@@ -157,3 +157,28 @@ Ten unseen sentences, fidelity 2: three OK (ἕως + imperfect for "while"; ο�
 ἴωμεν), seven Check, none wrong among OK. For Greek loop 4: "such a big dog" -> μέγαν κύνα drops "such" and is still OK
 (should be οὕτω μέγαν or τοιοῦτον, or at least Check with "such" in meaningMissing); "the rain stopped" -> τὸ ὕδωρ
 ἔστησεν (Check; ὁ ὄμβρος ἐπαύσατο); "why did you not come yesterday" -> διὰ τί οὐ χθὲς ἦλθες (Check; οὐκ ἦλθες χθές).
+
+# Loop 4 (C21) — degree words, weather verbs, negation order, gloss gaps
+
+## Blind check sentences (written at the start of C21, before any change; output not looked at until the end)
+Children's-book dialogue, our own sentences, none from a sample, the regression file or an earlier blind list.
+1. Look, the moon is shining over the sea!
+2. Grandmother, will you read me a story?
+3. The cat is sleeping on the warm stone.
+4. We did not find the key in the house.
+5. Why is the little boy so sad?
+6. It is snowing, so we cannot go out.
+7. Bring me some water from the well.
+8. The boys ran into the field to play.
+9. My sister has a beautiful red dress.
+10. Do not touch the fire, child!
+11. The wind is cold tonight.
+12. Who opened the door?
+13. I have never eaten such a sweet apple.
+14. When the rain stopped, we went outside.
+15. Father, the horses are drinking from the river.
+16. The bird built a nest in the old tree.
+17. We are happy because you came home.
+18. Where did you put my shoes?
+19. The queen gave each child a small gift.
+20. Come quickly, the soldiers are near!

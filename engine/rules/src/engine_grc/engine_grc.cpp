@@ -3,6 +3,7 @@
 #include "engine_grc/engine_grc.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <sstream>
 
@@ -206,6 +207,146 @@ bool frontedWhen(const std::string& text, const frame::FrameBuilder& fb, frame::
   for (const std::string& r : sa.repairs) out.repairs.push_back(r);
   for (const std::string& d : sa.doubts) out.doubt(d.c_str());
   return true;
+}
+
+// C21: two parts of a sentence the frame builder misreads, analysed apart and merged. text[a0, a1) is analysed as a
+// sentence of its own (with a final "."), text[b0, end) as the rest; the clause of the part that is not `mainIsA`
+// becomes a subordinate (relation, marker, before) of the other part's first clause. `mainSubject`: the main clause
+// must be a statement with a subject. False when a part does not give a clause.
+bool mergeParts(const std::string& text, const frame::FrameBuilder& fb, size_t a0, size_t a1, size_t b0, bool mainIsA,
+                frame::Relation rel, const std::string& marker, bool before, bool mainSubject, frame::SemSentence& out) {
+  if (a1 <= a0 || b0 >= text.size()) return false;
+  const std::string a = text.substr(a0, a1 - a0), b = text.substr(b0);
+  frame::SemSentence sa, sb;
+  fb.analyse(a + ".", sa);
+  fb.analyse(b, sb);
+  auto oneClause = [](const frame::SemSentence& x) {
+    return x.units.size() == 1 && x.units[0].type == frame::Unit::Clause && x.units[0].frame.hasPred;
+  };
+  if (!oneClause(sa) || sb.units.empty() || sb.units[0].type != frame::Unit::Clause || !sb.units[0].frame.hasPred)
+    return false;
+  // the artificial "." of part A
+  if (!sa.tokens.empty() && sa.tokens.back().start >= (int)a.size()) {
+    sa.tokens.pop_back();
+    if (sa.drop.size() > sa.tokens.size()) sa.drop.resize(sa.tokens.size());
+    for (frame::Unit& u : sa.units) u.last = std::min(u.last, (int)sa.tokens.size() - 1);
+  }
+  frame::SemSentence& mainS = mainIsA ? sa : sb;
+  frame::SemSentence& subS = mainIsA ? sb : sa;
+  const size_t mainOff = mainIsA ? a0 : b0, subOff = mainIsA ? b0 : a0;
+  const frame::SemFrame& mf = mainS.units[0].frame;
+  if (mf.type != frame::Kind::Decl || (mainSubject && !mf.hasSubject)) return false;
+  const frame::SemFrame& sf0 = subS.units[0].frame;
+  if (sf0.type == frame::Kind::Yn || sf0.type == frame::Kind::Wh) return false;
+  while (mainS.drop.size() < mainS.tokens.size()) mainS.drop.push_back(frame::Drop::No);
+  while (subS.drop.size() < subS.tokens.size()) subS.drop.push_back(frame::Drop::No);
+  const std::string finalPunct = sb.finalPunct;
+  out = std::move(mainS);
+  for (nlp::Token& t : out.tokens) { t.start += (int)mainOff; t.end += (int)mainOff; }
+  const int base = (int)out.tokens.size();
+  for (size_t i = 0; i < subS.tokens.size(); ++i) {
+    nlp::Token t = subS.tokens[i];
+    t.start += (int)subOff;
+    t.end += (int)subOff;
+    out.tokens.push_back(t);
+    out.drop.push_back(subS.drop[i]);
+  }
+  frame::SemFrame tf = subS.units[0].frame;
+  shiftFrame(tf, base);
+  tf.punct.clear();
+  tf.type = frame::Kind::Decl;
+  frame::SemSub ts;
+  ts.relation = rel;
+  ts.marker = marker;
+  ts.before = before;
+  ts.frame.push_back(std::move(tf));
+  if (before) out.units[0].frame.subordinate.insert(out.units[0].frame.subordinate.begin(), std::move(ts));
+  else out.units[0].frame.subordinate.push_back(std::move(ts));
+  out.finalPunct = finalPunct;
+  out.text = text;
+  for (const std::string& r : subS.repairs) out.repairs.push_back(r);
+  for (const std::string& d : subS.doubts) out.doubt(d.c_str());
+  return true;
+}
+
+// C21: "Sitting under the tree, the girl sang." The frame builder reads the -ing word as an imperative and the
+// clause after the comma as a broken noun phrase ("sang of girl"); C18's transfer repair needs that clause intact.
+// Analysed as "-ing phrase" + main clause and merged (the transfer makes the participle). English only.
+bool frontedIng(const std::string& text, const frame::FrameBuilder& fb, const frame::SemSentence& s,
+                frame::SemSentence& out) {
+  size_t lead = 0;
+  while (lead < text.size() && (text[lead] == ' ' || text[lead] == '-' || text[lead] == '"')) ++lead;
+  size_t w = lead;
+  while (w < text.size() && ((text[w] >= 'a' && text[w] <= 'z') || (text[w] >= 'A' && text[w] <= 'Z'))) ++w;
+  const std::string first = text::lower(text.substr(lead, w - lead));
+  if (first.size() < 5 || first.compare(first.size() - 3, 3, "ing") != 0) return false;
+  if (first == "nothing" || first == "something" || first == "anything" || first == "everything" || first == "morning" ||
+      first == "evening" || first == "during") return false;
+  size_t e = text.size();
+  while (e > 0 && text[e - 1] == ' ') --e;
+  if (e == 0 || text[e - 1] == '?') return false;
+  const size_t comma = text.find(',', w);
+  if (comma == std::string::npos || comma + 2 >= e) return false;
+  // already readable: a statement whose verb comes after the comma, or C18's shape (the -ing clause without a subject
+  // and a time / coordinated statement with a subject after it)
+  for (const frame::Unit& u : s.units) {
+    if (u.type != frame::Unit::Clause) continue;
+    const frame::SemFrame& f = u.frame;
+    if (f.type == frame::Kind::Decl && f.hasSubject && f.hasPred && f.pred.token >= 0 &&
+        (size_t)f.pred.token < s.tokens.size() && s.tokens[(size_t)f.pred.token].start > (int)comma)
+      return false;
+    if (!f.subordinate.empty()) {
+      const frame::SemSub& last = f.subordinate.back();
+      if ((last.relation == frame::Relation::Time || last.relation == frame::Relation::Coord) && !last.frame.empty() &&
+          last.frame[0].hasSubject && last.frame[0].hasPred && last.frame[0].type == frame::Kind::Decl)
+        return false;
+    }
+    break;
+  }
+  size_t b0 = comma + 1;
+  while (b0 < text.size() && text[b0] == ' ') ++b0;
+  return mergeParts(text, fb, lead, comma, b0, false, frame::Relation::Time, "", true, true, out);
+}
+
+// C21: "The wind was so strong that the tree fell." / "El viento era tan fuerte que el árbol cayó." with the result
+// clause broken by the parser ("that fell of tree"): "X so ADJ" and "Y" analysed apart, Y the "that" clause of X (the
+// transfer reads so + that as ὥστε). Only when no clause already has a that / que clause.
+bool soThat(const std::string& text, const frame::FrameBuilder& fb, const frame::SemSentence& s, bool es,
+            frame::SemSentence& out) {
+  for (const frame::Unit& u : s.units)
+    if (u.type == frame::Unit::Clause)
+      for (const frame::SemSub& sb : u.frame.subordinate)
+        if (!sb.frame.empty() && sb.frame[0].hasPred) return false;
+  const std::string low = text::lower(text);
+  auto word = [&](const std::string& wd, size_t from) {
+    for (size_t p = low.find(wd, from); p != std::string::npos; p = low.find(wd, p + 1)) {
+      const bool l = p == 0 || !std::isalpha((unsigned char)low[p - 1]);
+      const bool r = p + wd.size() >= low.size() || !std::isalpha((unsigned char)low[p + wd.size()]);
+      if (l && r) return p;
+    }
+    return std::string::npos;
+  };
+  size_t deg = std::string::npos;
+  static const char* const kEs[] = {"tan", "tanto", "tanta", "tantos", "tantas", nullptr};
+  static const char* const kEn[] = {"so", "such", nullptr};
+  for (const char* const* d = es ? kEs : kEn; *d; ++d) {
+    const size_t p = word(*d, 0);
+    if (p != std::string::npos && (deg == std::string::npos || p < deg)) deg = p;
+  }
+  if (deg == std::string::npos || deg == 0) return false;
+  const std::string conj = es ? "que" : "that";
+  const size_t th = word(conj, deg + 2);
+  if (th == std::string::npos) return false;
+  size_t a1 = th;
+  while (a1 > 0 && (text[a1 - 1] == ' ' || text[a1 - 1] == ',')) --a1;
+  size_t b0 = th + conj.size();
+  while (b0 < text.size() && text[b0] == ' ') ++b0;
+  // part A must end right after the degree group (so + one or two words): "so strong", "so very tired"
+  size_t words = 0;
+  for (size_t i = deg; i < a1; ++i)
+    if (text[i] == ' ') ++words;
+  if (words < 1 || words > 3) return false;
+  return mergeParts(text, fb, 0, a1, b0, true, frame::Relation::Complement, conj, false, true, out);
 }
 
 bool checkOk(const CueOutput& o, const char* id) {
@@ -524,6 +665,7 @@ struct GreekPath::Impl {
     fb.analyse(text, s);
     // C18: "When X, Y." read as a question or with X broken: X and Y analysed apart and merged (never OK: Check)
     bool whenRepaired = false;
+    std::string repairWhat = "\"When ..., ...\" analysed in two parts (time clause + main clause): check it";
     {
       bool fine = false;
       for (const frame::Unit& u : s.units)
@@ -535,6 +677,17 @@ struct GreekPath::Impl {
       if (!fine && frontedWhen(text, fb, merged)) {
         s = std::move(merged);
         whenRepaired = true;
+      }
+      // C21: "-ing phrase, S V." and "X so ADJ that Y." misread by the parser: two-part analysis (never OK)
+      const bool es = st.lang == frame::SrcLang::Es;
+      if (!whenRepaired && !es && frontedIng(text, fb, s, merged)) {
+        s = std::move(merged);
+        whenRepaired = true;
+        repairWhat = "\"-ing phrase, clause\" analysed in two parts (participle + main clause): check it";
+      } else if (!whenRepaired && soThat(text, fb, s, es, merged)) {
+        s = std::move(merged);
+        whenRepaired = true;
+        repairWhat = "\"so ... that\" analysed in two parts (main clause + result clause): check it";
       }
     }
     if (!whenRepaired && allowSplit && frame::FrameBuilder::troubled(s)) {
@@ -694,7 +847,7 @@ struct GreekPath::Impl {
     }
     if (whenRepaired) {
       addFlag(flags, "clause-repair");
-      so.reasons.push_back(Reason{-1, "form", "\"When ..., ...\" analysed in two parts (time clause + main clause): check it", ""});
+      so.reasons.push_back(Reason{-1, "form", repairWhat, ""});
     }
     // C18: a wh question frame in a sentence that is not a question (an interrogative word in a statement): Check
     if (s.finalPunct.find('?') == std::string::npos)
@@ -751,6 +904,18 @@ struct GreekPath::Impl {
       if (std::binary_search(covered.begin(), covered.end(), (int)i)) continue;
       if (t.upos == "ADV" && (t.lower == "not" || t.lower == "n't" || t.lower == "no")) continue;
       so.missing.push_back(t.text);
+    }
+    // C21: a degree word (such, so / too / very + adjective or adverb) the Greek does not render is never silently
+    // dropped: it counts as missing (A7, Check) whatever its tag or the frame builder's drop mark
+    for (size_t i = 0; i < s.tokens.size(); ++i) {
+      const std::string& w = s.tokens[i].lower;
+      bool degree = w == "such" || w == "tal" || w == "semejante";
+      if (!degree && i + 1 < s.tokens.size() &&
+          (w == "so" || w == "too" || w == "very" || w == "tan" || w == "muy" || w == "demasiado"))
+        degree = s.tokens[i + 1].upos == "ADJ" || s.tokens[i + 1].upos == "ADV";
+      if (!degree || std::binary_search(covered.begin(), covered.end(), (int)i)) continue;
+      if (std::find(so.missing.begin(), so.missing.end(), s.tokens[i].text) == so.missing.end())
+        so.missing.push_back(s.tokens[i].text);
     }
     for (const transfer::Choice& c : so.choices)
       if (c.kind == "sense" && c.candidates.size() > 1) so.minMargin = std::min(so.minMargin, c.margin);

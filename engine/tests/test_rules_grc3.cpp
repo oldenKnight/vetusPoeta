@@ -262,7 +262,7 @@ TEST_CASE("rules-grc3: C18 constructions (light verbs, purpose / result, partici
       {"Mother, look at the bird!", "ὦ μῆτερ, βλέπε πρὸς τὸν ὄρνιν!"},
       {"Let's go home, for it is late.", "οἴκαδε ἴωμεν, ὀψὲ γάρ ἐστιν."},
       {"It is late.", "ὀψέ ἐστιν."},
-      {"It is early.", "πρωΐ ἐστιν."},
+      {"It is early.", "πρωΐ ἐστιν. | πρῴ ἐστιν."},   // C21: Attic πρῴ
       // a verb without aorist cells: the narrative imperfect; derived English forms (C17) on the Greek path
       {"The dog barked at the moon.", "ὁ κύων πρὸς τὴν σελήνην ὑλάκτει."},
       {"The girl swam in the river.", "ἡ κόρη ἐν τῷ ποταμῷ ἔνευσεν."},
@@ -278,7 +278,7 @@ TEST_CASE("rules-grc3: C18 constructions (light verbs, purpose / result, partici
       // the verb chosen by its subject (kind subject), "wake up" in the passive (phrasal frame pass)
       {"When the sun rose, the birds sang.", "ἐπεὶ ὁ ἥλιος ἀνέτειλεν, οἱ ὄρνιθες ᾖσαν."},
       {"The moon rose over the hill.", "ἡ σελήνη ὑπὲρ τοῦ ὄρους ἀνέτειλεν."},
-      {"The children woke up early.", "οἱ παῖδες πρωῒ ἠγέρθησαν."},
+      {"The children woke up early.", "οἱ παῖδες πρωῒ ἠγέρθησαν. | οἱ παῖδες πρῲ ἠγέρθησαν."},
       {"The king woke up.", "ὁ βασιλεὺς ἠγέρθη."},
       // "all" + a singular time noun: the accusative of duration
       {"The baby slept all night.", "τὸ βρέφος πᾶσαν τὴν νύκτα ἐκάθευδεν."},
@@ -290,7 +290,7 @@ TEST_CASE("rules-grc3: C18 constructions (light verbs, purpose / result, partici
       {"Run, the wolf is coming!", "τρέχε, ὁ γὰρ λύκος ἔρχεται!"},
       {"Come quickly, the king is waiting!", "ἐλθὲ ταχέως, ὁ γὰρ βασιλεὺς μένει!"},
       {"You must eat, or you will be hungry.", "δεῖ σε φαγεῖν, εἰ δὲ μή, πεινήσεις."},
-      {"Hurry up, or we will be late.", "σπεῦσον, εἰ δὲ μή, ὑστερήσομεν."},
+      {"Hurry up, or we will be late.", "σπεῦσον, εἰ δὲ μή, ὑστερήσομεν. | σπεῦδε, εἰ δὲ μή, ὑστερήσομεν."},   // C21: σπεύδω durative (σπεῦδε)
       // "it" for the animal of the main clause takes the state verb; the degree word stays with it; durative states
       {"The cat is crying because it is hungry.", "ἡ γαλῆ κλαίει ὅτι πεινῇ."},
       {"The horse was so tired that it slept.", "ὁ ἵππος οὕτως ἔκαμνεν ὥστε ἐκάθευδεν."},
@@ -450,7 +450,7 @@ TEST_CASE("rules-grc3: C18 review (fronted when, -ing between commas, lost posse
       {"Where is her cat?", "ποῦ ἐστιν ἡ γαλῆ αὐτῆς;", false},
       // intransitive "leave" = depart; a ship / boat sails away (kind subject)
       {"The guests are leaving.", "οἱ ξένοι ἀπέρχονται.", false},
-      {"We left early.", "πρωῒ ἀπήλθομεν.", false},
+      {"We left early.", "πρωῒ ἀπήλθομεν. | πρῲ ἀπήλθομεν.", false},
       {"The boat is leaving.", "ἡ ναῦς ἀποπλεῖ.", false},
   };
   int ok = 0;
