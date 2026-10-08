@@ -1,0 +1,126 @@
+# Gold Latin for tests/regression/own_turns.en.txt (C28), one line per cue, written by the implementer before the
+# engine was run on the file; our own subtitle-style dialogue (no film or book text). Alternatives after " | ".
+# A sentence that runs over two or three cues is rendered once and re-split at the same cue boundary by clause or
+# phrase; an answer fragment takes the case its question gives it; speaker dashes are kept as in the source.
+# Speakers: Marcus (boy), Julia (girl, his sister), their mother and father, a farmer, a baker, a thief, a teacher,
+# Peter (a man, an old friend). Register: beginner reader (Orberg-like), macrons on long vowels.
+Marce!
+- Quid est, māter?
+Ubi est soror tua?
+In hortō.
+Librum legit
+sub arbore veterī. | sub vetere arbore.
+Vocā eam, quaesō.
+Iūlia! Māter tē vocat!
+- Veniō! - Festīnā!
+Iūlia, ī ad forum
+et eme pānem et lac. | et pānem et lac eme.
+Sōla?
+Minimē, cum frātre tuō. | Nōn, cum frātre tuō.
+Marcus corbem portābit.
+Marce, habēsne pecūniam?
+- Ita, in saccō meō.
+Quae via brevior est?
+Haec, prope flūmen.
+Ecce! Canis magnus! | Ecce! Magnus canis! | Aspice! Canis magnus!
+Nōlī timēre.
+Vetus est et valdē mītis. | Senex est et valdē mītis.
+Cuius canis est?
+Agricolae.
+Prope pontem habitat
+cum uxōre et tribus fīliīs.
+Hic est puer quī | Hic est puer
+canem nostrum annō priōre invēnit. | quī canem nostrum annō priōre invēnit. | canem nostrum superiōre annō invēnit. | quī canem nostrum superiōre annō invēnit.
+Salvē, agricola!
+- Salvēte, puerī! Quō ītis?
+Ad forum.
+Et deinde? | Et tum? | Et posteā?
+Domum, ante noctem.
+Salvē! Pānem velim. | Salvē! Pānem volō. | Salvē! Aliquid pānis velim.
+Quot pānēs?
+Duōs, et paulum lactis.
+Numquid aliud? | Num quid aliud? | Aliquid aliud?
+Minimē, grātiās tibi agō. | Nihil, grātiās tibi agō. | Minimē, grātiās.
+Heus! Cōnsiste, fūr! | Heus! Siste, fūr! | Heus! Manē, fūr!
+Saccum meum abstulit | Saccum meum cēpit
+et in turbam cucurrit. | et in turbam fūgit.
+Quō? | Quā?
+Illūc, praeter templum!
+Curre, Marce!
+Eum vidēre nōn possum.
+Ibi! Post plaustrum. | Illīc! Post plaustrum. | Ibi! Post carrum. | Illīc! Post carrum.
+Eum cēpī! | Cēpī eum! | Eum teneō!
+Redde saccum sorōrī meae! | Saccum sorōrī meae redde!
+- Ignōsce mihi! Ēsuriēbam. | - Ignōsce! Ēsuriēbam.
+Ecce, cape hunc pānem. | Ecce, accipe hunc pānem. | Ecce, hunc pānem cape. | Ecce, hunc pānem accipe.
+Benigna es, puella.
+Puerī, quis hanc epistulam scrīpsit?
+Iūlia.
+Cui eam scrīpsit?
+Aviae suae.
+Et quid scrīpsit?
+Fābulam brevem dē equō. | Brevem fābulam dē equō.
+Recitā eam nōbīs, Iūlia. | Lege eam nōbīs, Iūlia. | Iūlia, lege eam nōbīs.
+- Nunc? - Ita, nunc.
+Ōlim erat equus
+quī volāre poterat
+super montēs et mare.
+Nōndum sciō.
+Cūr nōn?
+Quia eam nōndum perfēcī. | Quia eam nōndum fīnīvī. | Quod eam nōndum perfēcī.
+Frāter tuus
+valdē fortis est.
+Cum ad domum pervēnimus, | Ubi ad domum pervēnimus, | Cum domum pervēnimus, | Ubi domum pervēnimus, | Cum ad domum pervēnissēmus,
+iānua aperta erat | iānua patēbat
+et lucerna ardēbat. | et lucerna lūcēbat.
+Eum exspectāvimus
+ante portam urbis.
+Sī crās pluet, | Sī crās pluit,
+domī manēbimus.
+Sed sī sōl lūcēbit, | Sed sī sōl lūcet,
+ad mare ībimus.
+Pater meus dīcit
+mare vēre nimis frīgidum esse. | mare nimis frīgidum esse vēre.
+Natārem, sī aqua calida esset. | Sī aqua calida esset, natārem.
+- Et ego. | - Ego quoque. | - Et ego natārem.
+Quis est ille vir
+in palliō rubrō? | palliō rubrō indūtus?
+Novus magister. | Magister novus.
+Athēnīs vēnit
+mēnse priōre. | priōre mēnse. | mēnse superiōre. | superiōre mēnse.
+♪ Lūna super aquam lūcet ♪ | ♪ Lūna in aquā lūcet ♪
+♪ et parva nāvis dormit ♪ | ♪ et nāvis parva dormit ♪ | ♪ et nāvicula dormit ♪
+♪ Dormī, mī fīlī, dormī ♪ | ♪ Dormī, fīlī mī, dormī ♪ | ♪ Dormī, mī puer, dormī ♪ | ♪ Dormī, puer mī, dormī ♪
+♪ dōnec sōl oriātur ♪ | ♪ dōnec sōl orītur ♪ | ♪ dum sōl oriātur ♪
+Iūlia, esne fessa? | Iūlia, fessane es?
+- Ita, valdē fessa.
+Et tū, Marce?
+- Fessus nōn sum. | - Nōn sum fessus.
+Cēna parāta est.
+Quid est?
+Piscis cum pāne.
+Ēheu! | Heu! | Ō mē miserum!
+Nōlī querī,
+aliter nihil edēs. | alioquī nihil edēs.
+Audīvistīne illud? | Audīvistīne hoc?
+- Quid?
+Vōcem in culīnā. | Vōx in culīnā.
+Fortasse fēlēs est.
+Fēlem nōn habēmus! | Nūllam fēlem habēmus!
+Excitā patrem.
+Pater! Expergīscere! | Pater! Surge!
+Aliquis in culīnā est. | Est aliquis in culīnā.
+- Manēte hīc, puerī. | - Hīc manēte, puerī. | - Puerī, manēte hīc.
+Quis adest? | Quis ibi est? | Quis est ibi? | Quis illīc est?
+Ego tantum sum, | Ego modo sum, | Ego sum,
+amīcus tuus vetus ē vīcō. | amīcus tuus vetus ex vīcō. | vetus amīcus tuus ē vīcō.
+Petre! Quid hīc facis
+hāc hōrā?
+In tenebrīs viam āmīsī. | Viam in tenebrīs āmīsī. | In tenebrīs errāvī.
+Ēsurīsne?
+- Paulum.
+Iūlia, affer pānem | Iūlia, pānem affer
+et reliquum piscem. | et piscem reliquum.
+Manē nōbīscum hāc nocte. | Hāc nocte nōbīscum manē.
+Bonam noctem, puerī! | Bene dormīte, puerī!
+♪ Dormīte, puerī meī, dormīte ♪ | ♪ Dormīte, līberī meī, dormīte ♪
