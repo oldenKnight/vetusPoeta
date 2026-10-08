@@ -362,6 +362,12 @@ behaviour.
 | blind check (20) | - | first run 11 / 20 (1 wrong among OK), after 20 / 20 |
 | Latin EN / ES / oz_sample / la2x / orberg | 114 / 100 / 78 / 201 / 60 | unchanged (no Latin file touched) |
 
+After the container restart (the C25 files checkpointed unchanged in da6cde4) everything was re-run on an archive of
+da6cde4, which also holds C26's frame checkpoint 505ad24 and C27: all Greek cases as above; EN -> GRC 114 / 114 with ok
+81 / check 33 (line 90 "Tomorrow we will write a letter in Latin." lost its frame-fallback flag through C26's frame
+work; the Greek text is the same); the Latin numbers there are C26's (oz 82 / 100). The blind first run (23:27 UTC)
+happened before the restart, on d9b65ce + the C25 files.
+
 ## What changed
 * **(1) Result clauses** (transfer_grc `soDegreeTokens`): the degree word is read from the source tokens of the main
   clause before the dependent clause (such / tanto anywhere; so / tan before an adjective, an adverb, much / many), so
