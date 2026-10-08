@@ -5,8 +5,10 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstring>
 #include <sstream>
 
+#include "la2x/internal.h"
 #include "vp/check.h"
 #include "vp/check_grc.h"
 #include "vp/cue.h"
@@ -349,6 +351,268 @@ bool soThat(const std::string& text, const frame::FrameBuilder& fb, const frame:
   return mergeParts(text, fb, 0, a1, b0, true, frame::Relation::Complement, conj, false, true, out);
 }
 
+// C25: a question the parser breaks: "Why did the dog run away?" read as a fragment "why", "How many sheep does the
+// farmer have?" with "sheep" as the subject and the farmer lost, "Did the dog bark?" with "do" as the main verb and
+// "bark of dog" as its object. The part from the auxiliary on is analysed as a yes / no question ("Did the dog run
+// away?", "Does the farmer have?"), or, after do / does / did, the statement without the auxiliary ("The dog bark.",
+// the tense from the auxiliary), and the wh word (or the "how many" NP, as the object) put back. English only;
+// false when the sentence does not have that shape.
+bool whAuxiliary(const std::string& text, const frame::FrameBuilder& fb, const frame::SemSentence& s,
+                 frame::SemSentence& out) {
+  if (s.units.size() != 1 || s.units[0].type != frame::Unit::Clause || s.tokens.size() < 3) return false;
+  const frame::SemFrame& f0 = s.units[0].frame;
+  static const char* const kAux[] = {"did", "do", "does", "is", "are", "was", "were", "can", "could", "will", "would",
+                                     "should", nullptr};
+  auto aux = [&](size_t k) {
+    for (const char* const* a = kAux; *a; ++a) if (s.tokens[k].lower == *a) return true;
+    return false;
+  };
+  auto doAux = [&](size_t k) { return s.tokens[k].lower == "do" || s.tokens[k].lower == "does" || s.tokens[k].lower == "did"; };
+  const std::string w0 = s.tokens[0].lower;
+  size_t k = 0;
+  enum { WhAdverb, HowMany, YesNo } mode;
+  if ((w0 == "why" || w0 == "where" || w0 == "when" || w0 == "how") && aux(1) &&
+      (f0.type == frame::Kind::Frag || f0.type == frame::Kind::Wh) &&
+      (!f0.hasPred || (doAux(1) && text::lower(f0.pred.lemma) == "do" && f0.hasObject && !f0.hasSubject))) {
+    k = 1;
+    mode = WhAdverb;
+  } else if (w0 == "how" && s.tokens[1].lower == "many" && f0.type == frame::Kind::Wh && f0.hasSubject &&
+             f0.subject.interrogative && !f0.hasObject) {
+    int last = f0.subject.token;
+    for (int t : f0.subject.tokens) last = std::max(last, t);
+    if (last < 0 || (size_t)last + 1 >= s.tokens.size() || !aux((size_t)last + 1)) return false;
+    // the auxiliary must be followed by a subject of its own (not "How many dogs are there?")
+    if ((size_t)last + 2 >= s.tokens.size() || s.tokens[(size_t)last + 2].lower == "there") return false;
+    k = (size_t)last + 1;
+    mode = HowMany;
+  } else if (doAux(0) && f0.type == frame::Kind::Yn && text::lower(f0.pred.lemma) == "do" && f0.hasObject &&
+             !f0.hasSubject) {
+    k = 0;
+    mode = YesNo;
+  } else {
+    return false;
+  }
+  auto cap = [](std::string x) {
+    if (!x.empty() && x[0] >= 'a' && x[0] <= 'z') x[0] = (char)(x[0] - 'a' + 'A');
+    return x;
+  };
+  frame::SemSentence sb;
+  size_t off = (size_t)s.tokens[k].start, keep = k;
+  bool fromStatement = false;
+  if (mode != YesNo) {
+    fb.analyse(cap(text.substr(off)), sb);
+    const bool good = sb.units.size() == 1 && sb.units[0].type == frame::Unit::Clause && sb.units[0].frame.hasPred &&
+                      sb.units[0].frame.type == frame::Kind::Yn && sb.units[0].frame.hasSubject &&
+                      !(doAux(k) && text::lower(sb.units[0].frame.pred.lemma) == "do");
+    if (!good) sb = frame::SemSentence{};
+  }
+  if (sb.units.empty() && doAux(k) && k + 1 < s.tokens.size()) {
+    // the statement without the auxiliary, its bare verb in the past only so that the tagger reads it as a verb
+    // ("Did the dog bark?" -> "The dog barked.", "Why do the dogs bark?" -> "The dogs barked."); the tense comes
+    // from the auxiliary. Each word after the first is tried in turn (C11's English inflection, la2x/internal.h).
+    off = (size_t)s.tokens[k + 1].start;
+    std::string st = text.substr(off);
+    while (!st.empty() && (st.back() == '?' || st.back() == ' ')) st.pop_back();
+    bool found = false;
+    for (size_t j = k + 2; j < s.tokens.size() && !found; ++j) {
+      const nlp::Token& vt = s.tokens[j];
+      if (vt.upos == "PUNCT" || vt.start < (int)off || (size_t)vt.end > off + st.size()) continue;
+      const std::string base = vt.lower;
+      const std::string past = la2x::detail::en::verb(base, la2x::detail::en::VForm::Past);
+      if (past.empty() || past == base || past.find(' ') != std::string::npos) continue;
+      const size_t a = (size_t)vt.start - off, b = (size_t)vt.end - off;
+      const std::string trial = cap(st.substr(0, a) + past + st.substr(b));
+      frame::SemSentence tr;
+      fb.analyse(trial + ".", tr);
+      if (tr.units.size() != 1 || tr.units[0].type != frame::Unit::Clause || !tr.units[0].frame.hasPred ||
+          tr.units[0].frame.type != frame::Kind::Decl || !tr.units[0].frame.hasSubject ||
+          text::lower(tr.units[0].frame.pred.lemma) != base)
+        continue;
+      if (!tr.tokens.empty() && tr.tokens.back().start >= (int)trial.size()) tr.tokens.pop_back();   // the added "."
+      const int delta = (int)past.size() - (int)(b - a);
+      for (nlp::Token& t : tr.tokens) {
+        if (t.start == (int)a) { t.end = (int)b; t.text = vt.text; t.lower = vt.lower; }
+        else if (t.start > (int)a) { t.start -= delta; t.end -= delta; }
+      }
+      sb = std::move(tr);
+      found = true;
+    }
+    if (!found) return false;
+    keep = k + 1;
+    fromStatement = true;
+  }
+  if (sb.units.empty()) return false;
+  if (mode == HowMany && sb.units[0].frame.hasObject) return false;
+  out = s;
+  out.tokens.resize(keep);
+  out.drop.resize(std::min(out.drop.size(), keep));
+  while (out.drop.size() < keep) out.drop.push_back(frame::Drop::No);
+  for (size_t i = 0; i < sb.tokens.size(); ++i) {
+    nlp::Token t = sb.tokens[i];
+    t.start += (int)off;
+    t.end += (int)off;
+    out.tokens.push_back(t);
+    out.drop.push_back(i < sb.drop.size() ? sb.drop[i] : frame::Drop::No);
+  }
+  frame::SemFrame nf = sb.units[0].frame;
+  shiftFrame(nf, (int)keep);
+  for (int t = 0; t < (int)keep; ++t) nf.tokens.insert(nf.tokens.begin() + t, t);
+  if (fromStatement) {
+    nf.pred.auxTokens.push_back((int)k);
+    nf.pred.tense = s.tokens[k].lower == "did" ? frame::Tense::Past : frame::Tense::Present;
+    nf.pred.aspect = frame::Aspect::Simple;
+  }
+  nf.type = mode == YesNo ? frame::Kind::Yn : frame::Kind::Wh;
+  if (mode == HowMany) {
+    nf.hasObject = true;
+    nf.object = f0.subject;
+    nf.wh = f0.wh;
+    nf.wh.role = frame::Role::Object;
+  } else if (mode == WhAdverb) {
+    nf.wh = frame::SemWh{};
+    nf.wh.word = w0;
+    nf.wh.role = frame::Role::Adverb;
+    nf.wh.token = 0;
+  }
+  out.units[0].frame = std::move(nf);
+  out.units[0].last = (int)out.tokens.size() - 1;
+  out.finalPunct = "?";
+  for (const std::string& r : sb.repairs) out.repairs.push_back(r);
+  for (const std::string& d : sb.doubts) out.doubt(d.c_str());
+  return true;
+}
+
+// C25: "My friends and I built a boat.": the address row "my friend" (phrasebook_en_grc.tsv, register voc) matched
+// before "and" (a conjunction counts as a phrase boundary in the shared frame builder) and took the subject. The
+// sentence is analysed again with "friend(s)" spelled as "father(s)" (same length: offsets kept), which no row
+// matches, and the NP head set back to "friend". False when the sentence does not have that shape.
+void renameHead(frame::SemNP& n, int tok, const std::string& from, const std::string& to);
+void renameHeadF(frame::SemFrame& f, int tok, const std::string& from, const std::string& to) {
+  if (f.hasSubject) renameHead(f.subject, tok, from, to);
+  if (f.hasObject) renameHead(f.object, tok, from, to);
+  if (f.hasIndirect) renameHead(f.indirectObject, tok, from, to);
+  for (auto& o : f.obliques) renameHead(o.np, tok, from, to);
+  for (auto& n : f.predicative) renameHead(n, tok, from, to);
+  for (auto& sb : f.subordinate) for (auto& x : sb.frame) renameHeadF(x, tok, from, to);
+}
+void renameHead(frame::SemNP& n, int tok, const std::string& from, const std::string& to) {
+  if (n.token == tok && text::lower(n.head) == from) { n.head = to; n.surface = to; }
+  for (auto& k : n.coord) renameHead(k, tok, from, to);
+  for (auto& g : n.genitive) renameHead(g, tok, from, to);
+  for (auto& r : n.relative) renameHeadF(r, tok, from, to);
+}
+bool vocCoordinated(const std::string& text, const frame::FrameBuilder& fb, const frame::SemSentence& s,
+                    frame::SemSentence& out) {
+  for (size_t ui = 0; ui + 1 < s.units.size(); ++ui) {
+    const frame::Unit& u = s.units[ui];
+    if (u.type != frame::Unit::Phrase || u.phrase.reg != "voc" || !u.sepAfter.empty()) continue;
+    const frame::Unit& nx = s.units[ui + 1];
+    bool conj = false;
+    if (nx.type == frame::Unit::Clause)
+      for (const std::string& k : nx.frame.connectors) conj = conj || text::lower(k) == "and" || text::lower(k) == "or";
+    if (!conj || u.last < 0 || (size_t)u.last >= s.tokens.size()) continue;
+    const nlp::Token& t = s.tokens[(size_t)u.last];
+    const char* sub = t.lower == "friend" ? "father" : t.lower == "friends" ? "fathers" : nullptr;
+    if (!sub) continue;
+    std::string alt = text;
+    for (size_t i = 0; sub[i]; ++i) alt[(size_t)t.start + i] = (t.text[0] == 'F' && i == 0) ? 'F' : sub[i];
+    fb.analyse(alt, out);
+    bool phrase = false;
+    for (const frame::Unit& v : out.units) phrase = phrase || v.type == frame::Unit::Phrase;
+    if (phrase || out.units.empty() || out.tokens.size() != s.tokens.size()) return false;
+    for (frame::Unit& v : out.units)
+      if (v.type == frame::Unit::Clause) renameHeadF(v.frame, u.last, "father", "friend");
+    for (size_t i = 0; i < out.tokens.size(); ++i) {
+      out.tokens[i].text = s.tokens[i].text;
+      out.tokens[i].lower = s.tokens[i].lower;
+    }
+    out.text = text;
+    return true;
+  }
+  return false;
+}
+
+// C25: Spanish "El niño nada en el río." read as a fragment "the boy of nothing in the river" ("nada" = nothing; the
+// Greek had no verb and was rated OK): with no verb in the sentence, a "nada" right after the subject NP is the verb
+// nadar. The sentence is analysed again with "come" (the same length) in its place and the verb set back to nadar.
+bool nadaVerb(const std::string& text, const frame::FrameBuilder& fb, const frame::SemSentence& s,
+              frame::SemSentence& out) {
+  if (s.units.size() != 1 || s.units[0].type != frame::Unit::Clause) return false;
+  const frame::SemFrame& f0 = s.units[0].frame;
+  if (f0.hasPred || !f0.hasSubject || f0.subject.isPronoun) return false;
+  size_t k = s.tokens.size();
+  for (size_t i = 1; i < s.tokens.size(); ++i)
+    if (s.tokens[i].lower == "nada" && s.tokens[i - 1].upos != "VERB" && s.tokens[i - 1].upos != "AUX") { k = i; break; }
+  if (k == s.tokens.size()) return false;
+  for (const nlp::Token& t : s.tokens) if (t.upos == "VERB" || t.upos == "AUX") return false;
+  std::string alt = text;
+  const char* rep = "come";
+  for (size_t i = 0; i < 4; ++i) alt[(size_t)s.tokens[k].start + i] = rep[i];
+  fb.analyse(alt, out);
+  if (out.units.size() != 1 || out.units[0].type != frame::Unit::Clause || !out.units[0].frame.hasPred ||
+      out.units[0].frame.pred.lemma != "comer" || out.units[0].frame.pred.token != (int)k || out.tokens.size() != s.tokens.size())
+    return false;
+  out.units[0].frame.pred.lemma = "nadar";
+  for (size_t i = 0; i < out.tokens.size(); ++i) {
+    out.tokens[i].text = s.tokens[i].text;
+    out.tokens[i].lower = s.tokens[i].lower;
+  }
+  out.text = text;
+  return true;
+}
+
+// C25: Spanish "Mi madre está en casa." / "Los niños están en casa." read as a fragment (the subject NP alone, the
+// verb and the rest lost): the part from the copula on is analysed alone ("Está en casa.", the subject implicit) and
+// the fragment's NP becomes its subject. False when the sentence does not have that shape.
+bool estarFragment(const std::string& text, const frame::FrameBuilder& fb, const frame::SemSentence& s,
+                   frame::SemSentence& out) {
+  if (s.units.size() != 1 || s.units[0].type != frame::Unit::Clause) return false;
+  const frame::SemFrame& f0 = s.units[0].frame;
+  if (f0.type != frame::Kind::Frag || f0.hasPred || !f0.hasSubject || f0.subject.isPronoun) return false;
+  int last = f0.subject.token;
+  for (int t : f0.subject.tokens) last = std::max(last, t);
+  const size_t k = (size_t)last + 1;
+  if (last < 0 || k >= s.tokens.size()) return false;
+  static const char* const kCop[] = {"está", "están", "estaba", "estaban", "estuvo", "estuvieron", "estará", "estarán",
+                                     "es", "son", "era", "eran", "fue", "fueron", nullptr};
+  bool cop = false;
+  for (const char* const* c = kCop; *c; ++c) cop = cop || s.tokens[k].lower == *c;
+  if (!cop) return false;
+  const size_t off = (size_t)s.tokens[k].start;
+  std::string part = text.substr(off);
+  if (!part.empty() && part[0] >= 'a' && part[0] <= 'z') part[0] = (char)(part[0] - 'a' + 'A');
+  else if (part.size() > 1 && (unsigned char)part[0] == 0xC3 && (unsigned char)part[1] >= 0xA0 && (unsigned char)part[1] <= 0xBF)
+    part[1] = (char)((unsigned char)part[1] - 0x20);   // é -> É ...
+  frame::SemSentence sb;
+  fb.analyse(part, sb);
+  if (sb.units.size() != 1 || sb.units[0].type != frame::Unit::Clause || !sb.units[0].frame.hasPred ||
+      sb.units[0].frame.type != frame::Kind::Decl)
+    return false;
+  out = s;
+  out.tokens.resize(k);
+  out.drop.resize(std::min(out.drop.size(), k));
+  while (out.drop.size() < k) out.drop.push_back(frame::Drop::No);
+  for (size_t i = 0; i < sb.tokens.size(); ++i) {
+    nlp::Token t = sb.tokens[i];
+    t.start += (int)off;
+    t.end += (int)off;
+    out.tokens.push_back(t);
+    out.drop.push_back(i < sb.drop.size() ? sb.drop[i] : frame::Drop::No);
+  }
+  frame::SemFrame nf = sb.units[0].frame;
+  shiftFrame(nf, (int)k);
+  nf.hasSubject = true;
+  nf.implicitSubject = false;
+  nf.subject = f0.subject;
+  for (int t = 0; t < (int)k; ++t) nf.tokens.insert(nf.tokens.begin() + t, t);
+  out.units[0].frame = std::move(nf);
+  out.units[0].last = (int)out.tokens.size() - 1;
+  out.finalPunct = sb.finalPunct;
+  for (const std::string& r : sb.repairs) out.repairs.push_back(r);
+  for (const std::string& d : sb.doubts) out.doubt(d.c_str());
+  return true;
+}
+
 bool checkOk(const CueOutput& o, const char* id) {
   for (const Check& c : o.checks)
     if (c.id == id) return c.ok;
@@ -626,6 +890,70 @@ struct GreekPath::Impl {
                                  "\",\"tier\":" + std::to_string((int)m.tier) + "}"});
   }
 
+  // C25 (as C24 (g) for Latin): spans of quoted sound words: one or two words between straight or curly double quotes,
+  // each an interjection of the source lexicon or a word it does not know ("woof", "moo", "guau"), not a translatable
+  // answer word (yes, no, hello ...). The span (quotes included) becomes the pronoun "it" / "eso" and spaces (offsets
+  // kept); the Greek pronoun of that place is replaced by the quoted word as written.
+  void quotedSounds(std::string& t, bool es, std::vector<std::pair<size_t, size_t>>& spans) const {
+    const lex::Lexicon* src = es ? esLex : enLex;
+    if (!src) return;
+    auto openAt = [&](size_t i, size_t& len) {
+      if (t[i] == '"') { len = 1; return true; }
+      if (i + 2 < t.size() && (unsigned char)t[i] == 0xE2 && (unsigned char)t[i + 1] == 0x80 &&
+          ((unsigned char)t[i + 2] == 0x9C || (unsigned char)t[i + 2] == 0x9D)) { len = 3; return true; }
+      if (i + 1 < t.size() && (unsigned char)t[i] == 0xC2 && ((unsigned char)t[i + 1] == 0xAB || (unsigned char)t[i + 1] == 0xBB)) {
+        len = 2;   // « »
+        return true;
+      }
+      return false;
+    };
+    for (size_t i = 0; i < t.size(); ++i) {
+      size_t ol = 0;
+      if (!openAt(i, ol)) continue;
+      const size_t j = i + ol;
+      size_t cl = 0, e = j;
+      while (e < t.size() && !openAt(e, cl)) ++e;
+      if (e >= t.size()) break;
+      std::string inner = t.substr(j, e - j);
+      while (!inner.empty() && (inner.back() == ',' || inner.back() == '!' || inner.back() == '.' || inner.back() == '?'))
+        inner.pop_back();
+      std::vector<std::string> ws;
+      bool okWords = !inner.empty() && inner.size() <= 24;
+      for (const std::string& w0 : splitWords(inner)) {
+        const std::string w = text::lower(w0);
+        for (char ch : w) okWords = okWords && (std::isalpha((unsigned char)ch) || ch == '-');
+        if (!w.empty()) ws.push_back(w);
+      }
+      okWords = okWords && !ws.empty() && ws.size() <= 2;
+      for (const std::string& w : ws) {
+        if (!okWords) break;
+        static const char* const kWords[] = {"yes", "no", "hello", "hi", "goodbye", "bye", "oh", "ah", "please",
+                                             "thanks", "ok", "okay", "sorry", "help", "hooray", "alas", "well", "why",
+                                             "what", "sí", "hola", "adiós", "gracias", "ay", "bueno", "vale", nullptr};
+        // a word with a Greek rendering is translated, not kept: the answer words (yes, hello ...) always, others
+        // when the reverse index of greek.vpl knows them ("mu", "miau", "hooray" have none: kept as written)
+        std::vector<lex::Candidate> gk;
+        lx.reverse(es ? "es:" + text::es_key(w) : text::en_key(w), gk);
+        bool listed = false;
+        for (const char* const* x = kWords; *x; ++x) listed = listed || w == *x;
+        if (listed && !gk.empty()) { okWords = false; break; }
+        std::vector<lex::Analysis> an;
+        src->lookup(es ? text::es_key(w) : text::en_key(w), an);
+        bool intj = an.empty() || gk.empty();
+        for (const lex::Analysis& a : an) intj = intj || src->lemma(a.lemma).pos == feat::Intj;
+        okWords = okWords && intj;
+      }
+      const size_t end = e + cl;
+      const char* pron = es ? "eso" : "it";
+      if (okWords && end - i >= std::strlen(pron)) {
+        spans.emplace_back(i, end);
+        for (size_t k = i; k < end; ++k) t[k] = ' ';
+        for (size_t k = 0; pron[k]; ++k) t[i + k] = pron[k];
+      }
+      i = end - 1;
+    }
+  }
+
   // ---- one sentence ---------------------------------------------------------------------------------------------------
   void speechSplit(const std::string& text, const std::vector<size_t>& pts, const frame::FrameBuilder& fb,
                    const rules::Options& opt, transfer::Memory& mem, const transfer::Settings& st, SentOut& so) {
@@ -662,7 +990,35 @@ struct GreekPath::Impl {
   void speech(const std::string& text, const frame::FrameBuilder& fb, const rules::Options& opt, transfer::Memory& mem,
               const transfer::Settings& st, SentOut& so, bool alternatives, bool allowSplit = true) {
     frame::SemSentence s;
-    fb.analyse(text, s);
+    // C25: quoted sound words ("woof", "moo") are kept as written (see quotedSounds); the parser reads a pronoun there
+    std::vector<std::pair<size_t, size_t>> soundSpans;
+    std::string parseText = text;
+    quotedSounds(parseText, st.lang == frame::SrcLang::Es, soundSpans);
+    {
+      // a sentence that is only a quoted sound ("Woof!"): copied as it is
+      std::string rest = parseText;
+      for (const auto& sp : soundSpans) for (size_t k = sp.first; k < sp.second; ++k) rest[k] = ' ';
+      bool empty = !soundSpans.empty();
+      for (char ch : rest) empty = empty && (ch == ' ' || ch == '.' || ch == '!' || ch == '?' || ch == ',');
+      if (empty) {
+        cue::Latin one;
+        rules::TokenView t;
+        std::string w = text;
+        while (!w.empty() && w.front() == ' ') w.erase(w.begin());
+        while (!w.empty() && w.back() == ' ') w.pop_back();
+        t.text = t.display = w;
+        t.start = 0;
+        t.end = (int)w.size();
+        one.text = w;
+        one.tokens.push_back(t);
+        so.text = one;
+        so.srcOffset.push_back(0);
+        so.reasons.push_back(Reason{-1, "form", "a sound word in quotes is kept as it is written: " + w, ""});
+        return;
+      }
+    }
+    const std::string& atext = soundSpans.empty() ? text : parseText;
+    fb.analyse(atext, s);
     // C18: "When X, Y." read as a question or with X broken: X and Y analysed apart and merged (never OK: Check)
     bool whenRepaired = false;
     std::string repairWhat = "\"When ..., ...\" analysed in two parts (time clause + main clause): check it";
@@ -674,20 +1030,36 @@ struct GreekPath::Impl {
             fine = fine || (sb.relation == frame::Relation::Time && sb.before && !sb.frame.empty() &&
                             sb.frame[0].hasPred && sb.frame[0].type == frame::Kind::Decl);
       frame::SemSentence merged;
-      if (!fine && frontedWhen(text, fb, merged)) {
+      if (!fine && frontedWhen(atext, fb, merged)) {
         s = std::move(merged);
         whenRepaired = true;
       }
       // C21: "-ing phrase, S V." and "X so ADJ that Y." misread by the parser: two-part analysis (never OK)
       const bool es = st.lang == frame::SrcLang::Es;
-      if (!whenRepaired && !es && frontedIng(text, fb, s, merged)) {
+      if (!whenRepaired && !es && frontedIng(atext, fb, s, merged)) {
         s = std::move(merged);
         whenRepaired = true;
         repairWhat = "\"-ing phrase, clause\" analysed in two parts (participle + main clause): check it";
-      } else if (!whenRepaired && soThat(text, fb, s, es, merged)) {
+      } else if (!whenRepaired && soThat(atext, fb, s, es, merged)) {
         s = std::move(merged);
         whenRepaired = true;
         repairWhat = "\"so ... that\" analysed in two parts (main clause + result clause): check it";
+      } else if (!whenRepaired && !es && vocCoordinated(atext, fb, s, merged)) {   // C25
+        s = std::move(merged);
+        whenRepaired = true;
+        repairWhat = "\"my friend(s) and ...\" read as an address: analysed again as a subject: check it";
+      } else if (!whenRepaired && !es && whAuxiliary(atext, fb, s, merged)) {   // C25
+        s = std::move(merged);
+        whenRepaired = true;
+        repairWhat = "a wh question analysed from its auxiliary on (yes / no question + the wh word): check it";
+      } else if (!whenRepaired && es && nadaVerb(atext, fb, s, merged)) {   // C25
+        s = std::move(merged);
+        whenRepaired = true;
+        repairWhat = "\"nada\" read as \"nothing\" in a sentence without a verb: read as the verb nadar: check it";
+      } else if (!whenRepaired && es && estarFragment(atext, fb, s, merged)) {   // C25
+        s = std::move(merged);
+        whenRepaired = true;
+        repairWhat = "a subject with \"estar / ser\" read as a fragment: the verb phrase analysed alone: check it";
       }
     }
     if (!whenRepaired && allowSplit && frame::FrameBuilder::troubled(s)) {
@@ -849,6 +1221,16 @@ struct GreekPath::Impl {
       addFlag(flags, "clause-repair");
       so.reasons.push_back(Reason{-1, "form", repairWhat, ""});
     }
+    // C25: a Spanish sentence read as a verbless fragment with a subject and a prepositional phrase or an "of"
+    // attribute ("El niño nada en el río." was "the boy of nothing in the river", OK) is a misreading: never OK
+    if (!whenRepaired && st.lang == frame::SrcLang::Es && s.units.size() == 1 && s.units[0].type == frame::Unit::Clause) {
+      const frame::SemFrame& f0 = s.units[0].frame;
+      if (f0.type == frame::Kind::Frag && !f0.hasPred && f0.hasSubject &&
+          (!f0.obliques.empty() || !f0.subject.genitive.empty())) {
+        addFlag(flags, "fragment");
+        so.reasons.push_back(Reason{-1, "form", "a sentence without a verb (subject + phrase): check the analysis", ""});
+      }
+    }
     // C18: a wh question frame in a sentence that is not a question (an interrogative word in a statement): Check
     if (s.finalPunct.find('?') == std::string::npos)
       for (const frame::Unit& u : s.units)
@@ -893,9 +1275,79 @@ struct GreekPath::Impl {
       rewriteTokens(L, tx);
       L.tokens[0].display = L.tokens[0].text;
     }
+    // C25: the quoted sound words back in place of the pronoun read for them: the n-th placeholder ("it" / "eso") of
+    // the parsed text is the n-th Greek token of αὐτός / οὗτος when the counts agree, else the quoted word goes before
+    // the final mark
+    if (!soundSpans.empty()) {
+      const bool es = st.lang == frame::SrcLang::Es;
+      const uint32_t pl = es ? findLemma(lx, "οὗτος") : findLemma(lx, "αὐτός");
+      const uint32_t pl2 = es ? findLemma(lx, "ἐκεῖνος") : kNone;   // "eso" -> ἐκεῖνο
+      const std::string ph = es ? "eso" : "it";
+      std::vector<size_t> pronTokens, phWords;
+      for (size_t q = 0; q < L.tokens.size(); ++q)
+        if (L.tokens[q].hasLemma && ((L.tokens[q].lemmaId == pl && pl != kNone) || (L.tokens[q].lemmaId == pl2 && pl2 != kNone)))
+          pronTokens.push_back(q);
+      const std::string low = text::lower(atext);
+      for (size_t q = low.find(ph); q != std::string::npos; q = low.find(ph, q + 1))
+        if ((q == 0 || !std::isalpha((unsigned char)low[q - 1])) &&
+            (q + ph.size() >= low.size() || !std::isalpha((unsigned char)low[q + ph.size()])))
+          phWords.push_back(q);
+      for (const auto& sp : soundSpans) {
+        const std::string quoted = text.substr(sp.first, sp.second - sp.first);
+        long k = -1;
+        if (pronTokens.size() == phWords.size())
+          for (size_t w = 0; w < phWords.size(); ++w)
+            if (phWords[w] == sp.first) k = (long)pronTokens[w];
+        if (k >= 0) {
+          std::vector<std::string> tx;
+          for (const auto& t : L.tokens) tx.push_back(t.text);
+          tx[(size_t)k] = quoted;
+          rewriteTokens(L, tx);
+          rules::TokenView& t = L.tokens[(size_t)k];
+          t.display = quoted;
+          t.hasLemma = false;
+          t.lemmaId = 0;
+          t.features = rules::Features{};
+          t.tier = 0;
+          t.emoji.clear();
+          t.unknown = false;
+        } else {
+          std::string fpx;
+          while (!L.text.empty() && (L.text.back() == '.' || L.text.back() == '!' || L.text.back() == ';' ||
+                                     L.text.back() == '?'))
+            { fpx.insert(fpx.begin(), L.text.back()); L.text.pop_back(); }
+          cue::Latin one;
+          rules::TokenView t;
+          t.text = t.display = quoted;
+          t.start = 0;
+          t.end = (int)quoted.size();
+          one.text = quoted;
+          one.tokens.push_back(t);
+          cue::append(L, one);
+          so.srcOffset.push_back((int)sp.first);
+          L.text += fpx;
+        }
+        for (size_t i = 0; i < s.tokens.size(); ++i)
+          if (s.tokens[i].start >= (int)sp.first && s.tokens[i].start < (int)sp.second) covered.push_back((int)i);
+        so.reasons.push_back(Reason{-1, "form", "a sound word in quotes is kept as it is written: " + quoted, ""});
+      }
+    }
     for (const std::string& f : flags) addFlag(so.flags, f);
     // A7: source coverage
     std::sort(covered.begin(), covered.end());
+    // C25: a word between quotes that is not a sound word ("the word "love"") is never dropped silently: missing
+    for (size_t i = 0; i < s.tokens.size(); ++i) {
+      bool rendered = false;   // a Greek word was chosen for this token (covered alone is not enough: "the word "love"")
+      for (const transfer::Choice& ch : so.choices) rendered = rendered || (ch.token == (int)i && ch.lemma != kNone);
+      if (rendered) continue;
+      const nlp::Token& t = s.tokens[i];
+      if (t.upos == "PUNCT" || t.start <= 0 || (size_t)t.end >= atext.size()) continue;
+      auto quoteAt = [&](size_t p) { return atext[p] == '"' || (p >= 2 && (unsigned char)atext[p] == 0x9D) ||
+                                            (p >= 2 && (unsigned char)atext[p] == 0x9C); };
+      if (quoteAt((size_t)t.start - 1) && quoteAt((size_t)t.end) &&
+          std::find(so.missing.begin(), so.missing.end(), t.text) == so.missing.end())
+        so.missing.push_back(t.text);
+    }
     for (size_t i = 0; i < s.tokens.size(); ++i) {
       const nlp::Token& t = s.tokens[i];
       const bool content = t.upos == "NOUN" || t.upos == "PROPN" || t.upos == "VERB" || t.upos == "ADJ" ||
@@ -1305,7 +1757,8 @@ struct GreekPath::Impl {
                  !checkOk(o, "A8") || !checkOk(o, "A9") || a.minMargin < 0.15 || a.song || a.nonverbal;
       for (const char* f : {"name-guessed", "from-rule", "addressee-guess", "missing-form", "merged", "frame-fallback",
                             "realia", "name-kept", "contact-relative", "noun-infinitive", "purpose-guess", "light-verb",
-                            "phrase-order", "participle-phrase", "ellipsis", "clause-repair", "wh-statement", "det-adverb"})
+                            "phrase-order", "participle-phrase", "ellipsis", "clause-repair", "wh-statement", "det-adverb",
+                            "past-form", "subject-guess", "fragment", "free-relative", "speech-inversion"})
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       for (const transfer::Choice& c : a.choices)
         if (c.lowTier) {

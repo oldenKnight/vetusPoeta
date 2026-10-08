@@ -170,7 +170,8 @@ verb	plant	φυτεύω
 verb	plantar	φυτεύω		
 verb	teach	διδάσκω		
 verb	enseñar	διδάσκω		
-verb	shake	τρέμω		intransitive "be shaking" (tremble)
+verb	shake	τρέμω	intr	intransitive "be shaking" (tremble); C25: frame intr (with an object σείω: "the boy shook the tree" was ἔτρεμεν, OK and wrong)
+verb	shake	σείω		C25: "the boy shook the tree" -> τὸ δένδρον ἔσεισεν
 verb	temblar	τρέμω		
 verb	paint	γράφω		γράφω "paint" (χρῴζω "colour" is the alternative)
 verb	pintar	γράφω		
@@ -320,3 +321,100 @@ noun	nest	νεοττιά		the Attic word for a bird's nest (Ar., Arist.)
 noun	nido	νεοττιά		
 realia	nest	καλιά		greek.vpl has no νεοττιά yet: καλιά "hut, nest" (Check) until the rebuild
 realia	nido	καλιά		
+# C25 (Greek loop 5): Spanish "anciano / anciana" (a noun in the frame; spanish.vpl knows only the adjective, and the
+# reverse index reaches ἀκτέα "elder tree" through the English pivot "elder") and "viejo / vieja" as nouns.
+noun	anciano	γέρων		C25: "el anciano duerme" -> ὁ γέρων καθεύδει (ἀκτέα, the elder tree, was a pivot ambiguity)
+noun	anciana	γραῦς		C25: "la anciana canta" -> ἡ γραῦς ᾄδει
+noun	viejo	γέρων		C25: "el viejo" as a noun
+noun	vieja	γραῦς		C25: "la vieja" as a noun
+noun	ancianos	γέρων		C25: the Spanish frame keeps the plural form as the head ("los ancianos hablan" -> οἱ γέροντες λαλοῦσιν)
+noun	ancianas	γραῦς		C25: "las ancianas" -> αἱ γρᾶες
+# C25: "have a good time" and its Spanish mirrors. Kind light, frame "manner": the object's evaluative adjective (or
+# the clause's adverb: "lo pasamos bien") becomes the manner adverb of the Greek verb through the rows of kind manner
+# (source = English / Spanish adjective or adverb, greek = one or two Greek adverbs); with no such word the row does
+# not apply ("we have time" -> χρόνον ἔχομεν). "such" / "so" before it -> οὕτως. A have / tener / pasar + time / tiempo
+# / rato with an adjective and no manner row is flagged light-verb (a calque, never OK).
+light	have time	διάγω	manner	"we had a good time" -> ἡδέως διηγάγομεν (Plato's ἡδέως διάγειν); "such a good time" -> οὕτως ἡδέως
+light	pasar lo	διάγω	manner	"lo pasamos bien" -> ἡδέως διηγάγομεν
+light	pasar tiempo	διάγω	manner	"pasamos un buen rato / tiempo" -> ἡδέως διηγάγομεν
+light	pasar rato	διάγω	manner	
+light	have fun	εὐφραίνω	pass	"we had fun" -> ηὐφράνθημεν (the passive "enjoy oneself")
+verb	divertirse	εὐφραίνω	pass	"nos divertimos" -> ηὐφράνθημεν; "se divirtieron" -> ηὐφράνθησαν
+manner	good	ἡδέως		
+manner	nice	ἡδέως		
+manner	lovely	ἡδέως		
+manner	pleasant	ἡδέως		
+manner	fun	ἡδέως		
+manner	great	πάνυ ἡδέως		
+manner	wonderful	πάνυ ἡδέως		
+manner	fantastic	πάνυ ἡδέως		
+manner	marvellous	πάνυ ἡδέως		
+manner	marvelous	πάνυ ἡδέως		
+manner	bad	κακῶς		
+manner	terrible	πάνυ κακῶς		
+manner	awful	πάνυ κακῶς		
+manner	hard	χαλεπῶς		
+manner	bien	ἡδέως		
+manner	bueno	ἡδέως		
+manner	genial	πάνυ ἡδέως		
+manner	estupendo	πάνυ ἡδέως		
+manner	mal	κακῶς		
+manner	malo	κακῶς		
+manner	fatal	πάνυ κακῶς		
+durative	pass time	διάγω		C25: "Have a good time!" -> ἡδέως διάγε (a continuing state: present imperative)
+# C25: "ride" is ἐλαύνω (intransitive "ride, drive on", Xen.) or ἱππεύω (ride a horse), never a verb of carrying;
+# "ride on X" -> ἐπί + genitive (ἐπ' ὄνου ἠλάσαμεν); Spanish cabalgar, "montar a caballo" (the noun is the verb's
+# meaning: ἱππεύω), "montar en burro".
+verb	ride	ἐλαύνω		C25: "the king rode to the city" -> εἰς τὴν πόλιν ἤλασεν; "ride a horse" -> ἵππον ἐλαύνειν
+verb	cabalgar	ἐλαύνω		C25: "el rey cabalgó" -> ἤλασεν
+verbprep	ride on	ἐλαύνω	prep:ἐπί+gen	C25: "we rode on a donkey" -> ἐπ' ὄνου ἠλάσαμεν
+verbprep	montar in	ἐλαύνω	prep:ἐπί+gen	C25: "monta en burro" -> ἐπ' ὄνου ἐλαύνει
+verbprep	montar on	ἐλαύνω	prep:ἐπί+gen	
+light	montar caballo	ἱππεύω		C25: "montábamos a caballo" -> ἱππεύομεν (the horse is the verb's meaning)
+light	ride horse	ἱππεύω		C25: "she rides a horse every day" -> ἑκάστης ἡμέρας ἱππεύει (ἵππον ἐλαύνει is the alternative)
+durative	ride	ἱππεύω		C25: "can you ride?" -> ἱππεύειν (an ability, a continuing activity)
+# C25: verb rows may have frame "intr-mid" (intransitive use, middle voice). "lie" without an object, a place or
+# "down" is "tell lies" ("One must not lie." was οὐ δεῖ κεῖσθαι, OK and
+# wrong); with a place it stays κεῖμαι ("the cat lies on the bed").
+verb	lie	ψεύδω	intr-mid	C25: "you must not lie" -> οὐ δεῖ σε ψεύδεσθαι; "don't lie!" -> μὴ ψεύδου
+durative	lie	ψεύδω		C25: a prohibition / general command: present (μὴ ψεύδου)
+verbprep	lie to	ψεύδω	obj	C25: "he lied to his mother" -> τὴν μητέρα ἔψευσεν (ψεύδω + acc "deceive"; κεῖμαι was OK and wrong)
+# C25: times of day as Attic adverbs ("this morning" was ταύτῃ τῇ ἠόϊ, the poetic ἠώς; "at night" the bare dative)
+pp	this morning	ἕωθεν	adv	C25: "we caught a fish this morning" -> ἕωθεν ἰχθὺν ... ("at dawn, early")
+pp	in the morning	ἕωθεν	adv	C25: "in the morning we go to school" -> ἕωθεν ...
+pp	at night	νύκτωρ	adv	C25: "they sailed at night" -> νύκτωρ ἔπλευσαν
+pp	by night	νύκτωρ	adv	
+pp	esta mañana	ἕωθεν	adv	Spanish "esta mañana" (this morning; "mañana" alone is tomorrow)
+pp	in la mañana	ἕωθεν	adv	Spanish "por / en la mañana"
+pp	by la mañana	ἕωθεν	adv	
+pp	by la noche	νύκτωρ	adv	Spanish "por la noche"
+pp	of noche	νύκτωρ	adv	Spanish "de noche"
+pp	in la noche	νύκτωρ	adv	
+# C25: kind verbobj (source = verb lemma + object noun lemma; the object is kept, unlike kind light; frame "mid" = the
+# middle voice): washing hands, feet, face is νίζομαι, a bath λούομαι.
+verbobj	wash hand	νίζω	mid	C25: "wash your hands" -> νίψαι τὰς χεῖρας (λοῦσον was OK and wrong)
+verbobj	wash foot	νίζω	mid	
+verbobj	wash face	νίζω	mid	
+verbobj	lavar mano	νίζω	mid	Spanish "lávate las manos"
+verbobj	lavar pie	νίζω	mid	
+verbobj	lavar cara	νίζω	mid	
+# C25: visiting a person is ἐπισκέπτομαι (ἐπιφοιτάω "come often" was chosen); meeting a person is ἐντυγχάνω + dative
+verb	visit	ἐπισκέπτομαι		C25: "we will visit grandfather tomorrow" -> αὔριον τὸν πάππον ἐπισκεψόμεθα
+verb	visitar	ἐπισκέπτομαι		
+verb	meet	ἐντυγχάνω		C25: "we met the king" -> τῷ βασιλεῖ ἐνετύχομεν (dative by valency_grc.tsv)
+# C25: kind ptc: a state adjective used attributively with a person or an animal is the present participle of the
+# Greek verb (frame mid / pass = the voice): "the hungry bird" -> ὁ πεινῶν ὄρνις, "to the hungry bird" -> τῷ πεινῶντι
+# ὄρνιθι (λιμηρός "famished, causing famine" was chosen). The oblique forms are derived by rule (Check).
+ptc	hungry	πεινάω		
+ptc	thirsty	διψάω		
+ptc	tired	κάμνω		
+ptc	angry	ὀργίζω	pass	
+ptc	afraid	φοβέω	mid	
+ptc	scared	φοβέω	mid	
+ptc	frightened	φοβέω	mid	
+ptc	hambriento	πεινάω		
+ptc	sediento	διψάω		
+ptc	cansado	κάμνω		
+ptc	enojado	ὀργίζω	pass	
+ptc	enfadado	ὀργίζω	pass	
+ptc	asustado	φοβέω	mid	

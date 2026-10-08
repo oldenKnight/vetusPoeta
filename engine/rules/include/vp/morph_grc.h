@@ -125,7 +125,10 @@ bool generate(const lex::Lexicon&, uint32_t lemma, const Features&, std::string&
 // generate()), agreeing in number and gender with a subject. The singular is a table cell (the tables list the
 // participles as nominatives singular); the plural is derived from the singular cells by the endings of the third and
 // second declension (τρέχων -> τρέχοντες, ἰδοῦσα -> ἰδοῦσαι, λυόμενος -> λυόμενοι), `info->fromRule` when the lexicon
-// does not list the derived form. False for other cases and for endings the rule does not know.
+// does not list the derived form. C25: the genitive, dative and accusative are derived from the nominatives too (-ντ-
+// type: τρέχοντος, πεινῶντι, κάμνουσαν, καμνουσῶν, διψῶσι(ν); -μενος type: λυομένου), `info->fromRule` unless the
+// lexicon lists the form; a cell tagged plural with a singular -μενος / -μένη / -μενον ending serves as the singular.
+// False for the vocative-less other cases, perfect actives in the oblique cases and endings the rule does not know.
 bool participle(const lex::Lexicon&, uint32_t lemma, uint8_t tense, uint8_t voice, uint8_t case_, uint8_t number,
                 uint8_t gender, std::string& out, GenInfo* info = nullptr);
 

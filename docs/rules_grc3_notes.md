@@ -311,3 +311,157 @@ imperfect is not marked (the frame says only "past").
 - For loop 5: "such a cold night that the river froze" -> ὅτι instead of ὥστε (Check); "wept" not derived (Fix);
   Spanish "anciano" -> ἀκτέα, the elder tree (gloss ambiguity: add γέρων for anciano); "We had such a good time"
   rendered word for word and rated OK (reported by the implementer; not fixed).
+
+# Loop 5 (C25) — result clauses, misread pasts, anciano, idioms, ride, generic "one", quoted sounds
+
+## Blind check sentences (written at 22:37 UTC at the start of C25, before any change; output not looked at until the end)
+Children's-book dialogue, our own sentences, none from a sample, the regression file or an earlier blind list.
+1. The little goat jumped over the wall.
+2. Mother, may I go to the market with you?
+3. The fisherman caught a big fish this morning.
+4. Why did the dog run away?
+5. Please close the window, it is cold.
+6. My friends and I built a small boat.
+7. The sky was so dark that we stayed at home.
+8. Who is singing in the garden?
+9. I gave my bread to the hungry bird.
+10. Do not be afraid, I am here.
+11. The children were playing near the river.
+12. Our teacher told us a long story.
+13. We will visit grandfather tomorrow.
+14. The horse is drinking water from the stream.
+15. She found a gold coin under the stone.
+16. Wash your hands before dinner!
+17. The baby laughed when she saw the dog.
+18. How many sheep does the farmer have?
+19. The sailors sailed across the sea at night.
+20. I lost my shoe in the mud.
+
+## Blind check result (C25)
+First run (23:27 UTC, after work items 1-8, before any fix for these sentences; built from HEAD + the C25 files, so
+the parallel C26 frame-builder work in progress was not in it): **11 / 20** acceptable Attic of the same meaning (1, 2,
+5, 7, 8, 10, 11, 12, 14, 15, 20). Not acceptable: #3 "this morning" -> ταύτῃ τῇ ἠόϊ (the poetic ἠώς), #4 "Τί;" (the
+parser read the question as a fragment "why"), #6 "Ὦ φίλε καί ..." (the address row "my friend" took the subject before
+"and"), #9 τῷ λιμηρῷ ὄρνιθι (λιμηρός "famished, causing famine"), #13 "Ἐπιουσίῳ ἐπιφοιτήσομεν" (grandfather read as a
+determiner of "tomorrow", visit -> ἐπιφοιτάω), #16 λοῦσον τὰς χεῖρας (**OK and wrong**: hands are washed with νίζομαι),
+#17 "ὅτι" for "when" (the when-clause hung as a that-complement), #18 the farmer lost ("how many sheep" read as the
+subject), #19 "[across]" unknown and "at night" a bare dative. Wrong among OK on the first run: **1** (#16).
+After the fixes (each with two or more own sentences in "C25 after the blind check", none a blind sentence): **20 / 20**
+(#9 τῷ πεινῶντι ὄρνιθι and #13, #17, #18 rebuilt: Check). The first-run figure is the one that predicts held-out
+behaviour.
+
+## Numbers (fidelity 2, speaker f, real data; HEAD d9b65ce + the C25 files)
+| set | before C25 | after C25 |
+|---|---|---|
+| EN -> GRC own_dialogue (114) | 114 / 114, ok 80 / check 34 / fix 0 | 114 / 114, ok 80 / check 34 / fix 0 (report byte-identical) |
+| ES -> GRC lines 1-40 | 39 / 40 | 39 / 40 (report byte-identical) |
+| GRC -> EN / GRC -> ES (40) | 40 / 40, 40 / 40 | 40 / 40, 40 / 40 (report byte-identical) |
+| C16 / C18 EN, ES / C18 review / C21 EN, ES / C21 after blind EN, ES | 37 / 56 / 12 / 13 / 63 / 27 / 37 / 15 | unchanged |
+| C25 constructions (new) | - | EN 41 / 41, ES 27 / 27 |
+| C25 after the blind check (new) | - | EN 25 / 25, ES 12 / 12, + participle / augment morphology case |
+| blind check (20) | - | first run 11 / 20 (1 wrong among OK), after 20 / 20 |
+| Latin EN / ES / oz_sample / la2x / orberg | 114 / 100 / 78 / 201 / 60 | unchanged (no Latin file touched) |
+
+## What changed
+* **(1) Result clauses** (transfer_grc `soDegreeTokens`): the degree word is read from the source tokens of the main
+  clause before the dependent clause (such / tanto anywhere; so / tan before an adjective, an adverb, much / many), so
+  "such a cold night that", "such good friends that" (ὅτι, **OK and wrong** before), "tan rápido que" are ὥστε + the
+  indicative. A degree word right before a single adverb that the frame left out is rendered (tan rápido -> οὕτω
+  ταχέως).
+* **(2) Irregular pasts** (transfer_grc `pastFormRepair`, reusing `frame::en::verbOfForm`): "wept" already reached the
+  Greek path through C17/C19's frame helpers (ἔκλαυσεν); what still failed after C19-C24: the tagger's lemma "bit"
+  ("The dog bit the boy." -> [bit], Fix) and "blue" for "blew" (no Greek verb for the tagger's lemma: the verb whose
+  listed past the form is, past, flag past-form, Check), "lay" without an object (the past of "lie"), and a past form
+  read as a present ("The children swung": only perfect readings in english.vpl -> past). A verb with neither aorist
+  nor imperfect cells (κραδάω) takes the historic present as a rule form (Check) instead of a missing word (Fix).
+* **(3) anciano** (lexical_en_grc.tsv kind noun): anciano / anciana / ancianos / ancianas / viejo / vieja -> γέρων /
+  γραῦς (ἀκτέα, the elder tree, came through the English pivot "elder"); "hombre viejo", "mujer anciana" -> γέρων /
+  γραῦς as "old man / woman"; an adverb pp row without the article does not take the phrase with it ("vive en la casa"
+  -> ἐν τῷ οἴκῳ, not οἴκοι).
+* **(4) "have a good time"** (kind light, new frame `manner`; new kind `manner`): the object's evaluative adjective is
+  the manner adverb of διάγω ("We had such a good time." -> οὕτως ἡδέως διηγάγομεν, "a wonderful time" -> πάνυ ἡδέως,
+  "a bad time" -> κακῶς; Plato's ἡδέως διάγειν); without a manner row the row does not apply ("we have time" -> χρόνον
+  ἔχομεν) and a have / tener / pasar + time / tiempo / rato with an adjective is flagged light-verb (a calque, never OK).
+  Spanish "pasarlo bien / mal" (pronoun object, the clause's adverb), "divertirse" -> εὐφραίνομαι (passive: ηὐφράνθησαν;
+  "nos divertimos": a Spanish clitic of the subject's own person is reflexive), "¡Que te diviertas!" (que + 2nd person
+  present subjunctive without a main clause) -> the imperative εὐφράνθητι. Light rows are events (no state imperfect).
+* **(5) ride** (verb / verbprep / light rows): ride -> ἐλαύνω (ἤλασεν, intransitive "ride, drive on"), "ride on X" ->
+  ἐπί + gen, "ride a horse" -> ἱππεύω (durative: "can you ride a horse?" -> ἱππεύειν), cabalgar -> ἐλαύνω, "montar a
+  caballo" -> ἱππεύω, "montar en burro" -> ἐπ' ὄνου ἐλαύνει. No verb of carrying is chosen.
+* **(6) generic "one"** (transfer_grc `genericOne`): the frame builder's "one-generic" or a bare clause-initial "one"
+  -> τις; with must / should the impersonal verb alone ("One must not lie." -> οὐ δεῖ ψεύδεσθαι). The realiser marks
+  every form of the indefinite τις enclitic and never lets it begin its clause: it goes after the finite verb ("τὸν
+  ἄρτον μου ἔφαγέ τις" for "Someone ate my bread.", which was "Τις τὸν ἄρτον ..." and **OK**; "δύναταί τις ...", "εἴ
+  τις", "ἐάν τις", "οὐδέποτέ τις"). "lie" without an object, a place or "down" is ψεύδομαι (verb rows may have frame
+  intr-mid; "One must not lie." was οὐ δεῖ κεῖσθαι, OK and wrong); "lie to" -> ψεύδω + acc.
+* **(7) The ten frame-builder misreadings of loop 4** (re-tested on HEAD after C19-C24): all ten still occur in the
+  shared frame builder ("The sun set." as a noun phrase, "Sitting ..." as an imperative, "so strong that fell of tree",
+  ", so" as a time clause, "Bring me some water" with me as the object, "told the truth" as an indirect object, "cold
+  tonight" as a predicate noun, "of the well" as an adverb, "such dogs" -> dog of such, "The king put" as a present,
+  "Father," as a name, the Spanish ones), so every Greek-side repair stays; each already had a test in
+  test_rules_grc4.cpp. Of C18's list, "When X, Y.", "tell you a story tonight" and "Hurry, ..." are parsed right now
+  (the repairs stay for the HEAD frames they were written for: the transfer-level test keeps the "when" repair
+  exercised); "Where is my book?" still loses "my" (restored on the Greek side). New Greek-side repairs: "of the well"
+  becomes the genitive attribute (τὸ ὕδωρ τοῦ φρέατος; was εὖ), "Mi madre está en casa." / "Los niños están en casa."
+  (a fragment: the copula part analysed alone, the NP its subject; Check).
+* **(8) Quoted sound words** (engine_grc `quotedSounds`, as C24 (g) for Latin): one or two words between quotes that
+  are interjections or unknown to the source lexicon (or have no Greek rendering) are kept as written: the parser reads
+  "it" / "eso" there and the Greek pronoun of that place is replaced ("Ὁ κύων "woof" ἔλεξεν.", "Ἡ βοῦς "mu" λέγει.");
+  a sentence that is only a quoted sound is copied; '"Woof!" said the dog.' reads the dog as the speaker (flag
+  speech-inversion, Check); a quoted word that no Greek word renders ("the word "love"") counts as missing (Check).
+* **(9) After the blind run** (own sentences, two or more each): questions the parser breaks are analysed from their
+  auxiliary ("Why do the dogs bark?", "Did the dog bark?" with the bare verb tried in the past so the tagger reads it as
+  a verb, the tense from do / did; "How many horses does the king have?" -> πόσους ἵππους ὁ βασιλεὺς ἔχει; Check);
+  "my friend(s) and I" (the address row before "and") analysed again; a when-clause hung as a that-complement is a time
+  clause (participle when the subject is the same); "this / in the morning" -> ἕωθεν, "at / by night" -> νύκτωρ,
+  Spanish "esta mañana" (also when read as the subject: comimos is 1st person) ; "across" -> διά + gen; kind verbobj
+  (verb + object noun, object kept): wash hands / feet / face -> νίζομαι (νίψαι τὰς χεῖρας; the table writes the augment
+  ἕνιψα, generate() writes ἔνιψα and the analysis reads it back); kind ptc: hungry, thirsty, tired, angry, afraid ...
+  with a person or an animal -> the attributive present participle (ὁ πεινῶν λύκος, τοῖς διψῶσιν ἵπποις, ὁ
+  ὀργιζόμενος βασιλεύς); morph_grc participle() derives the genitive, dative and accusative from the nominatives
+  (τρέχοντος, καμνούσης, καμνόντων, καμνουσῶν, κάμνουσι(ν), λυομένου; rule forms are Check) and accepts a singular
+  -μενος cell the table tags as plural (ὀργιζόμενος); the checker reads a caseless participle cell as a nominative; a
+  bare kinship noun read as a determiner or an adverb becomes the object (αὔριον τὴν τήθην ἐπισκεψόμεθα); visit ->
+  ἐπισκέπτομαι, meet -> ἐντυγχάνω + dat; a time adverb read as an "of" attribute is the clause's adverb ("bread of
+  tomorrow"); a plural head the frame left singular takes the plural from english.vpl.
+* **Found while probing** (not blind; fixed with own sentences): "Sé leer." / "I know how to read." lost the infinitive
+  (the complement verb took the main verb's verb row: οἶδα alone, **OK and wrong**) -> οἶδα + present infinitive;
+  "Quiero que vengas." -> βούλομαί σε ἐλθεῖν (was ὅτι ἥκεις, OK and wrong); "This book is mine." ([mine], Fix) ->
+  ἐμόν ἐστιν, "theirs" -> ἐκείνων; Spanish "río" -> ποταμός (στόμα came through the pivot); "El niño nada en el río."
+  ("the boy of nothing in the river", **OK and wrong**) -> νεῖ (Check), and a Spanish verbless subject + phrase is never
+  OK; "cerca de" -> ἐγγύς + gen.
+
+## Rows added
+lexical_en_grc.tsv +78 rows (light 7, manner 21, noun 6, pp 10, ptc 13, verb 8, verbobj 6, verbprep 4, durative 3; 1 row
+changed: shake -> τρέμω got frame intr) and
+the header notes for the new kinds / frames (manner, ptc, verbobj, intr-mid); tiers_grc.tsv +9 (διάγω, εὐφραίνω, ἑορτή,
+ἱππεύω, ἕωθεν, πάππος, τήθη, νίζω, ποταμός); valency_grc.tsv +2 (ἐντυγχάνω dat, ἐπισκέπτομαι acc). Gold file unchanged:
+**no gold alternative proposed**.
+
+## API changes (additive)
+realise_grc.h: GrcAdj::participle, GrcAdj::voice (an attributive participle). morph_grc.h: participle() keeps its
+signature; its contract now includes the oblique cases (comment updated). Changed expectation in test_rules_grc3.cpp
+(C18 morphology): participle(τρέχω, Gen) was required to fail, now gives τρέχοντος. No edit in frame/, transfer/,
+realise_la/, check/, cue/, english.* or engine.cpp.
+**Wish for frame/ (C26 or later), all repaired on the Greek side for now:** (1) "bit" lemmatised "bit", "blew" as
+"blue", "swung" read as a present, "lay" (no object) as "lay"; (2) "Why did the dog run away?", "Why do the dogs bark?",
+"How did the sheep escape?" built as fragments; "Did the dog bark?" with "do" as the main verb; "How many sheep does
+the farmer have?" loses the farmer; (3) the register-voc phrase "my friend" matched before "and" (a CCONJ counts as a
+right boundary); (4) "when she saw the dog" hung as a that-complement with connector "when-time"; (5) "visit
+grandfather tomorrow" -> grandfather as the determiner of tomorrow, "see grandmother today" -> grandmother as an
+adverb, "eat bread tomorrow" -> bread of tomorrow, "bought apples today" loses the plural; (6) '"Woof!" said the dog'
+-> dog as the object; (7) Spanish: "Esta mañana comimos pan." with the time NP as the subject, "El niño nada en el
+río." ("nada" = nothing), "Mi madre está en casa." still a fragment; (8) not repaired: "One / You should never
+steal." -> a fragment (Fix), "When one is tired, one sleeps." ("one sleep" as an NP), "El búho caza de noche." (caza a
+noun), "We rode home on a donkey" (home as an object noun).
+
+## Still open (for loop 6 / LIB)
+* LIB: νίζω's active / middle aorist cells carry a rough breathing on the augment (ἕνιψα); ὀργίζω (and others) tag
+  the singular -μενος participle cells as plural; ἐπιλανθάνομαι and ὄμνυμι have no aorist active / middle indicative
+  cells ("forgot", "swore" -> missing form); no αἰωρέομαι (swing), γονυπετέω (kneel). The C21 items stay open
+  (νεοττιά, δύω, λυπέω, κάθημαι, πρῴ, ἀναγιγνώσκω).
+* Seen while probing (own sentences, Check unless said): "kneel" -> τίθημι, "spring" -> ὑπάρχω, "tear" -> διαφέρω,
+  "swear an oath" -> λίθον ὤμνυ (lexical choices of the reverse index); "The boy clung to the rock." -> εἰς τὸν λίθον
+  εἶχεν (**OK and wrong**, pre-existing: "cling to" -> ἔχομαι + gen wants a middle verbprep row; "shook the tree" was
+  ἔτρεμεν, OK and wrong, and is fixed: the shake row τρέμω has frame intr, σείω with an object); "How many dogs are
+  there?" -> πόσοι κύνες ἐκεῖ εἰσιν (OK; existential "there" read as a place); "τὴν μητέρα αὐτῆς" for her own mother after a participle (Greek omits the possessive).

@@ -218,6 +218,8 @@ void GreekRealiser::form(uint32_t lemma, const Features& f, GWord& w, const char
     w.movableNu = gi.movableNu;
     if ((lemma == k_.eimi || lemma == k_.phemi) && f.mood == Indicative && (f.tense == Present) && isEncliticForm(w.form))
       w.enclitic = true;
+    // C25: the indefinite τις (every case) is enclitic: "εἴ τις", "ἔφαγέ τις", never first in its clause
+    if (lemma == k_.tisIndef && k_.tisIndef != kNone) w.enclitic = true;
     return;
   }
   if (l.flags & lex::Indeclinable) { literal(lemma, "?", w, rule); return; }
@@ -262,6 +264,24 @@ GreekRealiser::Agree GreekRealiser::ofNP(const GrcNP& n) const {
 void GreekRealiser::adjWord(const GrcAdj& ad, const Agree& a, const char* rule, std::vector<GWord>& out) {
   for (uint32_t adv : ad.adverbs) { GWord w; literal(adv, "?", w, "order.adv"); out.push_back(std::move(w)); }
   GWord w;
+  if (ad.participle) {   // C25: an attributive participle ("τῷ πεινῶντι ὄρνιθι")
+    GenInfo gi;
+    std::string f;
+    w.lemma = ad.lemma;
+    w.rule = rule;
+    if (participle(lx_, ad.lemma, Present, ad.voice ? ad.voice : (uint8_t)Active, a.case_ ? a.case_ : (uint8_t)Nom,
+                   a.number, a.gender ? a.gender : (uint8_t)M, f, &gi)) {
+      w.form = f;
+      w.packed = gi.packed;
+      w.fromRule = gi.fromRule;
+      w.movableNu = gi.movableNu;
+    } else {
+      w.form = "[verb]";
+      w.missing = true;
+    }
+    out.push_back(std::move(w));
+    return;
+  }
   form(ad.lemma, adjForm(a.case_, a.number, a.gender, ad.degree), w, rule);
   out.push_back(std::move(w));
 }
@@ -482,6 +502,15 @@ void GreekRealiser::verbGroup(const GrcClause& c, const Agree& subj, std::vector
       form(lemma, g, w2, rule);
       if (!w2.missing) w = std::move(w2);
     }
+    // C25: a verb with neither aorist nor imperfect cells (κραδάω): the historic present, marked as a rule form
+    // (Check), rather than a missing word (Fix)
+    if (w.missing && (f.tense == Aorist || f.tense == Imperfect) && f.mood == Indicative) {
+      Features g = f;
+      g.tense = Present;
+      GWord w2;
+      form(lemma, g, w2, rule);
+      if (!w2.missing) { w = std::move(w2); w.fromRule = true; }
+    }
     dst.push_back(std::move(w));
   };
   if (ctx.participle) {   // C18: circumstantial participle agreeing with the main clause's subject (ctx.ante)
@@ -651,7 +680,7 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
   for (const GrcNP& pn : c.predicative) {
     std::vector<GWord> w;
     whPred = whPred || pn.interrogative != kNone;
-    np(pn, predCase, false, true, o, w);
+    np(pn, pn.case_ == Gen ? (uint8_t)Gen : predCase, false, true, o, w);   // C25: a genitive of possession (ἐκείνου ἐστίν)
     append(pn.interrogative != kNone ? s[kWH] : s[kPRED], w);
   }
   if (!c.predAdj.empty()) {
@@ -883,6 +912,21 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
     GWord e = std::move(content[0]);
     content.erase(content.begin());
     content.insert(content.begin() + 1, std::move(e));
+  }
+  // C25: the indefinite τις never begins its clause ("Τις τὸν ἄρτον μου ἔφαγεν" was produced, OK): it goes right
+  // after the finite verb ("τὸν ἄρτον μου ἔφαγέ τις", "δύναταί τις ... ἰδεῖν"), or after the first word when no verb
+  // follows
+  if (s[kCONN].empty() && s[kVOC].empty() && intj.empty() && ctx.main && content.size() >= 2 && content[0].enclitic &&
+      content[0].lemma == k_.tisIndef && k_.tisIndef != kNone) {
+    GWord e = std::move(content[0]);
+    content.erase(content.begin());
+    size_t at = 1;
+    for (size_t i = 0; i < content.size(); ++i) {
+      const lex::Lemma l = lx_.lemma(content[i].lemma);
+      const Features wf = unpack(content[i].packed);
+      if (l.id != kNone && l.pos == Verb && wf.mood != Infinitive && wf.mood != ParticipleMood) { at = i + 1; break; }
+    }
+    content.insert(content.begin() + (long)at, std::move(e));
   }
   std::vector<GWord> clauseWords;
   for (GWord& w : intj) w.punctAfter = ",";

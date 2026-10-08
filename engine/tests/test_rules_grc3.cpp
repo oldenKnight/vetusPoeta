@@ -368,7 +368,9 @@ TEST_CASE("rules-grc3: participle forms, προσ- augment, οὕτω / οὕτ�
   CHECK(P("ποιέω", Present, Pl, M) == text::nfc("ποιοῦντες"));
   CHECK(P("λύω", Aorist, Pl, M) == text::nfc("λύσαντες"));
   std::string out;
-  CHECK_FALSE(grc::participle(lx, grc::findLemma(lx, "τρέχω", Verb), Present, 0, Gen, Sg, M, out));
+  // C25 (changed expectation): the oblique cases are derived from the nominatives now (were refused before)
+  CHECK(grc::participle(lx, grc::findLemma(lx, "τρέχω", Verb), Present, 0, Gen, Sg, M, out));
+  CHECK(out == text::nfc("τρέχοντος"));
   // προσκυνέω: the table's ἐπροσκύνησα is written προσεκύνησα, and the analysis reads it back
   const uint32_t pk = grc::findLemma(lx, "προσκυνέω", Verb);
   REQUIRE(pk != lex::kNoLemma);

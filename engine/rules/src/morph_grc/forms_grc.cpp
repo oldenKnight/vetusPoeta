@@ -530,6 +530,37 @@ bool attested(const lex::Lexicon& lx, uint32_t lemma, const char* form, const Fe
 
 }  // namespace
 
+// C25: the first letter of a word with its breathing swapped (rough <-> smooth) when it is an epsilon; empty otherwise
+namespace {
+std::string swapEpsilonBreathing(const std::string& w, char32_t from, char32_t to) {
+  std::u32string u = text::toUtf32(text::nfd(w));
+  if (u.size() < 3 || u[0] != U'ε') return std::string();
+  size_t i = 1;
+  bool hit = false;
+  while (i < u.size() && u[i] >= 0x0300 && u[i] <= 0x036F) {
+    if (u[i] == from) { u[i] = to; hit = true; }
+    ++i;
+  }
+  return hit ? text::nfc(text::toUtf8(u)) : std::string();
+}
+std::string smoothAugment(const std::string& form, std::string_view lemmaKey) {
+  // the lemma begins with a consonant and the form is that consonant after an augment ε with a rough breathing
+  const std::u32string lk = text::toUtf32(text::greek_bare(std::string(lemmaKey)));
+  const std::u32string fb = text::toUtf32(text::greek_bare(form));
+  if (lk.empty() || fb.size() < 3 || fb[0] != U'ε') return form;
+  const std::u32string vowels = U"αεηιουω";
+  if (vowels.find(lk[0]) != std::u32string::npos || fb[1] != lk[0]) return form;
+  const std::string r = swapEpsilonBreathing(form, 0x0314, 0x0313);
+  return r.empty() ? form : r;
+}
+std::string roughAugment(const std::string& form) {
+  const std::u32string fb = text::toUtf32(text::greek_bare(form));
+  const std::u32string vowels = U"αεηιουω";
+  if (fb.size() < 3 || fb[0] != U'ε' || vowels.find(fb[1]) != std::u32string::npos) return std::string();
+  return swapEpsilonBreathing(form, 0x0313, 0x0314);
+}
+}  // namespace
+
 bool generate(const lex::Lexicon& lx, uint32_t lemma, const Features& want0, std::string& out, GenInfo* info) {
   GenInfo gi;
   const lex::Lemma l = lx.lemma(lemma);
@@ -631,6 +662,9 @@ bool generate(const lex::Lexicon& lx, uint32_t lemma, const Features& want0, std
     // the preposition (προσεκύνησα); the analysis maps the form back (see analyse)
     if (bestForm.compare(0, std::strlen("ἐπροσ"), "ἐπροσ") == 0 && bestForm.size() > std::strlen("ἐπροσ") + 2)
       bestForm = "προσε" + bestForm.substr(std::strlen("ἐπροσ"));
+    // C25: a syllabic augment written with a rough breathing (νίζω: ἕνιψα, ἑνίψατο) is a table error: the augment of
+    // a verb that begins with a consonant is always ἐ- (ἔνιψα); the analysis maps the form back (see analyse)
+    if (l.pos == Verb) bestForm = smoothAugment(bestForm, l.key);
     out = bestForm;
     Features pf = unpack(bestPacked);
     gi.attic = (pf.extra & Attic) != 0;
@@ -694,6 +728,92 @@ std::string masculinePlural(const std::string& m, const std::string& f) {
   return std::string();
 }
 
+// C25: the word with its accents removed and an acute on the penult (the vowel group before the last one; diphthongs
+// αι ει οι υι αυ ευ ηυ ου count as one): "κάμνοντων" -> "καμνόντων", "πεινῶσης" -> "πεινώσης"
+std::string penultAcute(const std::string& w) {
+  std::u32string u = text::toUtf32(text::nfd(stripAccents(w)));
+  auto isMark = [](char32_t c) { return c >= 0x0300 && c <= 0x036F; };
+  auto vowel = [](char32_t c) {
+    const char32_t l = c >= U'Α' && c <= U'Ω' ? c + 0x20 : c;
+    return l == U'α' || l == U'ε' || l == U'η' || l == U'ι' || l == U'ο' || l == U'υ' || l == U'ω';
+  };
+  std::vector<size_t> base;   // indices of base letters
+  for (size_t i = 0; i < u.size(); ++i) if (!isMark(u[i])) base.push_back(i);
+  auto diaeresis = [&](size_t bi) {
+    for (size_t k = base[bi] + 1; k < u.size() && isMark(u[k]); ++k) if (u[k] == 0x0308) return true;
+    return false;
+  };
+  // vowel groups from the end
+  std::vector<size_t> groupLast;   // index (into base) of the last letter of each group, from the end
+  for (size_t b = base.size(); b-- > 0;) {
+    if (!vowel(u[base[b]])) continue;
+    size_t last = b;
+    if (b > 0 && vowel(u[base[b - 1]]) && !diaeresis(b)) {
+      const char32_t a = u[base[b - 1]], c = u[base[b]];
+      const bool diph = (c == U'ι' && (a == U'α' || a == U'ε' || a == U'ο' || a == U'υ')) ||
+                        (c == U'υ' && (a == U'α' || a == U'ε' || a == U'η' || a == U'ο'));
+      if (diph) --b;
+    }
+    groupLast.push_back(last);
+    if (groupLast.size() == 2) break;
+  }
+  if (groupLast.size() < 2) return w;
+  size_t at = base[groupLast[1]] + 1;
+  while (at < u.size() && isMark(u[at]) && u[at] != 0x0345) ++at;
+  u.insert(u.begin() + (long)at, 0x0301);
+  return text::nfc(text::toUtf8(u));
+}
+
+// C25: the oblique cases of a participle derived from its nominatives (the tables list only nominatives): the -ντ-
+// type (κάμνων κάμνουσα κάμνον; πεινῶν; ἰδών; λύσας; λυθείς; ὤν) and the -μενος type, with the accent rules of the
+// third / first / second declension (genitive plural -όντων, feminine -ούσης, -ουσῶν, middle -μένου). Perfect actives
+// (-ώς) are not derived. `m`, `f`, `n` are the nominatives singular; empty when no rule fits.
+std::string obliqueParticiple(const std::string& m, const std::string& f, const std::string& n, uint8_t case_,
+                              uint8_t number, uint8_t gender) {
+  const bool pl = number == Pl;
+  if (endsNfc(m, "μενος") || endsNfc(m, "μένος")) {
+    const std::string st = cut(m, "ος");
+    const char* e = nullptr;
+    bool longE = true;
+    if (gender == F) {
+      if (!pl) e = case_ == Gen ? "ης" : case_ == Dat ? "ῃ" : "ην";
+      else e = case_ == Gen ? "ων" : case_ == Dat ? "αις" : "ας";
+    } else if (!pl) {
+      if (case_ == Gen) e = "ου";
+      else if (case_ == Dat) e = "ῳ";
+      else { e = "ον"; longE = false; }
+    } else {
+      if (case_ == Gen) e = "ων";
+      else if (case_ == Dat) e = "οις";
+      else if (gender == N) { e = "α"; longE = false; }
+      else e = "ους";
+    }
+    const std::string w = st + text::nfc(e);
+    return longE ? penultAcute(w) : text::nfc(w);
+  }
+  if (endsNfc(m, "ώς")) return std::string();
+  const std::string mp = masculinePlural(m, f);
+  if (mp.empty() || !endsNfc(mp, "ντες")) return std::string();
+  const std::string S = cut(mp, "ες");   // κάμνοντ-
+  if (f.empty() || !endsNfc(f, "α")) return std::string();
+  const std::string fs = cut(f, "α");    // κάμνουσ-
+  std::string w;
+  if (gender == F) {
+    if (!pl) w = case_ == Gen ? penultAcute(fs + text::nfc("ης")) : case_ == Dat ? penultAcute(fs + text::nfc("ῃ")) : f + text::nfc("ν");
+    else w = case_ == Gen ? stripAccents(fs) + text::nfc("ῶν") : case_ == Dat ? penultAcute(fs + text::nfc("αις"))
+                                                                         : penultAcute(fs + text::nfc("ας"));
+  } else if (!pl) {
+    if (case_ == Gen) w = S + text::nfc("ος");
+    else if (case_ == Dat) w = S + text::nfc("ι");
+    else w = gender == N ? n : S + text::nfc("α");
+  } else {
+    if (case_ == Gen) w = penultAcute(S + text::nfc("ων"));
+    else if (case_ == Dat) w = fs + text::nfc("ι");
+    else w = gender == N ? S + text::nfc("α") : S + text::nfc("ας");
+  }
+  return w.empty() ? w : text::nfc(w);
+}
+
 // C21: a verb whose table files its present as a perfect (κάθημαι: καθήμενος tagged "plural perfect participle",
 // the feminine misaccented καθήμενη) while the lexicon has the participle as a lemma of its own with a full table
 // (καθήμενος, -η, -ον): that lemma, found through the verb's masculine participle cell. kNoLemma when there is none.
@@ -723,7 +843,39 @@ uint32_t participleLemma(const lex::Lexicon& lx, uint32_t lemma) {
 
 bool participle(const lex::Lexicon& lx, uint32_t lemma, uint8_t tense, uint8_t voice, uint8_t case_, uint8_t number,
                 uint8_t gender, std::string& out, GenInfo* info) {
-  if (case_ != Nom && case_ != Voc) return false;
+  if (case_ != Nom && case_ != Voc) {
+    // C25: genitive, dative, accusative derived from the nominatives (obliqueParticiple); a form the lexicon does not
+    // list is a rule form (Check)
+    if (case_ != Gen && case_ != Dat && case_ != Acc) return false;
+    std::string m, f, n;
+    if (!participle(lx, lemma, tense, voice, Nom, Sg, M, m, nullptr)) return false;
+    participle(lx, lemma, tense, voice, Nom, Sg, F, f, nullptr);
+    participle(lx, lemma, tense, voice, Nom, Sg, N, n, nullptr);
+    const uint8_t g = gender == F || gender == N ? gender : (uint8_t)M;
+    out = obliqueParticiple(m, f, n, case_, number == Pl ? (uint8_t)Pl : (uint8_t)Sg, g);
+    if (out.empty()) return false;
+    morph::Token t;
+    morph::analyseGreek(lx, out, t);
+    bool known = false;
+    for (const lex::Analysis& a : t.analyses) known = known || (a.lemma == lemma && !t.accentInsensitive);
+    Features pf;
+    pf.pos = Verb;
+    pf.mood = ParticipleMood;
+    pf.tense = tense;
+    pf.voice = voice;
+    pf.case_ = case_;
+    pf.number = number == Pl ? (uint8_t)Pl : (uint8_t)Sg;
+    pf.gender = g;
+    if (info) {
+      GenInfo r;
+      r.exact = known;
+      r.fromRule = !known;
+      r.packed = pack(pf);
+      r.movableNu = case_ == Dat && number == Pl && endsNfc(out, "σι");   // διψῶσι(ν)
+      *info = r;
+    }
+    return true;
+  }
   // C21: the present participle from a participle lemma of its own when the verb's table has no present cell for it
   if (tense == Present) {
     Features pf;
@@ -765,7 +917,17 @@ bool participle(const lex::Lexicon& lx, uint32_t lemma, uint8_t tense, uint8_t v
     f.voice = voice;
     f.gender = gg;
     f.number = Sg;
-    return generate(lx, lemma, f, o, gi) && !o.empty();
+    if (generate(lx, lemma, f, o, gi) && !o.empty()) return true;
+    // C25: tables that tag the singular nominatives of the middle / passive participle as plural (ὀργίζω:
+    // ὀργιζόμενος "plural masculine present participle passive"): such a cell with a singular ending serves
+    f.number = Pl;
+    if (!generate(lx, lemma, f, o, gi) || o.empty()) return false;
+    const bool sgShape = (gg == M && (endsNfc(o, "μενος") || endsNfc(o, "μένος"))) ||
+                         (gg == F && (endsNfc(o, "μένη") || endsNfc(o, "μενη"))) ||
+                         (gg == N && (endsNfc(o, "μενον") || endsNfc(o, "μένον")));
+    if (!sgShape) { o.clear(); return false; }
+    if (gi) { Features pf = unpack(gi->packed); pf.number = Sg; gi->packed = pack(pf); }
+    return true;
   };
   GenInfo gi;
   if (number != Pl) {
@@ -887,6 +1049,10 @@ void analyse(const lex::Lexicon& lx, std::string_view word, morph::Token& out) {
   // C18: προσε- written by generate() for a table's ἐπροσ- (an augment before the prefix): the table's spelling
   if (w0.compare(0, std::strlen("προσε"), "προσε") == 0 && w0.size() > std::strlen("προσε") + 2)
     cands[nc++] = "ἐπροσ" + w0.substr(std::strlen("προσε"));
+  // C25: ἔνιψα written by generate() for a table's ἕνιψα (see smoothAugment): the table's spelling, tried after the
+  // word itself; its augmented verb readings are added to the word's own (ἔνιψα is also a form of ἐνίπτω)
+  const std::string roughForm = roughAugment(w0);
+  if (!roughForm.empty()) cands[nc++] = roughForm;
   const std::string w1 = dropEncliticAcute(ultimaToAcute(w0));
   if (w1 != w0) cands[nc++] = w1;
   if (accentOf(w1).accents == 0 && accentOf(w1).syllables >= 2) cands[nc++] = encliticAccented(w1);
@@ -902,6 +1068,20 @@ void analyse(const lex::Lexicon& lx, std::string_view word, morph::Token& out) {
     morph::analyseGreek(lx, cands[i], out);
     if (!out.analyses.empty() && !out.accentInsensitive) {
       out.text = w0;
+      if (!roughForm.empty() && cands[i] != roughForm) {
+        morph::Token rt;
+        morph::analyseGreek(lx, roughForm, rt);
+        if (!rt.accentInsensitive)
+          for (const lex::Analysis& a : rt.analyses) {
+            const Features af = unpack(lx.feature(a.feat));
+            const lex::Lemma rl = lx.lemma(a.lemma);
+            if (rl.pos != Verb || smoothAugment(roughForm, rl.key) == roughForm) continue;   // only the augment case
+            if (af.tense != Aorist && af.tense != Imperfect && af.tense != Pluperfect) continue;
+            bool dup = false;
+            for (const lex::Analysis& b : out.analyses) dup = dup || (b.lemma == a.lemma && b.feat == a.feat);
+            if (!dup) out.analyses.push_back(a);
+          }
+      }
       atticFilter(out.analyses);
       return;
     }

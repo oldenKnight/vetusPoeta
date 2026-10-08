@@ -97,7 +97,13 @@ enum class Demonstrative : uint8_t { None, Houtos /* οὗτος */, Ekeinos /* 
 
 struct GrcClause;
 struct GrcPronoun { uint8_t person = 0, number = feat::Sg, gender = 0; };
-struct GrcAdj { uint32_t lemma = kNone; uint8_t degree = 0; std::vector<uint32_t> adverbs; /* "πάνυ μικρά" */ };
+struct GrcAdj {
+  uint32_t lemma = kNone; uint8_t degree = 0; std::vector<uint32_t> adverbs; /* "πάνυ μικρά" */
+  // C25 (additive): an attributive present participle of the verb `lemma` in this voice ("the hungry bird" -> ὁ
+  // πεινῶν ὄρνις, τῷ πεινῶντι ὄρνιθι), agreeing like an adjective
+  bool participle = false;
+  uint8_t voice = 0;
+};
 
 struct GrcNP {
   uint32_t head = kNone;          // noun / substantive adjective / pronoun lemma (kNone for names and pronoun specs)

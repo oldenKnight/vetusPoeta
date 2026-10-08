@@ -228,6 +228,15 @@ struct GreekChecker::Impl {
         r.f = unpack(packed);
         r.lpos = l.pos;
         if (r.lpos == Participle && r.f.case_ == 0 && r.f.mood == 0) r.lpos = Particle;   // library labels particles so
+        // C25: the verb tables list participles as nominatives without a case (πεινῶν "masculine present participle"):
+        // read them as nominatives, so that an attributive participle agrees with its article ("ὁ πεινῶν λύκος")
+        if (r.lpos == Verb && r.f.mood == ParticipleMood && r.f.case_ == 0) r.f.case_ = Nom;
+        // C25: and some tag the singular -μενος / -μένη / -μενον as plural (ὀργιζόμενος): a singular by its ending
+        if (r.lpos == Verb && r.f.mood == ParticipleMood && r.f.number == Pl && (r.f.case_ == Nom || r.f.case_ == 0)) {
+          const std::string b = text::greek_bare(t.text);
+          auto ends = [&](const char* e) { const std::string x(e); return b.size() > x.size() && b.compare(b.size() - x.size(), x.size(), x) == 0; };
+          if (ends("μενοσ") || ends("μενος") || ends("μενη") || ends("μενον")) r.f.number = Sg;
+        }
         r.lgender = l.gender;
         r.tier = r.lexTier = l.tier;
         r.freqRank = l.freqRank;
