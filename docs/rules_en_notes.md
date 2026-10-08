@@ -1262,6 +1262,15 @@ vetus valdē sōlus" -> Senex valdē sōlus; "Puellam quae pulchrē canit sciō"
 - #85 "Bene, crās ad mē venī nam tempore mihi opus est ut id cōgitem." - opus est with the ablative, as the teacher's
   phrasebook row "I need {NP}".
 
+### Final verification (after a container restart)
+The process was killed by a container restart after the blind check (first run 23:59 UTC and the run after the fixes
+both happened before the restart; the files were checkpointed by the main agent in 9d272fd). The final checks ran on the
+live tree at HEAD 9d272fd (C27 and C25's checkpoint included): rules + orberg suites 175 / 175 cases (oz 84 / 89, EN
+114 / 114 ok 64, ES 100 / 100 ok 80, EN->GRC 114 / 114 ok 81, ES->GRC 39 / 40, GRC->EN / ES 40 / 40, C18 review 13 / 13,
+la2x 201 / 201, Orbergise 60 / 60, 20 / 20, blind C27 20 / 20, with original 22 / 22), ctest 3 / 3 with VP_DATA_WORK /
+VP_CURATED_DIR / VP_NLP_DIR, -Wall -Wextra -Wshadow clean, ASan + LSan + UBSan rules tests 159 / 159 cases with zero
+reports (build-rules-k-asan, LLM off), VP_WITH_LLM=OFF tools/xcompile_check.sh OK (117 s, 0 warnings).
+
 ### Open points
 - "Is that X or Y's?" (that read as a subordinator), "one at a time" agreeing with the object, "they" for unnamed things.
 - The phrasebook rows "anything you want" and "anyone in trouble" have a fixed case (accusative); used as a subject
