@@ -74,12 +74,12 @@ still pending.
 | Measure | Result |
 |---|---|
 | English → Latin, 114-cue regression file, balanced fidelity | 114/114 match the reference (110/114 before four engine outputs were accepted as alternative references); marks OK 65, Check 49, Fix 0 |
-| English → Latin, 100-cue public-domain tuning sample (`tests/regression/oz_sample`) | 6 → 50 → 71 → 78/100 over four loops; no cue marked OK is wrong |
+| English → Latin, 100-cue public-domain tuning sample (`tests/regression/oz_sample`) | 6 → 50 → 71 → 78 → 89/100 over five loops; no cue marked OK is wrong |
 | Spanish → Latin, 100-cue regression file | 97/100 at the end of the Spanish loop; the 3 others were then accepted as alternatives (re-run 2026-10-06: 100/100); marks OK 81, Check 19, Fix 0 |
 | Latin → English and Latin → Spanish, 201 own sentences | 201/201 in both (tuned; blind batches of 30 and 40 written later were 20/30 and 31/40 English, 25/40 Spanish on their first run) |
 | English → Greek, 114-cue regression file | 114/114 after two loops (tuned); Spanish → Greek 38/40; Greek → English and Spanish 40/40 |
 | Orbergise | 60/60 own cases, 20/20 blind; with the original-language file 20/22 |
-| Held-out set (`tests/heldout/`, never read, never tuned on) | automatic errors: 74 own cues 10.8 % → 4.1 % (95 % CI 0.8-11.4 %); 700 public-domain cues 25.1 % → 14.4 % (CI 11.9-17.3 %); wrong among cues marked OK: 0 in every run. This is not yet an expert error rate (DESIGN §15) |
+| Held-out set (`tests/heldout/`, never read, never tuned on) | automatic errors: 74 own cues 10.8 % → 4.1 % (95 % CI 0.8-11.4 %); 700 public-domain cues 25.1 % → 14.0 % (CI 11.5-16.8 %); wrong among cues marked OK: 0 in every run. This is not yet an expert error rate (DESIGN §15) |
 | Acceptance test on the owner's partial film file (82 cues: 31 song lines, 9 quoted book text, 42 dialogue) | first run: automatic errors 25/82, **expert review 65/82 = 79.3 % wrong** (95 % CI 68.9-87.4 %), 2 of 9 OK cues wrong. After tuning loop 1 on the same file: expert review 22/82 = 26.8 % wrong. After loop 2: automatic 0/82, **expert review 3/82 = 3.7 % wrong** (CI 0.8-10.3 %), 0 of 20 OK cues wrong. A tuned number: no < 1 % claim is made (PREPLAN 6.1); the held-out files and the owner's second file are the honest measure |
 | Google Translate side-by-side (Latin) | **pending**: the tool is ready and tested offline; the live run has not been done |
 | Local model, Latin minimal-pair gate (1,000 pairs) | 749/1,000 = 74.9 % (95 % Wilson 72.1-77.5 %), below the 75 % bar fixed in advance: **not passed**, so the model is used for English/Spanish understanding only |
