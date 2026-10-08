@@ -19,8 +19,9 @@ Last updated: 2026-10-05 (session 1, step 1 of the production process).
 
 ## Next step (updated 2026-10-06, evening)
 - 54 tasks DONE through C27 / E13 (Latin loops 1-5, two acceptance loops, Greek loops 1-5, Orbergise on real material,
-  latinity toggle D18, release passes R1-R2; R3 in progress). No implementer running; every commit is pushed to
-  claude/fervent-cannon-6qif8i.
+  latinity toggle D18, release passes R1-R3). No implementer running; every commit is pushed to
+  claude/fervent-cannon-6qif8i. The tree is release-ready on Linux; nothing engineering-side is pending that does not
+  need the owner's input (second file, main branch, Google Translate run, Windows smoke test).
 - Waiting on the owner: the Alice .srt (acceptance run: `tools/eval/run_eval.py --tuned`, then a tuning loop C18 on
   its first-run mismatches, then the true held-out file), a `main` branch for the draft pull request, the Google
   Translate side-by-side on his machine (docs/EVAL.md §5), the Windows smoke checklist (docs/BUILD.md).
