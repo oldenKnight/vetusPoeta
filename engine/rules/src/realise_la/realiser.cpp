@@ -462,6 +462,15 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
   }
   // Subject
   const bool drop = pron_.dropSubject(c) || (ctx.relative && c.relRole == Role::Subject);
+  // C26: a dropped pronoun subject keeps its quantity word ("All of you must come." -> Omnēs venīre dēbētis)
+  if (c.hasSubject && drop && c.subject.isPronoun && !c.exclQuam && !c.exclO && c.type != ClauseType::Imp &&
+      !(ctx.relative && c.relRole == Role::Subject) && c.subject.adjectives.size() == 1 && c.subject.adjectives[0].after) {
+    LaNP x;
+    x.head = c.subject.adjectives[0].lemma;
+    x.number = c.subject.pron.number ? c.subject.pron.number : c.subject.number;
+    x.gender = c.subject.pron.gender ? c.subject.pron.gender : c.subject.gender ? c.subject.gender : (uint8_t)M;
+    np(x, subjCase, &c, o, s[kS]);
+  }
   if (c.hasSubject && !drop && !c.exclQuam && !c.exclO) {
     np(c.subject, subjCase, &c, o, s[kS]);
     if (c.subject.emphasis) focus = kS;

@@ -14,7 +14,7 @@ Estne vir bonus?
 Tamen omnibus artibus magicīs quās sciō ūtar ut tē ā malō servem. | Tamen omnibus artibus magicīs quās nōvī tē ā malō servābō.
 et nēmō audēbit nocēre eī quem Saga Septentriōnis ōsculāta est.
 Ad longum iter aptissimī essent, quia numquam dēterī possent. | Ad longum iter optimī essent, quia numquam terī possent.
-Praetereā album in veste habēs, et sōlae sagae albō vestiuntur. | Praetereā album in veste tuā est, et sōlae sagae alba gerunt.
+Praetereā album in veste habēs, et sōlae sagae albō vestiuntur. | Praetereā album in veste tuā est, et sōlae sagae alba gerunt. | Praetereā album in veste tuā habēs et sōlae sāgae et venēficae album gerunt.
 Melius est hominibus ab Oz abesse, nisi negōtium cum eō habent.
 Locūtusne es? | Locūtane es?
 Nōn potes dēscendere?
@@ -46,8 +46,8 @@ Puellam parvam nōbīscum feremus,
 Ō ita; amīcum nostrum servāre potes, Leōnem Timidum, quī in agrō papāverum dormit.
 Sed, sociī, quid nunc faciēmus?
 et tum ad Urbem Smaragdōrum pergere possumus.
-Dīcunt eum nēminem umquam ad sē admittere. | Quid? Dīcitur nēminem umquam ad sē admittere.
-nec quemquam vīvum nōvī quī eum vīdit.
+Dīcunt eum nēminem umquam ad sē admittere. | Quid? Dīcitur nēminem umquam ad sē admittere. | Quid? Dīcitur nēminem umquam sinere ad sē venīre.
+nec quemquam vīvum nōvī quī eum vīdit. | Nec quemquam vīvum quī eum vīdit nōvī.
 et quīdam dīcunt eum fēlī similem esse.
 Et nōbīs dictum est Oz magum bonum esse.
 Sed eīs quī nōn sunt honestī, aut quī cūriōsitāte ad eum accēdunt, | Sed eīs quī nōn probī sunt, aut quī cūriōsitāte ad eum adeunt, | Sed eīs quī honestī nōn sunt, aut quī eī cūriōsitāte appropinquant,
@@ -81,11 +81,11 @@ et eum iterum in fōrmam reflectere, et ubi frāctus est cōnferrūmināre? | et
 Eam caedam, et tum vestēs Terriculī capere poterimus. | Arborem caedam, et tum vestēs Terriculī sūmere possumus.
 tandem cor meum accipiam.
 Vix exspectāre posse mihi videor dum ad Oz perveniam, | Vix exspectāre possum dum ad Oz perveniam,
-et fatērī dēbēs hoc iter longissimum esse.
+et fatērī dēbēs hoc iter longissimum esse. | Et fatērī dēbēs hoc iter valdē longum esse.
 Cūr id anteā nōn cōgitāvimus? | Cūr nōn anteā dē eō cōgitāvimus?
 Nunc Pilleus Aureus tuus est,
 Cūr mē quaeris?
-Bene, crās ad mē venī, nam tempus mihi est ut dē hōc cōgitem. | Bene, crās ad mē venī, nam tempus ad cōgitandum mihi opus est.
+Bene, crās ad mē venī, nam tempus mihi est ut dē hōc cōgitem. | Bene, crās ad mē venī, nam tempus ad cōgitandum mihi opus est. | Bene, crās ad mē venī nam tempore mihi opus est ut id cōgitem.
 Sed nōlī mē ferīre, quaesō, nōlī, et faciam quidquid vīs.
 Ita plānē! | Rēctē!
 Quōmodo mihi ut Caput magnum appāruistī?

@@ -77,7 +77,7 @@ ludo	lūdō	verb	1	derived
 laboro	labōrō	verb	1	derived	
 pugno	pugnō	verb	1	derived	
 verbero	verberō	verb	1	derived	
-pulso	pulsō	verb	1	derived	knock, strike, ring (a bell)
+pulso	pulsō	verb	1	derived	knock, ring (a bell)
 tango	tangō	verb	1	derived	
 teneo	teneō	verb	1	derived	
 relinquo	relinquō	verb	1	derived	
@@ -696,7 +696,7 @@ anus	anus	noun	2	teacher	old woman
 potens	potēns	adj	2	teacher	powerful, mighty
 gero	gerō	verb	2	teacher	wear (clothes), carry on
 equito	equitō	verb	2	teacher	ride (on horseback)
-fuscus	fuscus	adj	2	teacher	brown, dusky
+fuscus	fuscus	adj	0	teacher	brown, dusky
 benignitas	benignitās	noun	2	teacher	kindness, goodness, friendliness
 scintillo	scintillō	verb	2	teacher	sparkle, twinkle, glitter
 later	later	noun	2	teacher	brick
@@ -705,3 +705,5 @@ versicolor	versicolor	adj	2	teacher	colourful, colorful, many-coloured
 asper	asper	adj	2	teacher	rough, uneven, bumpy
 ungo	ungō	verb	2	teacher	oil, grease, anoint
 excors	excors	adj	2	teacher	brainless, senseless, stupid
+ferio	feriō	verb	2	teacher	strike, hit, smite
+neglegens	neglegēns	adj	2	teacher	careless, negligent

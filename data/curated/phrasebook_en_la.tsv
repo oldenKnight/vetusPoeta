@@ -291,3 +291,10 @@ bother	vah	1	excl	C26: "Oh, bother!" -> Ō, vah!
 gee	papae	1	excl	C26
 gosh	papae	1	excl	C26
 golly	papae	1	excl	C26
+anything you want me to	quidquid vīs	1	tail	C26: "I will do anything you want me to." -> Faciam quidquid vīs.
+anything you want	quidquid vīs	1	tail	C26
+anything you like	quidquid tibi placet	1	tail	C26
+whatever you want	quidquid vīs	1	tail	C26
+whatever you like	quidquid tibi placet	1	tail	C26
+anyone in trouble	eōs quī in perīculō sunt	1	tail	C26: "I like to help anyone in trouble." -> Libenter adiuvō eōs quī in perīculō sunt (object at the end of its clause)
+people in trouble	eōs quī in perīculō sunt	1	tail	C26

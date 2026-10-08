@@ -2422,7 +2422,8 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       f.pred.lemma = xl;
       f.pred.token = xcomp;
       c.drop(h, Drop::Aux);
-    } else if (in(hl, {"have", "need", "tener", "necesitar"}) && f.pred.aspect != Aspect::Perfect) {
+    } else if (in(hl, {"have", "need", "tener", "necesitar"}) && f.pred.aspect != Aspect::Perfect &&
+               !(en && obj >= 0 && obj < xcomp)) {   // C26: "have time to think" is no "have to think"
       f.pred.modality = Modality::Must;
       f.pred.lemma = xl;
       f.pred.token = xcomp;
@@ -4096,6 +4097,38 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
 void FrameBuilder::repairTree(SemSentence& s) const {
   std::vector<nlp::Token>& tk = s.tokens;
   const int n = (int)tk.size();
+  // C26: "The kindness of the old woman surprised everyone.": a past verb the parser hung on a noun inside the
+  // subject phrase (acl, no subject, no relative word) when the sentence has no other verb is the main verb
+  if (lang_ == SrcLang::En && n >= 5) {
+    int r = -1, verbs = 0, v = -1;
+    for (int k = 0; k < n; ++k) {
+      if (tk[(size_t)k].head == 0) r = k;
+      if (tk[(size_t)k].upos == "VERB" || tk[(size_t)k].upos == "AUX") { ++verbs; v = k; }
+    }
+    if (r >= 0 && verbs == 1 && v > r && in(tk[(size_t)r].upos, {"NOUN", "PROPN"}) && tk[(size_t)v].deprel == "acl" &&
+        nlp::morph::get(tk[(size_t)v].feats, nlp::morph::TenseShift) == nlp::morph::TensePast &&
+        nlp::morph::get(tk[(size_t)v].feats, nlp::morph::VerbFormShift) != nlp::morph::VfPart) {
+      bool own = false;
+      for (int k = 0; k < n; ++k)
+        if (tk[(size_t)k].head == v + 1 && (tk[(size_t)k].deprel == "nsubj" ||
+                                            in(tk[(size_t)k].lower, {"who", "which", "that", "whom", "whose"})))
+          own = true;
+      int up = tk[(size_t)v].head - 1;   // the noun it hangs on must lie inside the root's phrase
+      bool inside = false;
+      for (int guard = 0; up >= 0 && guard < n; ++guard) {
+        if (up == r) { inside = true; break; }
+        up = tk[(size_t)up].head - 1;
+      }
+      if (!own && inside) {
+        tk[(size_t)v].head = 0;
+        tk[(size_t)v].deprel = "root";
+        tk[(size_t)r].head = v + 1;
+        tk[(size_t)r].deprel = "nsubj";
+        for (int k = 0; k < n; ++k)
+          if (k != v && tk[(size_t)k].head == r + 1 && tk[(size_t)k].deprel == "punct" && k > v) tk[(size_t)k].head = v + 1;
+      }
+    }
+  }
   // C26: verbless fragments (a cue that is a noun phrase).
   bool anyVerb = false;
   for (const nlp::Token& t : tk) anyVerb = anyVerb || t.upos == "VERB" || t.upos == "AUX";

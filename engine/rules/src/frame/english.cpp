@@ -603,6 +603,23 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
       }
     }
   }
+  // C26: a word tagged as an adjective that the parser gave an object ("The song of the bird pleased everyone.") and
+  // that english.vpl knows as a finite past is the verb
+  for (int i = 1; i < n; ++i) {
+    Token& t = tk[(size_t)i];
+    if (t.upos != "ADJ") continue;
+    // not after a determiner or a possessive ("her lost ring": the participle before its noun)
+    if (tk[(size_t)i - 1].upos == "DET" || isIn(tk[(size_t)i - 1].lower, {"my", "your", "his", "her", "its", "our", "their"}))
+      continue;
+    bool obj = false;
+    for (int j = i + 1; j < n; ++j) obj = obj || (tk[(size_t)j].head == i + 1 && tk[(size_t)j].deprel == "obj");
+    if (!obj) continue;
+    const Reading r = readingOf(lx, t.lower);
+    if (r.pastOf.empty() || !r.finitePast) continue;
+    t.upos = "VERB";
+    t.feats = nlp::morph::fromString("Tense=Past|VerbForm=Fin|Mood=Ind");
+    changed = true;
+  }
   // C26: a lower-case word tagged as a proper name that english.vpl knows as a common noun is that noun ("The road
   // of yellow brick." had "brick" as a name); a colour word tagged as a noun before "and" / "," and another
   // adjective or colour of the same noun is an adjective ("the pink and orange sky")

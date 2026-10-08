@@ -1270,7 +1270,7 @@ TEST_CASE("rules-d: end to end on oz_sample.en.srt vs the gold Latin (report; de
   MESSAGE("oz regression: " << matches << " / 100 match the gold; confidence ok " << conf["ok"] << " / check "
                             << conf["check"] << " / fix " << conf["fix"] << "; wrong among OK " << wrongOk);
   CHECK(wrongOk == 0);
-  CHECK(matches >= 74);   // C15 50 / 100; C17 68 / 100; C19 74 / 100 without the gold alternatives it proposes (docs/rules_en_notes.md)
+  CHECK(matches >= 84);   // C15 50 / 100; C17 68 / 100; C19 74 / 100; C26 84 / 100 without the gold alternatives it proposes (docs/rules_en_notes.md)
 }
 
 TEST_CASE("rules-d: tests/samples/sample.en.srt, 12 cues with the expected Latin") {
@@ -2921,7 +2921,7 @@ TEST_CASE("rules-j: word choices of songs and stories (work item e)") {
       {"What would the old king say?", "Quid rēx vetus dīceret?"},
       {"The boy is late for school.", "Puer ad lūdum sērō venit."},
   });
-  CHECK(run({"After this the king will need a new crown."})[0].text.rfind("Post hoc rēx", 0) == 0);
+  CHECK(run({"After this the king will need a new crown."})[0].text.rfind("Post hoc ", 0) == 0);   // C26: opus erit
 }
 
 TEST_CASE("rules-j: relative clauses: across song lines, where after a noun, can inside can (work item f)") {
@@ -3071,4 +3071,126 @@ TEST_CASE("rules-k: fragments keep the case and agreement of their phrase (work 
   CHECK(run({"She called the boys.", "and the girls too."})[1].text == "Et puellās quoque.");
   for (const char* s : {"A tall man in a green coat.", "An old woman in a red cloak.", "Just an old box."})
     CHECK(run({s})[0].conf != rules::Confidence::Fix);
+}
+
+TEST_CASE("rules-k: rules from the tuning sample, each with own sentences (work item a)") {
+  NEED_REAL();
+  expectEach({
+      // get + a thing that is given -> accipiō
+      {"Tomorrow you will get a present.", "Crās dōnum accipiēs."},
+      {"The good children will get a prize.", "Puerī bonī praemium accipient."},
+      // a match that is lit is a fax
+      {"She struck a match.", "Facem accendit."},
+      {"The lighted match fell.", "Fax accēnsa cecidit."},
+      // the rest of us / all of them
+      {"She is taller than the rest of us.", "Altior est quam nōs cēterae."},
+      {"The rest of the children laughed.", "Cēterī puerī rīsērunt."},
+      // only + subject -> sōlus
+      {"Only cats eat fish.", "Sōlae fēlēs piscem edunt."},
+      {"Only the king knows the secret.", "Sōlus rēx arcānum scit."},
+      // together after a comparison
+      {"The bear is stronger than all of us together.", "Ursus validior est quam nōs omnēs ūnā."},
+      // nor + any person -> nec quisquam
+      {"Nor did I see any person on the road.", "Nec quemquam in viā vīdī."},
+      // never + anyone -> nēminem umquam
+      {"He never helps anyone.", "Nēminem umquam adiuvat."},
+      {"I have never met anyone there.", "Nēminī umquam ibi occurrī."},
+      // know + a person -> nōvī
+      {"Do you know my uncle?", "Nōvistīne avunculum meum?"},
+      {"All of you must come.", "Omnēs venīre dēbētis."},
+      {"She knew the old king.", "Rēgem veterem nōverat."},
+      // brains = wits, a lot of + a mass noun
+      {"The boy wants a lot of brains.", "Puer multum cerebrī vult."},
+      {"You have good brains.", "Cerebrum bonum habēs."},
+      // let + object + verb -> sinō + accusative + infinitive
+      {"The farmer never lets the goats eat the corn.", "Agricola numquam caprās sinit annōnam edere."},
+      {"She let the cat come into the kitchen.", "Fēlem sīvit in culīnam venīre."},
+      // need -> opus est + dative (order_la.txt need.opus), the thing in the ablative as the teacher's row
+      {"We need a boat.", "Nāve nōbīs opus est."},
+      {"The birds need water.", "Aquā avibus opus est."},
+      {"I must have time to think it over.", "Tempore mihi opus est ut id cōgitem."},
+      // an elliptical prohibition is nōlī alone; anything you want -> quidquid vīs; strike -> feriō
+      {"Don't push me, please don't!", "Nōlī mē pellere, nōlī quaesō!"},
+      {"I will do anything you want.", "Faciam quidquid vīs."},
+      {"Take whatever you like.", "Sūme quidquid tibi placet."},
+      {"Don't strike the dog.", "Nōlī canem ferīre."},
+      // anyone / people in trouble -> eōs quī in perīculō sunt (phrasebook, at the end of the clause)
+      {"We must help anyone in trouble.", "Adiuvāre dēbēmus eōs quī in perīculō sunt."},
+      {"The doctor helps people in trouble.", "Medicus adiuvat eōs quī in perīculō sunt."},
+      // a coordinated clause with its own subject after a predicate noun
+      {"You are a good friend, for you have helped me.", "Amīcus bonus es nam mē adiūvistī."},
+  });
+}
+
+TEST_CASE("rules-k: words of the Oz register are never bracketed (work item c)") {
+  NEED_REAL();
+  expectEach({
+      {"The housetop was white.", "Apex domūs albus erat."},
+      {"We climbed to the hilltop.", "Ad apicem collis scandimus."},
+      {"The pink and orange sky.", "Caelum roseum et aurantium."},
+      {"A small brown mouse.", "Mūs parvus fuscus."},
+      {"The road of yellow brick.", "Via lateris flāvī."},
+      {"He spoke with great kindness.", "Benignitāte magnā locūtus est."},
+      {"The colourful birds sang.", "Avēs versicolōrēs cecinērunt."},
+      {"The road was bumpy.", "Via aspera erat."},
+      {"The woodman's joints were oiled.", "Artūs lignātōris ūnctī erant."},
+      {"The emerald city sparkled.", "Urbs smaragdīna scintillāvit."},
+      {"A beautiful silk dress.", "Vestis pulchra sēricī."},
+      {"Gee, that is strange.", "Papae, id mīrum est."},
+      {"Oh, bother!", "Ō, vah!"},
+      {"The hatless man shivered.", "Vir quī pilleō caret horruit."},
+      {"The roofless house was cold.", "Domus quae tēctō caret frīgida erat."},
+  });
+  for (const char* s : {"The housetop was white.", "The road of yellow brick.", "The hatless man shivered.",
+                        "The colourful birds sang.", "A beautiful silk dress."}) {
+    const Out o = run({s})[0];
+    CHECK_MESSAGE(o.text.find('[') == std::string::npos, s << " -> " << o.text);
+    CHECK(o.conf != rules::Confidence::Fix);
+  }
+}
+
+TEST_CASE("rules-k: deterministic with the new rules, in both latinity modes") {
+  NEED_REAL();
+  const std::vector<std::string> src = {"The knight rode to the castle.", "Is this your cat or mine?",
+                                        "Whose book is this?", "They walked for hours without finding water.",
+                                        "We found the cat.", "and the little dog.", "We need a boat.",
+                                        "The hatless man shivered.", "He never helps anyone."};
+  for (rules::Latinity lt : {rules::Latinity::Wide, rules::Latinity::Classical}) {
+    std::string first;
+    for (int k = 0; k < 2; ++k) {
+      std::unique_ptr<rules::Engine> e = engine();
+      std::vector<rules::CueInput> in;
+      for (size_t i = 0; i < src.size(); ++i) {
+        rules::CueInput c;
+        c.index = (uint32_t)i;
+        c.sourceText = src[i];
+        c.startMs = (int64_t)i * 4000;
+        c.endMs = c.startMs + 3500;
+        in.push_back(c);
+      }
+      rules::Options o;
+      o.speakerGender = 'f';
+      o.latinity = lt;
+      auto r = e->translate(in, o, rules::Context{}, nullptr, nullptr);
+      REQUIRE(r.ok());
+      std::string all;
+      for (const auto& c : r.value()) all += c.target + "\n";
+      if (k == 0) first = all;
+      else CHECK(all == first);
+    }
+    CHECK(first.find("equitāvit") != std::string::npos);
+    CHECK(first.find("Cuius est hic liber?") != std::string::npos);
+  }
+}
+
+TEST_CASE("rules-k: fixes after the blind check (own sentences, C26)") {
+  NEED_REAL();
+  expectEach({
+      {"The careless boy broke the cup.", "Puer neglegēns calicem frēgit."},
+      {"She is very careless.", "Valdē neglegēns est."},
+      {"The smell of the fresh bread filled the kitchen.", "Odor pānis recentis culīnam implēvit."},
+  });
+  // a past verb hung on a noun of the subject phrase is the main verb; an adjective with an object is a verb
+  CHECK(run({"The song of the little bird pleased everyone."})[0].text.find("placuit") != std::string::npos);
+  CHECK(run({"The roar of the angry lion frightened the girls."})[0].text.find("terru") != std::string::npos);
 }

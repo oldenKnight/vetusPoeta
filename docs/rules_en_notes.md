@@ -1132,3 +1132,139 @@ reflexive possessive of a coordinated verb. After: **11 / 20**.
   badly (blind lines 17-19); the clause split avoids the word-by-word Fix but the joins are rough.
 - "too ADJ to VP" (quam ut), "tell X that ..." (accusative and infinitive), "tired of + -ing", a coordinated infinitive
   under licet are not handled.
+
+## Quality loop 5 (C26, 2026-10-07/08)
+Material: the 22 remaining oz_sample mismatches, the held-out error classes of STATUS E10 (flags only, no text:
+fragment 54, unknown 25, purpose-guess 17, emoji 15, participle-phrase 8, contact-relative 8, names 7), the review
+items of C19/C20 (ride, alternative questions, must not, whose, tomorrow, give + person + thing, without + -ing,
+secret), tests/regression/sample.en.srt, own_dialogue EN / ES. tests/heldout/, tests/eval_gold/,
+data/work/eval/heldout-* and data/acceptance/ were not opened. Twenty blind sentences of children's-book dialogue were
+written at 22:37 UTC before any change (data/work/eval/c26-blind/, gitignored) and run once at 23:59 UTC. The Greek
+side (C25) ran at the same time: no Greek file was touched; the shared frame builder was checked against the Greek
+suites after every frame change. Builds ran in an isolated copy of HEAD plus the C26 files, so the other
+implementers' unfinished files never entered a measurement.
+
+### Before / after
+| file | start of C26 | end of C26 |
+|---|---|---|
+| oz_sample EN (100) | 78 / 100, exact 50, ok 25 / check 72 / fix 3, wrong among OK 0 | **84 / 100** without and **89 / 100** with the 5 proposed gold alternatives below; exact 57; ok 25 / check 73 / fix 2; wrong among OK 0 |
+| own_dialogue EN (114) / ES (100) | 114 / 114 (ok 64), 100 / 100 (ok 80) | outputs identical |
+| sample.en.srt 12, la2x 201 / 201, orberg 60 / 60 | 12, 201, 60 | unchanged |
+| Greek EN->GRC / ES->GRC / GRC->EN, ES / C18 review | 114 / 114, 39 / 40, 40 / 40, 13 / 13 | identical text; one cue Check -> OK ("Tomorrow we will write a letter in Latin.": "tomorrow" is now an adverb, no frame repair) |
+| blind check (20 own sentences) | first run **17 / 20** acceptable | 18 / 20 after the fixes |
+
+The oz threshold in the test is raised 74 -> 84 (the count without the proposed alternatives).
+
+### (a) The oz mismatches (each rule with own sentences in "rules-k: rules from the tuning sample")
+- #2 "powerful" -> potēns (teacher row; the teacher-gloss loop also finds a participle lemma), "all the rest of us" ->
+  nōs omnēs ("the rest of us" -> nōs cēterī, "the rest of the children" -> cēterī puerī, "all of us / you / them" ->
+  nōs / vōs / eōs omnēs, a dropped pronoun subject keeps its quantity word: "Omnēs venīre dēbētis"), "together" after
+  a comparison closes the quam phrase (ūnā); the checker no longer reads the nominative after quam as the subject
+  (the gold itself was A3 Fix).
+- #14 "only" right before the subject of a clause -> sōlus agreeing (sōlae sāgae); "wear" -> gerō (teacher row).
+- #21 "match" with light / strike / burn in the clause -> fax ("strike / light a match" -> facem accendere, states rows).
+- #46 "never ... anyone" -> nēminem umquam (umquam right before the verb: new AdvPos::Inner); "let" with its own subject
+  and an object is "allow" (sinō + accusative + infinitive), not the jussive; a bare verb the parser hung on the object
+  of let is its complement.
+- #47 "nor" + "any" + a person noun -> nec quisquam; "know" + a person -> nōvī (perfect of nōscō: nōveram, nōveris);
+  neque before a consonant is written nec (as the teacher writes it).
+- #79 "get" + a thing one is given (heart, prize, present, letter, answer ...) -> accipiō; things to fetch keep capiō.
+- #85 "need" + noun and "must have" + noun (not "have to") -> opus est + dative, the thing in the ablative as the
+  teacher's row "I need {NP}" (order_la.txt need.opus; "Nāvem dēbēmus" meant "we owe a ship"); "have time to think"
+  is no "have to think"; the purpose clause of the one who needs takes that person (ut id cōgitem); think over -> cōgitō.
+- #86 "please don't" / "don't!" alone -> nōlī (the verb is understood; after a comma no et); "anything / whatever you
+  want / like" -> quidquid vīs / quidquid tibi placet (phrasebook, tail); "strike" -> feriō (the note "strike" moved
+  from pulsō to a feriō row).
+- #93 a verb with its own subject coordinated with a predicate noun is a clause ("for I have given you ..." was lost);
+  "brains" (wits), "news" -> the Latin singular; "a lot of" + such a noun -> multum + genitive (multum cerebrī novī);
+  the checker accepts a quantity word heading a genitive after the subject.
+- #38 "anyone / people in trouble" -> eōs quī in perīculō sunt (phrasebook, tail: an object closing its clause).
+- Not done: free renderings (#5, #13, #23, #30, #80, #95), #26 ("they" for unnamed things), #34 (one at a time ->
+  singulōs agreeing), #69 (still = tamen, vetoed before as adhūc), #76 (any of your people + tinsmiths), #77.
+
+### (b) Fragments (test "rules-k: fragments keep the case and agreement of their phrase")
+- A list "the lion, the tiger and the bear." is one coordinated noun phrase (the parser made punctuation, genitives or
+  appositions of the members): "Leō et tigris et ursus."; a conjunct after a comma with a later "and" conjunct is no
+  apposition.
+- "Not my sister!" -> Nōn soror mea! (was "[not]" Fix); "Just / Only + noun phrase" -> tantum + nominative (the
+  verbless-sentence retag no longer makes "just" an imperative).
+- "A crown made of gold." -> Corōna quae ex aurō facta est: a bare past participle on a noun is passive; make / build
+  of -> ex (verbprep rows); a noun phrase with an indefinite article and made / built / covered ... of is no sentence.
+- A verbless cue rooted on its final punctuation ("and the girls too.") gets its first noun as the root ("Et puellās
+  quoque."); a cue that starts with a lower-case word continues the previous sentence of the same speaker whatever
+  its last mark (the object case of that sentence is offered to "and + noun phrase").
+- "for a long time" -> diū, "for a while" -> aliquamdiū, "all day long" -> tōtum diem (phrasebook adv).
+- Checker: a word a preposition governs is no finite verb ("Vir altus in palliō viridī" was A3 Fix: palliō = I cloak);
+  a segment-final word the generator wrote as a noun / adjective with that reading is no verb ("Via lateris flāvī");
+  the "no verb at all" test ignores the head of a compound noun ("a silver cup", "a small brown mouse").
+- "A beautiful silk dress." -> Vestis pulchra sēricī (an NP-final noun the tagger read as a verb; a word in -ss / -us / -is
+  is no 3rd-person -s verb); "Two pretty girls ..." (an adverb-tagged adjective of a noun).
+
+### (c) Unknown words of the Oz register (test "rules-k: words of the Oz register are never bracketed")
+- Compound heads -top, -side, -bank, -field, -way, -path, -land ("housetop" -> apex domūs, "hilltop" -> apex collis,
+  flag derived-word).
+- An unknown "X-less" adjective of a known noun -> a relative clause with careō ("The hatless man" -> Vir quī pilleō
+  caret, flag derived-word); "-less" words the library lists keep their adjective (ēcaudis, īnfrōns).
+- Colour words: orange, purple, violet, scarlet, crimson join the list; a colour tagged as a noun before "and" + another
+  colour of the same noun is an adjective ("Caelum roseum et aurantium"); brown -> fuscus (teacher row, tier 0: the
+  teacher's gloss now wins over the tier preference, so niger is no longer chosen).
+- A lower-case word tagged as a name that english.vpl knows as a noun is that noun ("yellow brick" -> lateris flāvī).
+- Rows for kindness (benignitās), sparkle (scintillō), brick (later), hey (heus), colourful (versicolor), bumpy
+  (asper), oil (ungō), brainless (excors), careless (neglegēns), gee / gosh / golly (papae), bother (vah), thank goodness
+  (dīs grātiās), goodness gracious / me (dī bonī).
+
+### (d) Review items (test "rules-k: ride, alternative questions, must not, whose" and "... tomorrow ...")
+- "rode to the castle" -> equitāvit; "rode his horse" -> equō suō vectus est (vehor + ablative of the mount).
+- "or" between the alternatives of a yes / no question -> an (also between predicate adjectives: new LaClause::predConj);
+  "your book or his" keeps tuus on the first noun.
+- After a modal (with not / never between) English has a bare verb: an adjective-tagged "open" is the verb ("Illam
+  iānuam aperīre nōn dēbēs", was a Fix); not the subject of an inverted question ("Can cats smile?").
+- "Whose book is this?" -> Cuius est hic liber? (new LaWh::case_, LaNP::whoseGen); "Whose dog is barking?" -> Cuius
+  canis lātrat?; an interrogative noun phrase before do / will + a second subject is the object ("Cuius domum vīdistī?").
+- "tomorrow / yesterday / today / tonight" opening a clause with a verb of its own are the time adverbs ("Crās rēx
+  perveniet.", was "prōcrāstinātiō ... Fix").
+- "Give the children something to drink." -> Puerīs aliquid ad bibendum dā (person dative, thing accusative with give,
+  bring, show ...); "old man / woman" -> senex / anus.
+- "without + -ing" -> nec / neque + the main verb's tense ("Hōrās ambulāvērunt neque aquam invēnērunt"; the frame marks
+  the clause negative, so the Greek side reads "and not").
+- "secret" (noun) was already arcānum.
+
+### Blind check
+20 own sentences written at 22:37 UTC, run once at 23:59 UTC: **17 / 20** acceptable at the first run (two borderline
+cases counted acceptable: "oak tree" -> arborem rōbustam, "on a grey pony" -> in mannō cānō). Wrong: "Is that your
+scarf or your sister's?" (the parser reads "that" as a subordinator; a plural verb), "The kindness of the old woman
+surprised everyone." (a relative clause invented from a verb hung on "woman"; surprise -> dēprehendō), "The careless
+boy" (sēcūrus = free from care). Fixed with own sentences ("rules-k: fixes after the blind check"): careless ->
+neglegēns, a past verb hung on a noun of the subject phrase is the main verb, an adjective-tagged past with an object is
+the verb (not after a determiner or possessive: "her lost ring" stays a participle). After: **18 / 20** (still wrong:
+the scarf question; "surprised" -> dēprehendit).
+
+### Rows
+tiers_la.tsv +16 (senex, anus, potēns, gerō, equitō, fuscus (tier 0), benignitās, scintillō, later, heus, versicolor,
+asper, ungō, excors, feriō, neglegēns) and 1 note (pulsō: "strike" removed); phrasebook_en_la.tsv +17 (for a long time,
+for a while, all day long, thank goodness, goodness gracious, goodness me, bother, gee, gosh, golly, anything you want
+(me to), anything you like, whatever you want / like, anyone / people in trouble); verbprep_en_la.tsv +2 (make of,
+build of); phrasal_en_la.tsv +1 (think over); states_en_la.tsv +2 (strike / light match).
+
+API changes (additive): realise_la.h `LaNP::whoseGen`, `LaWh::case_`, `LaClause::predConj`, `AdvPos::Inner`;
+transfer.h private `Transfer::orConj`. Flags unchanged (derived-word reused).
+
+Changed expectations (earlier tests): "Fortior est quam frāter suus" -> Potentior; "Modo sāgae pilleōs nigrōs portant"
+-> Sōlae sāgae ... gerunt; "Vir subūculam rubram portāvit" -> gessit; "Virō pauperī veterī" -> Senī pauperī; "Vir
+vetus valdē sōlus" -> Senex valdē sōlus; "Puellam quae pulchrē canit sciō" -> nōvī; Spanish "Neque canēs neque fēlēs"
+-> Nec canēs nec fēlēs; C24 "After this the king will need a new crown" now "Post hoc corōnā novā rēgī opus erit".
+
+### Proposed gold alternatives (added after " | " in oz_sample.la.gold.txt; veto freely)
+- #14 "Praetereā album in veste tuā habēs et sōlae sāgae et venēficae album gerunt." - the gold drops "sorceresses".
+- #46 "Quid? Dīcitur nēminem umquam sinere ad sē venīre." - sinere + accusative + infinitive for "let ... come".
+- #47 "Nec quemquam vīvum quī eum vīdit nōvī." - the relative clause stays with its antecedent.
+- #81 "Et fatērī dēbēs hoc iter valdē longum esse." - valdē longum for "very long" (the gold: longissimum).
+- #85 "Bene, crās ad mē venī nam tempore mihi opus est ut id cōgitem." - opus est with the ablative, as the teacher's
+  phrasebook row "I need {NP}".
+
+### Open points
+- "Is that X or Y's?" (that read as a subordinator), "one at a time" agreeing with the object, "they" for unnamed things.
+- The phrasebook rows "anything you want" and "anyone in trouble" have a fixed case (accusative); used as a subject
+  or with a dative verb they would be wrong (the rows match only at the end of a clause).
+- Guard sentences: the rules of (d) and (b) had their sentences written before the code; for the oz rules of (a) and
+  for (c) the sentences were written after the code was in place but before they were run.

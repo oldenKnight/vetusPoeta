@@ -606,7 +606,9 @@ uint32_t Transfer::select(const std::string& sourceLemma, uint8_t pos, const std
     return a.lemma < b.lemma;
   });
   // fidelity 2/3: a tier 1/2 lemma whose sense names the source word beats a tier 3 near-synonym (style target 1.2)
-  if (st.fidelity >= 2 && !sc.empty() && sc[0].tier >= 3 && sc[0].why.find("correction") == std::string::npos) {
+  // (C26: not over the teacher's own gloss of the word: "brown" -> fuscus, a tier-3 word the teacher chose)
+  if (st.fidelity >= 2 && !sc.empty() && sc[0].tier >= 3 && sc[0].why.find("correction") == std::string::npos &&
+      sc[0].why.find("teacher gloss") == std::string::npos) {
     for (size_t i = 1; i < sc.size(); ++i)
       if (sc[i].tier <= 2 && sc[i].kwHit && sc[i].base >= 0.2 && sc[i].base >= 0.5 * sc[0].base) {
         Scored x = sc[i];
@@ -1297,6 +1299,25 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
     }
     if (!o.coord.empty() && n.coordConj == "or") o.coordConj = orConj(c);
   };
+  // C26: "all of us" / "all of you" / "all of them" -> nōs omnēs, vōs omnēs, eī omnēs (the pronoun is kept)
+  if (c.st.lang == frame::SrcLang::En && n.isPronoun && (n.pronLemma == "all" || n.pronLemma == "both") &&
+      n.genitive.size() == 1 && n.genitive[0].isPronoun && tables::personalPronoun(n.genitive[0].pronLemma) &&
+      (n.genitive[0].pron.number == 2 || n.genitive[0].pronLemma == "you") &&
+      latin(n.pronLemma == "all" ? "omnis" : "ambō", Adj) != kNone) {
+    SemNP gp = n.genitive[0];
+    gp.pron.number = 2;   // "all of you": plural
+    gp.number = 2;
+    npInto(gp, c, o);
+    c.cover(n.tokens);
+    LaAdj m;
+    m.lemma = latin(n.pronLemma == "all" ? "omnis" : "ambō", Adj);
+    m.after = true;
+    o.adjectives.push_back(m);
+    o.number = Pl;
+    if (o.isPronoun) o.pron.number = Pl;
+    tableChoice(m.lemma, n.pronLemma);
+    return;
+  }
   // C26: "all the rest of us" -> nōs omnēs; "the rest of us" -> nōs cēterī; "the rest of the children" -> cēterī
   // puerī (cēterus agreeing; never "tōtum cēterum nostrī")
   if (c.st.lang == frame::SrcLang::En && !n.isPronoun && !n.isName && n.genitive.size() == 1 && n.adjectives.empty() &&
@@ -1933,6 +1954,41 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
                          (text::lower(n.head) == "man" || text::lower(n.head) == "woman");   // C26
   for (const frame::SemAdj& a : n.adjectives) {
     if (oldInNoun && text::lower(a.lemma) == "old" && a.adverbs.empty() && a.degree == 0) { c.cover(a.token); continue; }
+    // C26: an unknown "X-less" adjective of a known noun X ("the hatless man", "a homeless dog"): a relative clause
+    // with careō + ablative (vir quī pilleō caret), never a bracket
+    if (c.st.lang == frame::SrcLang::En && a.participle == 0 && a.adverbs.empty() && o.relative.empty() && n.relative.empty()) {
+      const std::string al = text::lower(a.lemma);
+      if (al.size() > 6 && al.compare(al.size() - 4, 4, "less") == 0 && latin("careō", Verb) != kNone) {
+        std::vector<lex::Candidate> probe;
+        la_.reverse(text::en_key(al), probe);
+        std::vector<const curated::TierEntry*> tp;
+        cd_.glossTiers(al, tp);
+        if (probe.empty() && tp.empty()) {
+          Choice cn;
+          cn.token = a.token;
+          const uint32_t nid = select(al.substr(0, al.size() - 4), Noun, c.context, false, false, c.st, cn);
+          if (nid != kNone) {
+            LaClause rc;
+            rc.pred.lemma = latin("careō", Verb);
+            rc.pred.tense = Present;
+            rc.relRole = realise::Role::Subject;
+            LaOblique ob;
+            ob.case_ = Abl;
+            ob.np.head = nid;
+            ob.np.case_ = Abl;
+            if (la_.lemma(nid).flags & lex::PluralOnly) ob.np.number = Pl;
+            rc.obliques.push_back(ob);
+            o.relative.push_back(rc);
+            cn.source = a.lemma;
+            cn.note = "\"" + al.substr(0, al.size() - 4) + "\" + -less: quī ... caret";
+            c.out.choices.push_back(cn);
+            c.out.flags.push_back("derived-word");
+            c.cover(a.token);
+            continue;
+          }
+        }
+      }
+    }
     // an adjective the phrasebook renders as a verb phrase ("impossible" -> fierī nōn potest): attributive use is a
     // relative clause agreeing with the noun ("sex rēs quae fierī nōn possunt")
     if (n.relative.empty() && o.relative.empty() && a.adverbs.empty()) {
@@ -2860,6 +2916,19 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     ch.lemma = verb;
     ch.kind = "table";
     c.out.choices.push_back(ch);
+  } else if (sp.ellipsis && c.st.lang == frame::SrcLang::En && (f.type == Kind::Imp || (f.type == Kind::Decl && !f.hasSubject)) &&
+             f.negative && !f.hasObject &&
+             f.obliques.empty() && latin("nōlō", Verb) != kNone) {
+    // C26: "please don't" / "don't!" alone: nōlī (the verb of the previous order is understood, not repeated)
+    verb = latin("nōlō", Verb);
+    cl.polarity = realise::Polarity::Pos;
+    Choice ch;
+    ch.token = sp.token;
+    ch.source = "don't";
+    ch.lemma = verb;
+    ch.kind = "table";
+    ch.note = "elliptical prohibition: nōlī";
+    c.out.choices.push_back(ch);
   } else if (sp.ellipsis) {
     verb = c.mem.lastVerb != kNone ? c.mem.lastVerb : latin("faciō", Verb);
     Choice ch;
@@ -3232,6 +3301,59 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
     c.cover(f0.pred.token);
     clauseInto(g, c, cl);
     c.forcedVerb = keep;
+    return;
+  }
+  // C26 (order_la.txt RULE need.opus): "We need a boat." -> Nāvis nōbīs opus est; "I must have time" (need) the
+  // same: the thing needed is the subject, the person in the dative, "opus est" (dēbeō = owe was a wrong meaning)
+  if (c.st.lang == frame::SrcLang::En && f0.hasPred && f0.hasObject && f0.hasSubject && !f0.hasIndirect &&
+      f0.pred.complementVerb.empty() && f0.pred.particle.empty() && f0.pred.voice == frame::Voice::Active &&
+      f0.type != Kind::Imp && f0.pred.fixedLatin.empty() && !f0.object.isPronoun && !f0.object.interrogative &&
+      ((f0.pred.lemma == "need" && f0.pred.modality == Modality::None) ||
+       (f0.pred.lemma == "have" && f0.pred.modality == Modality::Must &&
+        !cd_.state("have " + text::lower(f0.object.head)))) &&
+      latin("opus", Noun) != kNone && latin("sum", Verb) != kNone) {
+    SemFrame g = f0;
+    g.hasSubject = false;
+    g.subject = SemNP{};
+    g.hasObject = false;
+    g.object = SemNP{};
+    g.indirectObject = f0.subject;
+    g.hasIndirect = true;
+    g.pred.lemma = "be";
+    g.pred.modality = Modality::None;
+    g.copula = true;   // "be" -> sum (the verb table); no forced verb, which would reach the clause's subordinates
+    Choice ch;
+    ch.token = f0.pred.token;
+    ch.source = f0.pred.lemma;
+    ch.lemma = latin("opus", Noun);
+    ch.kind = "table";
+    ch.note = "need: opus est + dative (order_la.txt need.opus)";
+    c.out.choices.push_back(ch);
+    c.cover(f0.pred.token);
+    c.cover(f0.pred.auxTokens);
+    clauseInto(g, c, cl);
+    // the thing needed in the ablative, first (as the teacher's phrasebook row "I need {NP}": {1:abl} mihi opus est)
+    LaOblique th;
+    th.case_ = Abl;
+    npInto(f0.object, c, th.np);
+    th.np.case_ = Abl;
+    th.front = true;
+    cl.obliques.push_back(th);   // after a fronted time phrase ("Post hoc corōnā novā rēgī opus erit")
+    LaNP op;
+    op.fixed = "opus";
+    cl.predicative.push_back(op);
+    cl.indirect.case_ = Dat;
+    cl.pred.person = 3;
+    cl.pred.number = Sg;
+    // the purpose of the one who needs ("time to think it over" -> ut id cōgitem): that person acts
+    if (cl.indirect.isPronoun)
+      for (realise::LaSub& sb : cl.subs)
+        if (sb.rel == realise::SubRel::Purpose)
+          for (LaClause& k : sb.clause)
+            if (!k.hasSubject) {
+              k.pred.person = cl.indirect.pron.person;
+              k.pred.number = cl.indirect.pron.number ? cl.indirect.pron.number : cl.indirect.number;
+            }
     return;
   }
   // C26: "Give the children something to drink.": the parser made the person the object and the thing the indirect
@@ -4703,6 +4825,13 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
           }
         }
         if (sb.marker == "nor") sc.polarity = realise::Polarity::Pos;
+        // C26: "Don't push me, please don't!": the elliptical nōlī follows the order after a comma (no et)
+        if (sb.marker.empty() && sc.pred.lemma != kNone && sc.pred.lemma == latin("nōlō", Verb) && !sc.hasObject &&
+            sc.pred.modal == kNone && f.type == Kind::Imp) {
+          sc.type = realise::ClauseType::Imp;
+          ls.asyndeton = true;
+          ls.sep = ",";
+        }
         // C26: "without + -ing" -> nec + the main verb's tense and mood ("Hōrās ambulāvērunt nec aquam invēnērunt")
         if (sb.marker == "without") {
           k = "neque";
@@ -4718,6 +4847,7 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
             !sf.pred.pastModal)
           sc.pred.tense = Future;
         ls.conj = latin(k, Conj);
+        if (ls.asyndeton) ls.conj = kNone;   // C26: the elliptical nōlī after a comma
         // C17: ", so we walked ..." / ", but she ...": the clause's own connector joins it (itaque, not "et itaque")
         if (sb.marker.empty() && !sc.connectors.empty() && c.st.lang == frame::SrcLang::En) {
           const uint32_t first = sc.connectors[0];
@@ -4740,7 +4870,8 @@ void Transfer::clauseInto(const SemFrame& f0, Ctx& c, LaClause& cl) const {
             ls.sep = ";";
           }
         }
-        if (f.type == Kind::Imp && sc.type == realise::ClauseType::Decl && !sc.hasSubject) sc.type = realise::ClauseType::Imp;
+        if (f.type == Kind::Imp && sc.type == realise::ClauseType::Decl && !sc.hasSubject && !sf.hasSubject)
+          sc.type = realise::ClauseType::Imp;   // (C26: not a clause whose source has a subject: "... for I need X")
         if (sc.type == realise::ClauseType::Imp && cl.pred.number) sc.pred.number = cl.pred.number;
         break;
       }

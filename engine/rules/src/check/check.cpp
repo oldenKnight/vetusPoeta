@@ -353,9 +353,9 @@ struct LatinChecker::Impl {
       bool has = false;
       for (size_t j = b; j < e; ++j) {
         has = has || isVerb[j];
-        if (any(j, isFinite) && !nounHint[j]) { ++cands; which = j; }   // C26: not a word written as a noun / adjective
+        if (any(j, isFinite)) { ++cands; which = nounHint[j] ? n : j; }   // C26: not a word written as a noun / adjective
       }
-      if (!has && cands == 1) isVerb[which] = 1;
+      if (!has && cands == 1 && which < n) isVerb[which] = 1;
       b = e;
     }
     // coordinated clauses: split a segment with two verbs at et / sed / neque / atque between them
@@ -655,13 +655,15 @@ struct LatinChecker::Impl {
                               (r.key == "multus" || r.key == "plus" || r.key == "paulus" || r.key == "tantus" ||
                                r.key == "quantus" || r.key == "nimius" || r.key == "aliquantus"));
       if (any(i, isHead) || neutQty) {
-        bool gen = !cand.empty();
+        bool gen = !cand.empty(), genAfter = false;
         for (size_t h : cand) {
           bool g = false;
           for (const Reading& r : rd[h]) g = g || (isHead(r) && r.f.case_ == Gen);
           gen = gen && h > i && g;
+          genAfter = genAfter || (h > i && g);
         }
         if (gen) continue;
+        if (neutQty && genAfter) continue;   // C26: "Puer multum cerebrī vult": the quantity word heads the genitive
       }
       // C22: subject and predicate noun of a copula need not share the gender ("omnia nūgae essent", "mundus meus
       // Terra Mīrābilis esset"): a word that can stand as a noun (or a neuter plural substantive) next to a
