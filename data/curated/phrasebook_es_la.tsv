@@ -89,7 +89,7 @@ qué quieres decir	quid dīcis	1	q
 entiendes	intellegis	1	q	
 ay	heu	1	excl	"Ay, ay, ..." -> Heu, heu, ...
 ay de mí	ō mē miserum/miseram	1	excl	gender of speaker
-de veras	vērō	1	excl	
+de veras	vērē	1	excl	C34: "¿De veras?" -> Vērē? (was vērō)
 en serio	vērō	1	excl	
 oh	ō	1	excl	
 dios mío	dī bonī	1	excl	
@@ -197,3 +197,17 @@ no importa {WH}	nihil interest {1:subj}	1	state
 qué {NP} tan|más {ADJ}	quam {2} {1:nom}	1	excl	"¡Qué jardín tan extraño!" -> Quam mīrus hortus!
 toma mi abrigo	sūme pallium meum	1	imp	
 tal vez	fortasse	1	answer	
+fue sin querer	nōn cōnsultō fēcī	1	answer	C34: "It was an accident" (the speaker's own deed)
+que le vaya bien	bene tibi sit	1	greet	C34: usted -> tū
+que te vaya bien	bene tibi sit	1	greet	C34
+no es cierto	nōn est vērum	1	answer	C34
+y colorín colorado	et	1	excl	C34: the rhyme that closes a Mexican fairy tale carries no meaning of its own
+este cuento se ha acabado	haec fābula fīnīta est	1	answer	C34
+en voz alta	clārā vōce	1	adv	C34
+a la mañana siguiente	postrīdiē	1	narr	C34: "the next morning" (C30 has postrīdiē māne for English)
+muy temprano	bene māne	1	adv	C34
+un día	quōdam diē	1	narr	C34: the opening of an episode ("Un día le dijo ...")
+un ratito	paulisper	1	adv	C34: es-MX "espérense un ratito"
+todo el día	tōtum diem	1	adv	C34: accusative of duration (as "all day long")
+toda la noche	tōtam noctem	1	adv	C34
+toda la tarde	tōtum vesperum	1	adv	C34

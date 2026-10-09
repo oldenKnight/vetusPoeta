@@ -78,6 +78,8 @@ struct Memory {
   uint8_t whCase = 0, whPlace = 0, whGender = 0, whNumber = 0;
   uint32_t whPrep = kNone;
   bool whSubj3 = false, answer = false;
+  bool askedYou = false;  // C34: the sentence before was a question to "you" (a 2nd-person verb): Spanish replies
+                          // with an obligation in the 3rd plural speak to the askers (ustedes; a guess, Check)
   bool lastImp = false;   // C28: the last clause translated was an order ("Don't complain," + "or ..." -> aliter)
   // C30: main clauses translated since the last one with a noun or a name as its subject or object; a third-person
   // pronoun object (or a subject with a predicate adjective) two or more clauses after it is a guess (Check)
@@ -142,6 +144,9 @@ class Transfer {
  private:
   struct Ctx;
   void clauseInto(const frame::SemFrame& f, Ctx& c, realise::LaClause& out) const;
+  // C34: Spanish frames rewritten for the Latin path (aspectual se, weather and time idioms ...); true when g changed
+  bool spanishRewrite(const frame::SemFrame& f, Ctx& c, frame::SemFrame& g) const;
+  uint8_t esAdjectiveGender(const std::string& lower, const Settings& st) const;   // C34: buena -> F, 0 for amable
   void npInto(const frame::SemNP& n, Ctx& c, realise::LaNP& out) const;
   bool obliqueInto(const frame::SemOblique& o, Ctx& c, realise::LaClause& cl) const;
   void predicateInto(const frame::SemFrame& f, Ctx& c, realise::LaClause& cl) const;

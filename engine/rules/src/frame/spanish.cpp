@@ -107,7 +107,61 @@ bool notDiminutive(const std::string& l) {
   return in(l, {"señorita", "carretilla", "palito", "mosquito", "cerito", "favorito", "favorita", "bonito", "bonita",
                 "maldito", "maldita", "chiquito", "chiquita", "manito", "requisito", "apetito", "delito", "grito",
                 "mito", "rito", "cita", "visita", "pepita", "margarita", "infinito", "exquisito", "solicitud",
-                "abuelita", "abuelito", "momentito", "mamita", "papito", "ratito", "poquito", "cerquita", "ahorita"});
+                "momentito", "ratito", "poquito", "cerquita", "ahorita"});
+}
+
+std::string mascSingular(const std::string& w0) {
+  std::string w = w0;
+  if (w.size() > 3 && w.back() == 's' && (w[w.size() - 2] == 'a' || w[w.size() - 2] == 'o')) w.pop_back();
+  if (w.size() > 3 && w.back() == 'a') w.back() = 'o';
+  return w;
+}
+
+bool addressNoun(const std::string& l) {
+  return in(l, {"mamá", "papá", "mami", "papi", "mamita", "papito", "madre", "padre", "abuela", "abuelo", "abuelita",
+                "abuelito", "hijo", "hija", "hijos", "hijas", "niño", "niña", "niños", "niñas", "maestra", "maestro",
+                "maestros", "señora", "señor", "señorita", "señoras", "señores", "hermano", "hermana", "hermanito",
+                "hermanita", "tía", "tío", "amigo", "amiga", "amigos", "amigas", "chicos", "chicas", "muchachos",
+                "muchachas", "doctor", "doctora", "profesor", "profesora", "joven", "jóvenes", "cariño", "amor",
+                "mijo", "mija", "abuelos", "papás"});
+}
+
+bool endearment(const std::string& base) {
+  return in(base, {"abuela", "abuelo", "mamá", "papá", "madre", "padre", "mama", "papa", "hija", "hijo", "tía", "tío"});
+}
+
+std::string diminutiveBase(const lex::Lexicon& lex, const std::string& w0) {
+  if (notDiminutive(w0)) return "";
+  std::string w = w0;
+  if (w.size() > 6 && w.back() == 's' && (w[w.size() - 2] == 'o' || w[w.size() - 2] == 'a')) w.pop_back();
+  auto ends = [&](const char* suf) {
+    const size_t k = std::strlen(suf);
+    return w.size() > k + 2 && w.compare(w.size() - k, k, suf) == 0;
+  };
+  for (const char* suf : {"ecito", "ecita", "cito", "cita", "ito", "ita"}) {
+    if (!ends(suf)) continue;
+    std::string stem = w.substr(0, w.size() - std::strlen(suf));
+    const char g = w.back();   // o / a
+    std::vector<std::string> bases = {stem + g, stem + (g == 'o' ? "a" : "o"), stem, stem + "e"};
+    if (stem.size() > 2 && stem.compare(stem.size() - 2, 2, "gu") == 0) {   // amiguito -> amigo, tortuguita -> tortuga
+      const std::string s2 = stem.substr(0, stem.size() - 1);
+      bases.insert(bases.begin(), s2 + g);
+    } else if (stem.size() > 2 && stem.compare(stem.size() - 2, 2, "qu") == 0) {   // vaquita -> vaca
+      const std::string s2 = stem.substr(0, stem.size() - 2) + "c";
+      bases.insert(bases.begin(), s2 + g);
+    }
+    for (const std::string& b : bases) {
+      std::vector<lex::Analysis> an;
+      lex.lookup(text::es_key(b), an);
+      if (an.empty()) lex.lookup(text::es_bare(b), an);
+      for (const lex::Analysis& a : an) {
+        const lex::Lemma l = lex.lemma(a.lemma);
+        if (l.pos == feat::Noun) return text::es_bare(text::lower(l.head)) == text::es_bare(b) ? text::lower(l.head) : b;
+      }
+    }
+    break;
+  }
+  return "";
 }
 
 bool experiencerVerb(const std::string& l) {
@@ -161,7 +215,151 @@ bool hasImperative2(const lex::Lexicon& lex, const std::string& lower) {
 }
 
 // ---- retag ---------------------------------------------------------------------------------------------------------------
-bool retag(std::vector<Token>& tk, const lex::Lexicon& lex) {
+namespace {
+bool capital(const std::string& w) { return !w.empty() && ((w[0] >= 'A' && w[0] <= 'Z') || w.compare(0, 2, "\xC3\x81") == 0 ||
+                                                          w.compare(0, 2, "\xC3\x89") == 0 || w.compare(0, 2, "\xC3\x93") == 0); }
+bool nounReading(const lex::Lexicon& lex, const std::string& lower, bool* plural = nullptr) {
+  std::vector<lex::Analysis> an;
+  lex.lookup(text::es_key(lower), an);
+  for (const lex::Analysis& a : an)
+    if (lex.lemma(a.lemma).pos == feat::Noun) {
+      if (plural) *plural = feat::unpack(lex.feature(a.feat)).number == feat::Pl;
+      return true;
+    }
+  return false;
+}
+
+}  // namespace
+
+// C34: words the tagger reads as verbs or adjectives that the tables and the lexicon read otherwise: a name of
+// names_la.tsv ("Mateo" is not matear), a word of address before a comma ("Mamá, ...": not mamar), a diminutive the
+// lexicon does not list ("tortuguita"), "la vi" (the clitic and ver, not an article and a noun), a sentence-initial
+// "Ven" before "a" / "aquí" / a comma (venir's imperative, not ver 3rd plural)
+bool retagWords(std::vector<Token>& tk, const lex::Lexicon& lex, const curated::CuratedData& cd, bool& guess) {
+  bool changed = false;
+  const int n = (int)tk.size();
+  int firstWord = -1;
+  for (int i = 0; i < n && firstWord < 0; ++i)
+    if (!punct(tk[(size_t)i])) firstWord = i;
+  auto setNoun = [&](Token& t, const char* upos, bool plural) {
+    if (t.upos == upos) return;
+    t.upos = upos;
+    t.feats = nlp::morph::fromString(plural ? "Number=Plur" : "Number=Sing");
+    changed = true;
+  };
+  for (int i = 0; i < n; ++i) {
+    Token& t = tk[(size_t)i];
+    if (punct(t) || t.text.empty()) continue;
+    const std::string low = t.lower.empty() ? nlp::normalise(t.text) : t.lower;
+    const bool next = i + 1 < n && (tk[(size_t)i + 1].text == "," || tk[(size_t)i + 1].text == "!" ||
+                                    tk[(size_t)i + 1].text == "?" || tk[(size_t)i + 1].text == ".");
+    const bool afterComma = i > 0 && tk[(size_t)i - 1].text == ",";
+    // "hace tres días", "hace una hora": the time before now ("ago"), a preposition of the time noun, not the verb
+    if (in(low, {"hace", "hacía"}) && i + 2 < n &&
+        (tk[(size_t)i + 1].upos == "NUM" || in(tk[(size_t)i + 1].lower, {"un", "una", "unos", "unas", "dos", "tres", "mucho",
+                                                                          "muchos", "mucha", "muchas", "poco", "pocos"})) &&
+        in(tk[(size_t)i + 2].lower, {"día", "días", "hora", "horas", "semana", "semanas", "mes", "meses", "año", "años",
+                                     "minuto", "minutos", "rato", "momento", "tiempo", "noche", "noches"})) {
+      if (t.upos != "ADP") {
+        t.upos = "ADP";
+        t.feats = 0;
+        changed = true;
+      }
+      continue;
+    }
+    // a name of names_la.tsv, capitalised (not a sentence-initial common word with a reading of its own)
+    if (capital(t.text) && cd.nameByEnglish(t.text) && t.upos != "PROPN" &&
+        (i != firstWord || next || !nounReading(lex, low))) {
+      setNoun(t, "PROPN", false);
+      continue;
+    }
+    // a word of address alone between the sentence start / a comma and a comma / the end
+    if ((i == firstWord || afterComma || (i > 0 && tk[(size_t)i - 1].text == "\xC2\xA1")) && next &&
+        t.upos != "NOUN" && t.upos != "PROPN") {
+      std::string base = diminutiveBase(lex, low);
+      bool plural = false;
+      if ((addressNoun(low) || (!base.empty() && addressNoun(base))) && (nounReading(lex, low, &plural) || !base.empty())) {
+        setNoun(t, "NOUN", plural || (low.size() > 2 && low.back() == 's'));
+        continue;
+      }
+    }
+    if (t.upos == "PROPN" && !capital(t.text)) continue;
+    if (t.upos == "PROPN" && i == firstWord && next && addressNoun(low) && nounReading(lex, low)) {   // "Niños, ..."
+      setNoun(t, "NOUN", low.back() == 's');
+      continue;
+    }
+    // a diminutive the lexicon does not list: the noun of its base
+    if (t.upos != "NOUN" && t.upos != "PROPN") {
+      std::vector<lex::Analysis> an;
+      lex.lookup(text::es_key(low), an);
+      if (an.empty() && !diminutiveBase(lex, low).empty()) {
+        setNoun(t, "NOUN", low.back() == 's');
+        continue;
+      }
+    }
+    // "¿Está usted enfermo?", "Estoy cansado": a noun-tagged word after estar (and its subject pronoun) that the
+    // lexicon also reads as an adjective is the predicate adjective
+    if (t.upos == "NOUN" && i > 0) {
+      int p = i - 1;
+      if (p > 0 && in(tk[(size_t)p].lower, {"usted", "ustedes", "tú", "yo", "él", "ella", "nosotros", "ellos", "ellas"})) --p;
+      const bool estar = in(tk[(size_t)p].lower, {"está", "estás", "estoy", "estamos", "están", "estaba", "estabas",
+                                                  "estaban", "estábamos", "estuvo", "estuve", "estuviste"});
+      if (estar) {
+        std::vector<lex::Analysis> an;
+        lex.lookup(text::es_key(low), an);
+        bool adj = false;
+        for (const lex::Analysis& a : an) adj = adj || lex.lemma(a.lemma).pos == feat::Adj;
+        if (adj) {
+          t.upos = "ADJ";
+          t.feats = 0;
+          changed = true;
+          continue;
+        }
+      }
+    }
+    // "la vi": a clitic tagged as an article before a 1st-person preterite tagged as a noun
+    if (i > 0 && t.upos == "NOUN" && in(tk[(size_t)i - 1].lower, {"lo", "la", "los", "las"}) && !nounReading(lex, low)) {
+      std::vector<VerbReading> vr;
+      verbReadings(lex, low, vr);
+      for (const VerbReading& r : vr)
+        if (finite(r) && r.mood == feat::Indicative) {
+          t.upos = "VERB";
+          t.feats = featsOf(r);
+          tk[(size_t)i - 1].upos = "PRON";
+          tk[(size_t)i - 1].feats = 0;
+          changed = true;
+          break;
+        }
+      continue;
+    }
+    // "Ven a la mesa.", "Ven aquí.", "Ven, ...": venir's imperative at the start of the sentence
+    if (i == firstWord && (t.upos == "VERB" || t.upos == "AUX") && i + 1 < n &&
+        nlp::morph::get(t.feats, nlp::morph::MoodShift) != nlp::morph::MoodImp && hasImperative2(lex, low) &&
+        (in(tk[(size_t)i + 1].lower, {"a", "al", "aquí", "acá", "conmigo", "pronto", "rápido", ","}) || tk[(size_t)i + 1].text == "!" ||
+         tk[(size_t)i + 1].text == ".")) {
+      std::vector<VerbReading> vr;
+      verbReadings(lex, low, vr);
+      bool third = false;
+      for (const VerbReading& r : vr) third = third || (finite(r) && r.mood != feat::Imperative && r.person == 3 && r.number == feat::Pl);
+      const uint32_t tp = nlp::morph::get(t.feats, nlp::morph::PersonShift);
+      if (third && (tp == 3 || tp == 0))
+        for (const VerbReading& r : vr)
+          if (r.mood == feat::Imperative && r.person == 2) {
+            t.feats = featsOf(r);
+            t.upos = "VERB";
+            changed = true;
+            guess = true;   // the reading is a guess from the word order (Check), as the C13 retag
+            break;
+          }
+    }
+  }
+  return changed;
+}
+
+namespace {
+bool capital(const std::string& w);
+}
+bool retag(std::vector<Token>& tk, const lex::Lexicon& lex, const curated::CuratedData* cd) {
   bool changed = false;
   const int n = (int)tk.size();
   bool anyVerb = false;
@@ -174,6 +372,7 @@ bool retag(std::vector<Token>& tk, const lex::Lexicon& lex) {
   for (int i = 0; i < n; ++i) {
     Token& t = tk[(size_t)i];
     if (punct(t)) continue;
+    if (cd && capital(t.text) && cd->nameByEnglish(t.text)) continue;   // C34: a name of names_la.tsv ("Mateo", not matear)
     if (t.upos == "ADJ") {   // "Mi padre es agricultor": a word the lexicon knows only as a noun
       std::vector<lex::Analysis> an;
       lex.lookup(text::es_key(t.lower), an);
@@ -244,6 +443,13 @@ bool retag(std::vector<Token>& tk, const lex::Lexicon& lex) {
       if (!tagMoodOk) {
         if (moods.size() == 1) t.feats = setFeat(t.feats, nlp::morph::MoodShift, nlpMood(moods[0]));
         else if (subj && !ind) t.feats = setFeat(t.feats, nlp::morph::MoodShift, nlp::morph::MoodSub);   // entremos
+      }
+      // C34: the lexicon's one person / number wins over the tagger's ("¿Dormiste bien?", "¿Qué hiciste?": 2nd
+      // singular, not 3rd)
+      const uint32_t tp = nlp::morph::get(t.feats, nlp::morph::PersonShift);
+      if (onePn && p0 && tp && tp != p0 && !(tenses.empty() && moods.size() == 1 && moods[0] == feat::Imperative)) {
+        t.feats = setFeat(t.feats, nlp::morph::PersonShift, p0);
+        if (n0) t.feats = setFeat(t.feats, nlp::morph::NumberShift, n0 == feat::Pl ? nlp::morph::NumPlur : nlp::morph::NumSing);
       }
       if (!nlp::morph::get(t.feats, nlp::morph::PersonShift) && onePn && p0) {
         t.feats = setFeat(t.feats, nlp::morph::PersonShift, p0);
@@ -347,6 +553,17 @@ struct Tree {
 
 uint32_t fget(const Token& t, nlp::morph::Shift s) { return nlp::morph::get(t.feats, s); }
 
+// C34: an infinitive, also with an enclitic the tokenizer left on it ("lavarse", "decirle")
+bool infinitiveForm(const Token& t) {
+  if (fget(t, nlp::morph::VerbFormShift) == nlp::morph::VfInf) return true;
+  std::string w = t.lower;
+  for (const char* cl : {"selo", "sela", "melo", "telo", "se", "me", "te", "nos", "lo", "la", "le", "los", "las", "les"}) {
+    const size_t k = std::strlen(cl);
+    if (w.size() > k + 2 && w.compare(w.size() - k, k, cl) == 0) { w.resize(w.size() - k); break; }
+  }
+  return w.size() > 2 && w[w.size() - 1] == 'r' && (w[w.size() - 2] == 'a' || w[w.size() - 2] == 'e' || w[w.size() - 2] == 'i');
+}
+
 // The main verb a clitic belongs to: proclitic -> the next verb (over other clitics); enclitic -> its host word.
 int cliticHost(const Tree& T, int i, const curated::CuratedData& cd) {
   const std::vector<Token>& tk = T.tk;
@@ -385,12 +602,153 @@ void normalise(SemSentence& s, const lex::Lexicon* lex, const curated::CuratedDa
       }
     }
   }
+  // ---- C34: a trailing word of address after a comma ("Te lo juro, mamá.", "¿Te gustó, Pablito?", "¿Dónde estabas,
+  // hija?"): a vocative of its own (its own root: the unit builder makes it the address), never an argument of the
+  // clause; when the parser had made it one, the reading is rebuilt (doubt "addressee-guess": Check) -------------------------
+  {
+    int last = n - 1;
+    while (last >= 0 && punct(tk[(size_t)last])) --last;
+    int comma = -1;
+    for (int k = last; k > 0 && comma < 0; --k)
+      if (tk[(size_t)k].text == ",") comma = k;
+      else if (punct(tk[(size_t)k]) && tk[(size_t)k].text != "\xC2\xBF" && tk[(size_t)k].text != "\xC2\xA1") break;
+    bool verbBefore = false;
+    for (int k = 0; k < comma; ++k) verbBefore = verbBefore || T.verb(k);
+    if (comma > 0 && last > comma && last - comma <= 3 && verbBefore) {
+      const int a = comma + 1;
+      bool span = true, poss = false;
+      for (int k = a; k < last && span; ++k) {
+        if (in(tk[(size_t)k].lower, {"mi", "mis"})) poss = true;
+        else if (!in(tk[(size_t)k].lower, {"querido", "querida", "queridos", "queridas", "pobre"})) span = false;
+      }
+      const Token& h = tk[(size_t)last];
+      const std::string hl = text::lower(h.lemma.empty() ? h.lower : h.lemma);
+      const bool address = h.upos == "PROPN" || addressNoun(h.lower) || addressNoun(hl) ||
+                           (poss && h.upos == "NOUN") || in(h.lower, {"vida", "amor", "cielo", "corazón"});
+      // "Vi a Pedro, mi amigo.": a possessed noun right after a noun is an apposition
+      const bool appos = poss && (tk[(size_t)comma - 1].upos == "NOUN" || tk[(size_t)comma - 1].upos == "PROPN");
+      bool inner = false;   // the span is no clause of its own (no verb in it)
+      for (int k = a; k <= last; ++k) inner = inner || T.verb(k);
+      if (span && address && !appos && !inner && (h.upos == "NOUN" || h.upos == "PROPN")) {
+        const std::string was = h.deprel;
+        const int oldHead = T.head(last);
+        if (oldHead < 0) {   // the address was the root: the verb before the comma takes its place
+          int v = -1;
+          for (int k = 0; k < comma; ++k)
+            if (T.verb(k) && (v < 0 || T.head(k) == last)) v = k;
+          if (v >= 0) {
+            T.setHead(v, -1);
+            tk[(size_t)v].deprel = "root";
+            for (int k = 0; k < comma + 1; ++k)
+              if (k != v && T.head(k) == last) T.setHead(k, v);
+          }
+        } else {
+          for (int k = 0; k <= comma; ++k)
+            if (T.head(k) == last) T.setHead(k, oldHead);
+        }
+        T.setHead(last, -1);
+        tk[(size_t)last].deprel = "root";
+        for (int k = a; k < last; ++k) {
+          T.setHead(k, last);
+          tk[(size_t)k].deprel = "det";
+        }
+        if (in(was, {"nsubj", "obj", "iobj", "obl", "nmod", "conj", "appos", "amod", "xcomp", "ccomp", "advcl"}))
+          s.doubt("addressee-guess");   // a flag both engines rate Check
+      }
+    }
+  }
+  // ---- C34: "estás triste", "está enfermo": ser / estar read as a full verb with the adjective as its object: the
+  // adjective is the predicate (UD copula: the adjective heads the clause, the verb its "cop") ------------------------
+  for (int v = 0; v < n; ++v) {
+    Token& vt = tk[(size_t)v];
+    if (vt.upos != "VERB" && vt.upos != "AUX") continue;
+    const std::string vl = text::lower(vt.lemma);
+    if (vl != "estar" && vl != "ser") continue;
+    int adj = -1;
+    for (int k = v + 1; k < n && adj < 0; ++k)
+      if (T.head(k) == v && tk[(size_t)k].upos == "ADJ" && in(tk[(size_t)k].deprel, {"obj", "xcomp", "advmod", "obl", "nsubj", "amod"}))
+        adj = k;
+    if (adj < 0) continue;
+    bool nounBetween = false;   // "es una niña buena": the noun is the predicate, not the adjective
+    for (int k = v + 1; k < adj; ++k) nounBetween = nounBetween || tk[(size_t)k].upos == "NOUN" || tk[(size_t)k].upos == "PROPN";
+    if (nounBetween) continue;
+    const int up = T.head(v);
+    T.setHead(adj, up);
+    tk[(size_t)adj].deprel = vt.deprel;
+    for (int k = 0; k < n; ++k)
+      if (k != adj && T.head(k) == v) T.setHead(k, adj);
+    T.setHead(v, adj);
+    vt.deprel = "cop";
+    vt.upos = "AUX";
+  }
+  // ---- C34: "está escondido", "está dormido": estar + a participle that states_es_la.tsv lists as a state is the
+  // copula and that adjective (the state, not the resultant passive) ------------------------------------------------
+  for (int k = 0; k < n; ++k) {
+    Token& t = tk[(size_t)k];
+    if (t.upos != "VERB" || fget(t, nlp::morph::VerbFormShift) != nlp::morph::VfPart) continue;
+    if (!cd.state(mascSingular(t.lower))) continue;
+    for (int q = 0; q < k; ++q)
+      if (T.head(q) == k && tk[(size_t)q].deprel == "aux" && text::lower(tk[(size_t)q].lemma) == "estar") {
+        tk[(size_t)q].deprel = "cop";
+        t.upos = "ADJ";
+        t.feats = 0;
+        t.lemma = mascSingular(t.lower);
+      }
+  }
+  // ---- C34: a noun with its own preposition is never the object ("escondido debajo de la cama": cama is the place) --
+  for (int k = 0; k < n; ++k) {
+    Token& t = tk[(size_t)k];
+    if ((t.upos != "NOUN" && t.upos != "PROPN") || (t.deprel != "obj" && t.deprel != "nsubj")) continue;
+    bool prep = false;
+    for (int q = 0; q < k; ++q)
+      if (T.head(q) == k && tk[(size_t)q].deprel == "case" && tk[(size_t)q].upos == "ADP" &&
+          (!multiwordPrep(tk[(size_t)q].lower).empty() ||
+           in(tk[(size_t)q].lower, {"en", "sobre", "bajo", "entre", "tras", "hacia", "desde", "hasta"})))
+        prep = true;   // a place ("debajo de la cama"); "llorar por su hijo" keeps its object
+    if (prep && T.head(k) >= 0) t.deprel = "obl";
+  }
+  // ---- C34: "tener que" / "hay que" + infinitive: the infinitive is the complement of tener / haber, "que" its marker
+  // (the parser may coordinate them: "tienen que lavarse las manos") ------------------------------------------------
+  for (int i = 0; i + 2 < n; ++i) {
+    const std::string vl = text::lower(tk[(size_t)i].lemma);
+    if ((vl != "tener" && vl != "haber") || !T.verb(i) || tk[(size_t)i + 1].lower != "que") continue;
+    const int x = i + 2;
+    if (!T.verb(x) || !infinitiveForm(tk[(size_t)x])) continue;
+    if (T.head(x) != i) {
+      for (int k = 0; k < n; ++k)
+        if (T.head(k) == x && tk[(size_t)k].deprel == "cc") { T.setHead(k, i); }
+      T.setHead(x, i);
+    }
+    tk[(size_t)x].deprel = "xcomp";
+    T.setHead(i + 1, x);
+    tk[(size_t)i + 1].deprel = "mark";
+  }
+  // ---- C34: a sentence-initial coordinator the parser hung as an adverb ("Pero Pablo seguía hablando.", "Pero la
+  // tortuguita no tenía miedo."): the clause's connector (sed) ------------------------------------------------------
+  for (int i = 0; i < n; ++i) {
+    if (punct(tk[(size_t)i])) continue;
+    Token& t = tk[(size_t)i];
+    if (in(t.lower, {"pero", "y", "e", "o", "u", "mas"}) && t.upos == "CCONJ" && t.deprel != "cc" && T.verb(T.head(i)))
+      t.deprel = "cc";
+    break;
+  }
   // ---- "por qué" -> why, "a dónde" -> whither ------------------------------------------------------------------------
   for (int i = 0; i + 1 < n; ++i) {
     Token& a = tk[(size_t)i];
     Token& b = tk[(size_t)i + 1];
     if (a.lower == "por" && b.lower == "qué") {
       int r = T.root();
+      // C34: the root of this word's own tree (a segment parsed apart: "Mateo, ¿por qué estás triste?")
+      for (int x = i + 1, steps = 0; x >= 0 && steps <= n; ++steps) {
+        if (T.head(x) < 0) { r = x; break; }
+        x = T.head(x);
+      }
+      if (r == i || r == i + 1) {
+        int v = -1;
+        for (int k = i + 2; k < n && v < 0; ++k)
+          if (T.verb(k) && T.head(k) < 0) v = k;
+        if (v >= 0) r = v;
+      }
       if (r == i + 1 || r == i || r < 0) {
         r = -1;
         for (int k = 0; k < n && r < 0; ++k)
@@ -453,7 +811,9 @@ void normalise(SemSentence& s, const lex::Lexicon* lex, const curated::CuratedDa
     }
   // ---- multi-word prepositions: "detrás de la puerta" -> behind ---------------------------------------------------------
   for (int i = 0; i + 1 < n; ++i) {
-    if (multiwordPrep(tk[(size_t)i].lower).empty() || tk[(size_t)i + 1].lower != "de") continue;
+    if (multiwordPrep(tk[(size_t)i].lower).empty() ||
+        !(tk[(size_t)i + 1].lower == "de" || (tk[(size_t)i + 1].lower == "a" && in(tk[(size_t)i].lower, {"junto", "frente"}))))
+      continue;   // C34: "junto a", "frente a" too
     int j = -1;
     for (int k = i + 2; k < n; ++k) {
       const std::string& u = tk[(size_t)k].upos;

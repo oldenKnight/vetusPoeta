@@ -32,6 +32,14 @@ const char* const kAcute[] = {"\xC3\xA1", "a", "\xC3\xA9", "e", "\xC3\xAD", "i",
 uint32_t fget(const Token& t, nlp::morph::Shift s) { return nlp::morph::get(t.feats, s); }
 
 bool upper(const std::string& s) { return !s.empty() && ((s[0] >= 'A' && s[0] <= 'Z') || (unsigned char)s[0] >= 0xC3); }
+// C34: a Latin word written with a capital (A-Z or a capital long vowel: Ā Ē Ī Ō Ū)
+bool latinCapital(const std::string& s) {
+  if (s.empty()) return false;
+  if (s[0] >= 'A' && s[0] <= 'Z') return true;
+  return s.size() > 1 && (s.compare(0, 2, "\xC4\x80") == 0 || s.compare(0, 2, "\xC4\x92") == 0 ||
+                          s.compare(0, 2, "\xC4\xAA") == 0 || s.compare(0, 2, "\xC5\x8C") == 0 ||
+                          s.compare(0, 2, "\xC5\xAA") == 0);
+}
 
 // ---- canonical closed classes ------------------------------------------------------------------------------------
 struct PronInfo { const char* w; uint8_t person, number, gender; bool refl; };
@@ -97,6 +105,12 @@ std::string canonDet(SrcLang lang, const std::string& w) {
 std::string canonPrep(SrcLang lang, const std::string& w) {
   if (lang == SrcLang::En) return w;
   static const std::pair<const char*, const char*> kMap[] = {
+      {"hace", "ago"},     {"hacía", "ago"},      // C34: "hace tres días" (the time before now)
+      // C34: compound prepositions as the parser joins them (case + fixed)
+      {"debajo de", "under"}, {"detrás de", "behind"}, {"delante de", "in front of"}, {"cerca de", "near"},
+      {"junto a", "beside"}, {"junto de", "beside"}, {"al lado de", "beside"}, {"encima de", "on"}, {"dentro de", "inside"},
+      {"fuera de", "out of"}, {"lejos de", "far from"}, {"alrededor de", "around"}, {"a través de", "through"},
+      {"frente a", "in front of"}, {"enfrente de", "in front of"},
       {"a", "to"},         {"en", "in"},          {"de", "of"},         {"con", "with"},     {"sin", "without"},
       {"por", "by"},       {"para", "for"},       {"desde", "from"},    {"hasta", "until"},  {"sobre", "on"},
       {"bajo", "under"},   {"entre", "between"},  {"contra", "against"}, {"hacia", "toward"}, {"tras", "after"},
@@ -127,7 +141,8 @@ bool relationOf(SrcLang lang, const std::string& m, Relation& rel, std::string& 
                           {"mientras", Relation::Time, "while"},    {"después", Relation::Time, "after"},
                           {"antes", Relation::Time, "before"},      {"hasta", Relation::Time, "until"},
                           {"si", Relation::Condition, "if"},        {"para", Relation::Purpose, "to"},
-                          {"aunque", Relation::Concession, "although"}, {"que", Relation::Complement, "that"}};
+                          {"aunque", Relation::Concession, "although"}, {"que", Relation::Complement, "that"},
+                          {"a", Relation::Purpose, "to"}};   // C34: "Fui a ver el mar." (a + infinitive after motion)
   const std::string w = text::lower(m);
   const R* tab = lang == SrcLang::En ? kEn : kEs;
   const size_t n = lang == SrcLang::En ? sizeof(kEn) / sizeof(kEn[0]) : sizeof(kEs) / sizeof(kEs[0]);
@@ -240,6 +255,27 @@ bool vocativeSpan(const std::vector<Token>& tk, int a, int b) {
     return false;
   }
   return noun;
+}
+
+// C34: Spanish words that open a sentence before a comma ("Sí, ...", "Mira, ...", "Gracias, ...") and Spanish
+// vocative spans: a word of address or a name, with "mi" / "mis" / "querido" before it ("mi niña", "mi vida").
+bool esLeadWord(const std::string& w) {
+  return in(w, {"sí", "no", "bueno", "pues", "oye", "oiga", "mira", "mire", "ay", "oh", "ah", "entonces", "claro",
+                "perdón", "gracias", "adiós", "hola", "vaya", "órale", "ándale", "ojalá", "bien", "ya", "ok", "sale"});
+}
+bool esVocativeSpan(const std::vector<Token>& tk, int a, int b) {
+  if (b < a || b - a > 2) return false;
+  for (int i = a; i <= b; ++i) {
+    const Token& t = tk[(size_t)i];
+    if (i < b && in(t.lower, {"mi", "mis", "querido", "querida", "queridos", "queridas", "pobre"})) continue;
+    if (i == b && (t.upos == "PROPN" || es::addressNoun(t.lower) || in(t.lower, {"vida", "corazón", "cielo", "amor", "rey",
+                                                                                  "reina", "majestad", "hermanito",
+                                                                                  "hermanita"})))
+      return true;
+    if (i == b && t.upos == "NOUN" && i > a && in(tk[(size_t)a].lower, {"mi", "mis"})) return true;   // "mi niña"
+    return false;
+  }
+  return false;
 }
 
 // C15: the tagger's VERB / ADJ for a word the English lexicon never reads that way ("comrades" VERB, "farmer" ADJ):
@@ -1426,37 +1462,21 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
     np.pron.number = np.number;
     pron = true;
   }
-  // Spanish diminutives (C13): "gatito" -> gato + pequeño (parvus), "casita" -> casa + pequeño, "florecita" -> flor
+  // Spanish diminutives (C13): "gatito" -> gato + pequeño (parvus), "casita" -> casa + pequeño, "florecita" -> flor.
+  // C34: a diminutive the teacher's glosses list keeps its own word ("perrito" -> catulus, "niñito" -> puerulus); the
+  // family words of affection lose the suffix without "small" ("abuelita" -> avia)
   if (!en && ht.upos == "NOUN" && lex_ && !es::notDiminutive(np.head)) {
-    const std::string& w = np.head;
-    auto ends = [&](const char* suf) {
-      const size_t k = std::strlen(suf);
-      return w.size() > k + 2 && w.compare(w.size() - k, k, suf) == 0;
-    };
-    std::vector<std::string> bases;
-    for (const char* suf : {"ecito", "ecita", "cito", "cita", "ito", "ita"}) {
-      if (!ends(suf)) continue;
-      const std::string stem = w.substr(0, w.size() - std::strlen(suf));
-      const char g = w.back();   // o / a
-      bases = {stem + g, stem + (g == 'o' ? "a" : "o"), stem, stem + "e"};
-      break;
-    }
-    for (const std::string& b : bases) {
-      std::vector<lex::Analysis> an;
-      lex_->lookup(text::es_key(b), an);
-      if (an.empty()) lex_->lookup(text::es_bare(b), an);
-      std::string found;
-      for (const lex::Analysis& a : an) {
-        const lex::Lemma l = lex_->lemma(a.lemma);
-        if (l.pos == feat::Noun && text::es_bare(text::lower(l.head)) == text::es_bare(b)) { found = text::lower(l.head); break; }
+    std::vector<const curated::GlossEsEntry*> taught;
+    cd_.glossEsLemmas(text::nfc(np.head), taught);
+    const std::string base = taught.empty() ? es::diminutiveBase(*lex_, np.head) : std::string();
+    if (!base.empty()) {
+      np.head = base;
+      if (!es::endearment(base)) {
+        SemAdj a;
+        a.lemma = "pequeño";
+        a.token = h;
+        np.adjectives.push_back(a);
       }
-      if (found.empty()) continue;
-      np.head = found;
-      SemAdj a;
-      a.lemma = "pequeño";
-      a.token = h;
-      np.adjectives.push_back(a);
-      break;
     }
   }
   // Spanish feminine person nouns keep their own head ("hermana" is not hermano: soror, not frāter) (C13)
@@ -2441,6 +2461,9 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     if (auxes.empty() && (tt == nlp::morph::TensePast || tt == nlp::morph::TenseImp)) f.pred.tense = Tense::Past;
     if (!en) {
       if (tt == nlp::morph::TenseFut) f.pred.tense = Tense::Future;
+      // C34: the Spanish imperfecto is the Latin imperfect (background, a state, a habit: "seguía hablando" ->
+      // loquī pergēbat), the pretérito the perfect
+      if (auxes.empty() && tt == nlp::morph::TenseImp && f.pred.aspect == Aspect::Simple) f.pred.habitual = true;
       const uint32_t md = fget(ht, nlp::morph::MoodShift);
       if (md == nlp::morph::MoodSub) f.pred.mood = SrcMood::Subjunctive;
       if (md == nlp::morph::MoodCnd) f.pred.mood = SrcMood::Conditional;
@@ -2486,6 +2509,45 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       f.pred.aspect = Aspect::Simple;
       f.pred.lemma = xl;
       f.pred.token = xcomp;
+      c.drop(h, Drop::Aux);
+    } else if (!en && hl == "haber" && fget(c.t(xcomp), nlp::morph::VerbFormShift) == nlp::morph::VfInf && [&] {
+                 for (int g : c.kids[(size_t)xcomp])
+                   if (c.ok(g) && c.t(g).lower == "que") return true;
+                 return false;
+               }()) {
+      // C34: "hay que + infinitive": an obligation of nobody in particular (oportet + infinitive), not "there is"
+      f.existential = false;
+      f.pred.modality = Modality::Must;
+      f.pred.impersonal = true;
+      f.pred.lemma = xl;
+      f.pred.token = xcomp;
+      c.drop(h, Drop::Aux);
+    } else if (!en && hl == "ir" && fget(ht, nlp::morph::TenseShift) == nlp::morph::TensePast &&
+               fget(c.t(xcomp), nlp::morph::VerbFormShift) == nlp::morph::VfInf) {
+      // C34: the preterite "fui / fue a ver" is motion with a purpose ("Fui a ver el mar." -> Iī ut mare vidērem), not
+      // the periphrastic future
+      take = false;
+    } else if (!en && in(hl, {"seguir", "continuar"}) && fget(c.t(xcomp), nlp::morph::VerbFormShift) == nlp::morph::VfGer) {
+      // C34: "seguía hablando" -> loquī pergēbat (seguir + gerund: go on doing; "seguir haciendo" -> pergō)
+      f.pred.lemma = "seguir haciendo";
+      f.pred.complementVerb = xl;
+      f.pred.complementToken = xcomp;
+    } else if (!en && hl == "volver" && [&] {
+                 for (int g : c.kids[(size_t)xcomp])
+                   if (c.ok(g) && c.t(g).lower == "a" && (c.dep(g) == "mark" || c.dep(g) == "case")) return true;
+                 return false;
+               }()) {
+      // C34: "volver a + infinitive" = do again ("No lo vuelvo a hacer." -> Id iterum nōn faciam: a promise about the
+      // future when said of oneself in the negative present)
+      f.pred.lemma = xl;
+      f.pred.token = xcomp;
+      SemAdverb g;
+      g.lemma = "otra vez";
+      g.token = h;
+      f.adverbs.push_back(g);
+      if (f.pred.tense == Tense::Present && nsubj < 0 && fget(ht, nlp::morph::PersonShift) == nlp::morph::Pers1 &&
+          [&] { for (int k : c.kids[(size_t)h]) if (c.ok(k) && c.t(k).lower == "no") return true; return false; }())
+        f.pred.tense = Tense::Future;
       c.drop(h, Drop::Aux);
     } else if (!en && hl == "ir") {   // "voy a hacer" -> future (in the past: "iba a" -> past)
       if (f.pred.tense != Tense::Past) f.pred.tense = Tense::Future;
@@ -3706,9 +3768,18 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       if (leads && noSubj && notAux) {
         if (lexImp && pe != 1) { imp = true; plural = nu == nlp::morph::NumPlur; }
         else if (md == nlp::morph::MoodSub && pe == 2 && f.negative) { imp = true; plural = nu == nlp::morph::NumPlur; }
-        else if (md == nlp::morph::MoodSub && pe == 3 && nu == nlp::morph::NumPlur && (excl || everyoneSubj)) {
+        else if (md == nlp::morph::MoodSub && pe == 3 && nu == nlp::morph::NumPlur) {
+          // C34: a present subjunctive opening a main clause without "que" is the ustedes order ("Escriban la palabra",
+          // "Niños, siéntense") (C13 asked for "¡" or "todos")
           imp = true;
           plural = true;
+        } else if (pe == 3 && vtok + 1 < (int)c.s.tokens.size() && c.t(vtok + 1).start == vt.start &&
+                   c.t(vtok + 1).upos == "PRON" && fget(vt, nlp::morph::VerbFormShift) != nlp::morph::VfInf &&
+                   fget(vt, nlp::morph::VerbFormShift) != nlp::morph::VfGer) {
+          // C34: an enclitic on a finite 3rd-person form is the usted / ustedes order ("Siéntese", "Niños,
+          // siéntense"): the indicative never takes one, whatever mood the tagger gave
+          imp = true;
+          plural = nu == nlp::morph::NumPlur;
         } else if (md == nlp::morph::MoodSub && pe == 1 && nu == nlp::morph::NumPlur && !f.negative) {
           f.pred.modality = Modality::Let;
           f.hasSubject = true;
@@ -3754,7 +3825,8 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     f.subject = SemNP{};
   }
   if (f.type == Kind::Imp && f.hasSubject && f.subject.isPronoun && f.subject.pron.number == 2) f.imperativePlural = true;
-  if (!f.hasSubject && f.hasPred && !en && f.type != Kind::Imp && esPe) {
+  if (!f.hasSubject && f.hasPred && !en && f.type != Kind::Imp && esPe &&
+      !(f.pred.impersonal && f.pred.modality == Modality::Must)) {   // C34: "hay que" has no subject
     f.hasSubject = true;
     f.implicitSubject = true;
     f.subject.isPronoun = true;
@@ -3981,7 +4053,11 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
         leftOk = true;
       // C17: an adverbial phrase of several words inside a clause, before a verb, adjective or adverb ("I will of
       // course help you", "She was in fact very kind"); "after all the children ..." is not one
-      if (!leftOk && lang_ == SrcLang::En && (book[(size_t)m.entry].reg == "adv" || book[(size_t)m.entry].reg == "answer") &&
+      // C34: Spanish adv rows too (not a row whose Latin starts with a capital, "en latín" -> Latīnē: the clause
+      // builder renders it, and a phrase moved into a clause loses its capital)
+      if (!leftOk && (lang_ == SrcLang::En || (lang_ == SrcLang::Es && book[(size_t)m.entry].reg == "adv" &&
+                                               !latinCapital(book[(size_t)m.entry].latin))) &&
+          (book[(size_t)m.entry].reg == "adv" || book[(size_t)m.entry].reg == "answer") &&
           m.last > m.first && m.slots.empty() &&
           ((m.last + 1 < n && in(s.tokens[(size_t)m.last + 1].upos, {"VERB", "AUX", "ADJ", "ADV"})) ||
            (book[(size_t)m.entry].reg == "adv" && s.tokens[(size_t)m.first].lower != "in" &&
@@ -4108,6 +4184,16 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
       if (u.frame.type == Kind::Yn && s.question && &it != &items.back()) {
         bool qmark = false;
         for (int k = it.first; k <= it.last + 1 && k < n; ++k) qmark = qmark || s.tokens[(size_t)k].text == "?";
+        // C34: Spanish marks the question's start: a clause after an open "¿" is inside the question ("¿Usted tiene
+        // perro, señora?": the "?" comes after the address)
+        if (!qmark && lang_ == SrcLang::Es) {
+          int open = -1;
+          for (int k = 0; k <= it.first && k < n; ++k) {
+            if (s.tokens[(size_t)k].text == "\xC2\xBF") open = k;
+            if (s.tokens[(size_t)k].text == "?") open = -1;
+          }
+          qmark = open >= 0;
+        }
         if (!qmark) u.frame.type = Kind::Decl;
       }
       // a bare NP after/before a comma next to another unit is a vocative ("What is your name, child?")
@@ -5720,9 +5806,15 @@ bool FrameBuilder::segmentParse(std::vector<Token>& tk) const {
     const bool atEnd = sep >= n || (sep + 1 == n && tk[(size_t)sep].upos == "PUNCT" && !sepIsBreak);
     if (!sepIsBreak && !atEnd) continue;
     bool cut = false;
-    if (a == 0 && b == 0 && sepIsBreak && leadWord(tk[0].lower)) cut = true;            // "Oh, ..."
+    const bool esl = lang_ == SrcLang::Es;
+    if (a == 0 && b == 0 && sepIsBreak && (esl ? esLeadWord(tk[0].lower) : leadWord(tk[0].lower))) cut = true;   // "Oh, ..."
+    // C34: Spanish "¡Pablo, ...!", "Mamá, ¿...?": the inverted mark opens the sentence, the span after it decides (a
+    // vocative at the end, "¿..., niña?", is left to the parse and the clause builder, as before)
+    const int a0 = esl && a < n && (tk[(size_t)a].text == "\xC2\xA1" || tk[(size_t)a].text == "\xC2\xBF") ? a + 1 : a;
+    if (esl && a > 0 && a0 > a && b > a) cut = true;   // "Mamá, ¿puedo ...?": a question / exclamation after a comma
+    if (esl && !cut && a0 == b && b > a && sepIsBreak && esLeadWord(tk[(size_t)b].lower)) cut = true;   // "¡Ay, ...!"
     // "But, comrades, ...": a one-word "verb" after a lead word that the lexicon also reads as a noun is the addressee
-    if (a == 2 && b == 2 && sepIsBreak && leadWord(tk[0].lower) && tk[2].upos == "VERB" && lex_) {
+    if (!esl && a == 2 && b == 2 && sepIsBreak && leadWord(tk[0].lower) && tk[2].upos == "VERB" && lex_) {
       std::vector<lex::Analysis> an;
       lex_->lookup(text::en_key(tk[2].lower), an);
       for (const lex::Analysis& x : an)
@@ -5732,7 +5824,7 @@ bool FrameBuilder::segmentParse(std::vector<Token>& tk) const {
           break;
         }
     }
-    if (!cut && (sepIsBreak || a > 0) && !(a == 0 && atEnd) && vocativeSpan(tk, a, b)) {
+    if (!cut && (sepIsBreak || a > 0) && !(a == 0 && atEnd) && (esl ? !atEnd && esVocativeSpan(tk, a0, b) : vocativeSpan(tk, a, b))) {
       // a vocative needs something else in the sentence and no article; time nouns are adverbs, not addressees
       bool time = false;
       for (int i = a; i <= b; ++i) time = time || timeNoun(tk[(size_t)i].lower);
@@ -5977,9 +6069,11 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
   }
   // Spanish (C13): tags and features from spanish.vpl (second-person verbs read as nouns: "¿A dónde vas?", "¿Quién
   // eres?"; tense / mood the tagger left out: "escribiremos", "entremos"), then a new parse
-  if (nlp_ && lex_ && lang_ == SrcLang::Es && es::retag(tk, *lex_)) {
-    nlp_->parser().parse(tk);
-    out.repairs.emplace_back("retag");
+  if (nlp_ && lex_ && lang_ == SrcLang::Es) {
+    bool guess = es::retag(tk, *lex_, &cd_);
+    const bool sure = es::retagWords(tk, *lex_, cd_, guess);   // C34: after the C13 retag (a name stays a name)
+    if (sure || guess) nlp_->parser().parse(tk);
+    if (guess) out.repairs.emplace_back("retag");
   }
   bool reparse = nlp_ && lex_ && lang_ == SrcLang::En && lexiconVeto(tk, *lex_);
   // C15: "for" before a subject pronoun and its verb is the conjunction "for" (= nam): "for you will help ...",
@@ -6058,7 +6152,7 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
       }
     }
   }
-  if (nlp_ && lang_ == SrcLang::En) segmentParse(tk);
+  if (nlp_ && (lang_ == SrcLang::En || lang_ == SrcLang::Es)) segmentParse(tk);   // C34: Spanish too
   if (nlp_) punctRoot(tk);
   if (nlp_) repairTree(out);
   // "Bow!": a one-word exclamation tagged as an interjection that the lexicon knows as a verb -> imperative

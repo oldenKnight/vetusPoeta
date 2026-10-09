@@ -53,7 +53,7 @@ puella	puella	niña, muchacha
 puer	puer	niño, muchacho
 vir	vir	hombre, varón
 femina	fēmina	mujer
-pater	pater	padre
+pater	pater	padre, papá
 mater	māter	madre
 filius	fīlius	hijo
 filia	fīlia	hija
@@ -210,3 +210,34 @@ nemo	nēmō	nadie
 sero	serō	plantar, sembrar
 avus	avus	abuelo
 avia	avia	abuela
+# C34 (Spanish loop 2): school and family words of the own_dialogue2 material; "hacer frío / calor" and "esperar que" are the frame builder's weather and hope readings
+stilus	stilus	lápiz
+conclave	conclāve	salón
+vicinus	vīcīnus	vecino
+vicina	vīcīna	vecina
+curiosus	cūriōsus	curioso
+convivium	convīvium	fiesta, banquete
+consilium	cōnsilium	idea, plan, consejo
+poculum	pōculum	vaso, copa
+desidero	dēsīderō	extrañar, echar de menos
+disco	discō	aprender, estudiar
+traho	trahō	jalar, arrastrar
+relinquo	relinquō	dejar, abandonar
+cuniculus	cunīculus	conejo
+severus	sevērus	estricto, severo
+puerulus	puerulus	niñito
+catulus	catulus	perrito, cachorro
+apertus	apertus	abierto
+nato	natō	nadar
+venia	venia	perdón
+aufero	auferō	quitar, llevarse
+nosco	nōscō	conocer
+spero	spērō	esperar que, tener esperanza
+comedo	comedō	comerse
+frigeo	frīgeō	hacer frío
+caleo	caleō	hacer calor
+sollicitus	sollicitus	preocupado
+cubiculum	cubiculum	cuarto, recámara
+libellus	libellus	cuaderno
+litus	lītus	playa
+pergo	pergō	seguir haciendo, continuar haciendo

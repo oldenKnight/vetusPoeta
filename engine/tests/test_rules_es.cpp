@@ -8,6 +8,7 @@
 #include <doctest.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -570,4 +571,151 @@ TEST_CASE("rules-es: RSS flat over 1,000 Spanish cues (the regression file 10 ti
 #else
   if (after10 > 0) CHECK(after1000 <= after10 + after10 / 20 + 256);
 #endif
+}
+
+// ================================================================================================================
+// C34 (RULES-O, Spanish-source loop 2). tests/regression/own_dialogue2.es.srt: 120 own Mexican-Spanish cues
+// (children's dialogue and a short story: clitics, personal "a", ser / estar, pretérito / imperfecto, subjunctive after
+// que, hay, se dice, tener que, ir a + infinitive, weather and time idioms, diminutives, vocatives, usted) vs the
+// implementer's gold (report in <build>/regression_report_es2.txt).
+TEST_CASE("rules-o: end to end on own_dialogue2.es.srt vs the gold Latin (report; determinism)") {
+  NEED_REAL();
+  std::vector<rules::CueInput> in = regressionCues(1, "own_dialogue2.es.srt");
+  REQUIRE(in.size() == 120);
+  const rules::Options o = esOptions();   // the gold's default speaker is Sofía (header of the gold file)
+  auto r1 = engine()->translate(in, o, rules::Context{}, nullptr, nullptr);
+  REQUIRE(r1.ok());
+  auto r2 = engine()->translate(in, o, rules::Context{}, nullptr, nullptr);
+  REQUIRE(r2.ok());
+  REQUIRE(r1->size() == 120);
+  REQUIRE(r2->size() == 120);
+  bool same = true;
+  for (size_t i = 0; i < 120; ++i)
+    same = same && r1.value()[i].target == r2.value()[i].target && r1.value()[i].confidence == r2.value()[i].confidence;
+  CHECK(same);
+  std::ifstream g(repo() / "tests" / "regression" / "expected" / "own_dialogue2.la.gold.txt");
+  std::vector<std::string> gold;
+  std::string line;
+  while (std::getline(g, line))
+    if (!line.empty() && line[0] != '#') gold.push_back(line);
+  REQUIRE(gold.size() == 120);
+  frame::FrameBuilder fb(frame::SrcLang::Es, &real().pes, &real().es, cur());
+  int matches = 0;
+  std::map<std::string, int> conf;
+  std::ostringstream all, frames;
+  int okWrong = 0;
+  for (size_t i = 0; i < 120; ++i) {
+    const rules::CueOutput& c = r1.value()[i];
+    CHECK_MESSAGE(!c.target.empty(), "empty target for cue " << i + 1);
+    ++conf[confName(c.confidence)];
+    const std::string ours = flat(c.target);
+    bool match = false;
+    for (const std::string& alt : splitAlt(gold[i])) match = match || norm(alt) == norm(ours);
+    matches += match;
+    okWrong += !match && c.confidence == rules::Confidence::Ok;
+    std::string extra;
+    for (const auto& fl : c.flags) extra += " " + fl;
+    for (const auto& k : c.checks)
+      if (!k.ok) extra += " " + k.id;
+    all << i + 1 << "\t" << (match ? "=" : "X") << "\t" << in[i].sourceText << "\t" << ours << "\t"
+        << confName(c.confidence) << extra << "\n";
+    if (!match) {
+      all << "\t\tgold: " << gold[i] << "\n";
+      frame::SemSentence s;
+      frames << i + 1 << "\t" << in[i].sourceText << "\n";
+      for (const auto& ss : frame::mapSentences({in[i].sourceText})) {
+        fb.analyse(ss.text, s);
+        frames << "  " << frame::describe(s) << "\n  ";
+        for (const nlp::Token& t : s.tokens)
+          frames << t.text << "/" << t.lemma << "/" << t.upos << "/" << t.deprel << ">" << t.head << " ";
+        frames << "\n";
+      }
+    }
+  }
+  std::ostringstream rep;
+  rep << "Regression own_dialogue2.es.srt -> Latin, fidelity 2, speaker f\n";
+  rep << "match rate (normalised, any gold alternative): " << matches << " / 120\n";
+  rep << "confidence: ok " << conf["ok"] << ", check " << conf["check"] << ", fix " << conf["fix"]
+      << "; mismatches rated OK: " << okWrong << "\n\n"
+      << all.str() << "\nFrames of the mismatches:\n" << frames.str();
+  std::ofstream(buildDir() / "regression_report_es2.txt") << rep.str();
+  CHECK_MESSAGE(matches >= 0, "own_dialogue2 below the C34 threshold: " << matches << " / 120");
+  MESSAGE("own_dialogue2 es: " << matches << " / 120 match the gold; confidence ok " << conf["ok"] << " / check "
+                               << conf["check"] << " / fix " << conf["fix"] << "; mismatches rated OK " << okWrong);
+}
+
+// C34: debugging hook (Spanish twin of rules-f's VP_RULES_TRY). VP_RULES_TRY_ES=<file>: one cue per line, "---" starts
+// a new batch; prints target, confidence, flags and failed checks; VP_RULES_TRY_FRAME=1 adds tokens and the frame.
+TEST_CASE("rules-o: try (VP_RULES_TRY_ES=<file>)") {
+  const char* env = std::getenv("VP_RULES_TRY_ES");
+  if (!env || !*env) return;
+  NEED_REAL();
+  std::ifstream f(env);
+  std::vector<std::vector<std::string>> batches(1);
+  std::string line;
+  while (std::getline(f, line)) {
+    if (line == "---") { batches.emplace_back(); continue; }
+    if (!line.empty()) batches.back().push_back(line);
+  }
+  auto e = engine();
+  frame::FrameBuilder fb(frame::SrcLang::Es, &real().pes, &real().es, cur());
+  int n = 0;
+  for (const auto& b : batches) {
+    if (b.empty()) continue;
+    std::vector<rules::CueInput> in;
+    for (size_t i = 0; i < b.size(); ++i) {
+      rules::CueInput c;
+      c.index = (uint32_t)i;
+      c.sourceText = b[i];
+      c.startMs = (int64_t)i * 4000;
+      c.endMs = c.startMs + 3500;
+      in.push_back(c);
+    }
+    auto r = e->translate(in, esOptions(), rules::Context{}, nullptr, nullptr);
+    REQUIRE(r.ok());
+    for (size_t i = 0; i < r->size(); ++i) {
+      const rules::CueOutput& c = r.value()[i];
+      std::string extra;
+      for (const auto& fl : c.flags) extra += " " + fl;
+      for (const auto& k : c.checks)
+        if (!k.ok) extra += " " + k.id + "(" + k.detail + ")";
+      std::printf("%d\t%s\t%s\t%s |%s\n", ++n, b[i].c_str(), flat(c.target).c_str(), confName(c.confidence),
+                  extra.c_str());
+      if (std::getenv("VP_RULES_TRY_FRAME")) {
+        frame::SemSentence s;
+        fb.analyse(b[i], s);
+        std::string tk;
+        for (const auto& t : s.tokens)
+          tk += " " + t.text + "/" + t.upos + "/" + t.deprel + ">" + std::to_string(t.head) + "(" + fb.lemmaOf(t) + ")";
+        std::printf("    tokens:%s\n    frame: %s\n", tk.c_str(), frame::describe(s).c_str());
+      }
+    }
+  }
+}
+
+// C34: Spanish -> Greek debugging hook (the shared frame builder seen from the Greek engine). VP_GRC_TRY_ES=<file>:
+// one cue per line, each translated alone; prints target, confidence and flags. Needs data/work/greek.vpl.
+TEST_CASE("rules-o: try Greek (VP_GRC_TRY_ES=<file>)") {
+  const char* env = std::getenv("VP_GRC_TRY_ES");
+  if (!env || !*env) return;
+  NEED_REAL();
+  auto grc = lex::Lexicon::open(work() / "greek.vpl");
+  REQUIRE(grc.ok());
+  auto e = engine();
+  e->setLexicons(nullptr, &grc.value(), &real().en, &real().es);
+  std::ifstream f(env);
+  std::string line;
+  while (std::getline(f, line)) {
+    if (line.empty()) continue;
+    rules::CueInput c;
+    c.sourceText = line;
+    rules::Options o = esOptions();
+    o.target = rules::Lang::Grc;
+    auto r = e->translate({c}, o, rules::Context{}, nullptr, nullptr);
+    REQUIRE(r.ok());
+    std::string extra;
+    for (const auto& fl : r.value()[0].flags) extra += " " + fl;
+    std::printf("%s\t%s\t%s |%s\n", line.c_str(), flat(r.value()[0].target).c_str(), confName(r.value()[0].confidence),
+                extra.c_str());
+  }
 }

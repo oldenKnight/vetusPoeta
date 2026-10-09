@@ -1100,6 +1100,19 @@ class RulesEngine final : public Engine {
       if (h == w) return feat::M;
     for (const char* w : kF)
       if (h == w) return feat::F;
+    // C34: Spanish words of address say the sex in their ending ("niña", "hija", "maestra", "señor")
+    if (st.lang == frame::SrcLang::Es) {
+      static const char* const kMEs[] = {"niño", "hijo", "papá", "padre", "abuelo", "hermano", "tío", "señor", "maestro",
+                                         "rey", "príncipe", "muchacho", "chico", "amigo", "doctor", "profesor", "primo",
+                                         "mijo", "joven", "hombre", "esposo", "marido"};
+      static const char* const kFEs[] = {"niña", "hija", "mamá", "madre", "abuela", "hermana", "tía", "señora",
+                                         "señorita", "maestra", "reina", "princesa", "muchacha", "chica", "amiga",
+                                         "doctora", "profesora", "prima", "mija", "mujer", "esposa"};
+      for (const char* w : kMEs)
+        if (h == w) return feat::M;
+      for (const char* w : kFEs)
+        if (h == w) return feat::F;
+    }
     (void)st;
     (void)mem;
     return 0;
@@ -1650,6 +1663,30 @@ class RulesEngine final : public Engine {
           st.flipSpeakerGender = false;
           so.explicitSpeaker = g;
         }
+      }
+    } else if (st.lang == frame::SrcLang::Es) {
+      // C34: the turn mechanisms of C22 / C24 / C28 on the shared frame: a group addressed ("Niños, siéntense", "Que
+      // duerman bien, mis niños") makes the orders and "you" plural, one person addressed singular; a word of address
+      // that says the sex ("niña", "hija", "maestra") gives "you" its gender
+      int voc = 0;
+      for (const frame::Unit& u : s.units) {
+        if (u.type != frame::Unit::Clause) continue;
+        if (u.vocative && u.frame.hasSubject) voc = u.frame.subject.number == 2 ? 2 : std::max(voc, 1);
+        for (const frame::SemNP& v : u.frame.vocatives) voc = v.number == 2 ? 2 : std::max(voc, 1);
+      }
+      if (voc == 2) {
+        mem.addresseePlural = true;
+        mem.sawPlural = true;
+        for (frame::Unit& u : s.units)
+          if (u.type == frame::Unit::Clause && u.frame.type == frame::Kind::Imp) u.frame.imperativePlural = true;
+      } else if (voc == 1) {
+        mem.addresseePlural = false;
+        mem.answerWe = false;
+      }
+      addressInfo(s, st, mem, ctx, so);
+      if (so.vocGender) {
+        mem.addresseeGender = so.vocGender;
+        so.explicitAddr = so.vocGender;
       }
     }
     mem.sawFirst = false;
@@ -2515,6 +2552,11 @@ class RulesEngine final : public Engine {
     std::string t = ss.text;
     while (!t.empty() && (t.back() == ' ' || t.back() == '"' || t.back() == '\'')) t.pop_back();
     const bool question = ss.kind == frame::CueKind::Speech && !t.empty() && t.back() == '?';
+    // C34: a question put to "you" (its Latin has a 2nd-person verb)
+    mem.askedYou = false;
+    if (question)
+      for (const rules::TokenView& v : so.latin.tokens)
+        if (v.features.pos == "verb" && v.features.person == "second") mem.askedYou = true;
     auto clear = [&]() {
       mem.whCase = mem.whPlace = mem.whGender = mem.whNumber = 0;
       mem.whPrep = transfer::kNone;
@@ -2948,6 +2990,8 @@ class RulesEngine final : public Engine {
           }
         mem.addresseeGender = cueAddr ? cueAddr : ag;
         if (!cueAddr) agInferred = ag;
+      } else if (lang == frame::SrcLang::Es) {
+        mem.addresseeGender = cueAddr;   // C34: the person addressed in this cue only (a word of address of the cue)
       }
       mem.songLine = ss.kind == frame::CueKind::Song;   // C22
       mem.answer = ss.kind == frame::CueKind::Speech && (mem.whCase || mem.whPlace);   // C28

@@ -4,7 +4,7 @@
 # macrons on long vowels. Speakers: Sofía (girl, the default speaker: speaker gender f), her little brother Pablo,
 # their grandmother (who tells the story of the little tortoise, cues 67-89), mother, father, the teacher (maestra),
 # Mateo (a classmate), a neighbour (señora) and an old man (señor) addressed with usted (rendered with tū).
-# Names: Pablo -> Paulus, Mateo -> Matthaeus, Sofía -> Sophīa, Lucía -> Lūcia. Diminutives: the base noun (+ parvus)
+# Names: Pablo -> Paulus, Mateo -> Matthaeus, Sofía -> Sophia, Lucía -> Lūcia. Diminutives: the base noun (+ parvus)
 # or the classical diminutive when common (perrito -> catulus, niñito -> puerulus); abuelita -> avia.
 Salvē, avia!
 Salvē, mea puella. Dormīvistīne bene? | Salvē, puella mea. Dormīvistīne bene? | Salvē, mea puella. Bene dormīvistīne? | Salvē, puella mea. Bene dormīvistīne?
@@ -47,12 +47,12 @@ Puerī, sedēte, quaesō. | Puerī, cōnsīdite, quaesō.
 Hodiē fābulam legēmus.
 Quis prīmus legere vult? | Quis vult prīmus legere? | Quis prīmum legere vult?
 Ego, magistra!
-Optimē, Sophīa. Lege clārā vōce. | Bene, Sophīa. Lege clārā vōce. | Valdē bene, Sophīa. Lege clārā vōce. | Optimē, Sophīa. Lege magnā vōce.
+Optimē, Sophia. Lege clārā vōce. | Bene, Sophia. Lege clārā vōce. | Valdē bene, Sophia. Lege clārā vōce. | Optimē, Sophia. Lege magnā vōce.
 Matthaee, cūr trīstis es?
 Aliquis stilum meum mihi abstulit. | Aliquis mihi stilum meum abstulit. | Aliquis stilum mihi abstulit. | Aliquis stilum meum abstulit.
 Sūme meum. | Cape meum.
 Grātiās, valdē bona es. | Grātiās tibi, valdē bona es.
-Sophīa Matthaeō stilum suum dedit. | Sophīa stilum suum Matthaeō dedit.
+Sophia Matthaeō stilum suum dedit. | Sophia stilum suum Matthaeō dedit.
 Magistra Paulō imperāvit ut tacēret. | Magistra Paulum tacēre iussit. | Magistra Paulō dīxit ut tacēret.
 Sed Paulus loquī pergēbat. | Paulus tamen loquī pergēbat.
 Tum magistra valdē īrāta est. | Tum magistra vehementer īrāta est.
@@ -117,7 +117,7 @@ Vīsne pōculum aquae?
 Ita, grātiās; valdē benigna es, puella.
 Crās valdē frīgēbit. | Crās magnum frīgus erit.
 Fenestrae bene claudendae sunt. | Fenestrās bene claudere oportet. | Oportet fenestrās bene claudere.
-Cūr tam tacita es, Sophīa?
+Cūr tam tacita es, Sophia?
 Dē amīcā meā Lūciā cōgitō. | Dē Lūciā amīcā meā cōgitō.
 Nunc in aliā urbe habitat. | Nunc in aliā urbe vīvit.
 Eam valdē dēsīderō. | Eam multum dēsīderō.
