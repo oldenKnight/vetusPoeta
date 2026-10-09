@@ -7,3 +7,8 @@ reviewed them; a test fails when an output changes without an updated expectatio
 `own_turns.en.srt` (C28, from `own_turns.en.txt`): 120 cues of our own subtitle-style dialogue for cue context: speaker
 dashes, sentences split over two or three cues, lower-case continuations, noun-phrase and prepositional-phrase answers,
 interjections, vocatives, yes / no answers and a few song lines. Gold: `expected/own_turns.la.gold.txt`.
+
+`own_story.en.srt` (C30, from `own_story.en.txt`): 120 cues of our own short story in simple narrative English (past
+tense, dialogue in quotation marks, a few long sentences with subordinate clauses, narrative connectors), cut the way
+a subtitle maker would at 35-42 characters: mid-phrase, mid-clause and across sentence ends. Gold:
+`expected/own_story.la.gold.txt` (the Latin of each sentence distributed over its cues by phrase).
