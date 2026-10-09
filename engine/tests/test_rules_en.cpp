@@ -3469,3 +3469,79 @@ TEST_CASE("rules-l: fixes after the blind check (own sentences, C28)") {
   CHECK(run({"Mother, can we go out?", "- After dinner,", "if you are good."})[2].text == "Sī bonī estis.");
   CHECK(run({"Can we play now?", "Yes, if you are quiet."})[1].text == "Ita, sī tranquillī estis.");
 }
+
+// ================================================================================================================
+// C30 (Latin loop 7): narrative prose cut mid-sentence. tests/regression/own_story.en.srt (our own short story in
+// narrative English, cut at 35-42 characters mid-phrase, mid-clause and across sentence ends) vs its gold.
+
+TEST_CASE("rules-m: end to end on own_story.en.srt vs the gold Latin (report; determinism; cue identity)") {
+  NEED_REAL();
+  std::vector<rules::CueInput> in = regressionCues(1, "own_story.en.srt");
+  REQUIRE(in.size() == 120);
+  rules::Options o;
+  o.fidelity = 2;
+  o.speakerGender = 'm';
+  rules::Context ctx;
+  auto r1 = engine()->translate(in, o, ctx, nullptr, nullptr);
+  REQUIRE(r1.ok());
+  auto r2 = engine()->translate(in, o, ctx, nullptr, nullptr);   // byte-identical on a second run
+  REQUIRE(r2.ok());
+  REQUIRE(r1->size() == 120);
+  REQUIRE(r2->size() == 120);
+  bool same = true;
+  for (size_t i = 0; i < 120; ++i)
+    same = same && r1.value()[i].target == r2.value()[i].target && r1.value()[i].confidence == r2.value()[i].confidence;
+  CHECK(same);
+  std::ifstream g(repo() / "tests" / "regression" / "expected" / "own_story.la.gold.txt");
+  std::vector<std::string> gold;
+  std::string line;
+  while (std::getline(g, line))
+    if (!line.empty() && line[0] != '#') gold.push_back(line);
+  REQUIRE(gold.size() == 120);
+  int matches = 0, exact = 0, wrongOk = 0;
+  std::map<std::string, int> conf;
+  std::ostringstream table;
+  table << "| # | source | gold | ours | conf |\n|---|---|---|---|---|\n";
+  for (size_t i = 0; i < 120; ++i) {
+    const rules::CueOutput& c = r1.value()[i];
+    CHECK_MESSAGE(!c.target.empty(), "empty target for cue " << i + 1);   // C22: no cue is ever emptied
+    CHECK(c.index == in[i].index);
+    ++conf[confName(c.confidence)];
+    const std::string ours = flat(c.target);
+    bool match = false, exactMatch = false;
+    for (const std::string& alt : splitAlt(gold[i])) {
+      match = match || norm(alt) == norm(ours);
+      exactMatch = exactMatch || text::nfc(alt) == text::nfc(ours);
+    }
+    matches += match;
+    exact += exactMatch;
+    if (!match && c.confidence == rules::Confidence::Ok) ++wrongOk;
+    if (!match) {
+      std::string chk;
+      for (const auto& k : c.checks)
+        if (!k.ok) chk += k.id + " ";
+      for (const auto& f : c.flags)
+        if (f != "tags") chk += f + " ";
+      table << "| " << i + 1 << " | " << in[i].sourceText << " | " << splitAlt(gold[i])[0] << " | " << ours << " | "
+            << confName(c.confidence) << (chk.empty() ? "" : " " + chk) << "|\n";
+    }
+  }
+  std::ostringstream rep;
+  rep << "Regression own_story.en.srt -> Latin, fidelity 2, speaker m\n";
+  rep << "match rate (normalised, any gold alternative): " << matches << " / 120\n";
+  rep << "exact (macrons and punctuation too): " << exact << " / 120\n";
+  rep << "confidence: ok " << conf["ok"] << ", check " << conf["check"] << ", fix " << conf["fix"] << "\n";
+  rep << "wrong among OK: " << wrongOk << "\n\nMismatches:\n" << table.str() << "\nAll outputs:\n";
+  for (size_t i = 0; i < 120; ++i) {
+    const rules::CueOutput& c = r1.value()[i];
+    std::string fl;
+    for (const auto& f : c.flags) fl += f + " ";
+    rep << i + 1 << "\t" << in[i].sourceText << "\t" << flat(c.target) << "\t" << confName(c.confidence) << "\t" << fl
+        << "\n";
+  }
+  std::ofstream(buildDir() / "regression_report_story.txt") << rep.str();
+  MESSAGE("own_story regression: " << matches << " / 120 match the gold; confidence ok " << conf["ok"] << " / check "
+                                   << conf["check"] << " / fix " << conf["fix"] << "; wrong among OK " << wrongOk);
+  CHECK(wrongOk == 0);
+  CHECK(matches >= 0);
+}

@@ -190,7 +190,8 @@ const char* connector(const std::string& w, bool afterFirst) {
   static const std::pair<const char*, const char*> kC[] = {
       {"and", "et"},       {"but", "sed"},        {"or", "aut"},          {"so", "itaque"},   {"because", "quia"},
       {"if", "sī"},        {"nor", "neque"},      {"also", "quoque"},     {"yet", "tamen"},   {"therefore", "itaque"},
-      {"however", "tamen"}, {"when", "cum"}, {"when-time", "ubi"},   // C22: a when-clause standing alone (ubi)
+      {"however", "tamen"}, {"however-mid", "autem"},   // C30: "After an hour, however, the path ..." -> Post hōram autem
+      {"when", "cum"}, {"when-time", "ubi"},   // C22: a when-clause standing alone (ubi)
       {"what-if", "quid"},   // C22: "What if ...?" -> Quid sī ...?      {"although", "quamquam"}, {"while", "dum"},  {"unless", "nisi"},
       {"for", "nam"},      {"besides", "praetereā"}, {"moreover", "praetereā"}, {"still", "tamen"}, {"thus", "ita"},
       {"hence", "itaque"}};

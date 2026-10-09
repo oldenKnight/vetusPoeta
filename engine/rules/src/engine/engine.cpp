@@ -731,6 +731,265 @@ class RulesEngine final : public Engine {
     so.reasons.push_back(Reason{-1, "form", "the sentence was analysed in pieces (parser fallback): check the structure", ""});
   }
 
+  // ---- C30: direct speech with a reporting frame -----------------------------------------------------------------------
+  // "Where is my goat?" cried the old woman. / "Do not be afraid, Grandmother," she said. / "My goat is gone," said Anna,
+  // "and the bridge is broken.": each quotation is translated as a sentence of its own and the frame as a clause of
+  // saying put after it (verb first: clāmāvit anus, inquit, rogāvit Anna; say with nobody spoken to -> inquit); the
+  // quotation marks stay in the Latin. A quotation of one or two words without a mark inside ("woof", "yes") is not a
+  // speech (C24). Returns false (nothing done) when the sentence is not of that shape.
+  struct QSeg { size_t a = 0, b = 0; bool quote = false; };
+  static bool quoteMarkAt(const std::string& t, size_t i, size_t& len) {
+    if (t[i] == '"') { len = 1; return true; }
+    if (t.compare(i, 3, "\xE2\x80\x9C") == 0 || t.compare(i, 3, "\xE2\x80\x9D") == 0) { len = 3; return true; }
+    return false;
+  }
+  // The reporting frame of `seg` (punctuation trimmed): the canonical English clause ("The old woman shouted.") and,
+  // per word of it, the byte offset of the source word in `text`; false when it is no frame.
+  static bool reportingFrame(const std::string& text, size_t a, size_t b, std::string& canon, std::vector<int>& canonSrc,
+                             std::vector<int>& canonAt, bool& sayAlone) {
+    struct W { std::string w, low; size_t at; };
+    std::vector<W> ws;
+    size_t i = a;
+    while (i < b) {
+      while (i < b && (text[i] == ' ' || text[i] == ',' || text[i] == '.' || text[i] == ';' || text[i] == ':' ||
+                       text[i] == '!' || text[i] == '?'))
+        ++i;
+      size_t j = i;
+      while (j < b && text[j] != ' ' && text[j] != ',' && text[j] != '.' && text[j] != ';' && text[j] != ':' &&
+             text[j] != '!' && text[j] != '?')
+        ++j;
+      if (j > i) ws.push_back(W{text.substr(i, j - i), text::lower(text.substr(i, j - i)), i});
+      i = j;
+    }
+    if (ws.empty() || ws.size() > 6) return false;
+    static const std::pair<const char*, const char*> kSay[] = {
+        {"said", "said"},         {"says", "says"},           {"asked", "asked"},       {"asks", "asks"},
+        {"cried", "shouted"},     {"cries", "shouts"},        {"shouted", "shouted"},   {"called", "shouted"},
+        {"exclaimed", "shouted"}, {"answered", "answered"},   {"answers", "answers"},   {"replied", "answered"},
+        {"whispered", "whispered"}, {"added", "added"}};
+    long v = -1;
+    std::string verb;
+    for (size_t k = 0; k < ws.size() && v < 0; ++k)
+      for (const auto& p : kSay)
+        if (ws[k].low == p.first) { v = (long)k; verb = p.second; break; }
+    if (v < 0) return false;
+    // subject: the words before the verb, else the words after it up to an adverb in -ly or "to"
+    size_t s0 = 0, s1 = (size_t)v, r0 = (size_t)v + 1;
+    if (v == 0) {
+      s0 = 1;
+      s1 = 1;
+      while (s1 < ws.size() && ws[s1].low != "to" && !(ws[s1].low.size() > 3 && ws[s1].low.compare(ws[s1].low.size() - 2, 2, "ly") == 0))
+        ++s1;
+      r0 = s1;
+    }
+    if (s1 <= s0 || s1 - s0 > 4) return false;
+    // the rest: adverbs in -ly and "to" + a noun phrase
+    bool to = false;
+    for (size_t k = r0; k < ws.size(); ++k) {
+      if (ws[k].low == "to") { to = true; continue; }
+      if (!to && !(ws[k].low.size() > 3 && ws[k].low.compare(ws[k].low.size() - 2, 2, "ly") == 0)) return false;
+    }
+    canon.clear();
+    canonSrc.clear();
+    canonAt.clear();
+    auto add = [&](const W& w, const std::string& as) {
+      if (!canon.empty()) canon += ' ';
+      canonAt.push_back((int)canon.size());
+      canonSrc.push_back((int)w.at);
+      canon += as;
+    };
+    for (size_t k = s0; k < s1; ++k) {
+      std::string as = ws[k].w;
+      if (k == s0 && !as.empty() && as[0] >= 'a' && as[0] <= 'z') as[0] = (char)(as[0] - 'a' + 'A');
+      add(ws[k], as);
+    }
+    add(ws[(size_t)v], verb);
+    for (size_t k = r0; k < ws.size(); ++k) add(ws[k], ws[k].w);
+    canon += '.';
+    sayAlone = (verb == "said" || verb == "says") && !to;
+    return true;
+  }
+
+  bool speechQuoted(const std::string& text, const frame::FrameBuilder& fb, const Options& opt, const Context& ctx,
+                    transfer::Memory& mem, const transfer::Settings& st, SentOut& so) {
+    if (text.find('"') == std::string::npos && text.find("\xE2\x80\x9C") == std::string::npos) return false;
+    // segments between quotation marks (straight quotes toggle; curly ones open and close)
+    std::vector<QSeg> segs;
+    bool in = false;
+    size_t from = 0;
+    for (size_t i = 0; i < text.size();) {
+      size_t len = 0;
+      if (!quoteMarkAt(text, i, len)) { ++i; continue; }
+      const bool opening = text[i] == '"' ? !in : text.compare(i, 3, "\xE2\x80\x9C") == 0;
+      if (opening == in) return false;   // unbalanced curly quotes
+      segs.push_back(QSeg{from, i, in});
+      in = opening;
+      i += len;
+      from = i;
+    }
+    if (in) return false;
+    segs.push_back(QSeg{from, text.size(), false});
+    auto hasLetters = [&](const QSeg& g) {
+      for (size_t k = g.a; k < g.b; ++k)
+        if (std::isalpha((unsigned char)text[k]) || (unsigned char)text[k] >= 0x80) return true;
+      return false;
+    };
+    int quotes = 0, frames = 0;
+    for (const QSeg& g : segs) {
+      if (!hasLetters(g)) continue;
+      if (g.quote) {
+        // a speech: a mark inside the quotation or three words and more
+        std::string q = text.substr(g.a, g.b - g.a);
+        while (!q.empty() && q.back() == ' ') q.pop_back();
+        const bool mark = !q.empty() && (q.back() == '.' || q.back() == ',' || q.back() == '!' || q.back() == '?');
+        int words = 0;
+        for (size_t k = 0; k < q.size(); ++k) words += q[k] != ' ' && (k == 0 || q[k - 1] == ' ');
+        if (!mark && words < 3) return false;
+        ++quotes;
+      } else {
+        std::string canon;
+        std::vector<int> cs, ca;
+        bool alone = false;
+        if (!reportingFrame(text, g.a, g.b, canon, cs, ca, alone)) return false;
+        ++frames;
+      }
+    }
+    if (quotes == 0 || frames == 0) return false;
+    const transfer::Memory memFrame = mem;
+    std::vector<int> offs;
+    cue::Latin L;
+    bool newSentence = true;   // the next piece starts a sentence (capital)
+    bool any = false;
+    for (size_t gi = 0; gi < segs.size(); ++gi) {
+      const QSeg& g = segs[gi];
+      if (!hasLetters(g)) continue;
+      SentOut po;
+      std::string tail;   // the punctuation that closes this piece in the source
+      int base = (int)g.a;
+      std::vector<int> mapped;
+      if (g.quote) {
+        size_t a = g.a, b = g.b;
+        while (a < b && text[a] == ' ') ++a;
+        while (b > a && text[b - 1] == ' ') --b;
+        std::string q = text.substr(a, b - a);
+        base = (int)a;
+        if (!q.empty() && (q.back() == ',' || q.back() == ';' || q.back() == ':')) {
+          tail = std::string(1, q.back());
+          q.pop_back();
+          while (!q.empty() && q.back() == ' ') q.pop_back();
+          q += '.';   // analysed as the sentence it is
+        }
+        speech(q, fb, opt, ctx, mem, st, po, false);
+        if (po.latin.text.empty()) return false;
+        for (int o : po.srcOffset) mapped.push_back(o >= 0 ? o + base : -1);
+        if (!tail.empty()) {   // the Latin ends with the source's comma
+          while (!po.latin.text.empty() && endsWithAny(po.latin.text, ".!?")) po.latin.text.pop_back();
+          po.latin.text += tail;
+        }
+        po.latin.text = "\"" + po.latin.text + "\"";
+        for (auto& t : po.latin.tokens) { ++t.start; ++t.end; }
+      } else {
+        std::string canon;
+        std::vector<int> canonSrc, canonAt;
+        bool alone = false;
+        reportingFrame(text, g.a, g.b, canon, canonSrc, canonAt, alone);
+        size_t e = g.b;
+        while (e > g.a && text[e - 1] == ' ') --e;
+        tail = e > g.a && (text[e - 1] == ',' || text[e - 1] == '.' || text[e - 1] == ':' || text[e - 1] == ';' ||
+                           text[e - 1] == '!' || text[e - 1] == '?')
+                   ? std::string(1, text[e - 1])
+                   : std::string();
+        transfer::Memory m2 = memFrame;
+        speech(canon, fb, opt, ctx, m2, st, po, false);
+        if (po.latin.tokens.empty()) return false;
+        for (int o : po.srcOffset) {
+          int src = -1;
+          for (size_t k = 0; k < canonAt.size(); ++k)
+            if (o >= canonAt[k]) src = canonSrc[k];
+          mapped.push_back(o >= 0 ? src : -1);
+        }
+        // verb first (inquit avis, rogāvit Anna); "say" with nobody spoken to is inquit / inquiunt
+        long vi = -1;
+        for (size_t k = 0; k < po.latin.tokens.size() && vi < 0; ++k)
+          if (po.latin.tokens[k].features.pos == "verb") vi = (long)k;
+        if (vi < 0) return false;
+        std::vector<size_t> ord;
+        ord.push_back((size_t)vi);
+        for (size_t k = 0; k < po.latin.tokens.size(); ++k)
+          if ((long)k != vi) ord.push_back(k);
+        cue::Latin R;
+        std::vector<int> m3;
+        for (size_t k : ord) {
+          rules::TokenView t = po.latin.tokens[k];
+          const int so0 = mapped[k];
+          const bool srcCap = so0 >= 0 && (size_t)so0 < text.size() && text[(size_t)so0] >= 'A' && text[(size_t)so0] <= 'Z';
+          if (k == 0 && !srcCap && !(t.hasLemma && (la_->lemma(t.lemmaId).flags & lex::ProperName)) && !t.text.empty()) {
+            decapitalise(t.text);   // the subject after the verb (clāmāvit anus)
+            decapitalise(t.display);
+          }
+          if ((long)k == vi && alone && t.features.person == "third") {
+            const bool pl = t.features.number == "plural";
+            const std::string w = pl ? "inquiunt" : "inquit";
+            tokenInfo(w, t);
+          }
+          if (!R.text.empty()) R.text += ' ';
+          t.start = (int)R.text.size();
+          R.text += t.text;
+          t.end = (int)R.text.size();
+          R.tokens.push_back(t);
+          m3.push_back(mapped[k]);
+        }
+        std::vector<Reason> rs;
+        for (Reason r : po.reasons) {
+          if (r.tokenIndex >= 0) {
+            for (size_t q = 0; q < ord.size(); ++q)
+              if ((int)ord[q] == r.tokenIndex) { r.tokenIndex = (int)q; break; }
+          }
+          rs.push_back(r);
+        }
+        po.reasons = rs;
+        po.latin = R;
+        mapped = m3;
+        po.latin.text += tail;
+      }
+      // capital only at the start of a sentence (names keep theirs)
+      if (!po.latin.tokens.empty()) {
+        const rules::TokenView& t0 = po.latin.tokens[0];
+        const bool name = t0.hasLemma && (la_->lemma(t0.lemmaId).flags & lex::ProperName);
+        std::vector<std::string> tx;
+        for (const auto& t : po.latin.tokens) tx.push_back(t.text);
+        if (newSentence) capitalise(tx[0]);
+        else if (!name) decapitalise(tx[0]);
+        rewriteTokens(po.latin, tx);
+        po.latin.tokens[0].display = tx[0];
+      }
+      newSentence = tail.empty() ? false : (tail == "." || tail == "!" || tail == "?");
+      if (g.quote && tail.empty()) {   // a quotation ending with its own full stop / question mark
+        std::string q = text.substr(g.a, g.b - g.a);
+        while (!q.empty() && q.back() == ' ') q.pop_back();
+        newSentence = false;   // the frame after it goes on in lower case ("..." inquit avis.)
+        (void)q;
+      }
+      const int tb = (int)L.tokens.size();
+      cue::append(L, po.latin);
+      offs.insert(offs.end(), mapped.begin(), mapped.end());
+      for (Reason r : po.reasons) { if (r.tokenIndex >= 0) r.tokenIndex += tb; so.reasons.push_back(r); }
+      for (const std::string& f : po.flags) addFlag(so.flags, f);
+      so.choices.insert(so.choices.end(), po.choices.begin(), po.choices.end());
+      so.unknown.insert(so.unknown.end(), po.unknown.begin(), po.unknown.end());
+      so.missing.insert(so.missing.end(), po.missing.begin(), po.missing.end());
+      so.minMargin = std::min(so.minMargin, po.minMargin);
+      if (po.vocGender) so.vocGender = po.vocGender;
+      so.invites = po.invites;
+      any = true;
+    }
+    if (!any) return false;
+    so.latin = L;
+    so.srcOffset = offs;
+    so.reasons.push_back(Reason{-1, "form", "direct speech: the quotation and its frame (inquit) translated apart", ""});
+    return true;
+  }
+
   // C23 (D18): phrasebook rows of the same pattern, one marked eccl and the other not, are twins: the ecclesiastical
   // and the classical rendering ("I'm sorry" -> Habeās mē excūsātum / Ignōsce mihi). The twin of a row, or -1; with
   // latinity "classical" an eccl twin is never offered.
@@ -1023,6 +1282,8 @@ class RulesEngine final : public Engine {
   void speech(const std::string& text, const frame::FrameBuilder& fb, const Options& opt, const Context& ctx,
               transfer::Memory& mem, const transfer::Settings& st, SentOut& so, bool alternatives,
               bool allowSplit = true) {
+    // C30: direct speech with its reporting frame
+    if (st.lang == frame::SrcLang::En && allowSplit && speechQuoted(text, fb, opt, ctx, mem, st, so)) return;
     SemSentence s;
     const transfer::Memory memEntry = mem;   // C24: for the clause split before the word-by-word fallback
     // C17: editorial text in square brackets ("They are rusted [so badly] that ...") is analysed with the sentence
@@ -1633,6 +1894,14 @@ class RulesEngine final : public Engine {
           else if (k == "si") src = kSi;
           else if (k == "quia") src = kQuia;
           else if (k == "dum" || k == "donec") src = kDum;
+          // C30: the words of a name ("nōmine Anna", "cui nōmen erat Rūfus")
+          static const char* const kNomine[] = {"called", "named", nullptr};
+          static const char* const kNomen[] = {"name", nullptr};
+          static const char* const kErat[] = {"was", "is", nullptr};
+          if (k == "nomine") src = kNomine;
+          else if (k == "nomen") src = kNomen;
+          else if ((k == "erat" || k == "est") && &t != &ut.latin.tokens[0] && text::latin_key((&t - 1)->text) == "nomen")
+            src = kErat;
           static const char* const kEgo[] = {"me", "i", "my", "myself", nullptr};
           static const char* const kTu[] = {"you", "your", "yourself", nullptr};
           static const char* const kNos[] = {"us", "we", "our", "ourselves", nullptr};
@@ -1644,6 +1913,16 @@ class RulesEngine final : public Engine {
             else if (k == "is" || k == "ea" || k == "id" || k == "eum" || k == "eam" || k == "ei" || k == "eo" || k == "eos" ||
                      k == "eas" || k == "eis" || k == "iis" || k == "eius" || k == "eorum" || k == "earum")
               src = kIs;
+            // C30: an oblique form is found by an object pronoun, a genitive by a possessive ("audiēbant" | "ante eōs":
+            // eōs is "them", not the subject "they" of the cue before)
+            static const char* const kIsObl[] = {"him", "her", "it", "them", nullptr};
+            static const char* const kIsGen[] = {"his", "her", "its", "their", nullptr};
+            if (src == kIs) {
+              if (k == "eum" || k == "eam" || k == "ei" || k == "eo" || k == "eos" || k == "eas" || k == "eis" || k == "iis")
+                src = kIsObl;
+              else if (k == "eius" || k == "eorum" || k == "earum")
+                src = kIsGen;
+            }
           }
           for (int q = ut.first; src && !hit && q <= ut.last && q < (int)s.tokens.size(); ++q) {
             if (q < 0 || usedSrc.count(q)) continue;
@@ -2267,7 +2546,7 @@ class RulesEngine final : public Engine {
     for (const CueInput& c : cues) texts.push_back(c.sourceText);
     if (next) texts.push_back(cues.back().nextSource);
     const size_t off = prev ? 1 : 0;
-    std::vector<SourceSentence> sents = frame::mapSentences(texts);
+    std::vector<SourceSentence> sents = frame::mapSentences(texts, true);   // C30: narrative joins
     std::vector<char> cueSplit(sents.size(), 0);   // C22: re-split because a cue came out empty (Check)
 
     // which sentence finishes each cue

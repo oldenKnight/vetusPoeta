@@ -136,9 +136,58 @@ void splitCue(const std::string& t, std::vector<Piece>& out) {
   flushSpeech();
 }
 
+// C30: a short reporting frame of direct speech starts at `k` ("she said.", "Anna asked.", "said the bird,", "he asked
+// kindly."): at most five words up to the next terminal mark, comma or quotation mark, one of them a verb of saying
+bool frameAfter(std::string_view s, size_t k) {
+  static const char* const kSay[] = {"said", "says", "asked", "asks", "cried", "cries", "answered", "answers",
+                                     "replied", "replies", "shouted", "shouts", "called", "whispered", "exclaimed",
+                                     "added", "begged", "dijo", "preguntó", "gritó", "respondió"};
+  int words = 0;
+  bool say = false, closed = false;
+  size_t i = k;
+  while (i < s.size()) {
+    while (i < s.size() && isSpace(s[i])) ++i;
+    if (i >= s.size()) break;
+    const char c = s[i];
+    if (c == '.' || c == '!' || c == '?' || c == ',' || c == '"' || c == ';' || c == ':' ||
+        (unsigned char)c == 0xE2) {
+      closed = true;
+      break;
+    }
+    size_t b = i;
+    while (b < s.size() && !isSpace(s[b]) && s[b] != '.' && s[b] != ',' && s[b] != '!' && s[b] != '?' && s[b] != '"' &&
+           s[b] != ';' && s[b] != ':')
+      ++b;
+    std::string w(s.substr(i, b - i));
+    for (char& ch : w) ch = (char)((ch >= 'A' && ch <= 'Z') ? ch + 32 : ch);
+    for (const char* x : kSay) say = say || w == x;
+    ++words;
+    i = b;
+  }
+  return say && closed && words >= 1 && words <= 5;
+}
+
+// C30: the chunk [i, j) ends with a closing quotation mark
+bool quoteCloses(std::string_view s, size_t i, size_t j) {
+  for (size_t q = i; q < j; ++q)
+    if (s[q] == '"' || s.compare(q, 3, "\xE2\x80\x9D") == 0) return true;
+  return false;
+}
+
+// C30: the number of straight double quotes and curly opening / closing quotes in `s` leaves a quotation open
+bool quoteOpen(std::string_view s) {
+  int straight = 0, curly = 0;
+  for (size_t q = 0; q < s.size(); ++q) {
+    if (s[q] == '"') ++straight;
+    else if (s.compare(q, 3, "\xE2\x80\x9C") == 0) ++curly;
+    else if (s.compare(q, 3, "\xE2\x80\x9D") == 0) --curly;
+  }
+  return straight % 2 == 1 || curly > 0;
+}
+
 // Sentence boundaries inside a speech piece: returns [start,end) chunks; `openEnd` tells whether the last chunk ends
 // with terminal punctuation.
-void chunks(const std::string& s, std::vector<std::pair<size_t, size_t>>& out, bool& lastClosed) {
+void chunks(const std::string& s, std::vector<std::pair<size_t, size_t>>& out, bool& lastClosed, bool narrative) {
   out.clear();
   size_t start = 0, i = 0;
   lastClosed = false;
@@ -167,7 +216,10 @@ void chunks(const std::string& s, std::vector<std::pair<size_t, size_t>>& out, b
         lowerNext = k < s.size() && s[k] >= 'a' && s[k] <= 'z';
       }
       const bool ellipsis = tl == 3 || (j - i >= 3 && s[i] == '.');
-      if ((atEnd || spaceAfter) && !abbr && !(ellipsis && lowerNext)) {
+      // C30: direct speech closed by "?" / "!" / "." and a quotation mark goes on with its reporting frame ("Where is
+      // my goat?" cried the old woman. / "Anna!" she cried. / "..." Anna asked.)
+      const bool quoteFrame = narrative && spaceAfter && quoteCloses(s, i, j) && (lowerNext || frameAfter(s, j));
+      if ((atEnd || spaceAfter) && !abbr && !(ellipsis && lowerNext) && !quoteFrame) {
         out.emplace_back(start, j);
         while (j < s.size() && isSpace(s[j])) ++j;
         start = j;
@@ -217,6 +269,18 @@ bool startsClause(std::string_view s) {
   return false;
 }
 
+// C30: the piece is a narrative connector alone with its comma ("However,", "Meanwhile,", "At last,", "Suddenly,")
+bool connectorOnly(std::string_view piece) {
+  std::string w = trim(piece);
+  while (!w.empty() && (w.back() == ',' || isSpace(w.back()))) w.pop_back();
+  for (char& ch : w) ch = (char)((ch >= 'A' && ch <= 'Z') ? ch + 32 : ch);
+  for (const char* c : {"however", "meanwhile", "suddenly", "at last", "at first", "then", "later", "finally",
+                        "in the meantime", "after that", "soon", "sin embargo", "entretanto", "de repente", "por fin",
+                        "entonces", "luego"})
+    if (w == c) return true;
+  return false;
+}
+
 }  // namespace
 
 bool endsSentence(std::string_view text) {
@@ -240,7 +304,9 @@ bool endsSentence(std::string_view text) {
   return terminalAt(s, p, tl) && p + tl == n;
 }
 
-std::vector<SourceSentence> mapSentences(const std::vector<std::string>& cueTexts) {
+std::vector<SourceSentence> mapSentences(const std::vector<std::string>& cueTexts) { return mapSentences(cueTexts, false); }
+
+std::vector<SourceSentence> mapSentences(const std::vector<std::string>& cueTexts, bool narrative) {
   std::vector<SourceSentence> out;
   long open = -1;                     // index of a speech sentence waiting for its continuation
   std::vector<Piece> pieces;
@@ -282,7 +348,7 @@ std::vector<SourceSentence> mapSentences(const std::vector<std::string>& cueText
       }
       if (p.dash) open = -1;
       bool lastClosed = false;
-      chunks(p.text, ch, lastClosed);
+      chunks(p.text, ch, lastClosed, narrative);
       for (size_t k = 0; k < ch.size(); ++k) {
         const std::string piece = trim(std::string_view(p.text).substr(ch[k].first, ch[k].second - ch[k].first));
         if (piece.empty()) continue;
@@ -303,12 +369,38 @@ std::vector<SourceSentence> mapSentences(const std::vector<std::string>& cueText
         open = -1;
         const bool last = k + 1 == ch.size();
         if (last && !endsSentence(piece)) open = (long)out.size() - 1;
+        // C30: direct speech closed at the end of the cue goes on with a reporting frame that opens the next cue
+        // ("Anna!" | she cried.)
+        if (narrative && last && open < 0 && pi + 1 == pieces.size() && ci + 1 < cueTexts.size()) {
+          const std::string nx = trim(cueTexts[ci + 1]);
+          const size_t pe = piece.size();
+          if (pe > 0 && quoteCloses(piece, pe - 1, pe) && !nx.empty() && nx[0] != '-' &&
+              ((nx[0] >= 'a' && nx[0] <= 'z') || frameAfter(nx, 0)))
+            open = (long)out.size() - 1;
+        }
         // C15: a cue that ends at a clause boundary ("," ";" ":" or a dash) does not continue into a next cue that
         // starts a clause of its own (a capital letter, or a conjunction / subordinator): each cue is rendered as the
         // clause it is, which keeps the cue mapping exact ("..., my aunt and uncle," | "Can you help me ...?")
+        // C30: narrative prose cut mid-sentence stays one sentence: a quotation still open ("Do not be afraid," |
+        // "Grandmother," she said.), a next cue that starts in lower case ("..., and her" is no clause end; "Her
+        // grandmother was very sad," | "because the goat ..."), or a cue that is only a connector ("However," | "Rufus
+        // walked ...")
         if (last && open >= 0 && pi + 1 == pieces.size() && ci + 1 < cueTexts.size() && clauseEnd(piece) &&
-            startsClause(trim(cueTexts[ci + 1])))
-          open = -1;
+            startsClause(trim(cueTexts[ci + 1]))) {
+          const std::string nx = trim(cueTexts[ci + 1]);
+          bool lowerStart = !nx.empty() && nx[0] >= 'a' && nx[0] <= 'z';
+          // a coordinated clause after the comma ("..., and the first stars appeared", "..., for you can ...") is a
+          // clause of its own, rendered in its cue (C15)
+          if (lowerStart) {
+            size_t b = 0;
+            while (b < nx.size() && nx[b] >= 'a' && nx[b] <= 'z') ++b;
+            const std::string w0 = nx.substr(0, b);
+            for (const char* cc : {"and", "but", "or", "for", "so", "nor", "yet", "y", "pero", "o"})
+              if (w0 == cc) lowerStart = false;
+          }
+          const bool inQuote = quoteOpen(out[(size_t)open].text);
+          if (!narrative || !(lowerStart || inQuote || connectorOnly(piece))) open = -1;
+        }
         // an ellipsis at the end of a cue continues only when the next cue starts with "..." or lower case
         if (last && open < 0 && pi + 1 == pieces.size() && ci + 1 < cueTexts.size()) {
           const std::string& pc = piece;

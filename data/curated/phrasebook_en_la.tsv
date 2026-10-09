@@ -324,3 +324,22 @@ stop thief	cōnsiste, fūr	1	excl	C28
 here ,	ecce,	1	adv	C28: offering something ("Here, take this bread." -> Ecce, cape hunc pānem.)
 a lot	multum	1	answer	C28: "Yes, a lot." -> Ita, multum. (alone; "a lot of" stays the partitive)
 very much	valdē	1	answer	C28: "- Yes, very much."
+# C30 (Latin loop 7): narrative register: connectors, time phrases and frames of a told story
+called {NAME}	nōmine {1}	1	narr	C30: "a little girl called Anna" -> puella nōmine Anna (ablative of respect)
+named {NAME}	nōmine {1}	1	narr	C30
+every day	cotīdiē	1	adv	C30
+every night	omnī nocte	1	adv	C30
+one day	quōdam diē	1	narr	C30: the opening of an episode ("One day, however, the goat ...")
+that night	eā nocte	1	narr	C30
+the next morning	postrīdiē māne	1	narr	C30
+the next day	postrīdiē	1	narr	C30
+meanwhile	intereā	1	narr	C30: narrative connector (also interim)
+sometimes	interdum	1	adv	C30
+again and again	iterum atque iterum	1	adv	C30
+come closer	propius accēdere	1	vp	C30: "Anna came closer very quietly." -> Anna valdē tacitē propius accessit.
+came closer	propius accēdere	1	vp	C30
+eat (their|his|her|our|my|your) supper	cēnāre	1	vp	C30: "while they ate their supper" -> dum cēnābant
+have supper	cēnāre	1	vp	C30
+it was becoming dark	advesperāscēbat	1	narr	C30: "Meanwhile it was becoming dark," -> Intereā advesperāscēbat,
+it was getting dark	advesperāscēbat	1	narr	C30
+it is getting dark	advesperāscit	1	narr	C30

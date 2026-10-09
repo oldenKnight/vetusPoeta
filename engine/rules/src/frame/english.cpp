@@ -509,7 +509,11 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
     if (t.upos == "VERB") {
       // an irregular past read as a present ("She sang loudly.")
       const uint32_t tt = fget(t, nlp::morph::TenseShift), vf = fget(t, nlp::morph::VerbFormShift);
-      if (tt == nlp::morph::TensePast || vf == nlp::morph::VfPart || vf == nlp::morph::VfGer || vf == nlp::morph::VfInf)
+      // C30: a gerund tag on a form that is none ("The birds sang in the trees." had sang as a gerund
+      // and the clause in the present) is the tagger's slip: the past is checked below
+      const bool slip = vf == nlp::morph::VfGer && !endsWith(t.lower, "ing");
+      if (tt == nlp::morph::TensePast || vf == nlp::morph::VfPart ||
+          ((vf == nlp::morph::VfGer || vf == nlp::morph::VfInf) && !slip))
         continue;
       if (fget(t, nlp::morph::MoodShift) == nlp::morph::MoodImp) continue;
       const Reading r = readingOf(lx, t.lower);
@@ -568,8 +572,12 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
       // C20: the same clause at the end of the sentence ("We sang songs until the moon rose.", "We waited till the sun
       // set."): a subordinator inside the sentence, a noun, and a past form closing the sentence
       bool tailClause = false;
+      // C30: also before a closing place phrase ("until the moon rose above the trees.")
+      bool ppTail = i + 1 < n && tk[(size_t)i + 1].upos == "ADP";
+      for (int q = i + 1; ppTail && q < n; ++q)
+        ppTail = isIn(tk[(size_t)q].upos, {"ADP", "DET", "ADJ", "NOUN", "PROPN", "NUM"}) || (q + 1 == n && tk[(size_t)q].upos == "PUNCT");
       if (!subClause && !r.pastOf.empty() && r.finitePast && !r.nounInflected && i + 1 < n && i >= 3 &&
-          tk[(size_t)i + 1].upos == "PUNCT" && (i + 2 == n || tk[(size_t)i + 1].text != ",") && nominal(i - 1)) {
+          (tk[(size_t)i + 1].upos == "PUNCT" || ppTail) && (i + 2 == n || tk[(size_t)i + 1].text != ",") && nominal(i - 1)) {
         int q = i - 1;
         while (q > 0 && (nominal(q) || isIn(tk[(size_t)q].upos, {"DET", "ADJ", "NUM"}))) --q;
         tailClause = q > 0 && q < i - 1 && isIn(tk[(size_t)q].lower, {"until", "till", "when", "after", "before", "while", "since"});

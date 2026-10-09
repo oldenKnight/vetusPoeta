@@ -37,6 +37,11 @@ struct SourceSentence {
 // are songs; text entirely in [...] or (...) is nonverbal (bracket groups inside a speech cue become nonverbal
 // sentences of their own). Abbreviations (Mr. Mrs. Dr. St. Sr. Sra.) do not end a sentence.
 std::vector<SourceSentence> mapSentences(const std::vector<std::string>& cueTexts);
+// C30: with `narrative` (the Latin engine) narrative prose cut mid-sentence stays one sentence: direct speech goes on
+// with its reporting frame ("Where is my goat?" cried the old woman. / "Anna!" | she cried.), a quotation still open
+// continues into the next cue, a cue ending at a comma continues into a next cue that starts in lower case (not with a
+// coordinator), and a cue that is only a connector ("However,") continues. Without it: the behaviour of C15-C28.
+std::vector<SourceSentence> mapSentences(const std::vector<std::string>& cueTexts, bool narrative);
 // True when the text ends a sentence (. ! ? … possibly followed by closing quotes/brackets).
 bool endsSentence(std::string_view text);
 
@@ -100,6 +105,10 @@ struct SemNP {
   std::vector<int> tokens;       // all tokens of the NP
   // C22: an apposition between commas ("Edwin and Paul, the Dukes of Rome, fought ..."): same case, after the NP
   std::vector<SemNP> apposition;
+  // C30: the name the noun is called by ("a girl called Anna" -> puella nōmine Anna; "her dog, whose name was Rufus"
+  // -> canem suum, cui nōmen erat Rūfus): 0 or 1 NP; `calledRel` for the relative form, `calledPast` its tense
+  std::vector<SemNP> called;
+  bool calledRel = false, calledPast = false;
 };
 
 struct SemOblique { std::string prep; SemNP np; int token = -1; bool front = false; };
@@ -126,6 +135,8 @@ struct SemPredicate {
   // the Latin (complement words + infinitive) replaces the verb and the complements the row covers.
   std::string fixedLatin;
   int fixedEntry = -1;
+  int repeatToken = -1;          // C30: "They walked and walked": the second token of the verb said twice (ambulābant et
+                                 // ambulābant); -1 none
 };
 
 struct SemAdverb {
@@ -167,6 +178,9 @@ struct SemFrame {
   // a Scarecrow, stuffed with straw.", "I am a Cowardly Lion, afraid of everything." Each is a Frag frame with one
   // predAdj (SemAdj::participle for participles) and its obliques.
   std::vector<SemFrame> secondary;
+  // C30: a coordinated clause without a subject of its own shares the first clause's ("The fisherman smiled and said
+  // that he would ...": the fisherman says it): 0 or 1 NP, never realised, only read for reference
+  std::vector<SemNP> inheritedSubject;
 };
 
 struct SemSub { Relation relation = Relation::Cause; std::string marker; bool before = false; std::vector<SemFrame> frame; };

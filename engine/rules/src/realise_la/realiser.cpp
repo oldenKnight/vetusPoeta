@@ -1,5 +1,6 @@
 // LatinRealiser: wires the components of realise_la.h into one clause -> sentence pass (DESIGN.md §10.3).
 #include <algorithm>
+#include <cstring>
 #include <array>
 
 #include "vp/realise_la.h"
@@ -247,6 +248,56 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
     }
     if (n.possessive != kNone && !n.possContrast) out.push_back(modifierWord(n.possessive, 0, "order.poss"));
     for (const LaNP& g : n.genitive) np(g, Gen, nullptr, o, out);
+    // C30: the name the noun is called by: "puella nōmine Anna" (the name in the noun's case), or the relative "canem
+    // suum, cui nōmen erat Rūfus"
+    if (!n.called.empty()) {
+      const uint32_t nomen = morph::findLemma(lx_, "nōmen", Noun);
+      if (!n.calledRel) {
+        Word w;
+        Features f = morph::nounForm(Abl, Sg);
+        if (nomen != kNone) forms_.select(nomen, f, w);
+        else w.form = "nōmine";
+        w.rule = "order.name";
+        out.push_back(std::move(w));
+        std::vector<Word> nw;
+        np(n.called[0], case_, owner, o, nw);
+        append(out, nw);
+      } else {
+        if (!out.empty() && out.back().punctAfter.empty()) out.back().punctAfter = ",";
+        const uint32_t qui = morph::findLemma(lx_, "quī", Pron);
+        Word r;
+        Features rf;
+        rf.pos = Pron;
+        rf.case_ = Dat;
+        rf.number = a.number;
+        rf.gender = a.gender;
+        if (qui != kNone) forms_.select(qui, rf, r);
+        if (r.form.empty() || r.missing) { r = Word{}; r.form = a.number == Pl ? "quibus" : "cui"; }
+        r.rule = "order.name";
+        out.push_back(std::move(r));
+        Word w;
+        if (nomen != kNone) forms_.select(nomen, morph::nounForm(Nom, Sg), w);
+        else w.form = "nōmen";
+        w.rule = "order.name";
+        out.push_back(std::move(w));
+        Word v;
+        const uint32_t sum = morph::findLemma(lx_, "sum", Verb);
+        Features vf;
+        vf.pos = Verb;
+        vf.person = 3;
+        vf.number = Sg;
+        vf.tense = n.calledPast ? Imperfect : Present;
+        vf.mood = Indicative;
+        vf.voice = Active;
+        if (sum != kNone) forms_.select(sum, vf, v);
+        else v.form = n.calledPast ? "erat" : "est";
+        v.rule = "order.name";
+        out.push_back(std::move(v));
+        std::vector<Word> nw;
+        np(n.called[0], Nom, owner, o, nw);
+        append(out, nw);
+      }
+    }
     if (n.adGerund != kNone) {   // C20: "locum ad dormiendum"
       const uint32_t ad = morph::findLemma(lx_, "ad", Prep);
       Word p;
@@ -269,6 +320,10 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
       rctx.ante.person = 3;
       std::vector<Word> rw;
       clause(rc, o, rw, rctx);
+      if (rc.relUbi && !rw.empty()) {   // C30: set off by commas, moved after the main verb by the clause
+        for (Word& x : rw) x.extrapose = true;
+        if (!out.empty() && out.back().punctAfter.empty()) out.back().punctAfter = ",";
+      }
       append(out, rw);
     }
   }
@@ -610,8 +665,13 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
     Word w;
     forms_.select(k_.qui, agree_.relative(ctx.ante, rc), w);
     w.rule = "order.rel";
+    if (c.relUbi) {   // C30
+      const uint32_t ubi = morph::findLemma(lx_, "ubi", Adv);
+      w = Word{};
+      literal(ubi, "ubi", w, "order.rel");
+    }
     std::vector<Word> rel;
-    if (c.relRole == Role::Oblique && c.relPrep != kNone) {
+    if (c.relRole == Role::Oblique && c.relPrep != kNone && !c.relUbi) {
       if (c.relPrep == k_.cum && order_.encliticCum(text::latin_key(w.form) + "cum")) {
         w.form += "cum";
         rel.push_back(std::move(w));
@@ -627,6 +687,13 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
   }
   // Verb group
   verbGroup(c, subj, s[kV], s[kINF], ctx);
+  if (c.pred.repeat && s[kV].size() == 1) {   // C30: "ambulāvērunt et ambulāvērunt"
+    Word et;
+    literal(k_.et, "et", et, "order.repeat");
+    Word again = s[kV][0];
+    s[kV].push_back(std::move(et));
+    s[kV].push_back(std::move(again));
+  }
   // Negation
   const bool prohib = c.type == ClauseType::Imp && c.polarity == Polarity::Neg;
   const bool nonne = c.type == ClauseType::Yn && (c.bias == YnBias::ExpectYes || c.polarity == Polarity::Neg);
@@ -731,6 +798,12 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
       if (neg) seq.insert(at, kNEG);
       orderRule = "order.wh.cop";
     }
+    // C30: etiam alone before one place / time phrase focuses on it ("etiam aestāte frīgidus erat")
+    if (s[kADV].size() == 1 && s[kOBL].size() >= 1 && s[kOBL].size() <= 3 && c.obliques.size() == 1 &&
+        s[kADV][0].lemma != kNone && text::latin_key(lx_.lemma(s[kADV][0].lemma).head) == "etiam") {
+      auto ob = std::find(seq.begin(), seq.end(), kOBL), ad = std::find(seq.begin(), seq.end(), kADV);
+      if (ob != seq.end() && ad == ob + 1) std::iter_swap(ob, ad);
+    }
     // order.neg.degree: nōn before a degree adverb that the negation scopes over ("Nōn multum cūrō")
     if (!s[kNEG].empty() && !s[kADV].empty()) {
       bool allDegree = true;
@@ -772,6 +845,40 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
       auto io = std::find(seq.begin(), seq.end(), kIO);
       auto ob = std::find(seq.begin(), seq.end(), kO);
       if (io != seq.end() && ob != seq.end() && io < ob) std::iter_swap(io, ob);
+    }
+    // C30: a relative "ubi ..." set off by a comma follows the main verb ("Ūnā in silvam ambulāvērunt, ubi arborēs
+    // altae erant")
+    if (!s[kV].empty() && !ctx.relative) {
+      auto vb = std::find(seq.begin(), seq.end(), kV);
+      for (auto it = seq.begin(); it != vb && vb != seq.end(); ++it) {
+        std::vector<Word>& sl = s[*it];
+        size_t a0 = 0;
+        while (a0 < sl.size() && !sl[a0].extrapose) ++a0;
+        if (a0 == 0 || a0 >= sl.size()) continue;
+        size_t b0 = a0;
+        while (b0 < sl.size() && sl[b0].extrapose) ++b0;
+        std::vector<Word> moved(sl.begin() + (long)a0, sl.begin() + (long)b0);
+        sl.erase(sl.begin() + (long)a0, sl.begin() + (long)b0);
+        if (b0 - (b0 - a0) == sl.size()) sl[a0 - 1].punctAfter.clear();   // nothing of the slot follows it
+        for (Word& x : moved) x.extrapose = false;
+        moved.back().punctAfter.clear();
+        s[kV].back().punctAfter = ",";
+        append(s[kV], moved);
+        break;
+      }
+    }
+    // C30: "canem suum vocāvit, cui nōmen erat Rūfus": the relative of the name goes after the verb (the object stays)
+    if (c.hasObject && c.object.calledRel && !s[kO].empty() && !s[kV].empty()) {
+      auto ob = std::find(seq.begin(), seq.end(), kO), vb = std::find(seq.begin(), seq.end(), kV);
+      size_t j = 0;
+      while (j < s[kO].size() && std::strcmp(s[kO][j].rule ? s[kO][j].rule : "", "order.name") != 0) ++j;
+      if (ob != seq.end() && vb != seq.end() && ob < vb && j > 0 && j < s[kO].size()) {
+        std::vector<Word> tail(s[kO].begin() + (long)j, s[kO].end());
+        s[kO].erase(s[kO].begin() + (long)j, s[kO].end());
+        s[kO].back().punctAfter.clear();
+        s[kV].back().punctAfter = ",";
+        append(s[kV], tail);
+      }
     }
     // C19 order.heavy: an object or indirect object "is quī ..." (pronoun + relative clause) follows the verb group
     // ("Nēmō audēbit nocēre eī quem Saga ōsculāta est", "Amāmus eōs quī honestī sunt"); a modal then precedes its

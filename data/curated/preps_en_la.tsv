@@ -46,7 +46,7 @@ among	-	inter	acc
 against	-	contrā	acc	
 toward	-	ad	acc	
 near	-	prope	acc	
-beside	-	apud	acc	
+beside	-	iuxtā	acc	C30: "a stream ran beside the path" -> iuxtā sēmitam (apud is "at the house of")
 across	-	trāns	acc	
 beyond	-	ultrā	acc	
 outside	-	extrā	acc	
@@ -65,3 +65,5 @@ within	-	intrā	acc	C22: "within the castle" -> intrā castellum
 round	place	circum	acc	C22: "The moon goes round the Earth." -> circum Terram
 down	-	dē	abl	C24: "He fell down the stairs." -> dē scālīs
 past	-	praeter	acc	C28: "past the temple" -> praeter templum
+towards	-	ad	acc	C30: "walked towards the river" -> ad flūmen
+along	-	secundum	acc	C30: "came along the bank" -> secundum rīpam

@@ -77,6 +77,10 @@ struct LaNP {
   bool elideHead = false;         // C24: the antecedent is understood (a free relative: "quod vidētur" for "what it seems"):
                                   // the head is not written, the relative clause agrees with it
   bool whoseGen = false;          // C26: `interrogative` is quis in the genitive before the head ("Cuius canis lātrat?")
+  // C30: the name the noun is called by, after it: "nōmine" + the name in the noun's case (puellam nōmine Annam), or with
+  // `calledRel` the relative "cui nōmen erat / est" + the name in the nominative
+  std::vector<LaNP> called;
+  bool calledRel = false, calledPast = false;
 };
 
 struct LaOblique {
@@ -91,6 +95,7 @@ struct LaPredicate {
   uint8_t person = 0, number = 0;  // 0 = from the subject (3rd singular without one)
   uint32_t modal = kNone;          // possum, volō, nōlō, dēbeō, soleō, licet ...: finite modal + infinitive
   uint8_t infTense = feat::Present, infVoice = feat::Active;
+  bool repeat = false;             // C30: the verb said twice ("ambulāvērunt et ambulāvērunt")
 };
 
 struct LaSub {
@@ -130,6 +135,8 @@ struct LaClause {
   bool exclO = false;                      // order.excl: "Ō mē miseram!" (subject NP in the accusative)
   Role relRole = Role::None;               // set when the clause is a relative clause
   uint32_t relPrep = kNone;                // relative pronoun inside a prepositional phrase
+  bool relUbi = false;                     // C30: a place relative after a comma ("the forest, where the trees were
+                                           // tall"): ubi, and the clause follows the main verb
   std::string punct;                       // source punctuation; empty = "." / "?" by type
   bool plainQuestion = false;              // C15: a negated question said as a statement: nōn + verb first, no -ne
   // C17: object complement (factitive verbs: "eum rēgem fēcērunt", "mē fortiōrem facit"): after the object, in the
@@ -162,6 +169,7 @@ struct Word {
   bool fromRule = false, missing = false, unknown = false, name = false, title = false;
   std::string emoji;
   std::string punctAfter;       // "," attached to this word
+  bool extrapose = false;       // C30: part of a clause that follows the main verb (a relative "ubi ..." after a comma)
   const char* rule = "";        // rule id that produced or placed it (reason)
 };
 

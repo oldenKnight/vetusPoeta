@@ -221,6 +221,41 @@ bool regroupSentence(const frame::SourceSentence& src, const Latin& latin, const
         latin.tokens[i - 1].features.mood == "participle")
       part[i] = part[i - 1];
   }
+  // C30: a form of esse goes with the predicate or place phrase right before it ("Capra aviae meae" | "trāns flūmen
+  // est," -- not "... meae est,"); an adjective goes with the noun it agrees with ("capra stulta?" stays one phrase)
+  for (size_t i = 1; i < nt; ++i) {
+    const std::string k = text::latin_key(latin.tokens[i].text);
+    static const char* const kEsse[] = {"est", "sunt", "es", "sum", "sumus", "estis", "erat", "erant", "eram", "eras",
+                                        "erit", "erunt", "fuit", "fuerunt", "esset", "essent", "sit", "sint"};
+    bool esse = false;
+    for (const char* e : kEsse) esse = esse || k == e;
+    if (esse && part[i - 1] > part[i] && latin.tokens[i - 1].features.mood != "participle") part[i] = part[i - 1];
+  }
+  {
+    auto agree = [&](size_t a, size_t n) {
+      const rules::Features& fa = latin.tokens[a].features;
+      const rules::Features& fn = latin.tokens[n].features;
+      return (fa.pos == "adj" || fa.pos == "det" || fa.pos == "num" || (fa.pos == "pron" && !fa.case_.empty())) &&
+             fn.pos == "noun" && !fa.case_.empty() && fa.case_ == fn.case_ && fa.number == fn.number &&
+             (fa.gender.empty() || fn.gender.empty() || fa.gender == fn.gender ||
+              fa.gender.find(fn.gender) != std::string::npos || fn.gender.find(fa.gender) != std::string::npos);
+    };
+    for (size_t i = 0; i < nt; ++i) {
+      if (srcOffset[i] < 0) continue;
+      long np2 = -1;
+      // (the adjective's English word before the noun's, close by: an attribute, not a predicate "via angusta facta est")
+      auto attr = [&](size_t a, size_t n2) {
+        return srcOffset[n2] >= 0 && srcOffset[a] < srcOffset[n2] && srcOffset[n2] - srcOffset[a] <= 24;
+      };
+      if (i + 1 < nt && agree(i, i + 1) && attr(i, i + 1)) np2 = part[i + 1];
+      else if (i > 0 && agree(i, i - 1) && attr(i, i - 1)) np2 = part[i - 1];
+      // a genitive pronoun after its noun ("avia eius": "her" | "grandmother")
+      else if (i > 0 && latin.tokens[i].features.pos == "pron" && latin.tokens[i].features.case_ == "genitive" &&
+               latin.tokens[i - 1].features.pos == "noun")
+        np2 = part[i - 1];
+      if (np2 >= 0 && np2 != part[i]) part[i] = np2;
+    }
+  }
   // linkers: right to left, so "et nōn" moves together
   for (size_t i = nt - 1; i-- > 0;) {
     const rules::TokenView& t = latin.tokens[i];
@@ -230,8 +265,13 @@ bool regroupSentence(const frame::SourceSentence& src, const Latin& latin, const
     if (conjunction(k) || relativeWord(k) || k == "non" || k == "donec" || k == "antequam") {
       // with the verb of the clause it opens (the first verb after it), else the nearest later part
       long best = -1;
-      for (size_t j = i + 1; j < nt && best < 0; ++j)
-        if (latin.tokens[j].features.pos == "verb") best = part[j];
+      bool inRel = false;   // C30: a relative clause on the way has its own verb ("et avem ... quae sedēbat lātrāre coepit")
+      for (size_t j = i + 1; j < nt && best < 0; ++j) {
+        if (relativeWord(text::latin_key(latin.tokens[j].text)) && !relativeWord(k)) { inRel = true; continue; }
+        if (latin.tokens[j].features.pos != "verb") continue;
+        if (inRel) { inRel = false; continue; }
+        best = part[j];
+      }
       if (best < 0) {
         best = part[i + 1];
         for (size_t j = i + 1; j < nt; ++j)
@@ -248,17 +288,20 @@ bool regroupSentence(const frame::SourceSentence& src, const Latin& latin, const
     for (size_t i = 0; i < nt && !any; ++i) any = part[i] == (long)p && letters(latin.tokens[i].text);
     if (letters(s) && !any) return false;
   }
-  // the text: a prefix before the first token ("- "), each token with the marks after it, the final mark at the end
+  // the text: a prefix before the first token ("- "), each token with the marks after it, the final mark at the end;
+  // C30: marks after the last space of a gap open the next word (an opening quotation mark: inquit. "Capram ...)
   const std::string prefix = latin.text.substr(0, (size_t)std::max(0, latin.tokens[0].start));
-  std::vector<std::string> after(nt);
+  std::vector<std::string> after(nt), before(nt);
   for (size_t i = 0; i < nt; ++i) {
     const size_t a = (size_t)latin.tokens[i].end;
     const size_t b = i + 1 < nt ? (size_t)latin.tokens[i + 1].start : latin.text.size();
     std::string g = a < b ? latin.text.substr(a, b - a) : std::string();
-    std::string m;
-    for (char c : g)
-      if (!isSpace(c)) m += c;
+    const size_t sp = g.find_last_of(" \n\t");
+    std::string m, n;
+    for (size_t q = 0; q < g.size(); ++q)
+      if (!isSpace(g[q])) (sp != std::string::npos && q > sp && i + 1 < nt ? n : m) += g[q];
     after[i] = m;
+    if (i + 1 < nt) before[i + 1] = n;
   }
   const std::string finalMark = after[nt - 1];
   after[nt - 1].clear();
@@ -269,8 +312,10 @@ bool regroupSentence(const frame::SourceSentence& src, const Latin& latin, const
     if (p == 0) L.text = prefix;
     for (size_t i = 0; i < nt; ++i) {
       if (part[i] != (long)p) continue;
-      if (!L.text.empty() && !isSpace(L.text.back())) L.text += ' ';
+      const bool openQuote = p == 0 && L.text == prefix && !prefix.empty() && prefix.back() == '"';
+      if (!L.text.empty() && !isSpace(L.text.back()) && !openQuote) L.text += ' ';
       rules::TokenView t = latin.tokens[i];
+      L.text += before[i];
       t.start = (int)L.text.size();
       L.text += t.text;
       t.end = (int)L.text.size();
