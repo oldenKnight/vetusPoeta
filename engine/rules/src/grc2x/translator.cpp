@@ -42,22 +42,93 @@ const char* posName(uint8_t p) {
   }
 }
 
-// First item of a one-line gloss: "to go; to step" -> "go"; "a cake or loaf" -> "cake or loaf".
-std::string firstItem(std::string g, bool english) {
-  const size_t cut = g.find_first_of(";,(");
-  if (cut != std::string::npos) g = g.substr(0, cut);
-  while (!g.empty() && g.back() == ' ') g.pop_back();
-  size_t a = 0;
-  while (a < g.size() && g[a] == ' ') ++a;
-  g.erase(0, a);
-  if (english) {
-    for (const char* p : {"to ", "a ", "an ", "the "})
-      if (g.compare(0, std::char_traits<char>::length(p), p) == 0) g.erase(0, std::char_traits<char>::length(p));
+}  // namespace
+
+// C33: the head gloss of a one-line dictionary gloss (vp/grc2x.h). Before C33 the text before the first ";" "," "("
+// was printed, so a definition with a colon came out whole ("leader or commander of an army: general led ...") and a
+// gloss opening with a parenthesis came out empty.
+std::string headGloss(std::string_view gloss, bool english) {
+  std::string g = text::lower(std::string(gloss));
+  // parentheses and brackets removed with their content (nested), "…" ends the gloss
+  {
+    std::string o;
+    int depth = 0;
+    for (size_t i = 0; i < g.size(); ++i) {
+      const char c = g[i];
+      if (c == '(' || c == '[') { ++depth; continue; }
+      if ((c == ')' || c == ']') && depth > 0) { --depth; continue; }
+      if (depth == 0) o += c;
+    }
+    const size_t ell = o.find("\xE2\x80\xA6");
+    if (ell != std::string::npos) {   // a cut-off gloss: its last words are incomplete ("host and much…")
+      o.resize(ell);
+      const size_t sc = o.find_last_of(";,:");
+      const size_t an = o.find(" and ", sc == std::string::npos ? 0 : sc);
+      if (an != std::string::npos) o.resize(an);
+    }
+    g.swap(o);
   }
+  auto trim = [](std::string& s) {
+    size_t a = 0;
+    while (a < s.size() && (s[a] == ' ' || s[a] == '\t')) ++a;
+    s.erase(0, a);
+    while (!s.empty() && (s.back() == ' ' || s.back() == '.' || s.back() == '\t')) s.pop_back();
+    std::string o;
+    for (char c : s)
+      if (!(c == ' ' && !o.empty() && o.back() == ' ')) o += c;
+    s.swap(o);
+  };
+  auto words = [](const std::string& s) {
+    size_t n = s.empty() ? 0 : 1;
+    for (char c : s) n += c == ' ';
+    return n;
+  };
+  // the first item (before ";"), then a definition's colon: the word after it is the head ("something said: word")
+  g = g.substr(0, g.find(';'));
+  const size_t colon = g.find(':');
+  if (colon != std::string::npos) {
+    std::string after = g.substr(colon + 1);
+    after = after.substr(0, after.find(','));
+    trim(after);
+    if (!after.empty() && words(after) <= 3) g = after;
+    else g.resize(colon);
+  }
+  g = g.substr(0, g.find(','));
+  // "or" / "/" alternatives of a long gloss: the first ("leader or commander of an army" -> "leader"), unless the
+  // first is a preposition ("of or from the gods")
+  trim(g);
+  auto leading = [&](std::initializer_list<const char*> ps) {
+    for (bool again = true; again;) {
+      again = false;
+      for (const char* p : ps) {
+        const size_t n = std::char_traits<char>::length(p);
+        if (g.size() > n && g.compare(0, n, p) == 0) { g.erase(0, n); again = true; }
+      }
+    }
+  };
+  if (english) leading({"to ", "a ", "an ", "the "});
+  else leading({"el ", "la ", "los ", "las ", "un ", "una ", "unos ", "unas "});
+  if (words(g) > 3) {
+    for (const char* sep : {" or ", " o ", "/"}) {
+      const size_t at = g.find(sep);
+      if (at == std::string::npos || at == 0) continue;
+      const std::string first = g.substr(0, at);
+      if (first.find(' ') != std::string::npos) continue;
+      static const char* const kPrep[] = {"of", "from", "in", "with", "by", "to", "for", "at", "on", "de", "en", "con",
+                                          "por", "para", "a", nullptr};
+      bool prep = false;
+      for (size_t i = 0; kPrep[i]; ++i) prep = prep || first == kPrep[i];
+      if (!prep) { g = first; break; }
+    }
+  }
+  // an object placeholder ("help somebody", "ayudar a alguien") is not part of the verb
+  for (const char* p : {" somebody", " someone", " something", " sb", " sth", " a alguien", " algo"}) {
+    const size_t n = std::char_traits<char>::length(p);
+    if (g.size() > n && g.compare(g.size() - n, n, p) == 0) g.resize(g.size() - n);
+  }
+  trim(g);
   return g;
 }
-
-}  // namespace
 
 struct Translator::Impl : public detail::LexicalSource {
   const lex::Lexicon& lx;
@@ -94,9 +165,9 @@ struct Translator::Impl : public detail::LexicalSource {
       return x;
     }
     if (tg == Target::En) {
-      x.word = firstItem(text::lower(std::string(l.glossEn)), true);
+      x.word = headGloss(l.glossEn, true);
     } else {
-      x.word = firstItem(text::lower(std::string(l.glossEs)), false);
+      x.word = headGloss(l.glossEs, false);
       x.pivot = (l.flags & (1u << 8)) != 0;
     }
     if (x.word.empty()) x.missing = true;

@@ -391,3 +391,9 @@
 νεανίασ	νεανίας	noun	2	derived	young man, youth, lad
 τελευτάω	τελευτάω	verb	2	derived	come to an end
 παλαιόσ	παλαιός	adj	2	derived	old, ancient
+# C33 (loop-7 Check faults): "strong / fuerte" of a thing -> ἰσχυρός (δυνατός "able" was chosen), "sad / triste" of a
+# thing -> λυπηρός (μέλας "black" was chosen), "tall / alto / high" of a thing -> ὑψηλός (βαθύς "deep" was chosen for
+# alto); a person: the state rows of lexical_en_grc.tsv (tall -> μακρός, sad -> λυπέομαι)
+ἰσχυρόσ	ἰσχυρός	adj	2	derived	strong, mighty
+λυπηρόσ	λυπηρός	adj	2	derived	sad, painful, grievous
+ὑψηλόσ	ὑψηλός	adj	2	derived	tall, high, lofty

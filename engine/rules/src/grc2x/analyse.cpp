@@ -160,7 +160,9 @@ void Analyser::readings(const std::string& word, Token& t, const std::vector<rul
     r.nameEn = it->english;
     r.nameEs = it->spanish;
     r.place = it->place;
-    r.prior = 1.5;
+    // C33: a lower-case word with a lexicon reading is that word, not the name ("τὴν εἰρήνην ἤγγειλεν" was "announced
+    // Irene")
+    r.prior = t.capitalised ? 1.5 : -1.0;
     rs.push_back(r);
   }
   if (glossary && rs.empty())

@@ -147,6 +147,9 @@ Result<GreekTables> GreekTables::load(const std::filesystem::path& dir) {
                      [](const ReadableRow& a, const ReadableRow& b) { return a.key < b.key; });
     for (const ReadableRow& r : t.readable_) {
       if (r.pos != "noun" && r.pos != "verb" && r.pos != "adj" && r.pos != "adv" && r.pos != "mid") continue;
+      // C33: a row tagged "reverse-only" reads Greek back (grc2x) but is not a taught gloss of the EN / ES -> Greek
+      // path ("child" for τέκνον must not replace παῖς)
+      if (r.tags.find("reverse-only") != std::string::npos) continue;
       TaughtGloss g;
       g.key = r.key;
       g.head = r.head;

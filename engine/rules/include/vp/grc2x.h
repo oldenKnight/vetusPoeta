@@ -149,4 +149,10 @@ class Translator {
 // sentence end).
 std::vector<std::pair<size_t, size_t>> splitSentences(std::string_view text);
 
+// C33: the head gloss of a one-line dictionary gloss, as grc2x prints a lemma without a readable_grc.tsv row (the
+// readable sentence and the interlinear view): lower case, parentheses removed, the word after a definition's colon
+// ("The leader or commander of an army: general" -> "general"), else the text before the first ";" / ",", the first
+// of long "or" alternatives, without a leading "to" / article (English) or article (Spanish). Never throws.
+std::string headGloss(std::string_view gloss, bool english);
+
 }  // namespace vp::grc2x

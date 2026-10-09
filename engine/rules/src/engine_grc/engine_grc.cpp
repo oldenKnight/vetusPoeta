@@ -819,6 +819,94 @@ bool lostModifiers(frame::SemSentence& s) {
   return changed;
 }
 
+// C33: Spanish "El maestro nos enseñó una canción nueva.": the parser roots the sentence on the subject noun and hangs
+// the verb (after a clitic) on it as "acl"; the frame builder's fallback keeps the verb with a 3rd-person pronoun and
+// the noun is lost ("Ἡμῖν καινὴν ᾠδὴν ἐδίδαξεν", the teacher gone). The root noun with its article / possessive
+// before the verb becomes the subject. True if changed.
+bool esRootSubject(frame::SemSentence& s) {
+  if (s.lang != frame::SrcLang::Es || s.units.size() != 1 || s.units[0].type != frame::Unit::Clause) return false;
+  frame::SemFrame& f = s.units[0].frame;
+  if (!f.hasPred || f.type != frame::Kind::Decl || f.pred.token <= 0 || (size_t)f.pred.token >= s.tokens.size()) return false;
+  if (f.hasSubject && !(f.subject.isPronoun && f.subject.pron.person == 3)) return false;
+  const nlp::Token& v = s.tokens[(size_t)f.pred.token];
+  if (v.deprel != "acl" || v.head <= 0) return false;
+  const int r = v.head - 1;
+  if (r >= f.pred.token || s.tokens[(size_t)r].upos != "NOUN" || s.tokens[(size_t)r].deprel != "root") return false;
+  std::vector<int> used;
+  usedFrame(f, used);
+  if (std::find(used.begin(), used.end(), r) != used.end()) return false;
+  // only clitics between the noun and the verb
+  for (int j = r + 1; j < f.pred.token; ++j)
+    if (s.tokens[(size_t)j].upos != "PRON") return false;
+  const nlp::Token& t = s.tokens[(size_t)r];
+  frame::SemNP n;
+  n.head = t.lemma.empty() ? t.lower : t.lemma;
+  n.surface = t.text;
+  n.token = r;
+  n.tokens = {r};
+  n.number = nlp::morph::get(t.feats, nlp::morph::NumberShift) == nlp::morph::NumPlur ? 2 : 1;
+  if (t.lower.size() > 1 && t.lower.back() == 'a' && !n.head.empty() && n.head.back() == 'o') n.srcGender = feat::F;
+  for (int j = r - 1; j >= 0; --j) {
+    const nlp::Token& d = s.tokens[(size_t)j];
+    if (d.upos != "DET") break;
+    if (d.lower == "mi" || d.lower == "mis" || d.lower == "tu" || d.lower == "tus" || d.lower == "su" || d.lower == "sus") {
+      frame::SemNP p;
+      p.isPronoun = true;
+      p.pron.person = d.lower[0] == 'm' ? 1 : d.lower[0] == 't' ? 2 : 3;
+      p.pron.number = 1;
+      p.pronLemma = d.lower;
+      p.token = j;
+      p.tokens = {j};
+      n.possessor.push_back(p);
+    } else {
+      n.determiner = d.lower;
+      n.definite = d.lower == "el" || d.lower == "la" || d.lower == "los" || d.lower == "las";
+    }
+    n.tokens.push_back(j);
+  }
+  f.hasSubject = true;
+  f.subject = n;
+  f.implicitSubject = false;
+  return true;
+}
+
+// C33: "We will sail to the island tomorrow.": the parser hangs a bare time word on the noun before it ("of:tomorrow",
+// εἰς τὴν νῆσον ἐπιουσίου, "of the morrow"): today / tomorrow / yesterday / tonight (hoy, ayer, mañana without an
+// article) as a genitive attribute is an adverb of the clause. True if changed.
+bool timeAttribute(frame::SemSentence& s) {
+  bool changed = false;
+  std::function<void(frame::SemNP&, frame::SemFrame&)> fixNP = [&](frame::SemNP& n, frame::SemFrame& f) {
+    for (size_t g = 0; g < n.genitive.size();) {
+      const frame::SemNP& x = n.genitive[g];
+      const std::string h = text::lower(x.head);
+      const bool time = x.determiner.empty() && !x.definite && x.adjectives.empty() && x.possessor.empty() &&
+                        x.genitive.empty() && !x.isName &&
+                        (h == "tomorrow" || h == "today" || h == "yesterday" || h == "tonight" || h == "hoy" ||
+                         h == "ayer" || h == "mañana");
+      if (time && x.token >= 0) {
+        frame::SemAdverb a;
+        a.lemma = h;
+        a.token = x.token;
+        f.adverbs.push_back(a);
+        n.genitive.erase(n.genitive.begin() + (long)g);
+        changed = true;
+        continue;
+      }
+      ++g;
+    }
+  };
+  std::function<void(frame::SemFrame&)> visit = [&](frame::SemFrame& f) {
+    if (f.hasObject) fixNP(f.object, f);
+    if (f.hasSubject) fixNP(f.subject, f);
+    for (frame::SemOblique& o : f.obliques) fixNP(o.np, f);
+    for (frame::SemSub& sb : f.subordinate)
+      for (frame::SemFrame& x : sb.frame) visit(x);
+  };
+  for (frame::Unit& u : s.units)
+    if (u.type == frame::Unit::Clause) visit(u.frame);
+  return changed;
+}
+
 // C31: Spanish "Papá está en el jardín." / "Mamá está cansada.": a sentence-initial papá / mamá the tagger reads as a
 // verb (papar, mamar: "Ἴσθι ἐν τῷ κήπῳ [papá]", Fix). The rest from the verb on is analysed alone and the word becomes
 // its subject (ὁ πατήρ). False when the sentence does not have that shape.
@@ -953,6 +1041,96 @@ bool esParataxis(frame::SemSentence& s) {
       break;
     }
   }
+  return changed;
+}
+
+// C33: "al atardecer / al amanecer / al anochecer" read as a verb ("a" + "el" + the infinitive made a time or that
+// clause: "El barco llegó al atardecer." -> sub=time:when{pred=atardecer}): the nominalised infinitive is a time noun,
+// an oblique of the clause it hangs on (transfer_grc gives the Attic phrase: πρὸς ἑσπέραν, ἅμα τῇ ἕῳ). True if changed.
+bool timeInfinitive(frame::SemSentence& s) {
+  if (s.lang != frame::SrcLang::Es) return false;
+  bool changed = false;
+  std::function<void(frame::SemFrame&)> fix = [&](frame::SemFrame& f) {
+    for (size_t si = 0; si < f.subordinate.size();) {
+      frame::SemSub& sb = f.subordinate[si];
+      bool done = false;
+      if (sb.frame.size() == 1 && sb.frame[0].hasPred && !sb.frame[0].hasObject && sb.frame[0].obliques.empty() &&
+          (!sb.frame[0].hasSubject || sb.frame[0].implicitSubject)) {
+        const frame::SemFrame& tf = sb.frame[0];
+        const std::string lem = text::lower(tf.pred.lemma);
+        const int pt = tf.pred.token;
+        if ((lem == "atardecer" || lem == "amanecer" || lem == "anochecer") && pt >= 2 && (size_t)pt < s.tokens.size()) {
+          const std::string d = s.tokens[(size_t)pt - 1].lower, a = s.tokens[(size_t)pt - 2].lower;
+          const bool al = (a == "a" && d == "el") || d == "al";
+          if (al) {
+            frame::SemOblique o;
+            o.prep = "to";
+            o.np.head = lem;
+            o.np.surface = s.tokens[(size_t)pt].text;
+            o.np.token = pt;
+            o.np.definite = true;
+            o.np.determiner = "el";
+            o.np.tokens = {pt - 1, pt};
+            o.token = d == "al" ? pt - 1 : pt - 2;
+            o.front = f.hasPred && f.pred.token >= 0 && pt < f.pred.token;
+            f.obliques.push_back(o);
+            f.subordinate.erase(f.subordinate.begin() + (long)si);
+            changed = true;
+            done = true;
+          }
+        }
+      }
+      if (!done) {
+        for (frame::SemFrame& sf : sb.frame) fix(sf);
+        ++si;
+      }
+    }
+  };
+  for (frame::Unit& u : s.units)
+    if (u.type == frame::Unit::Clause) fix(u.frame);
+  return changed;
+}
+
+// C33: Spanish "conmigo / contigo" read as the object ("¿Vendrás conmigo?" -> [conmigo]): "with me / with you" (μετ'
+// ἐμοῦ, μετὰ σοῦ). A fixed form, not a guess: no flag. True if changed.
+bool conmigo(frame::SemSentence& s) {
+  if (s.lang != frame::SrcLang::Es) return false;
+  bool changed = false;
+  std::function<void(frame::SemFrame&)> fix = [&](frame::SemFrame& f) {
+    if (f.hasObject && !f.object.isName) {
+      const std::string h = text::lower(f.object.head.empty() ? f.object.pronLemma : f.object.head);
+      const uint8_t person = h == "conmigo" ? 1 : h == "contigo" ? 2 : 0;
+      if (person) {
+        frame::SemOblique o;
+        o.prep = "with";
+        o.np.isPronoun = true;
+        o.np.pron.person = person;
+        o.np.pron.number = 1;
+        o.np.token = f.object.token;
+        o.np.tokens = f.object.tokens;
+        o.token = f.object.token;
+        f.obliques.push_back(o);
+        f.hasObject = false;
+        f.object = frame::SemNP{};
+        changed = true;
+      }
+    }
+    // the parser may also hang it on the verb as a bare oblique ("¡Ven conmigo, hija mía!" -> "Ἐλθέ με")
+    for (frame::SemOblique& o : f.obliques) {
+      const std::string h = text::lower(o.np.head.empty() ? o.np.pronLemma : o.np.head);
+      if ((h == "conmigo" || h == "contigo") && (o.prep.empty() || o.prep == "-")) {
+        o.prep = "with";
+        o.np.isPronoun = true;
+        o.np.pron.person = h == "conmigo" ? 1 : 2;
+        o.np.pron.number = 1;
+        changed = true;
+      }
+    }
+    for (frame::SemSub& sb : f.subordinate)
+      for (frame::SemFrame& sf : sb.frame) fix(sf);
+  };
+  for (frame::Unit& u : s.units)
+    if (u.type == frame::Unit::Clause) fix(u.frame);
   return changed;
 }
 
@@ -1240,8 +1418,16 @@ bool addressModifier(const std::string& w) {
 // The vocative NP of an address of one to three words (tokens `v` of s; the last is the address word): built from the
 // words themselves (the parser reads a lone "Mamá." as a verb): the head's singular lemma, the Spanish gender, "my /
 // mi" as the possessor (the transfer leaves it out: ὦ παῖ), "dear / little / querido" as adjectives.
-frame::SemNP addressNP(const frame::SemSentence& s, const std::vector<size_t>& v, const GreekData& gd) {
+bool postPossessive(const std::string& w) { return w == "mío" || w == "mía" || w == "míos" || w == "mías"; }
+frame::SemNP addressNP(const frame::SemSentence& s, const std::vector<size_t>& v0, const GreekData& gd) {
   frame::SemNP n;
+  // C33: "hijo mío / hija mía": the possessive after the address word ("¡Ven aquí, hijo mío!" was "ἐμὸν υἱόν")
+  std::vector<size_t> v = v0;
+  int post = -1;
+  if (v.size() >= 2 && postPossessive(s.tokens[v.back()].lower)) {
+    post = (int)v.back();
+    v.pop_back();
+  }
   const nlp::Token& h = s.tokens[v.back()];
   static const char* const kPl[][2] = {{"children", "child"}, {"boys", "boy"}, {"girls", "girl"}, {"kids", "kid"},
                                        {"friends", "friend"}, {"niños", "niño"}, {"niñas", "niña"}, {"hijos", "hijo"},
@@ -1283,6 +1469,17 @@ frame::SemNP addressNP(const frame::SemSentence& s, const std::vector<size_t>& v
       n.adjectives.push_back(a);
     }
   }
+  if (post >= 0) {
+    frame::SemNP p;
+    p.isPronoun = true;
+    p.pron.person = 1;
+    p.pron.number = 1;
+    p.pronLemma = "mi";
+    p.token = post;
+    p.tokens.push_back(post);
+    n.possessor.push_back(p);
+    n.tokens.push_back(post);
+  }
   return n;
 }
 
@@ -1310,8 +1507,10 @@ bool addressSplit(const std::string& text, const frame::SemSentence& s, bool es,
     }
     return false;
   };
-  auto isAddress = [&](const std::vector<size_t>& v, bool atStart) {
-    if (v.empty() || v.size() > 3 || vocAlready(v)) return false;
+  auto isAddress = [&](const std::vector<size_t>& v0, bool atStart) {
+    if (v0.empty() || v0.size() > 3 || vocAlready(v0)) return false;
+    std::vector<size_t> v = v0;   // C33: "hijo mío": the postposed possessive is not part of the test
+    if (es && v.size() >= 2 && postPossessive(s.tokens[v.back()].lower)) v.pop_back();
     for (size_t i = 0; i + 1 < v.size(); ++i)
       if (!addressModifier(s.tokens[v[i]].lower)) return false;
     return addressWord(s.tokens[v.back()], atStart && v.size() == 1, gd);
@@ -1968,6 +2167,18 @@ struct GreekPath::Impl {
       if (!whenRepaired) repairWhat = "two clauses joined by a comma read as a time clause: coordinated: check it";
       whenRepaired = true;
     }
+    conmigo(s);   // C33
+    timeAttribute(s);   // C33: a fixed reading of a bare time word, not a guess (no flag)
+    // C33: the subject noun the parser made the root ("El maestro nos enseñó ..."): given back as the subject
+    if (esRootSubject(s)) {
+      if (!whenRepaired) repairWhat = "the subject noun read as the root of the sentence: given back as the subject: check it";
+      whenRepaired = true;
+    }
+    // C33: "al atardecer / al amanecer" read as a verb clause: the time phrase (a rebuilt structure: Check)
+    if (timeInfinitive(s)) {
+      if (!whenRepaired) repairWhat = "\"al atardecer / al amanecer\" read as a verb: analysed again as a time phrase: check it";
+      whenRepaired = true;
+    }
     // C31: the article and the adjectives of a noun hung on the verb ("The old king died." -> βασιλεὺς ἀπέθανεν)
     if ((whenRepaired || !frame::FrameBuilder::troubled(s)) && lostModifiers(s)) {
       if (!whenRepaired) repairWhat = "an article or adjective the parser hung on the verb given back to its noun: check it";
@@ -2131,6 +2342,26 @@ struct GreekPath::Impl {
     if (whenRepaired) {
       addFlag(flags, "clause-repair");
       so.reasons.push_back(Reason{-1, "form", repairWhat, ""});
+    }
+    // C33: "I saw the king, my father." -> "..., ὦ πάτερ" (OK and wrong): a trailing "my / our X" after a noun in a
+    // statement may be an apposition, not an address; the Greek side keeps the address but never as OK
+    if (s.units.size() >= 2 && s.finalPunct.find('.') != std::string::npos && !s.question) {
+      const frame::Unit& ul = s.units.back();
+      const frame::Unit& up = s.units[s.units.size() - 2];
+      const bool addr = (ul.type == frame::Unit::Clause && ul.vocative) ||
+                        (ul.type == frame::Unit::Phrase && ul.first >= 0 && (size_t)ul.first < s.tokens.size());
+      if (addr && up.type == frame::Unit::Clause && up.frame.hasPred && up.frame.type == frame::Kind::Decl &&
+          up.sepAfter == "," && ul.first >= 1 && (size_t)ul.first < s.tokens.size()) {
+        int prev = ul.first - 1;
+        while (prev >= 0 && s.tokens[(size_t)prev].upos == "PUNCT") --prev;
+        const std::string w0 = s.tokens[(size_t)ul.first].lower;
+        const bool poss = w0 == "my" || w0 == "our" || w0 == "mi" || w0 == "mis" || w0 == "nuestro" || w0 == "nuestra";
+        if (prev >= 0 && poss && (s.tokens[(size_t)prev].upos == "NOUN" || s.tokens[(size_t)prev].upos == "PROPN")) {
+          addFlag(flags, "addressee-guess");
+          so.reasons.push_back(Reason{-1, "form", "\"" + s.tokens[(size_t)ul.first].text +
+                                                     " ...\" after a noun may describe it (apposition), not address someone: check it", ""});
+        }
+      }
     }
     // C25: a Spanish sentence read as a verbless fragment with a subject and a prepositional phrase or an "of"
     // attribute ("El niño nada en el río." was "the boy of nothing in the river", OK) is a misreading: never OK
@@ -2669,7 +2900,8 @@ struct GreekPath::Impl {
       for (const char* f : {"name-guessed", "from-rule", "addressee-guess", "missing-form", "merged", "frame-fallback",
                             "realia", "name-kept", "contact-relative", "noun-infinitive", "purpose-guess", "light-verb",
                             "phrase-order", "participle-phrase", "ellipsis", "clause-repair", "wh-statement", "det-adverb",
-                            "past-form", "subject-guess", "fragment", "free-relative", "speech-inversion", "idiom"})
+                            "past-form", "subject-guess", "fragment", "free-relative", "speech-inversion", "idiom",
+                            "lexicon-gap"})   // C33: a form the lexicon lacks, the nearest attested one written
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       for (const transfer::Choice& c : a.choices)
         if (c.lowTier) {

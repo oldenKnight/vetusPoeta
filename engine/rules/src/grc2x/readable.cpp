@@ -308,6 +308,40 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
         continue;
       }
       if (keyIs(t, {"ὡς"}) && !sawContent && out.exclamation) { hos = true; ++k; continue; }
+      // C33: the Attic times of day read back as one adverb: ἅμα τῇ ἕῳ "at dawn", πρὸς ἑσπέραν "towards evening",
+      // μεσημβρίας "at noon", a bare νυκτός "at night", ἑσπέρας "in the evening"
+      {
+        auto at = [&](size_t d) -> const TokInfo* { return k + d < idx.size() ? &ti[idx[k + d]] : nullptr; };
+        const TokInfo* prev = k > 0 ? &ti[idx[k - 1]] : nullptr;
+        const bool bare = !prev || (prev->lpos != Article && prev->lpos != Adj && prev->lpos != Det);
+        size_t used = 0;
+        const char* en = nullptr;
+        const char* sp = nullptr;
+        if (keyIs(t, {"ἅμα"}) && at(1) && at(1)->lpos == Article && at(2) && at(2)->key == text::greek_key("ἕως") &&
+            at(2)->f.case_ == Dat) {
+          used = 3, en = "at dawn", sp = "al amanecer";
+        } else if (keyIs(t, {"ἅμα"}) && at(1) && at(1)->key == text::greek_key("ἕως") && at(1)->f.case_ == Dat) {
+          used = 2, en = "at dawn", sp = "al amanecer";
+        } else if (keyIs(t, {"πρός"}) && at(1) && at(1)->key == text::greek_key("ἑσπέρα") && at(1)->f.case_ == Acc) {
+          used = 2, en = "towards evening", sp = "al atardecer";
+        } else if (bare && t.key == text::greek_key("μεσημβρία") && t.f.case_ == Gen) {
+          used = 1, en = "at noon", sp = "a mediodía";
+        } else if (bare && t.key == text::greek_key("ἑσπέρα") && t.f.case_ == Gen) {
+          used = 1, en = "in the evening", sp = "por la tarde";
+        } else if (bare && t.key == text::greek_key("νύξ") && t.f.case_ == Gen && t.f.number != Pl) {
+          used = 1, en = "at night", sp = "de noche";
+        }
+        if (used) {
+          frame::SemAdverb a;
+          a.lemma = esT ? sp : en;
+          a.token = (int)i;
+          a.front = !sawContent && !frontSet;
+          f.adverbs.push_back(a);
+          for (size_t d = 0; d < used; ++d) out.roles[idx[k + d]] = "adverb";
+          k += used;
+          continue;
+        }
+      }
       // wh adverbs; διὰ τί
       if (keyIs(t, {"ποῦ", "ποῖ", "πῶς", "πότε", "πόθεν", "πηνίκα"})) {
         f.type = Kind::Wh;
@@ -339,7 +373,8 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
           else if (keyIs(t, {"παρά"})) w = np.case_ == Gen ? (esT ? "de" : "from") : np.case_ == Acc ? (esT ? "a" : "to") : (esT ? "junto a" : "beside");
           else if (keyIs(t, {"διά"})) w = np.case_ == Acc ? (esT ? "por" : "because of") : (esT ? "por" : "through");
           else if (keyIs(t, {"ἐπί"})) w = np.case_ == Acc ? (esT ? "contra" : "against") : (esT ? "sobre" : "on");
-          else if (keyIs(t, {"πρός"})) w = np.case_ == Acc ? (esT ? "hacia" : "to") : (esT ? "junto a" : "near");
+          // C33: a neuter noun group after πρός read as a nominative is the accusative ("πρὸς τὸ ὄρος" was "near")
+          else if (keyIs(t, {"πρός"})) w = np.case_ == Dat ? (esT ? "junto a" : "near") : (esT ? "hacia" : "to");
           else if (keyIs(t, {"ὑπό"})) w = np.case_ == Gen ? (esT ? "por" : "by") : (esT ? "bajo" : "under");
           if (w.empty()) w = esT ? "en" : "in";
           out.roles[i] = "preposition";
@@ -763,6 +798,27 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
     clauses.erase(clauses.begin() + (long)a);
     --a;
   }
+  // C33: πάλιν + "come" is "come back" ("αὔριον πάλιν ἥξομεν" -> "We will come back tomorrow", "Volveremos mañana")
+  for (Pending& c : clauses) {
+    if (!c.f.hasPred) continue;
+    const std::string& pl = c.f.pred.lemma;
+    if (pl != "have come" && pl != "come" && pl != "haber llegado" && pl != "venir" && pl != "llegar") continue;
+    for (size_t a = 0; a < c.f.adverbs.size(); ++a) {
+      const int tk = c.f.adverbs[a].token;
+      if (tk >= 0 && (size_t)tk < n && side.ti[(size_t)tk].key == text::greek_key("πάλιν")) {
+        c.f.pred.lemma = esT ? "volver" : "come back";
+        c.f.adverbs.erase(c.f.adverbs.begin() + (long)a);
+        break;
+      }
+    }
+  }
+  // C33: "say a story" is "tell a story" ("μῦθον λέγει" -> "tells a story", "cuenta un cuento")
+  for (Pending& c : clauses)
+    if (c.f.hasPred && c.f.hasObject && c.f.object.token >= 0 && (size_t)c.f.object.token < n &&
+        (c.f.pred.lemma == "say" || c.f.pred.lemma == "decir")) {
+      const std::string& o = side.lex[(size_t)c.f.object.token].word;
+      if (o == "story" || o == "cuento") c.f.pred.lemma = esT ? "contar" : "tell";
+    }
   for (size_t a = 0; a < clauses.size(); ++a) {
     out.frames.push_back(clauses[a].f);
     out.joiners.push_back(a == 0 ? std::string() : (clauses[a - 1].sepAfter == "," ? "," : ";"));
@@ -1284,7 +1340,17 @@ std::string esClause(const SemFrame& f, const Side& side) {
   if (f.copula) {
     const bool location = (f.predicative.empty() && f.predAdj.empty() && f.wh.role != frame::Role::Predicate) ||
                           f.wh.word == "where";
-    verb = location ? "estar" : "ser";
+    // C33: adjectives of a state take estar ("La comida está lista"; "es lista" is "she is clever")
+    bool state = !f.predAdj.empty() && f.predicative.empty();
+    for (const SemAdj& a : f.predAdj) {
+      bool st = false;
+      for (const char* sw : {"listo", "enfermo", "cansado", "contento", "lleno", "vacío", "abierto", "cerrado", "vivo",
+                            "muerto", "despierto", "dormido", "sentado", "sano", "solo", "ocupado", "preparado",
+                            "tranquilo", "enojado", "sucio", "limpio", "mojado", "seco", "roto"})
+        st = st || a.lemma == sw;
+      state = state && st;
+    }
+    verb = location || state ? "estar" : "ser";
   }
   bool refl = es::reflexive(verb);
   if (refl) {

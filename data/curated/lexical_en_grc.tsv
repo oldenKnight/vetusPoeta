@@ -31,6 +31,10 @@
 #         -> ἐλπίζω, while "esperar a" stays μένω).
 #   C31: verb rows may have frame "noobj-mid" (the middle voice whenever the verb has no object, places allowed: "hid
 #         behind the door" -> ἐκρύψατο); state rows may give "adverb(s) + verb" ("right" -> ὀρθῶς λέγω: ὀρθῶς λέγεις).
+#   C33: verb rows may have frame "pass" (the passive voice: "appear" -> φαίνομαι, ἐφάνη); verbprep sources may be a
+#         phrasal verb written with "_" ("go_out of" -> ἐκ + gen); state rows may have frame "adj-person" (as "adj",
+#         only with a person subject: "tall" -> μακρός of a person, a thing keeps ὑψηλός) or "adj-thing" (only with a
+#         subject that is a thing: "La cena está lista." -> ἕτοιμος, a person "listo" is clever).
 #   source: English (or Spanish) lemma(s), lower case. greek: the Greek lemma as in greek.vpl (headword without length
 #   marks). Spanish sources mirror the English rows (the Spanish frame builder keeps Spanish content lemmas).
 phrasal	come back	ἐπανέρχομαι		
@@ -547,3 +551,33 @@ subject	verano llegar	γίγνομαι
 verb	subir	ἀναβαίνω		C31: "subió al monte" -> εἰς τὸ ὄρος ἀνέβη (ὤφελλεν was produced)
 verb	bajar	καταβαίνω		
 noun	hierba	πόα		C31: ἄρωμα "spice" came through the pivot
+# C33: "begin / start" without a subject row -> the middle ἄρχομαι ("The war began." -> ὁ πόλεμος ἤρξατο; the active
+# ἦρξεν "ruled" was produced, OK and wrong, once readable_grc.tsv taught "rule" for ἄρχω); Spanish mirrors
+verb	begin	ἄρχω	mid	C33
+verb	start	ἄρχω	mid	C33
+verb	empezar	ἄρχω	mid	C33
+verb	comenzar	ἄρχω	mid	C33
+# C33: "go / come / get out of" and Spanish "salir de" -> ἐκ + genitive ("περὶ τοῦ ..." "about" was produced), salir ->
+# ἐξέρχομαι (unknown before); camp / campamento -> στρατόπεδον (ὅπλον "weapon" was produced)
+verbprep	go_out of	ἐξέρχομαι	prep:ἐκ+gen	C33
+verbprep	come_out of	ἐξέρχομαι	prep:ἐκ+gen	C33
+verbprep	get_out of	ἐξέρχομαι	prep:ἐκ+gen	C33
+verbprep	salir of	ἐξέρχομαι	prep:ἐκ+gen	C33
+verb	salir	ἐξέρχομαι		C33
+noun	camp	στρατόπεδον		C33
+noun	campamento	στρατόπεδον		C33
+# C33 (loop-7 Check faults): "tall / alto" of a person -> μακρός (LSJ "of stature, tall"; for alto βαθύς "deep" was OK
+# and wrong);
+# "appear / aparecer" -> φαίνομαι, the passive aorist ἐφάνη (ἐδόκει "seemed" was OK and wrong)
+state	tall	μακρός	adj-person	C33
+state	alto	μακρός	adj-person	C33
+state	listo	ἕτοιμος	adj-thing	C33: "la cena está lista" (σοφόν "clever" was OK and wrong)
+state	lista	ἕτοιμος	adj-thing	C33
+verb	appear	φαίνω	pass	C33
+verb	aparecer	φαίνω	pass	C33
+# C33 after the blind batch: street / calle -> ὁδός (πλατεῖα is Hellenistic), plaza -> ἀγορά (τόπος "place" was
+# chosen), reunirse -> συνέρχομαι (συνηνέχθησαν "were brought together" was produced)
+noun	street	ὁδός		C33
+noun	calle	ὁδός		C33
+noun	plaza	ἀγορά		C33
+verb	reunirse	συνέρχομαι		C33
