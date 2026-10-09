@@ -313,7 +313,7 @@ TEST_CASE("rules-grc4: C21 after the blind check (checker, touch, bring, sad, mi
       {"Teacher, the boy is crying.", "ὦ διδάσκαλε, ὁ παῖς κλαίει.", false},
       // a time word read as the predicate noun with the adjective on it
       {"The sea is calm tonight.", "ἡ θάλαττα νύκτωρ γαληνός ἐστιν.", true},
-      {"The house is quiet tonight.", "ἡ οἰκία νύκτωρ ἤρεμός ἐστιν.", false},
+      {"The house is quiet tonight.", "ἡ οἰκία νύκτωρ ἤρεμός ἐστιν. | ἡ οἰκία νύκτωρ ἥσυχός ἐστιν.", false},   // C29: quiet -> ἥσυχος (readable_grc.tsv)
       // verbs of placing ask ποῦ
       {"Where did you put the key?", "ποῦ τὴν κλεῖν ἔθηκας;", false},
       {"Where did the boy put his book?", "ποῦ ὁ παῖς τὸ βιβλίον αὐτοῦ ἔθηκεν;", false},

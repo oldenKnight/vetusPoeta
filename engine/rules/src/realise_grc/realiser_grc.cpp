@@ -341,11 +341,13 @@ void GreekRealiser::nameWord(const GrcNP& n, uint8_t case_, const GrcOptions& o,
     }
   if (const NameEntry* e = gd_.nameByEnglish(n.name)) {
     std::string out;
-    if (e->policy != curated::NamePolicy::Keep && n.number == Sg &&
-        declineName(e->nom, e->gen, e->declension, e->gender, case_, e->voc, out)) {
+    // C29: plural place names (Ἀθῆναι) and spelled-out forms through the entry; a neologism (Μεξικόν) is never OK
+    if (e->policy != curated::NamePolicy::Keep && (n.number == e->number || !e->forms.empty()) &&
+        declineName(*e, case_, out)) {
       w.form = out;
-      Features f; f.pos = Name; f.case_ = case_; f.number = Sg; f.gender = e->gender;
+      Features f; f.pos = Name; f.case_ = case_; f.number = e->number; f.gender = e->gender;
       w.packed = pack(f);
+      if (e->neologism && std::find(flags_.begin(), flags_.end(), "realia") == flags_.end()) flags_.push_back("realia");
       return;
     }
     w.form = e->nom;
@@ -621,7 +623,8 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
     (second ? conn2 : s[kCONN]).push_back(std::move(w));
   }
   // subject
-  const bool pronDrop = c.hasSubject && c.subject.isPronoun && !c.subject.emphasis && !impersDei && !impersExesti;
+  const bool pronDrop = c.hasSubject && c.subject.isPronoun && !c.subject.emphasis && !c.subject.keep && !impersDei &&
+                        !impersExesti;
   const bool relSubj = ctx.relative && c.relRole == Role::Subject;
   if (c.hasSubject && !pronDrop && !relSubj && !c.exclHos) {
     std::vector<GWord> w;
@@ -670,6 +673,12 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
     if (ad.pos == AdvPos::Front || (ad.pos == AdvPos::Auto && timeAdverb(ad.lemma))) s[kFRONT].push_back(std::move(w));
     else if (ad.pos == AdvPos::End) s[kEND].push_back(std::move(w));
     else s[kADV].push_back(std::move(w));
+  }
+  // C29: the accusative subject of an infinitive opens its clause ("ἐλπίζω σε αὔριον ἥξειν", not "αὔριόν σε ἥξειν"):
+  // the clause's time adverbs follow it
+  if (ctx.infinitival && c.hasSubject && c.subject.keep && !s[kFRONT].empty()) {
+    s[kADV].insert(s[kADV].begin(), std::make_move_iterator(s[kFRONT].begin()), std::make_move_iterator(s[kFRONT].end()));
+    s[kFRONT].clear();
   }
   // copula predicates
   const bool isEimi = c.pred.lemma != kNone && c.pred.lemma == k_.eimi && c.pred.modal == kNone;

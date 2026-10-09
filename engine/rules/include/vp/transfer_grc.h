@@ -121,6 +121,7 @@ class GreekTransfer {
   bool fixedVerbPhrase(const std::string& greek, Ctx& c, GrcClause& cl) const;
   std::string english(const std::string& sourceLemma, const transfer::Settings& st) const;   // pivot for ES rows
   bool durative(const std::string& sourceLemma, uint32_t greekLemma, const transfer::Settings& st) const;
+  bool animate(const frame::SemNP& n) const;   // C29: transfer::animate, but a place name is not a person
 
   const lex::Lexicon& lx_;
   const curated::CuratedData& cd_;

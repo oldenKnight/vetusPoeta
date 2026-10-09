@@ -6,8 +6,10 @@
 #include <cctype>
 #include <cmath>
 #include <cstring>
+#include <functional>
 #include <sstream>
 
+#include "frame/english.h"
 #include "la2x/internal.h"
 #include "vp/check.h"
 #include "vp/check_grc.h"
@@ -501,6 +503,12 @@ void renameHead(frame::SemNP& n, int tok, const std::string& from, const std::st
   for (auto& g : n.genitive) renameHead(g, tok, from, to);
   for (auto& r : n.relative) renameHeadF(r, tok, from, to);
 }
+void renameNounBack(frame::SemSentence& s, int tok, const std::string& from, const std::string& to) {
+  for (frame::Unit& u : s.units)
+    if (u.type == frame::Unit::Clause) renameHeadF(u.frame, tok, from, to);
+  if (tok >= 0 && (size_t)tok < s.tokens.size()) { s.tokens[(size_t)tok].lemma = to; s.tokens[(size_t)tok].upos = "NOUN"; }
+}
+
 bool vocCoordinated(const std::string& text, const frame::FrameBuilder& fb, const frame::SemSentence& s,
                     frame::SemSentence& out) {
   for (size_t ui = 0; ui + 1 < s.units.size(); ++ui) {
@@ -610,6 +618,586 @@ bool estarFragment(const std::string& text, const frame::FrameBuilder& fb, const
   out.finalPunct = sb.finalPunct;
   for (const std::string& r : sb.repairs) out.repairs.push_back(r);
   for (const std::string& d : sb.doubts) out.doubt(d.c_str());
+  return true;
+}
+
+// ---- C29: re-analyses of the shapes the shared frame builder misreads (Greek side only) ----------------------------
+
+// The sentence analysed again with the word of token `tok` replaced by `standIn`, the original spelling and offsets put
+// back on the tokens (the later offsets shifted back by the difference in length). False when the token counts differ.
+bool substituteWords(const std::string& text, const frame::FrameBuilder& fb, const frame::SemSentence& s,
+                     std::vector<std::pair<size_t, std::string>> subs, frame::SemSentence& out) {
+  std::sort(subs.begin(), subs.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+  std::string alt = text;
+  for (const auto& sb : subs) {   // from the last word back, so the earlier offsets stay valid
+    if (sb.first >= s.tokens.size() || sb.second.empty()) return false;
+    const nlp::Token& t = s.tokens[sb.first];
+    if (t.start < 0 || t.end < t.start || (size_t)t.end > text.size()) return false;
+    std::string w = sb.second;
+    if (t.text[0] >= 'A' && t.text[0] <= 'Z' && w[0] >= 'a' && w[0] <= 'z') w[0] = (char)(w[0] - 'a' + 'A');
+    alt = alt.substr(0, (size_t)t.start) + w + alt.substr((size_t)t.end);
+  }
+  fb.analyse(alt, out);
+  if (out.tokens.size() != s.tokens.size()) return false;
+  for (size_t i = 0; i < out.tokens.size(); ++i) {
+    out.tokens[i].text = s.tokens[i].text;
+    out.tokens[i].lower = s.tokens[i].lower;
+    out.tokens[i].start = s.tokens[i].start;
+    out.tokens[i].end = s.tokens[i].end;
+  }
+  out.text = text;
+  return true;
+}
+bool substituteWord(const std::string& text, const frame::FrameBuilder& fb, const frame::SemSentence& s, size_t tok,
+                    const std::string& standIn, frame::SemSentence& out) {
+  return substituteWords(text, fb, s, {{tok, standIn}}, out);
+}
+
+// C29: a common noun after a determiner that the tagger reads as an adjective before a verb ("The soldier/ADJ
+// sang/NOUN.": the clause loses its subject and its verb): english.vpl knows the word as a noun and not as an
+// adjective. Its token index (and the noun lemma) or false.
+bool nounTaggedAdj(const frame::SemSentence& s, const lex::Lexicon& en, size_t k, std::string& lemma, bool& plural) {
+  if (k == 0 || k + 1 >= s.tokens.size()) return false;
+  const nlp::Token& t = s.tokens[k];
+  if (t.upos != "ADJ" || s.tokens[k - 1].upos != "DET" || s.tokens[k + 1].upos == "PUNCT") return false;
+  std::vector<lex::Analysis> an;
+  en.lookup(text::en_key(t.lower), an);
+  bool noun = false, adj = false;
+  for (const lex::Analysis& a : an) {
+    const lex::Lemma l = en.lemma(a.lemma);
+    if (l.pos == feat::Adj || l.pos == feat::Participle) adj = true;
+    if (l.pos == feat::Noun && !noun) {
+      noun = true;
+      lemma = text::lower(std::string(l.head));
+      plural = feat::unpack(en.feature(a.feat)).number == feat::Pl;
+    }
+  }
+  return noun && !adj;
+}
+
+// C29: "The soldier sang." / "The soldier came because his horse died.": the subject noun read as an adjective and the
+// verb as a noun ("[sang]", Fix on both paths). The noun is analysed as "boy(s)" and set back.
+bool nounAsAdj(const std::string& text, const frame::FrameBuilder& fb, const frame::SemSentence& s, const lex::Lexicon* en,
+               frame::SemSentence& out, std::string& noun) {
+  if (!en) return false;
+  for (size_t k = 1; k + 1 < s.tokens.size(); ++k) {
+    std::string nl;
+    bool npl = false;
+    if (!nounTaggedAdj(s, *en, k, nl, npl)) continue;
+    // only when the analysis lost the noun as a subject (no clause has its subject there)
+    bool subj = false;
+    std::function<void(const frame::SemFrame&)> look = [&](const frame::SemFrame& f) {
+      subj = subj || (f.hasSubject && f.subject.token == (int)k);
+      for (const auto& sb : f.subordinate) for (const auto& x : sb.frame) look(x);
+    };
+    for (const frame::Unit& u : s.units) if (u.type == frame::Unit::Clause) look(u.frame);
+    if (subj) continue;
+    frame::SemSentence alt;
+    if (!substituteWord(text, fb, s, k, npl ? "boys" : "boy", alt)) continue;
+    bool pred = false;
+    for (const frame::Unit& u : alt.units) pred = pred || (u.type == frame::Unit::Clause && u.frame.hasPred);
+    if (!pred) continue;
+    renameNounBack(alt, (int)k, "boy", nl);
+    out = std::move(alt);
+    noun = s.tokens[k].lower;
+    return true;
+  }
+  return false;
+}
+
+
+// The frame (of any unit, subordinate or secondary clause) whose predicate is token `tok`; null when none.
+frame::SemFrame* predAt(frame::SemFrame& f, int tok) {
+  if (f.hasPred && f.pred.token == tok) return &f;
+  for (auto& sb : f.subordinate)
+    for (auto& x : sb.frame)
+      if (frame::SemFrame* r = predAt(x, tok)) return r;
+  for (auto& x : f.secondary)
+    if (frame::SemFrame* r = predAt(x, tok)) return r;
+  return nullptr;
+}
+frame::SemFrame* predAt(frame::SemSentence& s, int tok) {
+  for (frame::Unit& u : s.units)
+    if (u.type == frame::Unit::Clause)
+      if (frame::SemFrame* r = predAt(u.frame, tok)) return r;
+  return nullptr;
+}
+
+// Spanish "¿Qué haces?" / "¿Qué comes, mamá?": "qué" + a 2nd-person verb read as a determiner + a noun ("[haces]", "τίνες
+// ζωμοί"). The verb (a present indicative form of spanish.vpl) is replaced by the same person of leer, which the
+// tagger reads right, and the verb set back.
+bool queVerb(const std::string& text, const frame::FrameBuilder& fb, const frame::SemSentence& s, const lex::Lexicon* es,
+             frame::SemSentence& out) {
+  if (!es || s.units.empty() || s.units[0].type != frame::Unit::Clause || s.units[0].frame.hasPred) return false;
+  for (size_t k = 1; k < s.tokens.size(); ++k) {
+    if (s.tokens[k - 1].lower != "qué" || s.tokens[k].upos == "VERB" || s.tokens[k].upos == "AUX") continue;
+    std::vector<lex::Analysis> an;
+    es->lookup(text::es_key(s.tokens[k].lower), an);
+    std::string inf;
+    uint8_t pe = 0, nu = 0;
+    for (const lex::Analysis& a : an) {
+      const lex::Lemma l = es->lemma(a.lemma);
+      const feat::Features af = feat::unpack(es->feature(a.feat));
+      if (l.pos != feat::Verb || !af.person || af.tense != feat::Present || (af.mood != 0 && af.mood != feat::Indicative))
+        continue;
+      inf = text::lower(std::string(l.head));
+      pe = af.person;
+      nu = af.number;
+      break;
+    }
+    if (inf.empty()) continue;
+    const bool pl = nu == feat::Pl;
+    const char* sw = pe == 1 ? (pl ? "leemos" : "leo") : pe == 2 ? (pl ? "leéis" : "lees") : (pl ? "leen" : "lee");
+    frame::SemSentence alt;
+    if (!substituteWord(text, fb, s, k, sw, alt)) continue;
+    frame::SemFrame* g = predAt(alt, (int)k);
+    if (!g || text::lower(g->pred.lemma) != "leer") continue;
+    g->pred.lemma = inf;
+    out = std::move(alt);
+    return true;
+  }
+  return false;
+}
+
+// Spanish "Ven aquí." / "¡Ven pronto!" / "Hijo, ven aquí.": "ven" read as the 3rd plural of ver ("they see here", rated
+// OK). A clause-first "ven" with no subject of its own and no object but a pronoun is the imperative of venir: the
+// sentence is analysed with "sal" (the same length) in its place and the verb set back to venir.
+bool venImperative(const std::string& text, const frame::FrameBuilder& fb, const frame::SemSentence& s,
+                   frame::SemSentence& out) {
+  for (size_t k = 0; k < s.tokens.size(); ++k) {
+    if (s.tokens[k].lower != "ven") continue;
+    bool first = true;   // only punctuation (¡, a comma after an address) or an address word before it
+    for (size_t j = 0; j < k; ++j) first = first && (s.tokens[j].upos == "PUNCT" || j + 1 < k);
+    if (!first || (k > 0 && s.tokens[k - 1].upos != "PUNCT")) continue;
+    frame::SemSentence tmp = s;
+    frame::SemFrame* f = predAt(tmp, (int)k);
+    if (!f || text::lower(f->pred.lemma) != "ver") continue;
+    if (f->hasSubject && !f->implicitSubject && f->subject.token >= 0) continue;
+    if (f->hasObject && !f->object.isPronoun && !(f->object.isName || transfer::animate(f->object))) continue;
+    frame::SemSentence alt;
+    if (!substituteWord(text, fb, s, k, "sal", alt)) continue;
+    frame::SemFrame* g = predAt(alt, (int)k);
+    if (!g || g->type != frame::Kind::Imp || text::lower(g->pred.lemma) != "salir") continue;
+    g->pred.lemma = "venir";
+    // a person after the comma the parser took as the object ("Ven aquí, niño") is left to the address repair
+    out = std::move(alt);
+    return true;
+  }
+  return false;
+}
+
+// English irregular pasts the tagger reads as a noun or a name ("Mary wept for her brother." -> the name "Mary wept";
+// "The queen wept when she heard the news." -> wept as a noun; Latin and Greek both gave "[wept]"): a word that
+// english.vpl knows only as the finite past of another verb (frame::en::verbOfForm, reused), right after a noun or a
+// pronoun and given no predicate, is made the verb: the sentence is analysed with a regular past of the same length in
+// its place and that verb set back (past tense).
+bool pastAsNoun(const std::string& text, const frame::FrameBuilder& fb, const frame::SemSentence& s,
+                const lex::Lexicon* en, frame::SemSentence& out, std::string& form) {
+  if (!en) return false;
+  // regular pasts the tagger reads as verbs in any context (the offsets are restored after the analysis)
+  static const char* const kStand[] = {"cried", "called", "played", "looked", "watched"};
+  for (size_t k = 1; k < s.tokens.size(); ++k) {
+    const nlp::Token& t = s.tokens[k];
+    const nlp::Token& pv = s.tokens[k - 1];
+    if (t.upos == "VERB" || t.upos == "AUX" || t.upos == "PUNCT" || t.lower.size() < 3) continue;
+    // after a noun or a pronoun (the subject's end); the tagger sometimes makes the subject noun an adjective ("The
+    // soldier/ADJ wept/NOUN because ...")
+    const bool detAdj = pv.upos == "ADJ" && k >= 2 && s.tokens[k - 2].upos == "DET";
+    if (pv.upos != "NOUN" && pv.upos != "PROPN" && pv.upos != "PRON" && !detAdj) continue;
+    bool present = false;
+    const std::string v = frame::en::verbOfForm(*en, t.lower, &present);
+    if (v.empty() || present || v == t.lower || v.find(' ') != std::string::npos) continue;
+    // only a finite past of that verb, and nothing else (no noun, adjective or participle-only reading)
+    std::vector<lex::Analysis> an;
+    en->lookup(text::en_key(t.lower), an);
+    bool finite = false, other = false;
+    for (const lex::Analysis& a : an) {
+      const lex::Lemma l = en->lemma(a.lemma);
+      const feat::Features af = feat::unpack(en->feature(a.feat));
+      if (l.pos != feat::Verb) { other = true; continue; }
+      if (text::lower(std::string(l.head)) != v) continue;
+      if ((af.tense == feat::Perfect || af.tense == feat::Pluperfect) && (af.mood == 0 || af.mood == feat::Indicative)) finite = true;
+    }
+    // a noun reading too ("dug" is also a noun) is a misreading when a determiner or a pronoun follows ("The farmer
+    // dug a deep hole": a noun is not followed by "a")
+    const bool detNext = k + 1 < s.tokens.size() && (s.tokens[k + 1].upos == "DET" || s.tokens[k + 1].upos == "PRON");
+    if (!finite || (other && !detNext)) continue;
+    frame::SemSentence tmp = s;
+    if (predAt(tmp, (int)k)) continue;
+    std::string nl;
+    bool npl = false;
+    const bool subjNoun = detAdj && nounTaggedAdj(s, *en, k - 1, nl, npl);
+    for (const char* sw : kStand) {
+      frame::SemSentence alt;
+      std::vector<std::pair<size_t, std::string>> subs = {{k, sw}};
+      if (subjNoun) subs.emplace_back(k - 1, npl ? "boys" : "boy");
+      if (!substituteWords(text, fb, s, subs, alt)) continue;
+      frame::SemFrame* g = predAt(alt, (int)k);
+      if (!g || g->pred.tense != frame::Tense::Past) continue;
+      g->pred.lemma = v;
+      alt.tokens[k].lemma = v;
+      alt.tokens[k].upos = "VERB";
+      if (subjNoun) renameNounBack(alt, (int)k - 1, "boy", nl);
+      out = std::move(alt);
+      form = t.lower;
+      return true;
+    }
+    // the tagger reads the whole subject wrongly in context ("The soldier wept because his horse died." -> soldier an
+    // adjective): the clause up to a subordinator after the past is analysed alone (C17's retagging makes the past a
+    // verb in a sentence without one) and the rest merged as its dependent clause
+    for (size_t j = k + 1; j + 1 < s.tokens.size(); ++j) {
+      const std::string& m = s.tokens[j].lower;
+      frame::Relation rel;
+      if (m == "because" || m == "since") rel = frame::Relation::Cause;
+      else if (m == "when" || m == "while" || m == "after" || m == "before" || m == "until") rel = frame::Relation::Time;
+      else if (m == "if") rel = frame::Relation::Condition;
+      else continue;
+      size_t a1 = (size_t)s.tokens[j].start;
+      while (a1 > 0 && (text[a1 - 1] == ' ' || text[a1 - 1] == ',')) --a1;
+      const size_t b0 = (size_t)s.tokens[j + 1].start;
+      frame::SemSentence merged;
+      if (!mergeParts(text, fb, 0, a1, b0, true, rel, m, false, true, merged)) break;
+      frame::SemFrame* g = predAt(merged, (int)k);
+      if (!g || text::lower(g->pred.lemma) != v) break;
+      out = std::move(merged);
+      form = t.lower;
+      return true;
+    }
+  }
+  return false;
+}
+
+// Spanish 3rd-person present verbs read as nouns in a sentence without a verb ("El búho caza de noche." -> "the owl of
+// hunting of night"; C25 repaired "nada" alone): the word right after the subject NP that spanish.vpl knows as a 3rd
+// person present indicative is the verb; analysed with a common verb of the same length in its place, its lemma set
+// back. ASCII forms only (the stand-ins are ASCII, so the byte length is the same).
+bool esVerbAsNoun(const std::string& text, const frame::FrameBuilder& fb, const frame::SemSentence& s,
+                  const lex::Lexicon* es, frame::SemSentence& out) {
+  if (!es || s.units.size() != 1 || s.units[0].type != frame::Unit::Clause) return false;
+  const frame::SemFrame& f0 = s.units[0].frame;
+  if (f0.hasPred || !f0.hasSubject || f0.subject.isPronoun) return false;
+  for (const nlp::Token& t : s.tokens) if (t.upos == "VERB" || t.upos == "AUX") return false;
+  // the word right after the subject's head (the misread verb is often hung on the subject as an "of" attribute)
+  const int head = f0.subject.token;
+  const size_t k = (size_t)head + 1;
+  if (head < 0 || k >= s.tokens.size() || s.tokens[k].upos == "PUNCT" || s.tokens[k].upos == "ADP") return false;
+  const std::string w = s.tokens[k].lower;
+  for (char ch : w) if ((unsigned char)ch >= 0x80) return false;
+  std::vector<lex::Analysis> an;
+  es->lookup(text::es_key(w), an);
+  std::string inf;
+  uint8_t num = 0;
+  for (const lex::Analysis& a : an) {
+    const lex::Lemma l = es->lemma(a.lemma);
+    const feat::Features af = feat::unpack(es->feature(a.feat));
+    if (l.pos != feat::Verb || af.person != 3 || af.tense != feat::Present || (af.mood != 0 && af.mood != feat::Indicative)) continue;
+    inf = text::lower(std::string(l.head));
+    num = af.number;
+    break;
+  }
+  if (inf.empty()) return false;
+  static const char* const kSg[] = {"lee", "come", "corre", "camina", "escribe"};
+  static const char* const kPl[] = {"leen", "comen", "corren", "caminan", "escriben"};
+  const char* const* list = num == feat::Pl ? kPl : kSg;
+  const size_t base = num == feat::Pl ? 4 : 3;
+  if (w.size() < base || w.size() > base + 4) return false;
+  frame::SemSentence alt;
+  if (!substituteWord(text, fb, s, k, list[w.size() - base], alt)) return false;
+  frame::SemFrame* g = predAt(alt, (int)k);
+  if (!g || g->type != frame::Kind::Decl || !g->hasSubject) return false;
+  g->pred.lemma = inf;
+  out = std::move(alt);
+  return true;
+}
+
+// "When one is tired, one sleeps.": the generic "one" before a verb in -s read as a numeral ("one sleep", a noun
+// phrase). Every clause-initial "one" is analysed as "she" (the same length) and the subjects made generic again
+// (the transfer renders them τις). English only.
+bool oneGeneric(const std::string& text, const frame::FrameBuilder& fb, const frame::SemSentence& s,
+                frame::SemSentence& out) {
+  bool frag = false;
+  for (const frame::Unit& u : s.units)
+    if (u.type == frame::Unit::Clause && !u.frame.hasPred && u.frame.hasSubject) frag = true;
+  if (!frag) return false;
+  std::vector<size_t> ones;
+  for (size_t k = 0; k + 1 < s.tokens.size(); ++k) {
+    if (s.tokens[k].lower != "one") continue;
+    const bool start = k == 0 || s.tokens[k - 1].upos == "PUNCT" || s.tokens[k - 1].upos == "SCONJ" ||
+                       s.tokens[k - 1].upos == "CCONJ";
+    const std::string& nx = s.tokens[k + 1].lower;
+    if (start && (nx.size() > 2 && nx.back() == 's')) ones.push_back(k);
+    else if (start && (nx == "is" || nx == "was" || nx == "can" || nx == "must" || nx == "should" || nx == "has"))
+      ones.push_back(k);
+  }
+  if (ones.empty()) return false;
+  std::string alt = text;
+  for (size_t k : ones) {
+    const nlp::Token& t = s.tokens[k];
+    const char* she = t.text[0] == 'O' ? "She" : "she";
+    for (size_t i = 0; i < 3; ++i) alt[(size_t)t.start + i] = she[i];
+  }
+  fb.analyse(alt, out);
+  if (out.tokens.size() != s.tokens.size()) return false;
+  for (size_t i = 0; i < out.tokens.size(); ++i) {
+    out.tokens[i].text = s.tokens[i].text;
+    out.tokens[i].lower = s.tokens[i].lower;
+  }
+  out.text = text;
+  int fixed = 0;
+  std::function<void(frame::SemFrame&)> mark = [&](frame::SemFrame& f) {
+    if (f.hasSubject && f.subject.isPronoun &&
+        std::find(ones.begin(), ones.end(), (size_t)std::max(0, f.subject.token)) != ones.end() && f.subject.token >= 0) {
+      f.subject.pronLemma = "one-generic";
+      f.subject.head = "one";
+      ++fixed;
+    }
+    for (auto& sb : f.subordinate) for (auto& x : sb.frame) mark(x);
+  };
+  bool allPred = true;
+  for (frame::Unit& u : out.units)
+    if (u.type == frame::Unit::Clause) { mark(u.frame); allPred = allPred && u.frame.hasPred; }
+  return fixed > 0 && allPred;
+}
+
+// A word that addresses someone: kinship and person nouns of children's dialogue, a name of names_grc.tsv that is not
+// a place, or a capitalised word the tagger calls a proper name.
+bool addressWord(const nlp::Token& t, bool firstWord, const GreekData& gd) {
+  static const char* const kWords[] = {
+      "boy", "boys", "girl", "girls", "child", "children", "kid", "kids", "son", "daughter", "mother", "father", "mom",
+      "mum", "mommy", "mummy", "dad", "daddy", "papa", "mama", "grandmother", "grandfather", "grandma", "grandpa",
+      "granny", "brother", "sister", "friend", "friends", "sir", "madam", "teacher", "master", "lady", "uncle", "aunt",
+      "everyone", "everybody", "darling", "sweetheart", "dear", "niño", "niña", "niños", "niñas", "hijo", "hija",
+      "hijos", "hijas", "mamá", "papá", "madre", "padre", "abuelo", "abuela", "abuelita", "abuelito", "hermano",
+      "hermana", "amigo", "amiga", "amigos", "amigas", "señor", "señora", "señorita", "maestro", "maestra", "profesor",
+      "profesora", "chico", "chica", "chicos", "chicas", "muchacho", "muchacha", "muchachos", "muchachas", "tío", "tía",
+      "cariño", "todos", nullptr};
+  for (const char* const* w = kWords; *w; ++w)
+    if (t.lower == *w) return true;
+  const bool cap = !t.text.empty() && t.text[0] >= 'A' && t.text[0] <= 'Z';
+  if (!cap) return false;
+  if (const NameEntry* e = gd.nameByEnglish(t.text)) return !e->place && e->policy != curated::NamePolicy::Translate;
+  return !firstWord && t.upos == "PROPN";
+}
+bool addressModifier(const std::string& w) {
+  static const char* const kMods[] = {"my", "our", "dear", "little", "poor", "oh", "o", "mi", "mis", "nuestro",
+                                      "nuestra", "querido", "querida", "queridos", "queridas", "pequeño", "pequeña",
+                                      "pobre", nullptr};
+  for (const char* const* m = kMods; *m; ++m)
+    if (w == *m) return true;
+  return false;
+}
+
+// The vocative NP of an address of one to three words (tokens `v` of s; the last is the address word): built from the
+// words themselves (the parser reads a lone "Mamá." as a verb): the head's singular lemma, the Spanish gender, "my /
+// mi" as the possessor (the transfer leaves it out: ὦ παῖ), "dear / little / querido" as adjectives.
+frame::SemNP addressNP(const frame::SemSentence& s, const std::vector<size_t>& v, const GreekData& gd) {
+  frame::SemNP n;
+  const nlp::Token& h = s.tokens[v.back()];
+  static const char* const kPl[][2] = {{"children", "child"}, {"boys", "boy"}, {"girls", "girl"}, {"kids", "kid"},
+                                       {"friends", "friend"}, {"niños", "niño"}, {"niñas", "niña"}, {"hijos", "hijo"},
+                                       {"hijas", "hija"}, {"amigos", "amigo"}, {"amigas", "amiga"}, {"chicos", "chico"},
+                                       {"chicas", "chica"}, {"muchachos", "muchacho"}, {"muchachas", "muchacha"}};
+  n.head = h.lower;
+  for (const auto& p : kPl)
+    if (h.lower == p[0]) { n.head = p[1]; n.number = 2; }
+  // a capitalised word that is not one of the address nouns ("Mamá" is) is a name ("Mary")
+  nlp::Token low = h;
+  low.text = h.lower;
+  if (!h.text.empty() && h.text[0] >= 'A' && h.text[0] <= 'Z' && !addressWord(low, false, gd)) {
+    n.isName = true;
+    n.head = h.text;
+  }
+  static const char* const kF[] = {"niña", "hija", "mamá", "madre", "abuela", "abuelita", "hermana", "amiga", "señora",
+                                   "señorita", "maestra", "profesora", "chica", "muchacha", "tía", nullptr};
+  for (const char* const* f = kF; *f; ++f)
+    if (n.head == *f) n.srcGender = feat::F;
+  n.surface = h.text;
+  n.token = (int)v.back();
+  for (size_t i : v) n.tokens.push_back((int)i);
+  for (size_t i = 0; i + 1 < v.size(); ++i) {
+    const std::string& w = s.tokens[v[i]].lower;
+    if (w == "my" || w == "our" || w == "mi" || w == "mis" || w == "nuestro" || w == "nuestra") {
+      frame::SemNP p;
+      p.isPronoun = true;
+      p.pron.person = 1;
+      p.pron.number = (w == "our" || w == "nuestro" || w == "nuestra") ? 2 : 1;
+      p.pronLemma = w;
+      p.token = (int)v[i];
+      p.tokens.push_back((int)v[i]);
+      n.possessor.push_back(p);
+    } else if (w != "oh" && w != "o") {
+      frame::SemAdj a;
+      a.lemma = w == "querido" || w == "querida" || w == "queridos" || w == "queridas" ? "querido"
+                : w == "pequeño" || w == "pequeña" ? "pequeño" : w;
+      a.token = (int)v[i];
+      n.adjectives.push_back(a);
+    }
+  }
+  return n;
+}
+
+// "¿Por qué lloras, niña?" (niña read as the object: παῖδα), "Where are you, my son?" (son made the subject, "you"
+// lost), "Niña, ¿por qué lloras?" (a broken fragment): an address of one to three words (an address word, optionally
+// after my / dear / mi / querido) between a comma and the end of the sentence, or at its start before a comma, is
+// analysed apart from the rest and becomes a vocative unit (ὦ παῖ). Only when the analysis has no vocative already;
+// a trailing NP after a noun in a statement may be an apposition ("the king, my father") and is left alone.
+bool addressSplit(const std::string& text, const frame::SemSentence& s, bool es, const GreekData& gd, const std::function<void(const std::string&, frame::SemSentence&)>& analyse,
+                  frame::SemSentence& out) {
+  // the words of a span [a, b) of the text: token indices of s
+  auto tokensIn = [&](size_t a, size_t b) {
+    std::vector<size_t> v;
+    for (size_t i = 0; i < s.tokens.size(); ++i)
+      if (s.tokens[i].start >= (int)a && s.tokens[i].end <= (int)b && s.tokens[i].upos != "PUNCT") v.push_back(i);
+    return v;
+  };
+  // an address the analysis already has as a vocative (a vocative unit or a frame's vocative on these tokens)
+  auto vocAlready = [&](const std::vector<size_t>& v) {
+    for (const frame::Unit& u : s.units) {
+      if (u.vocative && u.first <= (int)v.front() && u.last >= (int)v.back()) return true;
+      if (u.type == frame::Unit::Clause)
+        for (const frame::SemNP& n : u.frame.vocatives)
+          if (n.token >= (int)v.front() && n.token <= (int)v.back()) return true;
+    }
+    return false;
+  };
+  auto isAddress = [&](const std::vector<size_t>& v, bool atStart) {
+    if (v.empty() || v.size() > 3 || vocAlready(v)) return false;
+    for (size_t i = 0; i + 1 < v.size(); ++i)
+      if (!addressModifier(s.tokens[v[i]].lower)) return false;
+    return addressWord(s.tokens[v.back()], atStart && v.size() == 1, gd);
+  };
+  auto capFirst = [](std::string x) {
+    for (size_t i = 0; i < x.size(); ++i) {
+      const unsigned char c = (unsigned char)x[i];
+      if (c >= 'a' && c <= 'z') { x[i] = (char)(c - 'a' + 'A'); break; }
+      if ((c >= 'A' && c <= 'Z') || c >= 0x80) {
+        if (c == 0xC3 && i + 1 < x.size() && (unsigned char)x[i + 1] >= 0xA0 && (unsigned char)x[i + 1] <= 0xBF)
+          x[i + 1] = (char)((unsigned char)x[i + 1] - 0x20);   // á é í ó ú ñ -> upper case
+        if (c != 0xC2) break;   // ¿ ¡ (C2 BF, C2 A1) are skipped
+        ++i;
+      }
+    }
+    return x;
+  };
+  // the end of the words: trailing punctuation, quotes and spaces
+  size_t e = text.size();
+  while (e > 0 && std::strchr(" .?!\"'\xE2\x80\xA6", text[e - 1])) --e;
+  while (e >= 3 && (unsigned char)text[e - 1] >= 0x80) {   // … » ” (multibyte closing marks)
+    const std::string tail3 = text.substr(e - 3, 3), tail2 = text.substr(e - 2, 2);
+    if (tail3 == "\xE2\x80\xA6" || tail3 == "\xE2\x80\x9D") e -= 3;
+    else if (tail2 == "\xC2\xBB") e -= 2;
+    else break;
+    while (e > 0 && std::strchr(" .?!\"'", text[e - 1])) --e;
+  }
+  const std::string endPunct = text.substr(e);
+  bool question = endPunct.find('?') != std::string::npos, bang = endPunct.find('!') != std::string::npos;
+  // trailing address
+  const size_t lc = text.rfind(',', e);
+  if (lc != std::string::npos && lc > 0) {
+    const std::vector<size_t> tail = tokensIn(lc + 1, e);
+    const std::vector<size_t> head = tokensIn(0, lc);
+    if (!head.empty() && isAddress(tail, false)) {
+      const nlp::Token& hl = s.tokens[head.back()];
+      const bool apposition = (hl.upos == "NOUN" || hl.upos == "PROPN") && !question && !bang;
+      if (!apposition) {
+        std::string ht = text.substr(0, lc);
+        while (!ht.empty() && ht.back() == ' ') ht.pop_back();
+        frame::SemSentence sh;
+        analyse(ht + (endPunct.empty() ? "." : endPunct), sh);
+        if (sh.units.empty() || sh.units.back().type != frame::Unit::Clause || !sh.units.back().frame.hasPred) return false;
+        out = std::move(sh);
+        // the head's own final punctuation (added for the analysis) is not a token of the sentence
+        while (!out.tokens.empty() && out.tokens.back().start >= (int)ht.size()) out.tokens.pop_back();
+        out.drop.resize(std::min(out.drop.size(), out.tokens.size()));
+        while (out.drop.size() < out.tokens.size()) out.drop.push_back(frame::Drop::No);
+        for (frame::Unit& u : out.units) u.last = std::min(u.last, (int)out.tokens.size() - 1);
+        const int base = (int)out.tokens.size();
+        std::vector<size_t> nv;   // the address words, re-indexed after the head's tokens
+        for (size_t i : tail) {
+          nv.push_back(out.tokens.size());
+          out.tokens.push_back(s.tokens[i]);
+          out.drop.push_back(frame::Drop::No);
+        }
+        for (size_t i = 0; i < s.tokens.size(); ++i)   // the sentence's final punctuation
+          if (s.tokens[i].start >= (int)e) { out.tokens.push_back(s.tokens[i]); out.drop.push_back(frame::Drop::Punct); }
+        frame::Unit vu;
+        vu.type = frame::Unit::Clause;
+        vu.vocative = true;
+        vu.frame.type = frame::Kind::Frag;
+        vu.frame.hasSubject = true;
+        vu.frame.subject = addressNP(out, nv, gd);
+        for (size_t i : nv) vu.frame.tokens.push_back((int)i);
+        vu.first = base;
+        vu.last = (int)nv.back();
+        out.units.back().sepAfter = ",";
+        out.units.push_back(std::move(vu));
+        out.text = text;
+        return true;
+      }
+    }
+  }
+  // leading address: "Niña, ¿por qué lloras?", "Hijo, ven aquí."
+  size_t ls = 0;
+  while (ls < text.size() && (text[ls] == ' ' || text[ls] == '-' || text[ls] == '"' ||
+                              (ls + 1 < text.size() && (unsigned char)text[ls] == 0xC2 &&
+                               ((unsigned char)text[ls + 1] == 0xA1 || (unsigned char)text[ls + 1] == 0xBF)))) {
+    ls += (unsigned char)text[ls] == 0xC2 ? 2 : 1;
+  }
+  const size_t fc = text.find(',', ls);
+  if (!es || fc == std::string::npos || fc + 2 >= e) return false;   // English leading addresses are parsed already
+  const std::vector<size_t> lead = tokensIn(ls, fc);
+  if (!isAddress(lead, true)) return false;
+  size_t r0 = fc + 1;
+  while (r0 < text.size() && text[r0] == ' ') ++r0;
+  frame::SemSentence sr;
+  const std::string rt = capFirst(text.substr(r0));
+  analyse(rt, sr);
+  if (sr.units.empty() || sr.units[0].type != frame::Unit::Clause || !sr.units[0].frame.hasPred) return false;
+  out = frame::SemSentence{};
+  out.lang = s.lang;
+  out.text = text;
+  int nv = 0;
+  for (size_t i = 0; i < s.tokens.size(); ++i)   // opening punctuation (¡ ¿) before the address
+    if (s.tokens[i].end <= (int)ls) { out.tokens.push_back(s.tokens[i]); out.drop.push_back(frame::Drop::Punct); }
+  const int vbase = (int)out.tokens.size();
+  std::vector<size_t> nvi;
+  for (size_t i : lead) {
+    nvi.push_back(out.tokens.size());
+    out.tokens.push_back(s.tokens[i]);
+    out.drop.push_back(frame::Drop::No);
+    ++nv;
+  }
+  frame::Unit vu;
+  vu.type = frame::Unit::Clause;
+  vu.vocative = true;
+  vu.frame.type = frame::Kind::Frag;
+  vu.frame.hasSubject = true;
+  vu.frame.subject = addressNP(out, nvi, gd);
+  for (size_t i : nvi) vu.frame.tokens.push_back((int)i);
+  vu.first = vbase;
+  vu.last = vbase + nv - 1;
+  vu.sepAfter = ",";
+  out.units.push_back(std::move(vu));
+  const int rbase = (int)out.tokens.size();
+  for (size_t i = 0; i < sr.tokens.size(); ++i) {
+    nlp::Token t = sr.tokens[i];
+    t.start += (int)r0;
+    t.end += (int)r0;
+    t.text = text.substr((size_t)t.start, (size_t)(t.end - t.start));
+    t.lower = text::lower(t.text);
+    out.tokens.push_back(t);
+    out.drop.push_back(i < sr.drop.size() ? sr.drop[i] : frame::Drop::No);
+  }
+  for (frame::Unit u : sr.units) {
+    if (u.type == frame::Unit::Clause) shiftFrame(u.frame, rbase);
+    u.first += rbase;
+    u.last += rbase;
+    out.units.push_back(std::move(u));
+  }
+  out.finalPunct = sr.finalPunct;
+  out.question = sr.question || question;
+  for (const std::string& r : sr.repairs) out.repairs.push_back(r);
+  for (const std::string& d : sr.doubts) out.doubt(d.c_str());
   return true;
 }
 
@@ -1022,7 +1610,54 @@ struct GreekPath::Impl {
     // C18: "When X, Y." read as a question or with X broken: X and Y analysed apart and merged (never OK: Check)
     bool whenRepaired = false;
     std::string repairWhat = "\"When ..., ...\" analysed in two parts (time clause + main clause): check it";
+    // C29: shapes the shared frame builder misreads, analysed again on the Greek side (never OK: Check): an address
+    // after or before a comma ("¿Por qué lloras, niña?"), a clause-first "ven" read as "they see", an irregular past
+    // read as a noun or a name ("Mary wept for her brother."), a Spanish verb read as a noun ("El búho caza de noche."),
+    // the generic "one" read as a numeral ("one sleeps")
     {
+      const bool es = st.lang == frame::SrcLang::Es;
+      auto analyseFixed = [&](const std::string& t, frame::SemSentence& o) {
+        fb.analyse(t, o);
+        frame::SemSentence r;
+        std::string pf;
+        if (es && venImperative(t, fb, o, r)) o = std::move(r);
+        else if (es && queVerb(t, fb, o, esLex, r)) o = std::move(r);
+        else if (!es && pastAsNoun(t, fb, o, enLex, r, pf)) { o = std::move(r); o.doubt("past-form"); }
+      };
+      frame::SemSentence r;
+      std::string pf;
+      if (addressSplit(atext, s, es, gd, analyseFixed, r)) {
+        s = std::move(r);
+        whenRepaired = true;
+        repairWhat = "an address before or after a comma analysed apart as a vocative (ὦ ...): check it";
+      } else if (es && venImperative(atext, fb, s, r)) {
+        s = std::move(r);
+        whenRepaired = true;
+        repairWhat = "\"ven\" read as \"they see\": read as the command of venir: check it";
+      } else if (!es && pastAsNoun(atext, fb, s, enLex, r, pf)) {
+        s = std::move(r);
+        s.doubt("past-form");
+        whenRepaired = true;
+        repairWhat = "\"" + pf + "\" read as a noun or a name: analysed again as a past verb: check it";
+      } else if (!es && nounAsAdj(atext, fb, s, enLex, r, pf)) {
+        s = std::move(r);
+        whenRepaired = true;
+        repairWhat = "\"" + pf + "\" read as an adjective: analysed again as the subject noun: check it";
+      } else if (es && queVerb(atext, fb, s, esLex, r)) {
+        s = std::move(r);
+        whenRepaired = true;
+        repairWhat = "\"qué\" + a verb read as a noun phrase: analysed again as a question: check it";
+      } else if (es && esVerbAsNoun(atext, fb, s, esLex, r)) {
+        s = std::move(r);
+        whenRepaired = true;
+        repairWhat = "a verb read as a noun in a sentence without a verb: analysed again as the verb: check it";
+      } else if (!es && oneGeneric(atext, fb, s, r)) {
+        s = std::move(r);
+        whenRepaired = true;
+        repairWhat = "the generic \"one\" read as a number: analysed again as a subject (τις): check it";
+      }
+    }
+    if (!whenRepaired) {
       bool fine = false;
       for (const frame::Unit& u : s.units)
         if (u.type == frame::Unit::Clause)

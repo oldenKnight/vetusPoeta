@@ -47,8 +47,8 @@ Analyser::Analyser(const lex::Lexicon& lx, const curated::CuratedData& cd, const
     if (e.policy == curated::NamePolicy::Translate) continue;
     for (uint8_t c : {Nom, Gen, Dat, Acc, Voc}) {
       std::string f;
-      if (grc::declineName(e.nom, e.gen, e.declension, e.gender, c, e.voc, f))
-        names_.push_back(NameForm{text::greek_key(f), e.english, c, e.gender});
+      if (grc::declineName(e, c, f))
+        names_.push_back(NameForm{text::greek_key(f), e.english, c, e.gender, e.number, e.spanish, e.place});
     }
   }
   std::sort(names_.begin(), names_.end(), [](const NameForm& a, const NameForm& b) {
@@ -152,12 +152,14 @@ void Analyser::readings(const std::string& word, Token& t, const std::vector<rul
     Features f;
     f.pos = Name;
     f.case_ = it->case_;
-    f.number = Sg;
+    f.number = it->number;
     f.gender = it->gender;
     r.packed = pack(f);
     r.display = word;
     r.name = true;
     r.nameEn = it->english;
+    r.nameEs = it->spanish;
+    r.place = it->place;
     r.prior = 1.5;
     rs.push_back(r);
   }
@@ -481,6 +483,8 @@ void tokInfos(const lex::Lexicon& lx, const Sentence& s, std::vector<TokInfo>& o
     x.f = unpack(r->packed);
     x.name = r->name;
     x.nameEn = r->nameEn;
+    x.nameEs = r->nameEs;
+    x.place = r->place;
     x.closed = r->closed;
     if (r->lemma != kNone) {
       const lex::Lemma l = lx.lemma(r->lemma);

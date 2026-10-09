@@ -25,7 +25,7 @@ class Analyser {
   void analyse(std::string_view sentence, Sentence& out, const std::vector<rules::GlossaryEntry>* glossary) const;
 
  private:
-  struct NameForm { std::string key, english; uint8_t case_, gender; };
+  struct NameForm { std::string key, english; uint8_t case_, gender, number = 1; std::string spanish; bool place = false; };
   void readings(const std::string& word, Token& t, const std::vector<rules::GlossaryEntry>* glossary) const;
   void disambiguate(Sentence& s) const;
   const lex::Lexicon& lx_;
@@ -45,6 +45,8 @@ struct TokInfo {
   bool word = false, punct = false, number = false, name = false, closed = false;
   std::string text;           // as written
   std::string nameEn;         // name reading: the English spelling
+  std::string nameEs;         // C29: the Spanish spelling of a place name ("Atenas"), "" = as nameEn
+  bool place = false;         // C29: a city / country of names_grc.tsv (not a person)
 };
 
 // The target-language word of a Greek lemma, with the facts the realisers need.

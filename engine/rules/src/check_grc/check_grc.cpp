@@ -287,7 +287,7 @@ struct GreekChecker::Impl {
           r.key = k;
           r.f.pos = Name;
           r.f.case_ = it->case_;
-          r.f.number = Sg;
+          r.f.number = it->number;
           r.lgender = it->gender;
           r.f.gender = it->gender;
           r.tier = 1;
@@ -354,6 +354,15 @@ struct GreekChecker::Impl {
       rep.tokens[i].segment = seg;
     }
     isVerb.assign(n, 0);
+    // C29: a word right after the article with a noun reading is that noun ("ἐν τῇ αὐλῇ": αὐλῇ is not a form of
+    // αὐλέω; read as the verb, the subject was said not to agree with it)
+    auto afterArticleNoun = [&](size_t i) {
+      if (i == 0 || boundaryBefore[i]) return false;
+      bool art = false, noun = false;
+      for (const Reading& r : rd[i - 1]) art = art || r.lpos == Article;
+      for (const Reading& r : rd[i]) noun = noun || (isNominal(r) && r.lpos != Verb && r.lpos != Participle);
+      return art && noun;
+    };
     for (size_t i = 0; i < n; ++i) {
       if (!any(i, isFinite)) continue;
       bool nominal = false, onlyParticiple = true;
@@ -362,6 +371,7 @@ struct GreekChecker::Impl {
         nominal = true;
         onlyParticiple = onlyParticiple && (r.lpos == Verb || r.lpos == Participle);
       }
+      if (afterArticleNoun(i)) continue;
       // a finite reading wins over participle homographs (βοηθοῦσι) and at the end of its clause (verb-final order)
       const bool last = i + 1 == n || rep.tokens[i + 1].segment != rep.tokens[i].segment || boundaryBefore[i + 1];
       if (!nominal || onlyParticiple || (last && !strongHead(i))) isVerb[i] = 1;
@@ -381,7 +391,7 @@ struct GreekChecker::Impl {
       bool has = false;
       for (size_t j = b; j < e; ++j) {
         has = has || isVerb[j];
-        if (any(j, isFinite)) { ++cands; which = j; }
+        if (any(j, isFinite) && !afterArticleNoun(j)) { ++cands; which = j; }
       }
       if (!has && cands == 1) isVerb[which] = 1;
       b = e;
@@ -933,8 +943,7 @@ GreekChecker::GreekChecker(const lex::Lexicon& lx, const curated::CuratedData& c
     if (e.policy == curated::NamePolicy::Translate) continue;   // titles are ordinary nouns
     for (uint8_t c : {Nom, Gen, Dat, Acc, Voc}) {
       std::string f;
-      if (grc::declineName(e.nom, e.gen, e.declension, e.gender, c, e.voc, f))
-        names_.push_back(NameForm{text::greek_key(f), c, e.gender});
+      if (grc::declineName(e, c, f)) names_.push_back(NameForm{text::greek_key(f), c, e.gender, e.number});
     }
   }
   std::sort(names_.begin(), names_.end(), [](const NameForm& a, const NameForm& b) {

@@ -27,6 +27,8 @@
 #         verb: "it is snowing" -> νίφει; a Spanish "nieva" read as an imperative is a statement) or "thing" (only with an
 #         object that is a thing: "bring the water" -> φέρω); state rows may have frame "pass" (the passive: λυπεῖται,
 #         ἐλυπήθη); kind noun (a fixed noun used only when greek.vpl has the lemma, else the realia row of the same source).
+#   C29: verb rows may have frame "clause" (only when the verb has a that / que clause or an infinitive: "esperar que"
+#         -> ἐλπίζω, while "esperar a" stays μένω).
 #   source: English (or Spanish) lemma(s), lower case. greek: the Greek lemma as in greek.vpl (headword without length
 #   marks). Spanish sources mirror the English rows (the Spanish frame builder keeps Spanish content lemmas).
 phrasal	come back	ἐπανέρχομαι		
@@ -42,8 +44,8 @@ phrasal	come out	ἐξέρχομαι
 phrasal	go out	ἐξέρχομαι		
 phrasal	get out	ἐξέρχομαι		
 phrasal	sit down	καθίζω		
-phrasal	get up	ἀνίσταμαι		
-phrasal	stand up	ἀνίσταμαι		
+phrasal	get up	ἀνίστημι	mid-pres	C29: greek.vpl has no lemma ἀνίσταμαι: ἀνίστημι, middle in the present system (ἀνίσταται), the intransitive root aorist elsewhere (ἀνέστη, ἀνάστηθι)
+phrasal	stand up	ἀνίστημι	mid-pres	
 phrasal	fall down	πίπτω		
 phrasal	pick up	αἴρω		
 phrasal	give back	ἀποδίδωμι		
@@ -175,6 +177,42 @@ verb	shake	σείω		C25: "the boy shook the tree" -> τὸ δένδρον ἔσ
 verb	temblar	τρέμω		
 verb	paint	γράφω		γράφω "paint" (χρῴζω "colour" is the alternative)
 verb	pintar	γράφω		
+verb	hope	ἐλπίζω		C29: "I hope that you will come tomorrow" -> ἐλπίζω σε αὔριον ἥξειν (accusative + infinitive, the subject kept; οἴομαι came through the reverse index)
+verb	esperar	ἐλπίζω	clause	C29: frame clause = only with a que-clause or an infinitive ("espero que vengas"); "esperar a / el autobús" stays μένω
+verb	die	ἀποθνῄσκω		C29: "the horse died" -> ἀπέθανεν (ἔβη came through the reverse index: OK-capable and wrong)
+verb	morir	ἀποθνῄσκω		
+verb	win	νικάω		C29: "we hope to win" -> νικήσειν
+verb	ganar	νικάω		C29: ganar a game, a race (ἄρνυμαι "win a prize" is epic)
+verb	shine	λάμπω		C29: "the moon shone" -> ἔλαμπεν (φαίνω active "show" was OK and wrong)
+verb	brillar	λάμπω		
+verb	nacer	γίγνομαι		C29: "nací en México" -> ἐγενόμην (as English "be born")
+verb	need	δέω	mid	C29: "we need water" -> ὕδατος δεόμεθα (middle + genitive; the active δέω "bind" was OK and wrong: "Δέω σε" for "I need you")
+verb	necesitar	δέω	mid	
+noun	money	ἀργύριον		C29: money -> ἀργύριον (τέλος is a tax or an end; χρήματα "property, money" is the alternative)
+noun	dinero	ἀργύριον		
+realia	doll	παίγνιον		C29: greek.vpl has no πλαγγών; the toy (παίγνιον) is the nearest word (κόρη "doll" read as "girl"); Check
+realia	muñeca	παίγνιον		
+verbprep	weep for	κλαίω	obj	C29: "Mary wept for her brother" -> τὸν ἀδελφὸν ἔκλαυσεν (lament: the accusative, not the dative of interest)
+verbprep	cry for	κλαίω	obj	
+verbprep	llorar por	κλαίω	obj	
+verbobj	spend money	ἀναλίσκω		C29: "spent his money" -> τὸ ἀργύριον ἀνήλωσεν (διάγω "spend time" was chosen)
+verbobj	gastar dinero	ἀναλίσκω		
+noun	cart	ἅμαξα		C29: the farm cart / wagon (κάρρον, from Latin carrus, is late)
+noun	carreta	ἅμαξα		
+noun	carro	ἅμαξα		
+noun	village	κώμη		C29: a village (χωρίον "a place" lost the sense)
+noun	aldea	κώμη		
+noun	chicken	ὄρνις		C29: the domestic fowl (Attic ὄρνις; κόττος came through the reverse index and has no plural)
+noun	hen	ὄρνις		
+noun	gallina	ὄρνις		
+noun	rooster	ἀλεκτρυών		
+noun	gallo	ἀλεκτρυών		
+subject	rain start	ἄρχω	mid	C29: "the rain started" -> ὁ ὄμβρος ἤρξατο (ὁρμάω "rush" was OK and wrong)
+subject	rain begin	ἄρχω	mid	
+subject	lluvia empezar	ἄρχω	mid	
+subject	lluvia comenzar	ἄρχω	mid	
+verbprep	throw at	-	prep:εἰς+acc	C29: "throw stones at the birds" -> βάλλε λίθους εἰς τοὺς ὄρνιθας (παρά + dat "beside" was wrong)
+verbprep	tirar a	-	prep:εἰς+acc	
 phrasal	cut off	ἀποτέμνω		
 phrasal	go inside	εἰσέρχομαι		"let's go inside" -> εἰσίωμεν
 phrasal	come inside	εἰσέρχομαι		

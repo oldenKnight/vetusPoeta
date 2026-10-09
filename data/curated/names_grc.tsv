@@ -2,6 +2,10 @@
 # Greek forms of common first names and a few mythological / historical names (our own list; same columns as
 # names_la.tsv). declension: 1 (-η / -α, masculine -ης / -ας), 2 (-ος), 3 (consonant stem from the genitive in -ος,
 # or -ης / -ους), 0 indeclinable. A note "voc=<form>" gives an irregular vocative. "translate" rows are titles.
+# C29: places (cities and countries). Note words: "place" (not a person: εἰς / ἐκ / ἐν + the name, no article),
+# "art" (keeps the article: ἡ Ἑλλάς), "pl" (a plural name: αἱ Ἀθῆναι ... εἰσίν), "forms=nom,gen,dat,acc" (every case
+# spelled out), "es=<Spanish spelling>" (the Spanish source word and the GRC -> ES name), "neologism" (no ancient name:
+# a New-Latin style coinage, the cue is never OK).
 Alice	Ἀλίκη	Ἀλίκης	f	1	decline	
 Mary	Μαρία	Μαρίας	f	1	decline	
 Anna	Ἄννα	Ἄννης	f	1	decline	
@@ -25,7 +29,6 @@ Chloe	Χλόη	Χλόης	f	1	decline
 Phoebe	Φοίβη	Φοίβης	f	1	decline	
 Zoe	Ζωή	Ζωῆς	f	1	decline	
 Athena	Ἀθηνᾶ	Ἀθηνᾶς	f	1	decline	
-Sparta	Σπάρτη	Σπάρτης	f	1	decline	
 Mark	Μᾶρκος	Μάρκου	m	2	decline	
 Peter	Πέτρος	Πέτρου	m	2	decline	
 Paul	Παῦλος	Παύλου	m	2	decline	
@@ -56,6 +59,20 @@ Daniel	Δανιήλ	Δανιήλ	m	0	decline	indeclinable
 David	Δαυίδ	Δαυίδ	m	0	decline	indeclinable
 Michael	Μιχαήλ	Μιχαήλ	m	0	decline	indeclinable
 Gabriel	Γαβριήλ	Γαβριήλ	m	0	decline	indeclinable
+Athens	Ἀθῆναι	Ἀθηνῶν	f	1	decline	place pl forms=Ἀθῆναι,Ἀθηνῶν,Ἀθήναις,Ἀθήνας,Ἀθῆναι es=Atenas
+Thebes	Θῆβαι	Θηβῶν	f	1	decline	place pl forms=Θῆβαι,Θηβῶν,Θήβαις,Θήβας,Θῆβαι es=Tebas
+Sparta	Σπάρτη	Σπάρτης	f	1	decline	place forms=Σπάρτη,Σπάρτης,Σπάρτῃ,Σπάρτην,Σπάρτη es=Esparta
+Rome	Ῥώμη	Ῥώμης	f	1	decline	place forms=Ῥώμη,Ῥώμης,Ῥώμῃ,Ῥώμην,Ῥώμη es=Roma
+Corinth	Κόρινθος	Κορίνθου	f	2	decline	place forms=Κόρινθος,Κορίνθου,Κορίνθῳ,Κόρινθον,Κόρινθε es=Corinto
+Delphi	Δελφοί	Δελφῶν	m	2	decline	place pl forms=Δελφοί,Δελφῶν,Δελφοῖς,Δελφούς,Δελφοί es=Delfos
+Troy	Τροία	Τροίας	f	1	decline	place forms=Τροία,Τροίας,Τροίᾳ,Τροίαν,Τροία es=Troya
+Crete	Κρήτη	Κρήτης	f	1	decline	place forms=Κρήτη,Κρήτης,Κρήτῃ,Κρήτην,Κρήτη es=Creta
+Egypt	Αἴγυπτος	Αἰγύπτου	f	2	decline	place forms=Αἴγυπτος,Αἰγύπτου,Αἰγύπτῳ,Αἴγυπτον,Αἴγυπτε es=Egipto
+Greece	Ἑλλάς	Ἑλλάδος	f	3	decline	place art forms=Ἑλλάς,Ἑλλάδος,Ἑλλάδι,Ἑλλάδα,Ἑλλάς es=Grecia
+Italy	Ἰταλία	Ἰταλίας	f	1	decline	place forms=Ἰταλία,Ἰταλίας,Ἰταλίᾳ,Ἰταλίαν,Ἰταλία es=Italia
+Sicily	Σικελία	Σικελίας	f	1	decline	place forms=Σικελία,Σικελίας,Σικελίᾳ,Σικελίαν,Σικελία es=Sicilia
+Persia	Περσίς	Περσίδος	f	3	decline	place art forms=Περσίς,Περσίδος,Περσίδι,Περσίδα,Περσίς es=Persia
+Mexico	Μεξικόν	Μεξικοῦ	n	2	decline	place neologism forms=Μεξικόν,Μεξικοῦ,Μεξικῷ,Μεξικόν,Μεξικόν es=México
 Queen	βασίλεια	βασιλείας	f	1	translate	title; an ordinary noun for the checker
 King	βασιλεύς	βασιλέως	m	3	translate	title; an ordinary noun for the checker
 Master	δεσπότης	δεσπότου	m	1	translate	title

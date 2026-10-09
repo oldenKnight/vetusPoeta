@@ -330,6 +330,8 @@ struct GreekTransfer::Ctx {
   std::vector<GrcClause> pendingInf;    // C18: bare infinitives of purpose found inside the object NP
   bool mannerLight = false;             // C25: a light row of frame "manner" chose the verb (adverbs by kind manner)
   bool forcedLight = false;             // C25: forcedVerb comes from a light row (an event: no state imperfect)
+  bool clauseRow = false;               // C29: a verb row of frame "clause" chose the verb ("esperar" -> ἐλπίζω)
+  bool midPres = false;                 // C29: a row of frame "mid-pres" chose the verb (middle in the present system)
   Ctx(const SemSentence& ss, const transfer::Settings& t, transfer::Memory& m, GrcClauseOut& o)
       : s(ss), st(t), mem(m), out(o) {}
   void cover(int tok) { if (tok >= 0) out.covered.push_back(tok); }
@@ -348,6 +350,20 @@ struct GreekTransfer::Ctx {
 GreekTransfer::GreekTransfer(const lex::Lexicon& grc, const curated::CuratedData& cd, const GreekData& gd,
                              const GreekTables& gt)
     : lx_(grc), cd_(cd), gd_(gd), gt_(gt) {}
+
+// C29: a person or an animal (transfer::animate), but never a city or a country of names_grc.tsv ("to Athens" -> εἰς
+// Ἀθήνας, "from Athens" -> ἐξ Ἀθηνῶν, not the dative of a person or παρά + gen)
+bool GreekTransfer::animate(const SemNP& n) const {
+  if (n.isName && !n.isPronoun)
+    if (const NameEntry* e = gd_.nameByEnglish(n.head); e && e->place) return false;
+  // farm animals of children's dialogue the shared table lacks ("I gave bread to the chicken" -> τῇ ὄρνιθι, not εἰς)
+  if (!n.isName && !n.isPronoun &&
+      in(text::lower(n.head), {"chicken", "hen", "rooster", "duck", "goose", "lamb", "calf", "donkey", "mule", "bee",
+                               "ant", "deer", "ox", "bull", "puppy", "kitten", "gallina", "gallo", "pato", "oveja",
+                               "cabra", "vaca", "burro", "abeja", "pollo", "cordero"}))
+    return true;
+  return transfer::animate(n);
+}
 
 uint32_t GreekTransfer::greek(const char* head, uint8_t pos) const {
   std::string key = std::string(head) + "#" + std::to_string((int)pos);
@@ -623,8 +639,14 @@ uint32_t GreekTransfer::adverb(const std::string& lemma0, int token, Ctx& c, boo
   }
   // C18: an English -ly adverb the reverse index does not list: the adjective it comes from ("happily" -> happy, C17's
   // base words), rendered by the realiser as that adjective's adverb cell (ἡδέως) when the table has one
-  if (id == kNone && c.st.lang == frame::SrcLang::En && lemma.size() > 4 && lemma.compare(lemma.size() - 2, 2, "ly") == 0) {
-    for (const std::string& b : frame::en::baseCandidates(lemma, "ADV")) {
+  // C29: the frame builder may give the -ly adverb's lemma as the adjective itself ("wept bitterly" -> adv=bitter):
+  // the written token decides
+  const std::string& surf = tokenLower(c.s, token);
+  const bool lyToken = surf.size() > 4 && surf.compare(surf.size() - 2, 2, "ly") == 0;
+  if (id == kNone && c.st.lang == frame::SrcLang::En && lemma.size() > 4 && (lemma.compare(lemma.size() - 2, 2, "ly") == 0 || lyToken)) {
+    std::vector<std::string> bases = frame::en::baseCandidates(lyToken ? surf : lemma, "ADV");
+    if (lyToken && std::find(bases.begin(), bases.end(), lemma) == bases.end()) bases.insert(bases.begin(), lemma);
+    for (const std::string& b : bases) {
       Choice c2;
       c2.token = token;
       const uint32_t aj = select(b, Adj, {}, false, false, c.st, c2);
@@ -656,6 +678,23 @@ void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
   const bool subjectRole = c.subjectRole;
   c.subjectRole = false;
   if (n.literalUnknown) { o.literal = n.surface; c.out.unknownWords.push_back(n.surface); return; }
+  // C29: "a lot of bread", "lots of friends" ("lot" -> πότμος "fate" was rendered): the "of" noun with πολύς (πολὺν
+  // ἄρτον, πολλοὺς φίλους)
+  if (!n.isPronoun && !n.isName && in(text::lower(n.head), {"lot", "lots"}) && n.genitive.size() == 1 &&
+      n.adjectives.empty() && n.possessor.empty() && (n.determiner.empty() || text::lower(n.determiner) == "a")) {
+    SemNP g = n.genitive[0];
+    if (g.determiner.empty() && g.possessor.empty() && !g.isPronoun && !g.isName) {
+      g.determiner = g.number == 2 ? "many" : "much";
+      g.definite = false;
+      c.subjectRole = subjectRole;
+      npInto(g, c, o);
+      c.cover(n.tokens);
+      c.cover(n.token);
+      if (n.token > 0) c.cover(n.token - 1);   // "a"
+      if (n.token >= 0) c.cover(n.token + 1);  // "of"
+      return;
+    }
+  }
   if (n.isPronoun) {
     const std::string& p = n.pronLemma;
     const bool personal = transfer::tables::personalPronoun(p);
@@ -836,6 +875,13 @@ void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
     o.name = n.head;
     o.definite = true;   // decision 6: names take the article in narrative (not in the vocative or a predicate)
     if (n.number == 2) o.number = Pl;
+    // C29: a city or a country of names_grc.tsv: its own number (Ἀθῆναι, Θῆβαι are plural) and no article unless the
+    // row asks for it (ἐν Ἀθήναις, εἰς Ἀθήνας, ἐκ Κορίνθου; ἡ Ἑλλάς)
+    if (const NameEntry* e = gd_.nameByEnglish(n.head); e && e->place) {
+      o.number = e->number;
+      o.gender = e->gender;
+      o.definite = e->article;
+    }
     Choice ch;
     ch.token = n.token;
     ch.source = n.head;
@@ -912,7 +958,7 @@ void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
       c.out.notes.push_back(rules::Reason{-1, "sense", "\"" + n.head + "\": no Attic word; equivalent used (" +
                                                           realia->greek + ")", realia->note});
     } else {
-      id = select(n.head, Noun, c.context, false, false, c.st, ch, transfer::animate(n) ? n.srcGender : 0);
+      id = select(n.head, Noun, c.context, false, false, c.st, ch, animate(n) ? n.srcGender : 0);
       // C18: consistency in a batch (as C17's Latin rule): a noun already rendered in this cue or a cue before keeps
       // its Greek word when that word is one of the candidates here too ("box" stays κιβωτός); forced alternatives
       // bypass the memory
@@ -1001,10 +1047,18 @@ void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
     // C18: "all day" -> πᾶσαν τὴν ἡμέραν (the whole): a singular noun stays singular
     const bool massSg = n.number == 1 && o.head != kNone && lx_.lemma(o.head).pos == Noun &&
                         !(lx_.lemma(o.head).flags & lex::PluralOnly) && (transfer::tables::timeNoun(text::lower(n.head)) ||
-                                                                        !transfer::animate(n));
+                                                                        !animate(n));
     o.number = massSg ? (uint8_t)Sg : (uint8_t)Pl;
     o.definite = true;
-  } else if (d == "many") { quantAdj("πολύς", d); o.number = Pl; }
+  } else if (d == "many") {
+    quantAdj("πολύς", d);
+    // C29: Spanish "mucho / mucha" + a singular noun reaches here as "many": "mucho dinero" -> πολὺ ἀργύριον (not
+    // πολλὰ ἀργύρια)
+    bool sgQuant = false;
+    for (int t : n.tokens) sgQuant = sgQuant || in(tokenLower(c.s, t), {"mucho", "mucha", "much"});
+    if (n.token > 0) sgQuant = sgQuant || in(tokenLower(c.s, n.token - 1), {"mucho", "mucha", "much"});
+    if (!(n.number != 2 && sgQuant)) o.number = Pl;
+  }
   else if (d == "few") { quantAdj("ὀλίγος", d); o.number = Pl; }
   else if (d == "much") quantAdj("πολύς", d);
   else if (d == "another" || d == "other") quantAdj("ἄλλος", d);
@@ -1071,6 +1125,11 @@ void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
       o.possPerson = p.pron.person;
       o.possNumber = num;
       o.possGender = p.pron.person == 3 ? (p.pron.gender ? simpleGender(p.pron.gender) : (uint8_t)M) : 0;
+      // C29: Spanish "su" says no gender: the clause's 3rd-person subject is the likely possessor ("La niña se sentó
+      // junto a su madre" -> τῇ μητρὶ αὐτῆς, not αὐτοῦ)
+      if (p.pron.person == 3 && !p.pron.gender && c.st.lang == frame::SrcLang::Es && c.subjPerson == 3 && c.subjGender &&
+          num == c.subjNumber)
+        o.possGender = simpleGender(c.subjGender);
       if (p.pron.emphatic && p.pron.person <= 2) o.possEmphatic = true;
       c.cover(p.tokens);
       c.cover(p.token);
@@ -1091,11 +1150,11 @@ void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
     ga.degree = a.degree;
     // C25 (lexical_en_grc.tsv kind ptc): a state adjective of a person or an animal used attributively is the present
     // participle of its Greek verb ("the hungry bird" -> ὁ πεινῶν ὄρνις; λιμηρός was chosen); frame mid / pass = voice
-    bool anim = transfer::animate(n);
+    bool anim = animate(n);
     if (!anim && c.st.lang == frame::SrcLang::Es) {   // the Spanish noun through its English gloss ("lobo" -> wolf)
       SemNP e = n;
       e.head = english(n.head, c.st);
-      anim = !e.head.empty() && transfer::animate(e);
+      anim = !e.head.empty() && animate(e);
     }
     if (const LexRow* pr = a.adverbs.empty() && anim ? gt_.find("ptc", text::lower(a.lemma)) : nullptr) {
       const uint32_t v = lexRowLemma(pr, Verb);
@@ -1334,7 +1393,14 @@ void GreekTransfer::obliqueInto(const frame::SemOblique& ob, Ctx& c, GrcClause& 
     return;
   }
   if (n.isPronoun && n.pronLemma.empty() && n.pron.person == 0) { c.cover(n.tokens); return; }   // "in here"
-  const bool person = transfer::animate(n);
+  const bool person = animate(n);
+  // C29: "full of apples", "lleno de agua", "empty of": the genitive of the adjective (πλήρης μήλων), not περί
+  if ((prep == "of" || prep == "de") && c.frame)
+    for (const frame::SemAdj& a : c.frame->predAdj)
+      if (in(text::lower(a.lemma), {"full", "empty", "lleno", "llena", "vacío", "vacía"})) { add(nullptr, Gen); return; }
+  // C29: a city or a country: "de / desde México" (Spanish "de" reaches here as "of") -> ἐκ + gen, never περί
+  if (n.isName && (prep == "of" || prep == "de" || prep == "desde" || prep == "from"))
+    if (const NameEntry* e = gd_.nameByEnglish(n.head); e && e->place) { add("ἐκ", Gen); return; }
   if (!c.prepOverride.empty() && prep == c.prepOverride && !c.prepOverrideGreek.empty()) {
     add(c.prepOverrideGreek.c_str(), c.prepOverrideCase ? c.prepOverrideCase : (uint8_t)Acc);
     return;
@@ -1342,6 +1408,16 @@ void GreekTransfer::obliqueInto(const frame::SemOblique& ob, Ctx& c, GrcClause& 
   if (!c.objPrep.empty() && prep == c.objPrep && !cl.hasObject) {   // verbprep frame obj ("wait for me")
     cl.hasObject = true;
     npInto(n, c, cl.object);
+    return;
+  }
+  // C29: "next to / beside / by the side of X", Spanish "junto a X": παρά + dative (a place beside someone or something;
+  // "next" was ἔπειτα and "to the boy" a dative of the person: OK and wrong)
+  int npFirst = n.token;   // the oblique's token is the NP head: the preposition stands before the NP's first token
+  for (int t : n.tokens) if (t >= 0 && (npFirst < 0 || t < npFirst)) npFirst = t;
+  if ((prep == "to" && npFirst >= 2 && tokenLower(c.s, npFirst - 1) == "to" && tokenLower(c.s, npFirst - 2) == "next") ||
+      prep == "beside" || prep == "junto a" || prep == "junto" || prep == "al lado de") {
+    if (prep == "to") c.cover(npFirst - 2);
+    add("παρά", Dat);
     return;
   }
   if (prep == "to") {
@@ -1471,6 +1547,7 @@ bool GreekTransfer::fixedVerbPhrase(const std::string& greekText, Ctx& c, GrcCla
 void GreekTransfer::predicateInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
   GrcPredicate& p = cl.pred;
   const frame::SemPredicate& sp = f.pred;
+  c.clauseRow = false;
   c.cover(sp.token);
   c.cover(sp.auxTokens);
   const std::string lemma = text::lower(sp.lemma);
@@ -1498,12 +1575,19 @@ void GreekTransfer::predicateInto(const SemFrame& f, Ctx& c, GrcClause& cl) cons
         if (const LexRow* r = row("verb", s, "intr-mid")) return r;   // C25: intransitive and middle (ψεύδομαι)
       }
       if (const LexRow* r = row("verb", s, want)) return r;
+      // C29: frame "clause" = only with a that / que clause or an infinitive complement ("espero que vengas" ->
+      // ἐλπίζω; "espero el autobús" stays μένω)
+      bool clauseComp = !sp.complementVerb.empty();
+      for (const frame::SemSub& sb : f.subordinate)
+        clauseComp = clauseComp || sb.relation == Relation::Complement ||
+                     // a Spanish bare infinitive read as purpose ("esperamos ganar": no "para")
+                     (c.st.lang == frame::SrcLang::Es && sb.relation == Relation::Purpose && text::lower(sb.marker) == "to");
       for (const LexRow& r : gt_.rows())
         if (r.kind == "verb" && r.source == s &&
-            (r.frame.empty() || r.frame == "impers" || r.frame == "mid" ||
+            (r.frame.empty() || r.frame == "impers" || r.frame == "mid" || (r.frame == "clause" && clauseComp) ||
              // C21: frame "thing" = only with an object that is a thing ("bring the water" -> φέρω; a person or an
              // animal keeps the reverse index's ἄγω)
-             (r.frame == "thing" && f.hasObject && !transfer::animate(f.object) && !f.object.isPronoun)))
+             (r.frame == "thing" && f.hasObject && !animate(f.object) && !f.object.isPronoun)))
           return &r;
     }
     return nullptr;
@@ -1530,6 +1614,7 @@ void GreekTransfer::predicateInto(const SemFrame& f, Ctx& c, GrcClause& cl) cons
       id = lexRowLemma(r, Verb);
       if (id != kNone) {
         c.table(id, lm, token, "lexical_en_grc.tsv");
+        if (r->frame == "clause" && token == sp.token) c.clauseRow = true;
         if (r->frame == "mid" || r->frame == "intr-mid") rowMiddle = true;   // C21: "touch" -> ἅπτομαι (+ gen)
         return id;
       }
@@ -1540,7 +1625,7 @@ void GreekTransfer::predicateInto(const SemFrame& f, Ctx& c, GrcClause& cl) cons
     return id;
   };
   const bool hasObj = f.hasObject;
-  const bool personObj = f.hasObject && transfer::animate(f.object);
+  const bool personObj = f.hasObject && animate(f.object);
   uint32_t verb = kNone;
   // verb + preposition (lexical_en_grc.tsv kind verbprep)
   const LexRow* vpr = nullptr;
@@ -1571,6 +1656,13 @@ void GreekTransfer::predicateInto(const SemFrame& f, Ctx& c, GrcClause& cl) cons
     ph = row("phrasal", lemma + " " + sp.particle);
     if (!ph && !en.empty()) ph = row("phrasal", en + " " + sp.particle);
   }
+  // C29: a phrasal verb the frame builder joined into one lemma ("Stand up!" -> stand_up: the row "stand up" ->
+  // ἀνάστηθι; στῆσον "set it up" was OK and wrong)
+  if (!ph && sp.particle.empty() && lemma.find('_') != std::string::npos) {
+    std::string sp2 = lemma;
+    std::replace(sp2.begin(), sp2.end(), '_', ' ');
+    ph = row("phrasal", sp2);
+  }
   if (!sp.fixedLatin.empty() && fixedVerbPhrase(sp.fixedLatin, c, cl)) {
     verb = cl.pred.lemma;
     Choice ch;
@@ -1586,6 +1678,7 @@ void GreekTransfer::predicateInto(const SemFrame& f, Ctx& c, GrcClause& cl) cons
     c.table(verb, seParticle ? sp.lemma + "se" : sp.lemma + " " + sp.particle, sp.token, "lexical_en_grc.tsv");
     if (ph->frame == "mid") cl.pred.voice = Middle;   // C18: the voice of the row
     else if (ph->frame == "pass") cl.pred.voice = Passive;   // "wake up" -> ἠγέρθην
+    else if (ph->frame == "mid-pres") { midPresent = true; rowVoice = true; }   // C29: ἀνίσταται / ἀνέστη
   } else if (const LexRow* sv = f.hasSubject && !f.subject.isPronoun
                                     ? row("subject", text::lower(f.subject.head) + " " + lemma) : nullptr) {
     // C18 (lexical_en_grc.tsv kind subject): the verb chosen by its subject ("the sun rose" -> ἀνέτειλεν)
@@ -1600,6 +1693,12 @@ void GreekTransfer::predicateInto(const SemFrame& f, Ctx& c, GrcClause& cl) cons
     }
   } else if (vpr && vpr->greek != "-" && (verb = lexRowLemma(vpr, Verb)) != kNone) {
     c.table(verb, sp.lemma, sp.token, "verb with its preposition");
+  } else if ((lemma == "bear" || lemma == "born") && sp.voice == frame::Voice::Passive && !f.hasObject &&
+             greek("γίγνομαι", Verb) != kNone) {
+    // C29: "I was born in Mexico" -> ἐγενόμην (ἠνέχθην, "I was carried", came through the passive of "bear")
+    verb = greek("γίγνομαι", Verb);
+    rowVoice = true;
+    c.table(verb, "be born", sp.token, "\"be born\" -> γίγνομαι");
   } else if ((lemma == "have" || en == "have") && f.type == Kind::Imp && sp.complementVerb.empty()) {
     verb = greek("λαμβάνω", Verb);   // "Have some tea." = take
     c.table(verb, sp.lemma, sp.token, "\"have\" as a command: take");
@@ -1725,7 +1824,16 @@ void GreekTransfer::predicateInto(const SemFrame& f, Ctx& c, GrcClause& cl) cons
       if (r->frame == "sub" && tense == Aorist && lx_.lemma(id).key == std::string("ἥκω")) tense = Imperfect;
     }
   }
+  // C29: ἵστημι without an object is "stand" only in the perfect system: "stands" -> ἕστηκε, "stood / was standing"
+  // -> εἱστήκει ("The girl stood beside her mother." was the transitive ἔστησεν, "set up", OK and wrong)
+  if (p.lemma != kNone && p.modal == kNone && !f.hasObject && p.mood == Indicative && sp.particle.empty() &&
+      lx_.lemma(p.lemma).key == std::string("ἵστημι") && (lemma == "stand" || en == "stand")) {
+    if (tense == Present) tense = Perfect;
+    else if (tense == Aorist || tense == Imperfect) tense = Pluperfect;
+    p.voice = 0;
+  }
   p.tense = tense;
+  c.midPres = midPresent;
   if (midPresent)   // also over a Spanish "se" read as a passive ("el sol se puso" -> ἔδυ, not ἐδύθη)
     p.voice = tense == Present || tense == Imperfect || tense == Future ? (uint8_t)Middle : (uint8_t)0;
   if (p.modal != kNone) {
@@ -2024,7 +2132,7 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
   // "be" + state adjective with a person subject (lexical_en_grc.tsv kind state): "Don't be afraid" -> μὴ φοβοῦ
   const LexRow* state = nullptr;
   if (f.copula && f.predAdj.size() == 1 && f.predicative.empty()) {
-    const bool personSubj = (f.hasSubject && transfer::animate(f.subject)) || f.type == Kind::Imp ||
+    const bool personSubj = (f.hasSubject && animate(f.subject)) || f.type == Kind::Imp ||
                             (f.hasSubject && f.subject.isPronoun && f.subject.pron.person > 0 && f.subject.pron.person < 3) ||
                             // C18: "The dog is barking because it is hungry": "it" for the animal of the main clause
                             (c.animateIt && f.hasSubject && f.subject.isPronoun && f.subject.pron.person == 3 &&
@@ -2164,22 +2272,61 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
         pl = false;
     }
     if (!pl && c.mem.addresseePlural) { pl = true; c.mem.addresseeGuess = true; }
+    // C29: a plural address in the same sentence ("Get up, children!") -> the plural imperative
+    if (!pl) {
+      for (const frame::Unit& u : c.s.units) pl = pl || (u.vocative && u.frame.hasSubject && u.frame.subject.number == 2);
+      for (const SemNP& v : f.vocatives) pl = pl || v.number == 2;
+    }
     if (pl) { cl.pred.number = Pl; c.mem.sawPlural = true; }
     const bool dur = state || f.negative || f.copula ||
                      durative(f.pred.lemma, cl.pred.modal != kNone ? cl.pred.modal : cl.pred.lemma, c.st);
     if (cl.pred.modal == kNone) cl.pred.tense = dur ? (uint8_t)Present : (uint8_t)Aorist;
+    // C29: a "mid-pres" row is middle only in the present system: "Stand up!" -> ἀνάστηθι (not ἀνάστησαι)
+    if (c.midPres && cl.pred.modal == kNone) cl.pred.voice = cl.pred.tense == Present ? (uint8_t)Middle : (uint8_t)0;
   }
   // object
   // a reflexive pronoun object ("se fueron", "inclínense") is the middle voice in Greek or nothing at all
   const bool reflexiveObj = reflexiveClitic(f, c.st.lang == frame::SrcLang::Es);   // C25: also "nos divertimos"
   if (reflexiveObj) c.cover(f.object.tokens);
-  if (f.hasObject && !stateObj && !reflexiveObj && !light &&
+  // C29: an object the frame builder made of a goal: "We rode home on a donkey." (home as a noun after a verb of
+  // motion) -> οἴκαδε; Spanish "navegó a Corinto" (the personal "a" before a name) with a city -> εἰς + acc
+  bool goalObj = false;
+  if (f.hasObject && !stateObj && !reflexiveObj && !light && f.hasPred && !f.object.isPronoun) {
+    const std::string oh = text::lower(f.object.head);
+    const bool motionV = transfer::tables::motionVerb(f.pred.lemma) ||
+                         in(text::lower(f.pred.lemma), {"sail", "march", "navegar", "cabalgar", "hurry", "rush", "head"});
+    if (motionV && oh == "home" && f.object.determiner.empty() && f.object.possessor.empty() &&
+        f.object.adjectives.empty() && f.object.number != 2) {
+      const uint32_t id = greek("οἴκαδε", Adv);
+      if (id != kNone) {
+        cl.adverbs.push_back(GrcAdverb{id, AdvPos::Auto});
+        c.table(id, "home", f.object.token, "goal of motion: οἴκαδε");
+        c.cover(f.object.tokens);
+        c.cover(f.object.token);
+        goalObj = true;
+      }
+    } else if (f.object.isName && f.object.token > 0 && (size_t)f.object.token < c.s.tokens.size() &&
+               in(tokenLower(c.s, f.object.token - 1), {"a", "al", "hacia"})) {
+      if (const NameEntry* e = gd_.nameByEnglish(f.object.head); e && e->place) {
+        frame::SemOblique ob;
+        ob.prep = "to";
+        ob.token = f.object.token - 1;
+        ob.np = f.object;
+        const bool keep = c.motion;
+        c.motion = true;
+        obliqueInto(ob, c, cl);
+        c.motion = keep;
+        goalObj = true;
+      }
+    }
+  }
+  if (f.hasObject && !stateObj && !reflexiveObj && !light && !goalObj &&
       !(f.type == Kind::Wh && f.wh.role == frame::Role::Object && f.object.isPronoun && f.object.interrogative)) {
     cl.hasObject = true;
     npInto(f.object, c, cl.object);
     // C16: a verb whose valency_grc.tsv frames are "dat;acc" (πιστεύω): the person in the dative, a thing in the
     // accusative ("ἓξ ἀδύνατα πιστεύω")
-    if (cl.pred.lemma != kNone && cl.pred.modal == kNone && !transfer::animate(f.object) && !f.object.isPronoun)
+    if (cl.pred.lemma != kNone && cl.pred.modal == kNone && !animate(f.object) && !f.object.isPronoun)
       if (const Valency* v = gd_.valency(lx_.lemma(cl.pred.lemma).key)) {
         bool dat = false, acc = false;
         for (const Frame& fr : v->frames) {
@@ -2377,6 +2524,31 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
   }
   for (const std::string& ij : f.interjections) {
     const std::string w = text::lower(ij);
+    // C29: an address word the tagger read as an interjection ("Grandmother, why are you sitting ...?": the address was
+    // left out and the cue rated OK) is a vocative (ὦ τήθη)
+    if (in(w, {"grandmother", "grandfather", "grandma", "grandpa", "granny", "mother", "father", "mom", "mum", "dad",
+               "daddy", "mommy", "mummy", "brother", "sister", "son", "daughter", "uncle", "aunt", "teacher", "friend",
+               "boy", "girl", "child", "children", "abuela", "abuelo", "mamá", "papá", "madre", "padre", "hijo", "hija",
+               "hermano", "hermana", "niño", "niña", "amigo", "amiga", "maestro", "maestra", "tío", "tía"})) {
+      SemNP v;
+      v.head = w == "children" ? "child" : w == "grandma" || w == "granny" ? "grandmother" : w == "grandpa" ? "grandfather"
+               : w == "mom" || w == "mum" || w == "mommy" || w == "mummy" ? "mother" : w == "dad" || w == "daddy" ? "father" : w;
+      v.number = w == "children" ? 2 : 1;
+      v.surface = ij;
+      for (size_t t = 0; t < c.s.tokens.size(); ++t)
+        if (c.s.tokens[t].lower == w) { v.token = (int)t; v.tokens.push_back((int)t); break; }
+      GrcNP x;
+      npInto(v, c, x);
+      x.definite = false;
+      x.possPerson = 0;
+      cl.vocatives.push_back(x);
+      if (x.number == Pl) c.mem.sawPlural = true;
+      // a rebuilt reading: never OK
+      if (std::find(c.out.flags.begin(), c.out.flags.end(), "clause-repair") == c.out.flags.end())
+        c.out.flags.push_back("clause-repair");
+      c.out.notes.push_back(rules::Reason{-1, "form", "\"" + ij + "\" read as an interjection: rendered as an address (ὦ ...): check it", ""});
+      continue;
+    }
     const char* g = w == "alas" || w == "ay" ? "φεῦ" : (w == "oh" || w == "o") && !cl.vocatives.empty() ? nullptr : nullptr;
     if (g) {
       const uint32_t id = greek(g);
@@ -2386,6 +2558,8 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
       c.out.unknownWords.push_back(ij);
   }
   for (const frame::SemAdverb& a : f.adverbs) {
+    // C29: "next to the boy": "next" is part of the preposition (παρά + dat, in obliqueInto), not ἔπειτα
+    if (text::lower(a.lemma) == "next" && tokenLower(c.s, a.token + 1) == "to") { c.cover(a.token); continue; }
     // C21: a determiner never stands before an adverb: "the water of the well" read with "well" as an adverb (εὖ)
     // is a misparse of a noun; the cue is never OK
     // C25: "the water of the well": a determiner after "of" / "de" before a word with a Greek noun reading: that noun
@@ -2600,10 +2774,11 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
     GrcClause sc;
     const int dep = sb.relation == Relation::Coord ? 0 : 1;   // a coordinated clause is not dependent
     c.depth += dep;
-    const bool keepAnim = c.animateIt;
-    c.animateIt = f.hasSubject && !f.subject.isPronoun && transfer::animate(f.subject);
+    const bool keepAnim = c.animateIt, keepRow = c.clauseRow;
+    c.animateIt = f.hasSubject && !f.subject.isPronoun && animate(f.subject);
     clauseInto(sf, c, sc);
     c.animateIt = keepAnim;
+    c.clauseRow = keepRow;
     c.depth -= dep;
     c.frame = &f;
     const std::string mk = text::lower(sb.marker);
@@ -2760,6 +2935,14 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
         if (mk == "unless") sc.polarity = sc.polarity == Polarity::Neg ? Polarity::Pos : Polarity::Neg;
         break;
       case Relation::Purpose:
+        // C29: "esperamos ganar" (a Spanish bare infinitive the frame builder reads as purpose) after a verb of the
+        // "clause" rows: the infinitive is the verb's complement (ἐλπίζομεν νικήσειν), not ἵνα + subjunctive
+        if (c.clauseRow && c.st.lang == frame::SrcLang::Es && mk == "to" && !sf.hasSubject && sc.pred.lemma != kNone) {
+          gs.rel = SubRel::AccInf;
+          sc.hasSubject = false;
+          sc.pred.tense = cl.pred.lemma != kNone && lx_.lemma(cl.pred.lemma).key == std::string("ἐλπίζω") ? Future : Present;
+          break;
+        }
         gs.rel = SubRel::Purpose;
         // C18: "so that the cat can come in" -> ἵνα ἡ γαλῆ εἰσέλθῃ: the subjunctive says "can / may" already
         if (sc.pred.modal != kNone && (sf.pred.modality == Modality::Can || sf.pred.modality == Modality::May)) {
@@ -2836,8 +3019,41 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
               c.out.flags.push_back("subject-guess");
             c.out.notes.push_back(rules::Reason{-1, "form", "the subject of the wished action is not expressed: check it", ""});
           }
-        } else if (accInf) gs.rel = SubRel::AccInf;
-        else { gs.rel = SubRel::Cause; gs.conj = conj("ὅτι"); }
+        } else if (accInf) {
+          gs.rel = SubRel::AccInf;
+          // C29: the subject of the infinitive: the main subject's own person is left out ("I hope to win"); a pronoun
+          // of another person stays, in the accusative ("I hope that you will come tomorrow" -> ἐλπίζω σε αὔριον ἥξειν;
+          // the pronoun was dropped and "you" lost); an "it" with nothing to point to is left out
+          if (sc.hasSubject && sc.subject.isPronoun && sf.hasSubject) {
+            const bool mainPron = cl.hasSubject && cl.subject.isPronoun;
+            const uint8_t mp = mainPron ? cl.subject.pron.person : 3;
+            const bool same = mainPron && mp == sc.subject.pron.person && cl.subject.pron.number == sc.subject.pron.number &&
+                              (mp != 3 || text::lower(sf.subject.pronLemma) != "it");
+            const bool expletive = text::lower(sf.subject.pronLemma) == "it" || text::lower(sf.subject.pronLemma) == "ello";
+            if (same || expletive) sc.hasSubject = false;
+            else if (sc.subject.pron.person == 1 || sc.subject.pron.person == 2 ||
+                     (sc.subject.pron.person == 3 && mainPron && mp != 3)) sc.subject.keep = true;
+          }
+          // Spanish "espero que vengas": the present subjunctive after ἐλπίζω points ahead (the future infinitive ἥξειν)
+          if (c.st.lang == frame::SrcLang::Es && sc.pred.tense == Present && sc.pred.modal == kNone && !sf.copula &&
+              mv != kNone && lx_.lemma(mv).key == std::string("ἐλπίζω"))
+            sc.pred.tense = Future;
+          // a future infinitive the verb lacks (ἐπανέρχομαι: Attic uses ἐπάνειμι) -> the aorist infinitive, as Attic
+          // also writes after ἐλπίζω ("she hopes that her father will return" -> ἐπανελθεῖν)
+          if (sc.pred.tense == Future && sc.pred.modal == kNone && sc.pred.lemma != kNone) {
+            Features inf;
+            inf.pos = Verb;
+            inf.mood = Infinitive;
+            inf.tense = Future;
+            inf.voice = sc.pred.voice;
+            std::string probe;
+            if (!generate(lx_, sc.pred.lemma, inf, probe)) {
+              Features mid = inf;
+              mid.voice = Middle;
+              if (!generate(lx_, sc.pred.lemma, mid, probe)) sc.pred.tense = Aorist;
+            }
+          }
+        } else { gs.rel = SubRel::Cause; gs.conj = conj("ὅτι"); }
         break;
       }
       case Relation::Coord: {
@@ -2887,10 +3103,10 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
     const std::string ak = text::greek_key("ἀκούω");
     const bool akouo = vk.size() >= ak.size() && vk.compare(vk.size() - ak.size(), ak.size(), ak) == 0 && vk.size() <= ak.size() + 4;
     const bool person = (cl.object.isPronoun && cl.object.pron.person > 0) ||
-                        (f.hasObject && transfer::animate(f.object)) ||
+                        (f.hasObject && animate(f.object)) ||
                         (!c.objPrep.empty() && [&] {
                           for (const frame::SemOblique& o : f.obliques)
-                            if (o.prep == c.objPrep) return transfer::animate(o.np) || (o.np.isPronoun && o.np.pron.person > 0);
+                            if (o.prep == c.objPrep) return animate(o.np) || (o.np.isPronoun && o.np.pron.person > 0);
                           return false;
                         }());
     if (akouo && person && cl.pred.voice != Passive) cl.object.case_ = Gen;
@@ -3248,9 +3464,12 @@ void GreekTransfer::vocative(const SemNP& n, const SemSentence& s, const transfe
   // C21: a capitalised address word at the start ("Father, ...", "Teacher, ...") that the tagger took for a name is
   // the common noun in the vocative (ὦ πάτερ), unless the glossary or names_grc.tsv knows it as a name
   SemNP nn = n;
+  // C29: "Children, be quiet!" (a plural address read as a name, head "Children"): the plural of child (ὦ παῖδες, not
+  // μόθωνες)
+  if (text::lower(nn.head) == "children") { nn.head = "child"; nn.number = 2; nn.isName = false; nn.title = false; }
   {
-    const std::string low = text::lower(n.head);
-    if (n.isName && !gd_.nameByEnglish(n.head) &&
+    const std::string low = text::lower(nn.head);
+    if (nn.isName && !gd_.nameByEnglish(nn.head) &&
         in(low, {"father", "mother", "grandfather", "grandmother", "brother", "sister", "son", "daughter", "uncle",
                  "aunt", "teacher", "master", "friend", "child", "boy", "girl", "king", "queen", "doctor", "shepherd",
                  "farmer", "sir", "madam", "lady", "papá", "mamá", "padre", "madre", "abuelo", "abuela", "hermano",

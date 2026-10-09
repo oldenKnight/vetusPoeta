@@ -192,11 +192,40 @@ struct GreekLoader {
       else if (cols[5] == "translate") n.policy = curated::NamePolicy::Translate;
       else warn(no, "policy must be keep / decline / translate");
       n.note = col(cols, 6);
-      const size_t v = n.note.find("voc=");
-      if (v != std::string::npos) {
-        size_t e = n.note.find(' ', v);
-        n.voc = text::nfc(n.note.substr(v + 4, e == std::string::npos ? std::string::npos : e - v - 4));
+      auto field = [&](const char* key) {   // "key=value" up to the next space
+        const std::string k = std::string(key) + "=";
+        for (size_t v = n.note.find(k); v != std::string::npos; v = n.note.find(k, v + 1)) {
+          if (v > 0 && n.note[v - 1] != ' ') continue;
+          const size_t e = n.note.find(' ', v);
+          return n.note.substr(v + k.size(), e == std::string::npos ? std::string::npos : e - v - k.size());
+        }
+        return std::string();
+      };
+      auto word = [&](const char* w) {   // a bare word of the note
+        const std::string x(w);
+        for (size_t v = n.note.find(x); v != std::string::npos; v = n.note.find(x, v + 1)) {
+          const size_t e = v + x.size();
+          if ((v == 0 || n.note[v - 1] == ' ') && (e == n.note.size() || n.note[e] == ' ')) return true;
+        }
+        return false;
+      };
+      n.voc = text::nfc(field("voc"));
+      // C29: spelled-out forms, plural names, places, Spanish spellings, neologisms
+      if (const std::string fs = field("forms"); !fs.empty()) {
+        size_t a = 0;
+        while (a <= fs.size()) {
+          const size_t c = fs.find(',', a);
+          n.forms.push_back(text::nfc(fs.substr(a, c == std::string::npos ? std::string::npos : c - a)));
+          if (c == std::string::npos) break;
+          a = c + 1;
+        }
+        if (n.forms.size() < 4) { warn(no, "forms= needs nominative, genitive, dative, accusative (and a vocative)"); n.forms.clear(); }
       }
+      if (word("pl")) n.number = feat::Pl;
+      n.place = word("place");
+      n.article = word("art");
+      n.neologism = word("neologism");
+      n.spanish = field("es");
       d.names_.push_back(std::move(n));
     });
   }
@@ -296,6 +325,10 @@ const NameEntry* GreekData::nameByEnglish(std::string_view english) const {
   const std::string k = text::en_key(english);
   for (const NameEntry& n : names_)
     if (text::en_key(n.english) == k) return &n;
+  // C29: the Spanish spelling of a place ("Atenas", "México"), accents ignored
+  const std::string b = text::es_bare(english);
+  for (const NameEntry& n : names_)
+    if (!n.spanish.empty() && text::es_bare(n.spanish) == b) return &n;
   return nullptr;
 }
 

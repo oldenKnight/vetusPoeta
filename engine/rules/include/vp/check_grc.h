@@ -58,7 +58,7 @@ class GreekChecker {
   const lex::Lexicon& lx_;
   const curated::CuratedData& cd_;
   const grc::GreekData& gd_;
-  struct NameForm { std::string key; uint8_t case_, gender; };
+  struct NameForm { std::string key; uint8_t case_, gender, number = 1; };   // C29: number (plural place names)
   std::vector<NameForm> names_;                               // declined forms of names_grc.tsv (sorted by key)
   std::vector<std::pair<std::string, uint32_t>> closedIds_;   // closed-table key -> lemma id
 };

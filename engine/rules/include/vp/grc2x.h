@@ -46,6 +46,8 @@ struct Reading {
   bool name = false;                // a name (names_grc.tsv, glossary, lexicon proper name)
   bool fromRule = false;            // paradigm fallback (lemma without a table)
   std::string nameEn;               // the English spelling of a name reading ("Alice")
+  std::string nameEs;               // C29 (additive): the Spanish spelling of a place name ("Atenas"), "" = nameEn
+  bool place = false;               // C29 (additive): a city / country of names_grc.tsv
   double prior = 0;                 // context-free preference (closed tables, tier, canonical, Attic)
 };
 

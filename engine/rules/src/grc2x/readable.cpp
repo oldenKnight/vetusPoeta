@@ -63,7 +63,11 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
   for (size_t i = 0; i < n; ++i) {
     const TokInfo& t = ti[i];
     if (!t.word) continue;
-    if (t.name) { side.lex[i].word = t.nameEn.empty() ? t.text : t.nameEn; side.lex[i].person = true; continue; }
+    if (t.name) {
+      side.lex[i].word = esT && !t.nameEs.empty() ? t.nameEs : t.nameEn.empty() ? t.text : t.nameEn;
+      side.lex[i].person = !t.place;   // C29: a city is not a person ("a Atenas" only after a verb of motion)
+      continue;
+    }
     if (t.lemma == kNone) continue;
     const bool middle = t.f.voice == Middle || t.f.voice == Passive;
     side.lex[i] = src.lexical(t.lemma, t.lpos, middle, tg);

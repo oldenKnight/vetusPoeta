@@ -183,6 +183,11 @@ TEST_CASE("rules-grc3: debug frames (VP_GRC3_FRAMES=<file>, VP_GRC3_ES=1 for Spa
       std::cout << line << "\n   " << frame::describe(s);
       for (const std::string& d : s.doubts) std::cout << " [" << d << "]";
       std::cout << "\n";
+      if (std::getenv("VP_GRC3_TOKENS")) {   // C29: the tagger's view of each token
+        std::cout << "   ";
+        for (const nlp::Token& t : s.tokens) std::cout << " " << t.text << "/" << t.upos << "/" << t.lemma;
+        std::cout << "\n";
+      }
     }
   }
 }

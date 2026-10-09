@@ -471,3 +471,145 @@ noun), "We rode home on a donkey" (home as an object noun).
   εἶχεν (**OK and wrong**, pre-existing: "cling to" -> ἔχομαι + gen wants a middle verbprep row; "shook the tree" was
   ἔτρεμεν, OK and wrong, and is fixed: the shake row τρέμω has frame intr, σείω with an object); "How many dogs are
   there?" -> πόσοι κύνες ἐκεῖ εἰσιν (OK; existential "there" read as a place); "τὴν μητέρα αὐτῆς" for her own mother after a participle (Greek omits the possessive).
+
+# Loop 6 (C29) — misread pasts, place names, hope, money, addresses, next to
+
+## Blind check sentences (written at 23:19 UTC 2026-10-08 at the start of C29, before any change; output not looked at until the end)
+Children's-book dialogue, our own sentences, none from a sample, the regression file or an earlier blind list.
+1. The little girl wept because she lost her doll.
+2. Grandmother, why are you sitting next to the door?
+3. The merchant has a lot of money.
+4. We hope to see the sea tomorrow.
+5. The soldiers marched to Sparta.
+6. Children, come inside, the rain is starting.
+7. The cat slept beside the warm fire.
+8. My father bought a new cart in the city.
+9. Who broke the window?
+10. The shepherd led his sheep up the hill.
+11. I am writing a letter to my friend in Corinth.
+12. Do not throw stones at the birds!
+13. The queen wore a beautiful crown.
+14. Why are you laughing, boy?
+15. The farmer dug a deep hole in the field.
+16. The moon shone over the quiet village.
+17. My sister fed the chickens this morning.
+18. Tell me the truth, my son.
+19. The ship sank in the storm.
+20. They hid the treasure under a tree.
+
+## Blind check result (C29)
+First run (00:13 UTC 2026-10-09, after work items 1-7, before any fix for these sentences; built from HEAD 173f5a4 +
+the C29 files in an isolated copy): **11 / 20** acceptable Attic of the same meaning (4, 5, 7, 9, 10, 11, 13, 14, 18,
+19, 20). Not acceptable: #1 "τὴν κόρην αὐτῆς" for "her doll" (κόρη read as "girl"), #2 "Grandmother" left out (the
+tagger made it an interjection; **OK and wrong**), #3 "a lot of" -> πότμον "fate", #6 "Children" -> μόθωνες and "the
+rain is starting" -> ὁρμᾷ "rushes", #8 cart -> κάρρον (the late Latin carrus), #12 "throw at the birds" -> παρά + dat
+("beside"), #15 "Ὁ βόθρος γεωργοῦ." ("dug" read as a noun: the verb lost), #16 quiet village -> ἠρέμου χωρίου (late
+adjective, "a place"), #17 chickens -> "τὰ κόττος" (no plural: Fix). Wrong among OK on the first run: **1** (#2).
+After the fixes (each with two or more own sentences in "C29 after the blind check", written at 00:14 UTC before the
+fixes, none a blind sentence): **20 / 20** (#1 with the realia row doll -> παίγνιον "toy", Check; #2, #6 Check). The
+first-run figure is the one that predicts held-out behaviour.
+
+## Numbers (fidelity 2, speaker f, real data; HEAD 173f5a4 + the C29 files, isolated copy)
+| set | before C29 | after C29 |
+|---|---|---|
+| EN -> GRC own_dialogue (114) | 114 / 114, ok 81 / check 33 / fix 0 | 114 / 114, ok 81 / check 33 / fix 0 (report byte-identical) |
+| ES -> GRC lines 1-40 | 39 / 40 | 39 / 40 (report byte-identical) |
+| GRC -> EN / GRC -> ES (40) | 40 / 40, 40 / 40 | 40 / 40, 40 / 40 (report byte-identical) |
+| C16 / C18 EN, ES / C18 review / C21 EN, ES / C21 after blind EN, ES / C25 EN, ES / C25 after blind EN, ES | 37 / 56 / 12 / 13 / 63 / 27 / 37 / 15 / 41 / 27 / 28 / 12 | unchanged (one alternative added in C21: quiet -> ἥσυχος) |
+| C29 constructions (new) | - | EN 42 / 42, ES 24 / 24 |
+| C29 after the blind check (new) | - | EN 19 / 19, + names / augment / ἵστημι / checker case |
+| blind check (20) | - | first run 11 / 20 (1 wrong among OK), after 20 / 20 |
+| Latin suites | - | unchanged (no Latin file touched; ctest green) |
+
+## What changed
+* **(1) Irregular pasts** (engine_grc `pastAsNoun`, reusing `frame::en::verbOfForm`): "wept" itself reached the Greek
+  path when the tagger read it as a verb ("She wept." -> ἔκλαυσεν); it was lost when the tagger read it as a noun or a
+  name: "Mary wept for her brother." (the name "Mary wept"), "The queen wept when she heard the news.", "The soldier
+  wept because his horse died." ([Wept], Fix, on the Latin path too). A word english.vpl knows as the finite past of
+  another verb, right after a noun or a pronoun (or after "the" + a noun the tagger made an adjective), with no
+  predicate on it, is analysed again with a regular past in its place ("cried": the tagger reads it as a verb in any
+  context) and the verb set back (flag past-form, Check); a noun reading too ("dug") counts only when a determiner or
+  a pronoun follows. When the tagger breaks the whole clause, the part before the subordinator (because, when, if
+  ...) is analysed alone and the rest merged as its dependent clause. Also "slid" (ὠλίσθησεν). Found with it: the
+  subject noun read as an adjective ("The soldier sang." -> [Sang] on both paths; engine_grc `nounAsAdj`: the noun
+  analysed as "boy" and set back), "die" -> ἀποθνῄσκω (ἔβη came through the reverse index), "shine" -> λάμπω (ἔφηνεν
+  "showed", OK and wrong), "be born" -> ἐγενόμην (ἠνέχθην "I was carried"), intransitive "stand" -> the perfect system
+  ("stands" ἕστηκε, "stood" εἱστήκει; ἔστησεν "set up" was OK and wrong; Attic perfect cells as overrides, the table's
+  first cells are Doric ἕστακα), "stand up / get up" -> ἀνίστημι middle in the present, the root aorist elsewhere
+  (ἀνέστη, ἀνάστηθι; the rows named ἀνίσταμαι, which greek.vpl lacks, and στῆσον was OK and wrong; a phrasal verb the
+  frame joins as "stand_up" finds its row), the doubled augment of a table (ἐνυπνιάζω: ἐἐνυπνίασε -> ἠνυπνίασε, read
+  back by the analysis), "wept bitterly" (the frame gives the adverb's lemma as "bitter": the written -ly token decides;
+  πικρῶς, was [bitter], Fix). Still bracketed: "bleed" (greek.vpl has no verb: LIB).
+* **(2) Places** (names_grc.tsv, new note words `place`, `art`, `pl`, `forms=`, `es=`, `neologism`): Athens Ἀθῆναι
+  (plural: ἐν Ἀθήναις, εἰς Ἀθήνας, ἐξ Ἀθηνῶν), Thebes Θῆβαι, Delphi Δελφοί, Sparta, Rome Ῥώμη, Corinth Κόρινθος (f),
+  Troy, Crete, Egypt Αἴγυπτος (f), Greece ἡ Ἑλλάς (with the article), Italy, Sicily, Persia ἡ Περσίς, Mexico Μεξικόν (a
+  New-Latin style neologism: flag realia, never OK). A place is not a person (εἰς / ἐκ / ἐν, never the dative of a
+  person or παρά + gen), takes no article unless the row says `art`, keeps its own number (αἱ Ἀθῆναι ... εἰσίν); the
+  Spanish spelling (es=) is a source name too (Atenas, México: accents ignored) and the GRC -> ES name; "de / desde
+  México" -> ἐκ + gen (was περί); "navegó a Corinto" (the personal "a" before a name read as the object) -> εἰς + acc;
+  "rode home" (home as an object after a verb of motion) -> οἴκαδε. The checker and grc2x read the declined forms with
+  their number (realise_grc.h declineName(NameEntry)).
+* **(3) hope** -> ἐλπίζω (verb row; Spanish "esperar" only with a que-clause or an infinitive: new verb-row frame
+  `clause`; "espero el autobús" stays μένω): accusative + infinitive with the subject of the infinitive kept when it is
+  another person (GrcNP::keep: the pronoun is not dropped, enclitic σε; it opens the infinitive clause before its time
+  adverbs: "ἐλπίζω σε αὔριον ἥξειν"); the same subject is left out; a future infinitive the verb lacks (ἐπανέρχομαι) ->
+  the aorist infinitive; Spanish "espero que vengas" -> the future infinitive; "esperamos ganar" (a bare infinitive the
+  frame reads as purpose) -> ἐλπίζομεν νικήσειν; win / ganar -> νικάω.
+* **(4) money** -> ἀργύριον (τέλος "tax"; χρήματα noted as the alternative), Spanish "mucho dinero" -> πολὺ ἀργύριον (the
+  frame gives "many"), "need" -> δέομαι + gen (valency δέω acc; mid:gen: "Δέω σε" for "I need you" and "Ὕδωρ δέομεν"
+  were OK and wrong: "I bind you"), "spend money" -> ἀναλίσκω (verbobj; διάγω "spend time" was chosen).
+* **(5) Addresses** (engine_grc `addressSplit`): one to three words after the last comma (my / dear / mi / querido +
+  an address word or a name) or, in Spanish, before the first comma are analysed apart from the rest and become a
+  vocative unit built from the words themselves (the parser reads a lone "Mamá." as a verb): "¿Por qué lloras, niña?"
+  -> διὰ τί κλαίεις, ὦ παῖ; (παῖδα, an object, before), "¿Dónde estás, hijo?" -> ποῦ εἶ, ὦ υἱέ; (Ποῦ υἱὸν εἶ, OK and
+  wrong), "Where are you, my son?" (son made the subject), "Niña, ¿por qué lloras?". Not after a noun in a statement
+  (an apposition: "the king, my father"). Spanish "ven" read as "they see" ("Ven aquí." -> Ἐνθάδε ὁρῶσιν, OK and
+  wrong) -> the command of venir (engine_grc `venImperative`, "sal" as the stand-in); "¿Qué haces?" ("qué" + a noun
+  "[haces]") -> τί ποιεῖς; (engine_grc `queVerb`, leer as the stand-in, same person); a plural address makes the
+  command plural (ἀνάστητε, ὦ παῖδες). All rebuilt: Check.
+* **(6) next to / beside / junto a / al lado de** -> παρά + dat ("next" was ἔπειτα and "to the boy" a dative of the
+  person: OK and wrong).
+* **(7) Loop-5 wishes**: "When one is tired, one sleeps." (oneGeneric: "one" analysed as "she", the subjects made
+  generic: ὅτε τις κάμνει, καθεύδει τις), "We rode home on a donkey." (οἴκαδε), "El búho caza de noche." and "El perro
+  ladra." (esVerbAsNoun: a 3rd-person present right after the subject's head analysed as a verb: νύκτωρ διώκει,
+  ὑλακτεῖ); "One / You should never steal." now parses (Οὐδέποτε χρὴ κλέψαι). Re-checked on HEAD: the other loop-5
+  repairs still apply.
+* **After the blind run**: an address word the tagger reads as an interjection ("Grandmother, why ...") -> the vocative
+  (ὦ τήθη; clause-repair, Check); "a lot of / lots of X" -> πολύς + X; "Children" read as a name -> παῖδες; rain start
+  -> ἄρχεται (subject rows); cart -> ἅμαξα, village -> κώμη, quiet -> ἥσυχος (readable_grc.tsv teacher glosses),
+  chicken / hen -> ὄρνις, rooster -> ἀλεκτρυών, doll -> παίγνιον (realia); throw at -> εἰς + acc; "full of" -> the
+  genitive (πλήρης μήλων, was περί); farm animals are indirect objects ("gave bread to the chicken" -> τῷ ὄρνιθι);
+  weep / cry for -> κλαίω + acc; Spanish "su" takes the gender of the clause's 3rd-person subject (αὐτῆς for "la niña
+  ... su madre"). Checker: a word right after the article with a noun reading is not a verb ("ἐν τῇ αὐλῇ" read as
+  αὐλέω made "Οἱ ὄρνιθες ἐν τῇ αὐλῇ εἰσιν" an A3 Fix).
+
+## Rows added
+lexical_en_grc.tsv +36 rows (verb 11, noun 12, verbprep 5, subject 4, realia 2, verbobj 2) and 2 changed (phrasal get up
+/ stand up: ἀνίσταμαι -> ἀνίστημι, frame mid-pres) + the header note for the verb-row frame `clause`; names_grc.tsv +14
+place rows (Sparta's row moved and extended) + the header note; valency_grc.tsv +2 (ἐλπίζω acc+inf, δέω acc;mid:gen);
+readable_grc.tsv +7 (ἥσυχος, κώμη, ἅμαξα, ἐλπίζω, ἀργύριον, λάμπω, πικρός). Gold file unchanged: **no gold alternative
+proposed**. One expectation of test_rules_grc4.cpp got an alternative ("The house is quiet tonight." also ἥσυχος).
+
+## API changes (additive)
+realise_grc.h: NameEntry::forms, number, place, article, neologism, spanish; `declineName(const NameEntry&, case, out)`;
+GrcNP::keep. transfer_grc.h: GreekTransfer::animate (private). grc2x.h: Reading::nameEs, Reading::place.
+check_grc.h: GreekChecker::NameForm::number (private). No edit in frame/, transfer/, realise_la/, check/, cue/,
+english.* or engine.cpp.
+**Wish for frame/ (C28 or later), repaired on the Greek side for now:** (1) irregular pasts tagged as nouns or joined
+to a name ("Mary wept", "wept because", "dug a hole"), a subject noun tagged as an adjective before a verb ("The
+soldier sang."); (2) a trailing address after a comma ("¿Por qué lloras, niña?" -> object; "Where are you, my son?" ->
+subject), a leading Spanish one ("Niña, ¿por qué lloras?"), an English one tagged as an interjection ("Grandmother,
+..."); (3) Spanish "ven" as ver 3pl, "¿Qué haces?" as qué + noun, 3rd-person verbs as nouns after the subject ("caza",
+"ladra"); (4) "next to" as the adverb "next" + "to"; (5) "one sleeps" as a noun phrase; (6) "Stand up!" with the lemma
+"stand_up"; (7) "The old king died." loses "old" and the article (not repaired).
+
+## Still open (for loop 7 / LIB)
+* LIB: no verb for "bleed"; ἐνυπνιάζω's aorist cells carry a doubled augment (ἐἐνυπνίασα); ἵστημι's first perfect
+  cells are Doric (ἕστακα); greek.vpl has no ἀνίσταμαι, πλαγγών (doll).
+* GRC -> EN / ES: an accusative + infinitive after ἐλπίζω / νομίζω is read without the infinitive ("ἐλπίζω σε αὔριον
+  ἥξειν" -> "I hope you tomorrow"; grc2x renders a non-modal complement verb nowhere); "I want to come you" for
+  βούλομαί σε ἐλθεῖν. Pre-existing, not a regression.
+* Seen while probing (own sentences, Check): "The girl hid behind the door."
+  (ἔκρυψεν, transitive), "hope you are well" (σε ἄλλον εἶναι), "I think that you are right" (εὐθύν), lexical choices
+  of the reverse index for tear / draw / lend / lay / shoot / swear (Check), "Children, be quiet!" -> σίγα (the
+  phrasebook row is singular).

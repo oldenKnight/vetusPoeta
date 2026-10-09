@@ -52,6 +52,15 @@ struct NameEntry {
   uint8_t gender = 0;
   int declension = -1;         // 1, 2, 3; 0 indeclinable; -1 not given
   curated::NamePolicy policy = curated::NamePolicy::Keep;
+  // C29 (additive), read from the note column: "forms=<nom>,<gen>,<dat>,<acc>[,<voc>]" spells every case out (plural
+  // place names, neuters: Ἀθῆναι, Ἀθηνῶν, Ἀθήναις, Ἀθήνας); "pl" = a plural name (the verb agrees in the plural);
+  // "place" = a city or country (not a person: εἰς / ἐκ / ἐν + the name, no article unless "art"); "es=<Spanish
+  // spelling>" = the Spanish source spelling and the GRC -> ES rendering (Atenas); "neologism" = no ancient name
+  // (Μεξικόν): the cue is never OK (flag realia)
+  std::vector<std::string> forms;
+  uint8_t number = 1;          // feat::Sg
+  bool place = false, article = false, neologism = false;
+  std::string spanish;
 };
 struct ParticleEntry { std::string head, key, function, english, note; bool second = false; };
 
@@ -133,6 +142,9 @@ struct GrcNP {
   // before the noun without its article ("Ἄρεως ἡμέρα").
   bool adjFirst = false;
   bool genFirst = false;
+  // C29 (additive): a pronoun subject that is never dropped (the accusative subject of an infinitive of another person:
+  // "ἐλπίζω σε ἥξειν"); unlike `emphasis` it keeps the enclitic forms
+  bool keep = false;
 };
 
 struct GrcOblique { uint32_t prep = kNone; uint8_t case_ = 0; GrcNP np; bool front = false;
@@ -232,6 +244,9 @@ struct GWord {
 // indeclinable). `voc` overrides the vocative. False for the plural or endings that do not fit.
 bool declineName(std::string_view nom, std::string_view gen, int declension, uint8_t gender, uint8_t case_,
                  std::string_view voc, std::string& out);
+// C29: one entry of names_grc.tsv in a case: its spelled-out forms when it has them ("forms=", plural place names),
+// else declineName() above (singular only).
+bool declineName(const NameEntry& e, uint8_t case_, std::string& out);
 
 // Tense of an English verb phrase in Greek (order_grc.txt tense.*): past events -> aorist, past states /
 // background / progressive -> imperfect, perfect with a present result -> perfect, else aorist.

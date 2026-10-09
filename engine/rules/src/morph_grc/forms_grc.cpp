@@ -486,6 +486,20 @@ const Override kOverrides[] = {
     {"δύω", Aorist, Indicative, P2, Sg, "ἔδυς", false, true},
     {"δύω", Aorist, Indicative, P3, Sg, "ἔδυ", false, true},
     {"δύω", Aorist, Indicative, P3, Pl, "ἔδυσαν", false, true},
+    // C29: the perfect of ἵστημι "I stand": the table's first cells are Doric (ἕστακα)
+    {"ἵστημι", Perfect, Indicative, P1, Sg, "ἕστηκα", false, true},
+    {"ἵστημι", Perfect, Indicative, P2, Sg, "ἕστηκας", false, true},
+    {"ἵστημι", Perfect, Indicative, P3, Sg, "ἕστηκε", true, true},
+    {"ἵστημι", Perfect, Indicative, P3, Pl, "ἑστᾶσι", true, true},
+    // C29: ἀνίστημι in "stand up / get up" (lexical_en_grc.tsv, active outside the present system): the intransitive
+    // root aorist, not ἀνέστησε "raised up"
+    {"ἀνίστημι", Aorist, Indicative, P1, Sg, "ἀνέστην", false, true},
+    {"ἀνίστημι", Aorist, Indicative, P2, Sg, "ἀνέστης", false, true},
+    {"ἀνίστημι", Aorist, Indicative, P3, Sg, "ἀνέστη", false, true},
+    {"ἀνίστημι", Aorist, Indicative, P1, Pl, "ἀνέστημεν", false, true},
+    {"ἀνίστημι", Aorist, Indicative, P3, Pl, "ἀνέστησαν", false, true},
+    {"ἀνίστημι", Aorist, Imperative, P2, Sg, "ἀνάστηθι", false, true},
+    {"ἀνίστημι", Aorist, Imperative, P2, Pl, "ἀνάστητε", false, true},
 };
 
 // C21: the simplex verbs with a middle future in Attic (Smyth 805-806; our own selection of the common ones); a
@@ -552,6 +566,26 @@ std::string smoothAugment(const std::string& form, std::string_view lemmaKey) {
   if (vowels.find(lk[0]) != std::u32string::npos || fb[1] != lk[0]) return form;
   const std::string r = swapEpsilonBreathing(form, 0x0314, 0x0313);
   return r.empty() ? form : r;
+}
+// C29: a table that writes the syllabic augment before a verb in ε- (ἐνυπνιάζω: ἐἐνυπνίασε) is wrong: ε + ε is the
+// temporal augment η (ἠνυπνίασε). `toEta` makes the Attic form from the table's, `!toEta` the table's from the Attic.
+std::string doubleAugment(const std::string& form, bool toEta) {
+  std::u32string u = text::toUtf32(text::nfd(form));
+  if (toEta) {
+    if (u.size() < 5 || u[0] != U'ε' || u[1] != 0x0313 || u[2] != U'ε' || (u[3] != 0x0313 && u[3] != 0x0314)) return std::string();
+    std::u32string r = U"η";
+    r.push_back(u[3]);
+    r += u.substr(4);
+    return text::nfc(text::toUtf8(r));
+  }
+  if (u.size() < 4 || u[0] != U'η' || (u[1] != 0x0313 && u[1] != 0x0314) || (u[2] >= 0x0300 && u[2] <= 0x036F))
+    return std::string();
+  std::u32string r = U"ε";
+  r.push_back(0x0313);
+  r.push_back(U'ε');
+  r.push_back(u[1]);
+  r += u.substr(2);
+  return text::nfc(text::toUtf8(r));
 }
 std::string roughAugment(const std::string& form) {
   const std::u32string fb = text::toUtf32(text::greek_bare(form));
@@ -665,6 +699,8 @@ bool generate(const lex::Lexicon& lx, uint32_t lemma, const Features& want0, std
     // C25: a syllabic augment written with a rough breathing (νίζω: ἕνιψα, ἑνίψατο) is a table error: the augment of
     // a verb that begins with a consonant is always ἐ- (ἔνιψα); the analysis maps the form back (see analyse)
     if (l.pos == Verb) bestForm = smoothAugment(bestForm, l.key);
+    if (l.pos == Verb)
+      if (const std::string eta = doubleAugment(bestForm, true); !eta.empty()) bestForm = eta;
     out = bestForm;
     Features pf = unpack(bestPacked);
     gi.attic = (pf.extra & Attic) != 0;
@@ -1036,7 +1072,7 @@ std::string restoreElided(std::string_view word) {
 void analyse(const lex::Lexicon& lx, std::string_view word, morph::Token& out) {
   // exact readings of the canonical spellings first: as written, grave -> acute, without the acute an enclitic
   // added, an orthotone enclitic, without a movable nu, an elided word restored
-  std::string cands[8];
+  std::string cands[10];
   int nc = 0;
   const std::string w0 = text::nfc(word);
   const std::string restored = restoreElided(w0);
@@ -1053,6 +1089,9 @@ void analyse(const lex::Lexicon& lx, std::string_view word, morph::Token& out) {
   // word itself; its augmented verb readings are added to the word's own (ἔνιψα is also a form of ἐνίπτω)
   const std::string roughForm = roughAugment(w0);
   if (!roughForm.empty()) cands[nc++] = roughForm;
+  // C29: ἠνυπνίασε written by generate() for a table's ἐἐνυπνίασε (see doubleAugment): the table's spelling
+  const std::string twoAug = doubleAugment(w0, false);
+  if (!twoAug.empty()) cands[nc++] = twoAug;
   const std::string w1 = dropEncliticAcute(ultimaToAcute(w0));
   if (w1 != w0) cands[nc++] = w1;
   if (accentOf(w1).accents == 0 && accentOf(w1).syllables >= 2) cands[nc++] = encliticAccented(w1);
@@ -1245,6 +1284,25 @@ bool declineName(std::string_view nom0, std::string_view gen0, int declension, u
     return true;
   }
   return false;
+}
+
+bool declineName(const NameEntry& e, uint8_t case_, std::string& out) {
+  if (e.forms.size() >= 4) {
+    int i = -1;
+    switch (case_) {
+      case feat::Nom: i = 0; break;
+      case feat::Gen: i = 1; break;
+      case feat::Dat: i = 2; break;
+      case feat::Acc: i = 3; break;
+      case feat::Voc: i = e.forms.size() > 4 ? 4 : 0; break;
+      default: break;
+    }
+    if (i < 0 || e.forms[(size_t)i].empty()) return false;
+    out = e.forms[(size_t)i];
+    return true;
+  }
+  if (e.number != feat::Sg) return false;
+  return declineName(e.nom, e.gen, e.declension, e.gender, case_, e.voc, out);
 }
 
 uint8_t mapTense(uint8_t englishTense, bool progressive, bool state, bool perfectResult) {
