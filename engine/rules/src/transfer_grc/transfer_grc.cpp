@@ -2,6 +2,7 @@
 // Greek closed classes, article policy, particles, tense / aspect mapping and the lexical rules of lexical_en_grc.tsv.
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -2186,7 +2187,7 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
   // C31: Spanish rewrites after the blind batch (each a frame-builder misreading repaired on the Greek side):
   if (c.st.lang == frame::SrcLang::Es && f.hasPred) {
     SemFrame fx = f;
-    bool changed = false;
+    bool changed = false, misread = false;   // C35: misread = a parse repaired (Check); else a fixed Spanish rule
     const std::string pl = text::lower(f.pred.lemma);
     // (a) "debajo de la mesa" read as the object with "debajo de" as its case marker: the oblique
     if (fx.hasObject && !fx.object.tokens.empty()) {
@@ -2204,7 +2205,7 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
         fx.hasObject = false;
         fx.object = SemNP{};
         c.cover(first - 1);
-        changed = true;
+        changed = misread = true;
       }
     }
     // (b) the aspectual / reflexive "se" (and me / te / nos of the subject's own person) with a direct object read as
@@ -2220,6 +2221,9 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
         fx.hasIndirect = false;
         fx.indirectObject = SemNP{};
         changed = true;
+        // C35: the aspectual "se" of eating and drinking ("se comió el pan") is Spanish grammar, as the Latin transfer
+        // reads it since C34 (comēdit); with other verbs the reflexive may be meant ("se lava las manos"): Check
+        if (!in(pl, {"comer", "beber", "tomar", "tragar", "comerse", "beberse"})) misread = true;
       }
     }
     // (c) the doubled clitic: "le dio una flor a su maestra" (le + a X): the clitic is X
@@ -2252,7 +2256,7 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
           fx.subject = o.np;
           fx.implicitSubject = false;
           fx.obliques.erase(fx.obliques.begin() + (long)i);
-          changed = true;
+          changed = misread = true;
           break;
         }
       }
@@ -2297,9 +2301,17 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
       }
     }
     if (changed) {
-      if (std::find(c.out.flags.begin(), c.out.flags.end(), "clause-repair") == c.out.flags.end())
-        c.out.flags.push_back("clause-repair");
-      c.out.notes.push_back(rules::Reason{-1, "form", "a Spanish construction the parser misread was rebuilt: check it", ""});
+      if (std::getenv("VP_GRC_TRACE")) std::fprintf(stderr, "TRACE esRewrite\t%s %d\n", f.pred.lemma.c_str(), (int)misread);
+      // C35: the doubled clitic (le ... a X), the aspectual se of comer / beber, "hace frío / calor" and "a casa" are
+      // read by fixed rules of Spanish grammar (as the Latin transfer does since C34), not parse repairs: no flag
+      if (misread) {
+        if (std::find(c.out.flags.begin(), c.out.flags.end(), "clause-repair") == c.out.flags.end())
+          c.out.flags.push_back("clause-repair");
+        c.out.notes.push_back(rules::Reason{-1, "form", "a Spanish construction the parser misread was rebuilt: check it", ""});
+      } else {
+        c.out.notes.push_back(rules::Reason{-1, "form", "a Spanish construction read by a fixed rule (doubled clitic, "
+                                                         "aspectual se, weather hacer, a casa)", ""});
+      }
       clauseInto(fx, c, cl);
       return;
     }

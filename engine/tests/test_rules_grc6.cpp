@@ -219,11 +219,11 @@ TEST_CASE("rules-grc6: C29 constructions (pasts, places, hope, money, addresses,
       {"No tengo dinero.", "ἀργύριον οὐκ ἔχω.", false},
       {"El mercader tiene mucho dinero.", "ὁ πώλης πολὺ ἀργύριον ἔχει.", false},
       {"Necesito agua.", "ὕδατος δέομαι.", false},
-      {"¿Por qué lloras, niña?", "διὰ τί κλαίεις, ὦ παῖ;", true},
-      {"¿Dónde estás, hijo?", "ποῦ εἶ, ὦ υἱέ;", true},
-      {"Ven aquí, niño.", "ἐλθὲ δεῦρο, ὦ παῖ.", true},
-      {"Ven aquí.", "ἐλθὲ δεῦρο.", true},
-      {"Niña, ¿por qué lloras?", "ὦ παῖ, διὰ τί κλαίεις;", true},
+      {"¿Por qué lloras, niña?", "διὰ τί κλαίεις, ὦ παῖ;", false},   // C35: relaxed (trailing address read by the frame since C34)
+      {"¿Dónde estás, hijo?", "ποῦ εἶ, ὦ υἱέ;", false},   // C35: relaxed (trailing address read by the frame since C34)
+      {"Ven aquí, niño.", "ἐλθὲ δεῦρο, ὦ παῖ.", false},   // C35: relaxed ("Ven" read by the frame since C34)
+      {"Ven aquí.", "ἐλθὲ δεῦρο.", false},   // C35: relaxed ("Ven" read by the frame since C34)
+      {"Niña, ¿por qué lloras?", "ὦ παῖ, διὰ τί κλαίεις;", false},   // C35: relaxed (leading vocative segment of the frame since C34)
       {"Hijo, ven aquí.", "ὦ υἱέ, ἐλθὲ δεῦρο.", true},
       {"¿Qué haces, mamá?", "τί ποιεῖς, ὦ μάμμα;", true},
       {"¿Qué comes?", "τί ἐσθίεις;", true},

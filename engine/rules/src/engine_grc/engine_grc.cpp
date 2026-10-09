@@ -3,6 +3,8 @@
 #include "engine_grc/engine_grc.h"
 
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 #include <cctype>
 #include <cmath>
 #include <cstring>
@@ -36,6 +38,9 @@ namespace {
 
 namespace stdfs = std::filesystem;
 
+void gtraceTMP(const char* what, const std::string& t) {
+  if (std::getenv("VP_GRC_TRACE")) std::fprintf(stderr, "TRACE %s\t%s\n", what, t.c_str());
+}
 std::string jsonEscape(const std::string& s) {
   std::string o;
   for (char c : s) {
@@ -819,57 +824,6 @@ bool lostModifiers(frame::SemSentence& s) {
   return changed;
 }
 
-// C33: Spanish "El maestro nos enseñó una canción nueva.": the parser roots the sentence on the subject noun and hangs
-// the verb (after a clitic) on it as "acl"; the frame builder's fallback keeps the verb with a 3rd-person pronoun and
-// the noun is lost ("Ἡμῖν καινὴν ᾠδὴν ἐδίδαξεν", the teacher gone). The root noun with its article / possessive
-// before the verb becomes the subject. True if changed.
-bool esRootSubject(frame::SemSentence& s) {
-  if (s.lang != frame::SrcLang::Es || s.units.size() != 1 || s.units[0].type != frame::Unit::Clause) return false;
-  frame::SemFrame& f = s.units[0].frame;
-  if (!f.hasPred || f.type != frame::Kind::Decl || f.pred.token <= 0 || (size_t)f.pred.token >= s.tokens.size()) return false;
-  if (f.hasSubject && !(f.subject.isPronoun && f.subject.pron.person == 3)) return false;
-  const nlp::Token& v = s.tokens[(size_t)f.pred.token];
-  if (v.deprel != "acl" || v.head <= 0) return false;
-  const int r = v.head - 1;
-  if (r >= f.pred.token || s.tokens[(size_t)r].upos != "NOUN" || s.tokens[(size_t)r].deprel != "root") return false;
-  std::vector<int> used;
-  usedFrame(f, used);
-  if (std::find(used.begin(), used.end(), r) != used.end()) return false;
-  // only clitics between the noun and the verb
-  for (int j = r + 1; j < f.pred.token; ++j)
-    if (s.tokens[(size_t)j].upos != "PRON") return false;
-  const nlp::Token& t = s.tokens[(size_t)r];
-  frame::SemNP n;
-  n.head = t.lemma.empty() ? t.lower : t.lemma;
-  n.surface = t.text;
-  n.token = r;
-  n.tokens = {r};
-  n.number = nlp::morph::get(t.feats, nlp::morph::NumberShift) == nlp::morph::NumPlur ? 2 : 1;
-  if (t.lower.size() > 1 && t.lower.back() == 'a' && !n.head.empty() && n.head.back() == 'o') n.srcGender = feat::F;
-  for (int j = r - 1; j >= 0; --j) {
-    const nlp::Token& d = s.tokens[(size_t)j];
-    if (d.upos != "DET") break;
-    if (d.lower == "mi" || d.lower == "mis" || d.lower == "tu" || d.lower == "tus" || d.lower == "su" || d.lower == "sus") {
-      frame::SemNP p;
-      p.isPronoun = true;
-      p.pron.person = d.lower[0] == 'm' ? 1 : d.lower[0] == 't' ? 2 : 3;
-      p.pron.number = 1;
-      p.pronLemma = d.lower;
-      p.token = j;
-      p.tokens = {j};
-      n.possessor.push_back(p);
-    } else {
-      n.determiner = d.lower;
-      n.definite = d.lower == "el" || d.lower == "la" || d.lower == "los" || d.lower == "las";
-    }
-    n.tokens.push_back(j);
-  }
-  f.hasSubject = true;
-  f.subject = n;
-  f.implicitSubject = false;
-  return true;
-}
-
 // C33: "We will sail to the island tomorrow.": the parser hangs a bare time word on the noun before it ("of:tomorrow",
 // εἰς τὴν νῆσον ἐπιουσίου, "of the morrow"): today / tomorrow / yesterday / tonight (hoy, ayer, mañana without an
 // article) as a genitive attribute is an adverb of the clause. True if changed.
@@ -1044,6 +998,32 @@ bool esParataxis(frame::SemSentence& s) {
   return changed;
 }
 
+// C35: Spanish clauses joined by a comma, parsed apart by the shared frame builder since C34 (setCommaClauses):
+// "Camina rápido, ya es tarde." / "¡No grites, el bebé duerme!" -> two clause units. A statement after a command
+// explains it: the statement is coordinated to the command (the transfer then puts γάρ second: "βάδιζε ταχέως, ἤδη γὰρ
+// ὀψέ ἐστιν"). A sure reading of a correct parse, no flag. True if changed.
+bool esCommaGar(frame::SemSentence& s) {
+  if (s.lang != frame::SrcLang::Es) return false;
+  bool changed = false;
+  for (size_t ui = 0; ui + 1 < s.units.size(); ++ui) {
+    frame::Unit& u1 = s.units[ui];
+    const frame::Unit& u2 = s.units[ui + 1];
+    if (u1.type != frame::Unit::Clause || u2.type != frame::Unit::Clause || u1.vocative || u2.vocative) continue;
+    if (u1.sepAfter != "," || u1.frame.type != frame::Kind::Imp || !u1.frame.hasPred) continue;
+    if (u2.frame.type != frame::Kind::Decl || !u2.frame.hasPred || !u2.frame.connectors.empty()) continue;
+    frame::SemSub co;
+    co.relation = frame::Relation::Coord;
+    co.before = false;
+    co.frame.push_back(u2.frame);
+    u1.frame.subordinate.push_back(co);
+    u1.last = u2.last;
+    u1.sepAfter = u2.sepAfter;
+    s.units.erase(s.units.begin() + (long)ui + 1);
+    changed = true;
+  }
+  return changed;
+}
+
 // C33: "al atardecer / al amanecer / al anochecer" read as a verb ("a" + "el" + the infinitive made a time or that
 // clause: "El barco llegó al atardecer." -> sub=time:when{pred=atardecer}): the nominalised infinitive is a time noun,
 // an oblique of the clause it hangs on (transfer_grc gives the Attic phrase: πρὸς ἑσπέραν, ἅμα τῇ ἕῳ). True if changed.
@@ -1091,48 +1071,6 @@ bool timeInfinitive(frame::SemSentence& s) {
   return changed;
 }
 
-// C33: Spanish "conmigo / contigo" read as the object ("¿Vendrás conmigo?" -> [conmigo]): "with me / with you" (μετ'
-// ἐμοῦ, μετὰ σοῦ). A fixed form, not a guess: no flag. True if changed.
-bool conmigo(frame::SemSentence& s) {
-  if (s.lang != frame::SrcLang::Es) return false;
-  bool changed = false;
-  std::function<void(frame::SemFrame&)> fix = [&](frame::SemFrame& f) {
-    if (f.hasObject && !f.object.isName) {
-      const std::string h = text::lower(f.object.head.empty() ? f.object.pronLemma : f.object.head);
-      const uint8_t person = h == "conmigo" ? 1 : h == "contigo" ? 2 : 0;
-      if (person) {
-        frame::SemOblique o;
-        o.prep = "with";
-        o.np.isPronoun = true;
-        o.np.pron.person = person;
-        o.np.pron.number = 1;
-        o.np.token = f.object.token;
-        o.np.tokens = f.object.tokens;
-        o.token = f.object.token;
-        f.obliques.push_back(o);
-        f.hasObject = false;
-        f.object = frame::SemNP{};
-        changed = true;
-      }
-    }
-    // the parser may also hang it on the verb as a bare oblique ("¡Ven conmigo, hija mía!" -> "Ἐλθέ με")
-    for (frame::SemOblique& o : f.obliques) {
-      const std::string h = text::lower(o.np.head.empty() ? o.np.pronLemma : o.np.head);
-      if ((h == "conmigo" || h == "contigo") && (o.prep.empty() || o.prep == "-")) {
-        o.prep = "with";
-        o.np.isPronoun = true;
-        o.np.pron.person = h == "conmigo" ? 1 : 2;
-        o.np.pron.number = 1;
-        changed = true;
-      }
-    }
-    for (frame::SemSub& sb : f.subordinate)
-      for (frame::SemFrame& sf : sb.frame) fix(sf);
-  };
-  for (frame::Unit& u : s.units)
-    if (u.type == frame::Unit::Clause) fix(u.frame);
-  return changed;
-}
 
 // The frame (of any unit, subordinate or secondary clause) whose predicate is token `tok`; null when none.
 frame::SemFrame* predAt(frame::SemFrame& f, int tok) {
@@ -1733,7 +1671,10 @@ struct GreekPath::Impl {
       return fbEn.get();
     }
     if (!pes) return nullptr;
-    if (!fbEs) fbEs = std::make_unique<frame::FrameBuilder>(lang, pes, esLex, cd);
+    if (!fbEs) {
+      fbEs = std::make_unique<frame::FrameBuilder>(lang, pes, esLex, cd);
+      fbEs->setCommaClauses(true);   // C35: the shared C34 reading of comma-joined Spanish clauses (esCommaGar)
+    }
     return fbEs.get();
   }
 
@@ -2087,11 +2028,14 @@ struct GreekPath::Impl {
       };
       frame::SemSentence r;
       std::string pf;
-      if (addressSplit(atext, s, es, gd, analyseFixed, r)) {
+      const bool noAddrTMP = es && std::getenv("VP_GRC_EXP") && std::strstr(std::getenv("VP_GRC_EXP"), "noaddr");
+      if (!noAddrTMP && addressSplit(atext, s, es, gd, analyseFixed, r)) {
+        if (es) gtraceTMP("addressSplit", atext);
         s = std::move(r);
         whenRepaired = true;
         repairWhat = "an address before or after a comma analysed apart as a vocative (ὦ ...): check it";
       } else if (es && venImperative(atext, fb, s, r)) {
+        gtraceTMP("venImperative", atext);
         s = std::move(r);
         whenRepaired = true;
         repairWhat = "\"ven\" read as \"they see\": read as the command of venir: check it";
@@ -2105,10 +2049,12 @@ struct GreekPath::Impl {
         whenRepaired = true;
         repairWhat = "\"" + pf + "\" read as an adjective: analysed again as the subject noun: check it";
       } else if (es && queVerb(atext, fb, s, esLex, r)) {
+        gtraceTMP("queVerb", atext);
         s = std::move(r);
         whenRepaired = true;
         repairWhat = "\"qué\" + a verb read as a noun phrase: analysed again as a question: check it";
       } else if (es && esVerbAsNoun(atext, fb, s, esLex, r)) {
+        gtraceTMP("esVerbAsNoun", atext);
         s = std::move(r);
         whenRepaired = true;
         repairWhat = "a verb read as a noun in a sentence without a verb: analysed again as the verb: check it";
@@ -2127,6 +2073,7 @@ struct GreekPath::Impl {
                             sb.frame[0].hasPred && sb.frame[0].type == frame::Kind::Decl);
       frame::SemSentence merged;
       if (!fine && frontedWhen(atext, fb, merged)) {
+        if (st.lang == frame::SrcLang::Es) gtraceTMP("frontedWhen", atext);
         s = std::move(merged);
         whenRepaired = true;
       }
@@ -2137,6 +2084,7 @@ struct GreekPath::Impl {
         whenRepaired = true;
         repairWhat = "\"-ing phrase, clause\" analysed in two parts (participle + main clause): check it";
       } else if (!whenRepaired && soThat(atext, fb, s, es, merged)) {
+        if (es) gtraceTMP("soThat", atext);
         s = std::move(merged);
         whenRepaired = true;
         repairWhat = "\"so ... that\" analysed in two parts (main clause + result clause): check it";
@@ -2149,38 +2097,39 @@ struct GreekPath::Impl {
         whenRepaired = true;
         repairWhat = "a wh question analysed from its auxiliary on (yes / no question + the wh word): check it";
       } else if (!whenRepaired && es && nadaVerb(atext, fb, s, merged)) {   // C25
+        gtraceTMP("nadaVerb", atext);
         s = std::move(merged);
         whenRepaired = true;
         repairWhat = "\"nada\" read as \"nothing\" in a sentence without a verb: read as the verb nadar: check it";
       } else if (!whenRepaired && es && familyFirst(atext, fb, s, merged)) {   // C31
+        gtraceTMP("familyFirst", atext);
         s = std::move(merged);
         whenRepaired = true;
         repairWhat = "\"papá / mamá\" read as a verb at the start: analysed again as the subject: check it";
       } else if (!whenRepaired && es && estarFragment(atext, fb, s, merged)) {   // C25
+        gtraceTMP("estarFragment", atext);
         s = std::move(merged);
         whenRepaired = true;
         repairWhat = "a subject with \"estar / ser\" read as a fragment: the verb phrase analysed alone: check it";
       }
     }
     // C31: Spanish clauses joined by a comma read as a time clause ("¡No corras, te vas a caer!" -> ὅτε οὐ τρέχεις)
+    if (esCommaGar(s)) gtraceTMP("esCommaGar", atext);
     if (esParataxis(s)) {
+      gtraceTMP("esParataxis", atext);
       if (!whenRepaired) repairWhat = "two clauses joined by a comma read as a time clause: coordinated: check it";
       whenRepaired = true;
     }
-    conmigo(s);   // C33
-    timeAttribute(s);   // C33: a fixed reading of a bare time word, not a guess (no flag)
-    // C33: the subject noun the parser made the root ("El maestro nos enseñó ..."): given back as the subject
-    if (esRootSubject(s)) {
-      if (!whenRepaired) repairWhat = "the subject noun read as the root of the sentence: given back as the subject: check it";
-      whenRepaired = true;
-    }
+    if (timeAttribute(s) && st.lang == frame::SrcLang::Es) gtraceTMP("timeAttribute", atext);   // C33: a fixed reading of a bare time word, not a guess (no flag)
     // C33: "al atardecer / al amanecer" read as a verb clause: the time phrase (a rebuilt structure: Check)
     if (timeInfinitive(s)) {
+      gtraceTMP("timeInfinitive", atext);
       if (!whenRepaired) repairWhat = "\"al atardecer / al amanecer\" read as a verb: analysed again as a time phrase: check it";
       whenRepaired = true;
     }
     // C31: the article and the adjectives of a noun hung on the verb ("The old king died." -> βασιλεὺς ἀπέθανεν)
     if ((whenRepaired || !frame::FrameBuilder::troubled(s)) && lostModifiers(s)) {
+      if (st.lang == frame::SrcLang::Es) gtraceTMP("lostModifiers", atext);
       if (!whenRepaired) repairWhat = "an article or adjective the parser hung on the verb given back to its noun: check it";
       whenRepaired = true;
     }
