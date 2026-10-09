@@ -6,7 +6,7 @@
 # Mateo (a classmate), a neighbour (señora) and an old man (señor) addressed with usted (rendered with tū).
 # Names: Pablo -> Paulus, Mateo -> Matthaeus, Sofía -> Sophia, Lucía -> Lūcia. Diminutives: the base noun (+ parvus)
 # or the classical diminutive when common (perrito -> catulus, niñito -> puerulus); abuelita -> avia.
-# C34 proposed gold alternatives (the last alternative of cues 16 17 20 22 25 26 27 56 63 66 76 86 92 94 104 119),
+# C34 proposed gold alternatives (the last alternative of cues 16 17 20 22 25 26 27 56 63 66 86 92 94 104 119 (76 vetoed by the main agent: lepus is the hare; cunīculus added to tiers_la.tsv with the gloss rabbit)),
 # added after the engine run: correct Latin the gold did not list (word order, Nōn / Minimē, tum, sērum as in cue 9,
 # lepus for "conejo" as tiers_la.tsv gives it for "rabbit", maneō as periphrasis_la.tsv gives it for exspectō);
 # docs/rules_es_notes.md "Spanish loop 2 (C34)". Veto freely.
@@ -85,7 +85,7 @@ Postrīdiē bene māne exiit. | Postrīdiē multō māne exiit. | Postrīdiē pr
 Multōs diēs ambulāvit. | Per multōs diēs ambulāvit. | Multōs diēs iter fēcit.
 Magnus aestus erat et valdē fessa erat. | Magnus erat aestus et valdē fessa erat. | Valdē calēbat et valdē fessa erat.
 Sub arbore cōnsēdit. | Sub arbore sēdit.
-Ibi cunīculum parvum invēnit. | Ibi parvum cunīculum invēnit. | Ibi cunīculum invēnit. | Ibi leporem parvum invēnit.
+Ibi cunīculum parvum invēnit. | Ibi parvum cunīculum invēnit. | Ibi cunīculum invēnit.
 Quō īs, parva testūdō? | Quō īs, testūdō parva?
 Ad mare eō. Vīsne mēcum venīre? | Ad mare eō. Vīsne venīre mēcum?
 Minimē, grātiās. Mare timeō. | Nōn, grātiās. Mare timeō. | Benignē. Mare timeō. | Minimē, grātiās. Mare mē terret.
