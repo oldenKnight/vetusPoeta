@@ -18,8 +18,8 @@ Last updated: 2026-10-05 (session 1, step 1 of the production process).
   missing, check `data/raw/dl-*.log` and rerun the curl commands (they resume with `-C -`).
 
 ## Next step (updated 2026-10-06, evening)
-- 74 tasks DONE through C34 / E18 (Latin loops 1-5, two acceptance loops, Greek loops 1-5, Orbergise on real material,
-  latinity toggle D18, Latin loops 6-8, Greek loops 6-8, Spanish-source loop C34, release passes R1-R7). No implementer running; every commit is pushed to
+- 77 tasks DONE through C35 / R8 (Latin loops 1-5, two acceptance loops, Greek loops 1-5, Orbergise on real material,
+  latinity toggle D18, Latin loops 6-8, Greek loops 6-8, Spanish-source loops C34 (Latin) and C35 (Greek), release passes R1-R8). No implementer running; every commit is pushed to
   claude/fervent-cannon-6qif8i. The tree is release-ready on Linux; nothing engineering-side is pending that does not
   need the owner's input (second file, main branch, Google Translate run, Windows smoke test).
 - Waiting on the owner: the Alice .srt (acceptance run: `tools/eval/run_eval.py --tuned`, then a tuning loop C18 on
