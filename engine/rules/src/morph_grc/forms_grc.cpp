@@ -701,6 +701,22 @@ bool generate(const lex::Lexicon& lx, uint32_t lemma, const Features& want0, std
     if (l.pos == Verb) bestForm = smoothAugment(bestForm, l.key);
     if (l.pos == Verb)
       if (const std::string eta = doubleAugment(bestForm, true); !eta.empty()) bestForm = eta;
+    // C31: compounds of ἔρχομαι whose aorist indicative cells lack the augment (ἐπανέρχομαι: ἐπάνελθον, ἐπανέλθομεν):
+    // Attic augments after the prefix, as ἦλθον: ἐπανῆλθον, ἐπανήλθομεν (the accent cannot go back past the augment)
+    if (l.pos == Verb && want.tense == Aorist && want.mood == Indicative) {
+      const std::string key(l.key);
+      const std::string erx = text::greek_key("έρχομαι");
+      const std::string elth = text::nfc("ελθ");
+      const std::string b = stripAccents(bestForm);
+      const size_t at = b.find(elth);
+      if (key.size() > erx.size() && key.compare(key.size() - erx.size(), erx.size(), erx) == 0 && at != std::string::npos &&
+          at > 0) {
+        const std::string ending = b.substr(at + elth.size());
+        const bool shortEnd = ending == text::nfc("ον") || ending == text::nfc("ες") || ending == text::nfc("ε") ||
+                              ending == text::nfc("εν");
+        bestForm = b.substr(0, at) + text::nfc(shortEnd ? "ῆλθ" : "ήλθ") + ending;
+      }
+    }
     out = bestForm;
     Features pf = unpack(bestPacked);
     gi.attic = (pf.extra & Attic) != 0;
@@ -712,6 +728,49 @@ bool generate(const lex::Lexicon& lx, uint32_t lemma, const Features& want0, std
     gi.movableNu = bestNu || movableNuCandidate(out, pf);
     if (info) *info = gi;
     return true;
+  }
+  // C31: a comparative in -τερος whose table lists only the citation form (νέος: νεώτερος) is declined by rule like
+  // an o / a-stem adjective, the accent on the penult when the ultima is long (νεωτέρου, νεωτέρᾳ, νεωτέρα), else where
+  // the citation form has it (νεώτερος, νεώτεροι, νεώτερα). From a rule: Check
+  if (want.pos == Adj && want.degree == Comparative && want.case_) {
+    for (const auto& c : cells) {
+      const Features cf = unpack(c.first);
+      if (cf.degree != Comparative || cf.case_ != 0) continue;
+      const std::string cit = cleanCell(c.second);
+      const std::string tail = text::nfc("ερος");
+      if (cit.size() <= tail.size() + 2 || cit.compare(cit.size() - tail.size(), tail.size(), tail) != 0) continue;
+      const std::string stemA = cit.substr(0, cit.size() - tail.size());   // νεώτ
+      const std::string stemB = stripAccents(stemA);                       // νεωτ
+      const uint8_t g = want.gender ? want.gender : (uint8_t)M;
+      const bool pl = want.number == Pl;
+      const char* shortEnd = nullptr;
+      const char* longEnd = nullptr;
+      switch (want.case_) {
+        case Nom: case Voc:
+          if (g == F) { if (pl) shortEnd = "εραι"; else longEnd = "έρα"; }
+          else if (g == N) shortEnd = pl ? "ερα" : "ερον";
+          else shortEnd = pl ? "εροι" : (want.case_ == Voc ? "ερε" : "ερος");
+          break;
+        case Acc:
+          if (g == F) longEnd = pl ? "έρας" : "έραν";
+          else if (g == N) shortEnd = pl ? "ερα" : "ερον";
+          else if (pl) longEnd = "έρους";
+          else shortEnd = "ερον";
+          break;
+        case Gen: longEnd = pl ? "έρων" : (g == F ? "έρας" : "έρου"); break;
+        case Dat: longEnd = pl ? (g == F ? "έραις" : "έροις") : (g == F ? "έρᾳ" : "έρῳ"); break;
+        default: break;
+      }
+      if (!shortEnd && !longEnd) break;
+      out = shortEnd ? stemA + text::nfc(shortEnd) : stemB + text::nfc(longEnd);
+      gi.fromRule = true;
+      Features pf = want;
+      pf.extra = 0;
+      gi.packed = pack(pf);
+      gi.movableNu = false;
+      if (info) *info = gi;
+      return true;
+    }
   }
   // rule paradigm (lemmas without a table only)
   if (paradigmApplies(l)) {
@@ -1072,7 +1131,7 @@ std::string restoreElided(std::string_view word) {
 void analyse(const lex::Lexicon& lx, std::string_view word, morph::Token& out) {
   // exact readings of the canonical spellings first: as written, grave -> acute, without the acute an enclitic
   // added, an orthotone enclitic, without a movable nu, an elided word restored
-  std::string cands[10];
+  std::string cands[12];
   int nc = 0;
   const std::string w0 = text::nfc(word);
   const std::string restored = restoreElided(w0);
@@ -1092,6 +1151,27 @@ void analyse(const lex::Lexicon& lx, std::string_view word, morph::Token& out) {
   // C29: ἠνυπνίασε written by generate() for a table's ἐἐνυπνίασε (see doubleAugment): the table's spelling
   const std::string twoAug = doubleAugment(w0, false);
   if (!twoAug.empty()) cands[nc++] = twoAug;
+  // C31: ἐπανῆλθον / ἐπανήλθομεν written by generate() for a table's unaugmented ἐπάνελθον / ἐπανέλθομεν (compounds of
+  // ἔρχομαι): the table's spellings (the accent on the stem, or on the prefix's last vowel)
+  {
+    const std::string b = stripAccents(w0);
+    const std::string elth = text::nfc("ηλθ");
+    const size_t at = b.find(elth);
+    if (at != std::string::npos && at > 0 && (w0.find(text::nfc("ῆλθ")) != std::string::npos ||
+                                              w0.find(text::nfc("ήλθ")) != std::string::npos)) {
+      const std::string pre = b.substr(0, at), ending = b.substr(at + elth.size());
+      cands[nc++] = pre + text::nfc("έλθ") + ending;
+      std::u32string u = text::toUtf32(text::nfd(pre));
+      for (size_t i = u.size(); i-- > 0;)
+        if (vowel(u[i])) {
+          size_t j = i + 1;
+          while (j < u.size() && u[j] >= 0x0300 && u[j] <= 0x036F) ++j;
+          u.insert(u.begin() + (long)j, (char32_t)0x0301);
+          break;
+        }
+      cands[nc++] = text::nfc(text::toUtf8(u)) + text::nfc("ελθ") + ending;
+    }
+  }
   const std::string w1 = dropEncliticAcute(ultimaToAcute(w0));
   if (w1 != w0) cands[nc++] = w1;
   if (accentOf(w1).accents == 0 && accentOf(w1).syllables >= 2) cands[nc++] = encliticAccented(w1);

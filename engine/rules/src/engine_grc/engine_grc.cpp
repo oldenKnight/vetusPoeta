@@ -370,6 +370,9 @@ bool whAuxiliary(const std::string& text, const frame::FrameBuilder& fb, const f
     return false;
   };
   auto doAux = [&](size_t k) { return s.tokens[k].lower == "do" || s.tokens[k].lower == "does" || s.tokens[k].lower == "did"; };
+  // C31: "When will the war end?" / "Will the rain stop?" (the verb read as a noun: "the end of the war"): with will /
+  // can the statement without the auxiliary is analysed as with do, the tense or the modal taken from the auxiliary
+  auto modalAux = [&](size_t k) { return s.tokens[k].lower == "will" || s.tokens[k].lower == "can"; };
   const std::string w0 = s.tokens[0].lower;
   size_t k = 0;
   enum { WhAdverb, HowMany, YesNo } mode;
@@ -391,6 +394,10 @@ bool whAuxiliary(const std::string& text, const frame::FrameBuilder& fb, const f
              !f0.hasSubject) {
     k = 0;
     mode = YesNo;
+  } else if (modalAux(0) && !f0.hasPred && (f0.type == frame::Kind::Frag || f0.type == frame::Kind::Yn) &&
+             s.tokens.size() >= 4) {   // C31
+    k = 0;
+    mode = YesNo;
   } else {
     return false;
   }
@@ -408,7 +415,7 @@ bool whAuxiliary(const std::string& text, const frame::FrameBuilder& fb, const f
                       !(doAux(k) && text::lower(sb.units[0].frame.pred.lemma) == "do");
     if (!good) sb = frame::SemSentence{};
   }
-  if (sb.units.empty() && doAux(k) && k + 1 < s.tokens.size()) {
+  if (sb.units.empty() && (doAux(k) || modalAux(k)) && k + 1 < s.tokens.size()) {
     // the statement without the auxiliary, its bare verb in the past only so that the tagger reads it as a verb
     // ("Did the dog bark?" -> "The dog barked.", "Why do the dogs bark?" -> "The dogs barked."); the tense comes
     // from the auxiliary. Each word after the first is tried in turn (C11's English inflection, la2x/internal.h).
@@ -461,7 +468,9 @@ bool whAuxiliary(const std::string& text, const frame::FrameBuilder& fb, const f
   for (int t = 0; t < (int)keep; ++t) nf.tokens.insert(nf.tokens.begin() + t, t);
   if (fromStatement) {
     nf.pred.auxTokens.push_back((int)k);
-    nf.pred.tense = s.tokens[k].lower == "did" ? frame::Tense::Past : frame::Tense::Present;
+    nf.pred.tense = s.tokens[k].lower == "did" ? frame::Tense::Past
+                    : s.tokens[k].lower == "will" ? frame::Tense::Future : frame::Tense::Present;   // C31: will
+    if (s.tokens[k].lower == "can") nf.pred.modality = frame::Modality::Can;
     nf.pred.aspect = frame::Aspect::Simple;
   }
   nf.type = mode == YesNo ? frame::Kind::Yn : frame::Kind::Wh;
@@ -705,6 +714,247 @@ bool nounAsAdj(const std::string& text, const frame::FrameBuilder& fb, const fra
   return false;
 }
 
+
+// ---- C31: modifiers the parser hung on the verb ("The old king died.") -------------------------------------------
+// The tokens a frame uses (every NP, adjective, adverb, predicate and wh token), recursively.
+void usedNP(const frame::SemNP& n, std::vector<int>& u);
+void usedFrame(const frame::SemFrame& f, std::vector<int>& u) {
+  auto add = [&u](int t) { if (t >= 0) u.push_back(t); };
+  add(f.pred.token);
+  add(f.pred.complementToken);
+  for (int t : f.pred.auxTokens) add(t);
+  if (f.hasSubject) usedNP(f.subject, u);
+  if (f.hasObject) usedNP(f.object, u);
+  if (f.hasIndirect) usedNP(f.indirectObject, u);
+  for (const auto& o : f.obliques) { add(o.token); usedNP(o.np, u); }
+  for (const auto& n : f.predicative) usedNP(n, u);
+  for (const auto& a : f.predAdj) { add(a.token); for (int t : a.advTokens) add(t); }
+  for (const auto& n : f.vocatives) usedNP(n, u);
+  for (const auto& a : f.adverbs) add(a.token);
+  for (const auto& sb : f.subordinate) for (const auto& x : sb.frame) usedFrame(x, u);
+  add(f.wh.token);
+  for (const auto& n : f.objComplement) usedNP(n, u);
+  for (const auto& a : f.objComplementAdj) { add(a.token); for (int t : a.advTokens) add(t); }
+  for (const auto& x : f.secondary) usedFrame(x, u);
+}
+void usedNP(const frame::SemNP& n, std::vector<int>& u) {
+  if (n.token >= 0) u.push_back(n.token);
+  for (int t : n.tokens) if (t >= 0) u.push_back(t);
+  for (const auto& p : n.possessor) usedNP(p, u);
+  for (const auto& a : n.adjectives) {
+    if (a.token >= 0) u.push_back(a.token);
+    for (int t : a.advTokens) if (t >= 0) u.push_back(t);
+  }
+  for (const auto& g : n.genitive) usedNP(g, u);
+  for (const auto& r : n.relative) usedFrame(r, u);
+  for (const auto& k : n.coord) usedNP(k, u);
+}
+
+// The adjectives and the article right before an NP's head that no part of the analysis uses (the parser hung them on
+// the verb: "The/det>died old/amod>died king died.") are given back to the NP. Also a clause without a subject whose
+// noun before the verb was made a compound of it ("The old king died yesterday." lost the king). English only; true
+// when something was given back (the analysis is then a repair: Check).
+bool lostModifiers(frame::SemSentence& s) {
+  if (s.lang != frame::SrcLang::En) return false;
+  std::vector<int> used;
+  for (const frame::Unit& u : s.units) if (u.type == frame::Unit::Clause) usedFrame(u.frame, used);
+  auto isUsed = [&](int t) { return std::find(used.begin(), used.end(), t) != used.end(); };
+  bool changed = false;
+  auto fixNP = [&](frame::SemNP& n) {
+    if (n.isPronoun || n.isName || n.token <= 0 || (size_t)n.token >= s.tokens.size()) return;
+    if (s.tokens[(size_t)n.token].upos != "NOUN") return;
+    for (int j = n.token - 1; j >= 0; --j) {
+      const nlp::Token& t = s.tokens[(size_t)j];
+      if (isUsed(j) || t.head - 1 == n.token) break;   // the parser's own NP, or a word in use elsewhere
+      if (t.upos == "ADJ") {
+        frame::SemAdj a;
+        a.lemma = t.lemma.empty() ? t.lower : t.lemma;
+        a.token = j;
+        n.adjectives.insert(n.adjectives.begin(), a);
+      } else if (t.upos == "DET" && (t.lower == "the" || t.lower == "a" || t.lower == "an")) {
+        if (n.determiner.empty()) n.determiner = t.lower == "the" ? "the" : "a";
+        n.definite = t.lower == "the";
+      } else {
+        break;
+      }
+      n.tokens.push_back(j);
+      used.push_back(j);
+      changed = true;
+      if (t.upos == "DET") break;
+    }
+  };
+  std::function<void(frame::SemFrame&)> visit = [&](frame::SemFrame& f) {
+    // a subject noun made a compound of the verb
+    if (f.hasPred && !f.hasSubject && f.type == frame::Kind::Decl && f.pred.token > 0) {
+      for (int j = f.pred.token - 1; j >= 0; --j) {
+        const nlp::Token& t = s.tokens[(size_t)j];
+        if (t.upos != "NOUN" || isUsed(j) || t.head - 1 != f.pred.token || t.deprel != "compound")
+          continue;
+        frame::SemNP n;
+        n.head = t.lemma.empty() ? t.lower : t.lemma;
+        n.surface = t.text;
+        n.token = j;
+        n.tokens = {j};
+        n.number = nlp::morph::get(t.feats, nlp::morph::NumberShift) == nlp::morph::NumPlur ? 2 : 1;
+        f.hasSubject = true;
+        f.subject = n;
+        f.implicitSubject = false;
+        used.push_back(j);
+        changed = true;
+        break;
+      }
+    }
+    if (f.hasSubject) fixNP(f.subject);
+    if (f.hasObject) fixNP(f.object);
+    if (f.hasIndirect) fixNP(f.indirectObject);
+    for (auto& o : f.obliques) fixNP(o.np);
+    for (auto& sb : f.subordinate) for (auto& x : sb.frame) visit(x);
+  };
+  for (frame::Unit& u : s.units) if (u.type == frame::Unit::Clause) visit(u.frame);
+  if (changed)
+    for (size_t i = 0; i < s.drop.size() && i < s.tokens.size(); ++i)
+      if (s.drop[i] != frame::Drop::No && std::find(used.begin(), used.end(), (int)i) != used.end() &&
+          s.tokens[i].upos == "ADJ")
+        s.drop[i] = frame::Drop::No;
+  return changed;
+}
+
+// C31: Spanish "Papá está en el jardín." / "Mamá está cansada.": a sentence-initial papá / mamá the tagger reads as a
+// verb (papar, mamar: "Ἴσθι ἐν τῷ κήπῳ [papá]", Fix). The rest from the verb on is analysed alone and the word becomes
+// its subject (ὁ πατήρ). False when the sentence does not have that shape.
+bool familyFirst(const std::string& text, const frame::FrameBuilder& fb, const frame::SemSentence& s,
+                 frame::SemSentence& out) {
+  if (s.lang != frame::SrcLang::Es || s.tokens.size() < 3 || s.units.empty()) return false;
+  const nlp::Token& t0 = s.tokens[0];
+  if (!(t0.lower == "papá" || t0.lower == "mamá") || t0.upos != "VERB") return false;
+  const nlp::Token& t1 = s.tokens[1];
+  if (t1.upos != "VERB" && t1.upos != "AUX") return false;
+  const size_t off = (size_t)t1.start;
+  std::string part = text.substr(off);
+  if (!part.empty() && part[0] >= 'a' && part[0] <= 'z') part[0] = (char)(part[0] - 'a' + 'A');
+  else if (part.size() > 1 && (unsigned char)part[0] == 0xC3 && (unsigned char)part[1] >= 0xA0 && (unsigned char)part[1] <= 0xBF)
+    part[1] = (char)((unsigned char)part[1] - 0x20);
+  frame::SemSentence sb;
+  fb.analyse(part, sb);
+  if (sb.units.size() != 1 || sb.units[0].type != frame::Unit::Clause || !sb.units[0].frame.hasPred ||
+      sb.units[0].frame.type != frame::Kind::Decl)
+    return false;
+  const frame::SemFrame& g = sb.units[0].frame;
+  if (g.hasSubject && !(g.subject.isPronoun && g.subject.token < 0 && g.subject.pron.person == 3)) return false;
+  out = s;
+  out.tokens.resize(1);
+  out.tokens[0].upos = "NOUN";
+  out.tokens[0].lemma = t0.lower;
+  out.drop.assign(1, frame::Drop::No);
+  for (size_t i = 0; i < sb.tokens.size(); ++i) {
+    nlp::Token t = sb.tokens[i];
+    t.start += (int)off;
+    t.end += (int)off;
+    out.tokens.push_back(t);
+    out.drop.push_back(i < sb.drop.size() ? sb.drop[i] : frame::Drop::No);
+  }
+  frame::SemFrame nf = g;
+  shiftFrame(nf, 1);
+  frame::SemNP n;
+  n.head = t0.lower;
+  n.surface = t0.text;
+  n.token = 0;
+  n.tokens = {0};
+  n.number = 1;
+  n.definite = true;
+  n.srcGender = t0.lower == "mamá" ? feat::F : feat::M;
+  nf.hasSubject = true;
+  nf.implicitSubject = false;
+  nf.subject = n;
+  nf.tokens.insert(nf.tokens.begin(), 0);
+  out.units.resize(1);
+  out.units[0] = sb.units[0];
+  out.units[0].frame = std::move(nf);
+  out.units[0].first = 0;
+  out.units[0].last = (int)out.tokens.size() - 1;
+  out.finalPunct = sb.finalPunct;
+  for (const std::string& r : sb.repairs) out.repairs.push_back(r);
+  for (const std::string& d : sb.doubts) out.doubt(d.c_str());
+  return true;
+}
+
+// C31: Spanish clauses joined by a comma without a conjunction ("¡No corras, te vas a caer!", "¡Cierra la puerta, hace
+// frío!", "Tengo sed, ¿me das agua?"): the parser hangs one on the other as an adverbial clause and the frame builder
+// makes it a time clause ("ὅτε οὐ τρέχεις, πεσεῖ", rated OK). A time clause with no subordinating word in or right
+// before it and a comma between it and its main clause is coordinated instead: the first clause is the main one and
+// the second follows it (a statement after a command takes γάρ in the transfer); a question after "¿" becomes a unit
+// of its own. True when something was changed.
+bool esParataxis(frame::SemSentence& s) {
+  if (s.lang != frame::SrcLang::Es) return false;
+  static const char* const kMark[] = {"cuando", "mientras", "si", "después", "antes", "hasta", "apenas", "desde",
+                                      "que", "porque", "aunque", "como", "donde", "mientras", "luego", nullptr};
+  bool changed = false;
+  for (size_t ui = 0; ui < s.units.size(); ++ui) {
+    if (s.units[ui].type != frame::Unit::Clause || s.units[ui].vocative) continue;
+    frame::SemFrame& f = s.units[ui].frame;
+    for (size_t si = 0; si < f.subordinate.size(); ++si) {
+      const frame::SemSub& sb = f.subordinate[si];
+      if (sb.relation != frame::Relation::Time || sb.frame.empty() || !sb.frame[0].hasPred || !f.hasPred) continue;
+      std::vector<int> toks;
+      usedFrame(sb.frame[0], toks);
+      if (toks.empty()) continue;
+      const int lo = *std::min_element(toks.begin(), toks.end()), hi = *std::max_element(toks.begin(), toks.end());
+      bool marked = false;
+      for (int t = std::max(0, lo - 2); t <= hi && (size_t)t < s.tokens.size(); ++t)
+        for (const char* const* m = kMark; *m; ++m) marked = marked || s.tokens[(size_t)t].lower == *m;
+      if (marked) continue;
+      // a comma between the two clauses
+      const int mp = f.pred.token;
+      const int a = sb.before ? hi : mp, b = sb.before ? mp : lo;
+      int comma = -1;
+      for (int t = a + 1; t < b && (size_t)t < s.tokens.size(); ++t)
+        if (s.tokens[(size_t)t].text == ",") comma = t;
+      if (comma < 0) continue;
+      frame::SemFrame subF = sb.frame[0];
+      frame::SemFrame mainF = f;
+      mainF.subordinate.erase(mainF.subordinate.begin() + (long)si);
+      frame::SemFrame& first = sb.before ? subF : mainF;
+      frame::SemFrame& second = sb.before ? mainF : subF;
+      // "¡No corras, ...!": "no" + a 2nd-person present subjunctive is a prohibition, not a statement
+      if (first.type == frame::Kind::Decl && first.negative && first.pred.token >= 0 &&
+          (size_t)first.pred.token < s.tokens.size()) {
+        const uint32_t ft = s.tokens[(size_t)first.pred.token].feats;
+        if (nlp::morph::get(ft, nlp::morph::MoodShift) == nlp::morph::MoodSub &&
+            nlp::morph::get(ft, nlp::morph::PersonShift) == nlp::morph::Pers2) {
+          first.type = frame::Kind::Imp;
+          first.hasSubject = false;
+          first.imperativePlural = nlp::morph::get(ft, nlp::morph::NumberShift) == nlp::morph::NumPlur;
+        }
+      }
+      // "¿" after the comma: the second clause alone is the question
+      int inv = -1;
+      for (size_t t = 0; t < s.tokens.size(); ++t)
+        if (s.tokens[t].text == "\xC2\xBF") inv = (int)t;
+      if (inv > comma) {
+        if (first.type == frame::Kind::Yn) first.type = frame::Kind::Decl;
+        if (second.type == frame::Kind::Decl) second.type = frame::Kind::Yn;
+        frame::Unit u1 = s.units[ui], u2 = s.units[ui];
+        u1.frame = first;
+        u2.frame = second;
+        u1.last = comma - 1;
+        u1.sepAfter = ",";
+        u2.first = comma + 1;
+        s.units[ui] = u1;
+        s.units.insert(s.units.begin() + (long)ui + 1, u2);
+      } else {
+        frame::SemSub co;
+        co.relation = frame::Relation::Coord;
+        co.before = false;
+        co.frame.push_back(second);
+        first.subordinate.push_back(co);
+        s.units[ui].frame = first;
+      }
+      changed = true;
+      break;
+    }
+  }
+  return changed;
+}
 
 // The frame (of any unit, subordinate or secondary clause) whose predicate is token `tok`; null when none.
 frame::SemFrame* predAt(frame::SemFrame& f, int tok) {
@@ -1098,7 +1348,12 @@ bool addressSplit(const std::string& text, const frame::SemSentence& s, bool es,
     const std::vector<size_t> head = tokensIn(0, lc);
     if (!head.empty() && isAddress(tail, false)) {
       const nlp::Token& hl = s.tokens[head.back()];
-      const bool apposition = (hl.upos == "NOUN" || hl.upos == "PROPN") && !question && !bang;
+      // C31: not after a command ("Cuéntanos un cuento, papá." was "καὶ πατέρα": the head has an imperative verb)
+      bool command = false;
+      for (size_t i : head)
+        command = command || (s.tokens[i].upos == "VERB" &&
+                              nlp::morph::get(s.tokens[i].feats, nlp::morph::MoodShift) == nlp::morph::MoodImp);
+      const bool apposition = (hl.upos == "NOUN" || hl.upos == "PROPN") && !question && !bang && !command;
       if (!apposition) {
         std::string ht = text.substr(0, lc);
         while (!ht.empty() && ht.back() == ' ') ht.pop_back();
@@ -1334,7 +1589,14 @@ struct GreekPath::Impl {
                     std::vector<std::string>& flags, std::vector<transfer::Choice>& choices, std::vector<int>& covered,
                     std::vector<std::string>& unknown) {
     std::string greekText = m.latin;
-    if (mem.addresseePlural && greekText.find(' ') == std::string::npos) {   // "plural χαίρετε"
+    // C31: a plural address in the same sentence ("Children, be quiet!" -> ὦ παῖδες, σιγᾶτε; σίγα was produced)
+    bool plAddr = mem.addresseePlural;
+    for (const frame::Unit& u : s.units) {
+      if (u.vocative && u.frame.hasSubject && u.frame.subject.number == 2 && !u.frame.subject.isPronoun) plAddr = true;
+      if (u.type == frame::Unit::Clause)
+        for (const frame::SemNP& v : u.frame.vocatives) plAddr = plAddr || v.number == 2;
+    }
+    if (plAddr && greekText.find(' ') == std::string::npos) {   // "plural χαίρετε"
       const size_t p = m.note.find("plural");
       if (p != std::string::npos) {
         size_t a = p + 6;
@@ -1691,11 +1953,25 @@ struct GreekPath::Impl {
         s = std::move(merged);
         whenRepaired = true;
         repairWhat = "\"nada\" read as \"nothing\" in a sentence without a verb: read as the verb nadar: check it";
+      } else if (!whenRepaired && es && familyFirst(atext, fb, s, merged)) {   // C31
+        s = std::move(merged);
+        whenRepaired = true;
+        repairWhat = "\"papá / mamá\" read as a verb at the start: analysed again as the subject: check it";
       } else if (!whenRepaired && es && estarFragment(atext, fb, s, merged)) {   // C25
         s = std::move(merged);
         whenRepaired = true;
         repairWhat = "a subject with \"estar / ser\" read as a fragment: the verb phrase analysed alone: check it";
       }
+    }
+    // C31: Spanish clauses joined by a comma read as a time clause ("¡No corras, te vas a caer!" -> ὅτε οὐ τρέχεις)
+    if (esParataxis(s)) {
+      if (!whenRepaired) repairWhat = "two clauses joined by a comma read as a time clause: coordinated: check it";
+      whenRepaired = true;
+    }
+    // C31: the article and the adjectives of a noun hung on the verb ("The old king died." -> βασιλεὺς ἀπέθανεν)
+    if ((whenRepaired || !frame::FrameBuilder::troubled(s)) && lostModifiers(s)) {
+      if (!whenRepaired) repairWhat = "an article or adjective the parser hung on the verb given back to its noun: check it";
+      whenRepaired = true;
     }
     if (!whenRepaired && allowSplit && frame::FrameBuilder::troubled(s)) {
       const std::vector<size_t> pts = frame::FrameBuilder::splitPoints(text);
@@ -2393,7 +2669,7 @@ struct GreekPath::Impl {
       for (const char* f : {"name-guessed", "from-rule", "addressee-guess", "missing-form", "merged", "frame-fallback",
                             "realia", "name-kept", "contact-relative", "noun-infinitive", "purpose-guess", "light-verb",
                             "phrase-order", "participle-phrase", "ellipsis", "clause-repair", "wh-statement", "det-adverb",
-                            "past-form", "subject-guess", "fragment", "free-relative", "speech-inversion"})
+                            "past-form", "subject-guess", "fragment", "free-relative", "speech-inversion", "idiom"})
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       for (const transfer::Choice& c : a.choices)
         if (c.lowTier) {

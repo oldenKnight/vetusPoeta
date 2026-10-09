@@ -29,6 +29,8 @@
 #         ἐλυπήθη); kind noun (a fixed noun used only when greek.vpl has the lemma, else the realia row of the same source).
 #   C29: verb rows may have frame "clause" (only when the verb has a that / que clause or an infinitive: "esperar que"
 #         -> ἐλπίζω, while "esperar a" stays μένω).
+#   C31: verb rows may have frame "noobj-mid" (the middle voice whenever the verb has no object, places allowed: "hid
+#         behind the door" -> ἐκρύψατο); state rows may give "adverb(s) + verb" ("right" -> ὀρθῶς λέγω: ὀρθῶς λέγεις).
 #   source: English (or Spanish) lemma(s), lower case. greek: the Greek lemma as in greek.vpl (headword without length
 #   marks). Spanish sources mirror the English rows (the Spanish frame builder keeps Spanish content lemmas).
 phrasal	come back	ἐπανέρχομαι		
@@ -456,3 +458,92 @@ ptc	cansado	κάμνω
 ptc	enojado	ὀργίζω	pass	
 ptc	enfadado	ὀργίζω	pass	
 ptc	asustado	φοβέω	mid	
+# C31 (Greek loop 7): "muchacho / chico" -> παῖς (ὄρπηξ "sapling" and μικρόν "small" were chosen; νεανίας for a young
+# man), Spanish children's nouns the reverse index or the English pivot rendered with a wrong, poetic or figurative sense
+# (probe of 151 nouns: bebé -> ποτόν, cuerpo -> ψυχή, muerte -> πάθος, ejército -> στόμα, estrella -> λέμνα, roca ->
+# πέλεια, cabra -> κόρη, oveja -> μῆλον, mentira -> ἀλήθεια, verdad -> ναμέρτεια ...), intransitive "end" ->
+# τελευτάω (διοίσει was chosen), "end" + a thing -> παύω, "bleed" (engine: αἷμα ῥεῖ + the dative of the person).
+noun	muchacho	παῖς		C31: "el muchacho" -> ὁ παῖς, "¡ven, muchacho!" -> ὦ παῖ (ὄρπηξ is a poetic sapling)
+noun	muchachos	παῖς		
+noun	chico	παῖς		C31: "el chico" -> ὁ παῖς (μικρόν "the small thing" was chosen)
+noun	chicos	παῖς		
+noun	muchacha	κόρη		
+noun	chica	κόρη		
+noun	chicas	κόρη		
+noun	lad	νεανίας		
+noun	youth	νεανίας		
+noun	joven	νεανίας		C31: "el joven" as a noun (the adjective stays νέος)
+noun	jóvenes	νεανίας		
+noun	bebé	βρέφος		C31: ποτόν "a drink" came through the pivot (beber)
+noun	hija	θυγάτηρ		
+noun	oveja	πρόβατον		C31: μῆλον is the Homeric sheep (and the apple)
+noun	ovejas	πρόβατον		
+noun	cabra	αἴξ		
+noun	roca	πέτρα		C31: πέλεια "dove" came through the pivot
+noun	estrella	ἀστήρ		
+noun	hora	ὥρα		
+noun	ejército	στρατιά		C31: στόμα "mouth" (the front of an army) came through the reverse index
+noun	cuerpo	σῶμα		C31: ψυχή was chosen
+noun	vida	βίος		
+noun	muerte	θάνατος		C31: πάθος was chosen
+noun	verdad	ἀλήθεια		C31: ναμέρτεια is poetic
+noun	mentira	ψεῦδος		C31: ἀλήθεια "truth" was chosen
+noun	ira	ὀργή		
+noun	cueva	σπήλαιον		
+noun	mercado	ἀγορά		
+noun	fruta	καρπός		C31: σάρξ "flesh" was chosen
+noun	carne	κρέας		
+noun	batalla	μάχη		
+noun	escudo	ἀσπίς		
+noun	juguete	παίγνιον		
+noun	cuento	μῦθος		
+noun	nariz	ῥίς		
+noun	silla	καθέδρα		
+noun	sangre	αἷμα		
+noun	blood	αἷμα		
+verb	end	τελευτάω	intr	C31: "the war will end" -> ὁ πόλεμος τελευτήσει (διοίσει was chosen; παύσεται is the alternative)
+verb	end	παύω	thing	C31: "they ended the war" -> τὸν πόλεμον ἔπαυσαν
+verb	end	τελευτάω		C31: "the war ended in the spring"
+verb	terminar	τελευτάω	intr	C31: "la guerra terminará" -> ὁ πόλεμος τελευτήσει (περανεῖ was chosen)
+verb	acabar	τελευτάω	intr	C31: "la guerra acabó" -> ὁ πόλεμος ἐτελεύτησεν (ἧξεν was chosen)
+verb	hide	κρύπτω	noobj-mid	C31: frame noobj-mid = the middle without an object, places allowed ("The girl hid behind the door." -> ἐκρύψατο; ἔκρυψεν was produced)
+verb	esconderse	κρύπτω	mid	C31: "se escondió detrás de la puerta" -> ἐκρύψατο
+state	well	ὑγιαίνω	verb	C31: "I hope you are well" -> ἐλπίζω σε ὑγιαίνειν (σε ἄλλον εἶναι was produced)
+state	right	ὀρθῶς λέγω	verb	C31: "you are right" -> ὀρθῶς λέγεις (an adverb + verb state row; εὐθύς "straight" was produced)
+state	tener razón	ὀρθῶς λέγω	verb	C31: "tienes razón" -> ὀρθῶς λέγεις
+# C31, after the Spanish blind batch (each with two or more own sentences in test_rules_grc7.cpp "C31 after the blind
+# check"): Spanish family words (papá -> πατήρ: [papá] was unknown), maestra (κύριος "master" was chosen; frame f = the
+# noun is feminine: ἡ διδάσκαλος), monte (Ὀδόμαντοι, a Thracian tribe, came through the pivot), tener hambre / sed,
+# contar un cuento (ἀριθμέω "count" was chosen), gritar (κλαίω), quemarse, dormirse / fall asleep, older / mayor.
+noun	papá	πατήρ		C31: "con papá" -> μετὰ τοῦ πατρός ([papá] was unknown)
+noun	abuela	τήθη		
+noun	abuelita	τήθη		
+noun	abuelo	πάππος		
+noun	abuelito	πάππος		
+noun	maestra	διδάσκαλος	f	C31: frame f = the noun is feminine (ἡ διδάσκαλος; κύριος was chosen)
+noun	monte	ὄρος		C31: Ὀδόμαντοι (a Thracian tribe) came through the pivot
+noun	tarde	ἑσπέρα		C31: "la tarde" (the evening); "tarde" as an adverb stays ὀψέ
+state	tener hambre	πεινάω	verb	C31: "tengo hambre" -> πεινῶ (λιμὸν ἔχω was produced)
+state	tener sed	διψάω	verb	C31: "tengo mucha sed" -> σφόδρα διψῶ
+state	tener sueño	νυστάζω	verb	
+verbobj	contar cuento	λέγω		C31: "cuéntame un cuento" -> λέξον μοι μῦθον (ἀρίθμησον "count" was chosen)
+verbobj	contar historia	λέγω		
+verb	gritar	βοάω		C31: κλαίω "weep" was chosen
+verb	quemarse	καίω	pass	C31: "te vas a quemar" -> καυθήσει (θύσεις "you will sacrifice" was produced)
+verb	quemar	καίω		
+verb	dormirse	κοιμάω	pass	C31: "se durmieron" -> ἐκοιμήθησαν (fell asleep; ἐκάθευδον "were sleeping"; greek.vpl has no καταδαρθάνω)
+phrasal	fall asleep	κοιμάω	pass	C31: "fell asleep" -> ἐκοιμήθησαν ([asleep] was left)
+subject	night come	γίγνομαι		C31: "when night came" -> ἐπεὶ νὺξ ἐγένετο (ἧκεν, ἀφίκετο "arrived")
+subject	night fall	γίγνομαι		C31: "when night fell" -> ἐπεὶ νὺξ ἐγένετο (ἔπεσεν "fell down" was produced)
+subject	morning come	γίγνομαι		
+subject	day come	γίγνομαι		
+subject	winter come	γίγνομαι		
+subject	noche llegar	γίγνομαι		C31: "cuando llegó la noche" -> ἐπεὶ ἡ νὺξ ἐγένετο
+subject	noche caer	γίγνομαι		
+subject	mañana llegar	γίγνομαι		
+subject	día llegar	γίγνομαι		
+subject	invierno llegar	γίγνομαι		
+subject	verano llegar	γίγνομαι		
+verb	subir	ἀναβαίνω		C31: "subió al monte" -> εἰς τὸ ὄρος ἀνέβη (ὤφελλεν was produced)
+verb	bajar	καταβαίνω		
+noun	hierba	πόα		C31: ἄρωμα "spice" came through the pivot

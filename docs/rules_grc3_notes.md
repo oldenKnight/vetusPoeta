@@ -613,3 +613,165 @@ subject), a leading Spanish one ("Niña, ¿por qué lloras?"), an English one ta
   (ἔκρυψεν, transitive), "hope you are well" (σε ἄλλον εἶναι), "I think that you are right" (εὐθύν), lexical choices
   of the reverse index for tear / draw / lend / lay / shoot / swear (Check), "Children, be quiet!" -> σίγα (the
   phrasebook row is singular).
+
+# Loop 7 (C31) — boy, end, bleed, acc + inf read back, the old king, Spanish blind batch
+
+## Blind check sentences (Spanish, written at 08:00 UTC 2026-10-09 at the start of C31, before any change; output not looked at until the end)
+Children's-book dialogue in Mexican Spanish, our own sentences, none from a sample, the regression file or an earlier
+blind list.
+1. Mamá, ¿puedo jugar con mis amigos en el patio?
+2. El perro de mi abuelo duerme debajo de la mesa.
+3. ¡No corras, te vas a caer!
+4. ¿Quién se comió las manzanas?
+5. Mañana vamos a ir al río con papá.
+6. La niña le dio una flor a su maestra.
+7. Tengo mucha sed, ¿me das agua?
+8. Los pájaros cantan en el árbol cada mañana.
+9. ¿Por qué estás tan triste, hermanito?
+10. El gato persiguió al ratón por toda la casa.
+11. Cuando llegó la noche, los niños se durmieron.
+12. Mi hermana mayor sabe leer muy bien.
+13. ¡Cierra la puerta, hace frío!
+14. El pastor perdió una oveja en el monte.
+15. No encontramos la pelota en el jardín.
+16. ¿Dónde dejaste mi sombrero?
+17. El rey tenía tres hijas muy hermosas.
+18. Ayer vimos un barco grande en el mar.
+19. Abuela, cuéntame un cuento, por favor.
+20. Los soldados volvieron a casa después de la guerra.
+
+## Blind check result (C31)
+First run (08:42 UTC 2026-10-09, after work items 1-6, before any fix for these sentences; built from HEAD caaab3a +
+the C31 files in an isolated copy): **6 / 20** acceptable Attic of the same meaning (1, 9, 15, 16, 17, 18). Not
+acceptable: #2 "debajo de la mesa" read as the object (τὴν τράπεζαν καθεύδει), #3 "¡No corras, te vas a caer!" ->
+"ὅτε οὐ τρέχεις, πεσεῖ" (**OK and wrong**: the comma clause made a time clause), #4 "se comió" -> τίς αὐτῷ ...
+(the aspectual se as a dative), #5 [papá] unknown, #6 the doubled clitic (αὐτῷ ... τῷ κυρίῳ) and maestra -> κύριος
+"master", #7 "ἔχω πολλὴν δίψαν ὅτε μοι ὕδωρ δίδως" (a comma clause again), #8 "cada mañana" -> πάσῃ ἕῳ (Fix), #10 "por
+toda la casa" -> παρὰ παντί ("beside"), #11 "Cuando llegó la noche" -> ἐπεὶ τῇ νυκτὶ ἀφίκετο (**OK and wrong**: the
+subject after the verb read as a time dative), #12 "mayor" -> μεγάλη "big", #13 "hace frío" -> "ὅτε κρύος ποιεῖ", #14
+monte -> [Ὀδόμαντοι] (a Thracian tribe, Fix), #19 [Abuela] unknown and cuéntame -> ἀρίθμησον "count", #20 [después de]
+and ἐπάνελθον (greek.vpl's unaugmented aorist of ἐπανέρχομαι, also on the English path). Wrong among OK on the first
+run: **2** (#3, #11). After the fixes (each with two or more own sentences in "C31 after the blind check", written at
+08:44 UTC before the fixes, none a blind sentence): **20 / 20**, wrong among OK 0. The first-run figure (6 / 20, against
+11 / 20 on the English batches of loops 4-6) is the one that predicts held-out behaviour: ES -> GRC is clearly behind
+EN -> GRC, mostly through Spanish parses the shared frame builder misreads (comma clauses, compound prepositions,
+clitics, a subject after its verb) and Spanish family words the pivot does not know.
+Note on independence: the personal "a" repair (work item 5, found through "Vi al viejo pastor") was made before the
+blind run and also touches #10 ("al ratón"); no other change before the run was aimed at a blind sentence.
+
+## Numbers (fidelity 2, speaker f, real data; HEAD caaab3a + the C31 files, isolated copy)
+| set | before C31 | after C31 |
+|---|---|---|
+| EN -> GRC own_dialogue (114) | 114 / 114, ok 81 / check 33 / fix 0 | 114 / 114, ok 81 / check 33 / fix 0 (report byte-identical) |
+| ES -> GRC lines 1-40 | 39 / 40 | 39 / 40 (report byte-identical) |
+| GRC -> EN / GRC -> ES (40) | 40 / 40, 40 / 40 | 40 / 40, 40 / 40 (report byte-identical) |
+| C16 ... C29 Greek suites | all green | all green (one C29 expectation corrected: "Children, be quiet!" -> σιγᾶτε, see below) |
+| C31 constructions (new) | - | EN 33 / 33, ES 21 / 21 |
+| C31 acc + inf GRC -> EN / ES (new) | - | 19 / 19 (English and Spanish exact) |
+| C31 after the blind check (new) | - | EN 8 / 8, ES 31 / 31, + morphology case (νεώτερος, ἐπανῆλθον) |
+| Spanish blind check (20) | - | first run 6 / 20 (2 wrong among OK), after 20 / 20 |
+| common-noun probe ("The X is here.", 173 EN, 151 ES nouns) | - | 13 EN and 28 ES nouns now get the Attic everyday word (listed below); the other probe outputs unchanged |
+| Latin suites | - | unchanged (no Latin file touched; ctest green) |
+
+## What changed
+* **(1) boy and the common nouns.** "muchacho / chico / chica / muchacha / joven" -> παῖς / κόρη / νεανίας by noun rows
+  (ὄρπηξ "sapling" and μικρόν "the small thing" were chosen); English "boy" was already παῖς (tiers note "boy" added
+  for the Spanish pivot), "lad / youth" -> νεανίας. A probe of 173 English and 151 Spanish children's nouns ("The X is
+  here.") found the reverse index's poetic, figurative or wrong senses; the commonest English ones got tiers_grc.tsv
+  teacher glosses (14 rows, 13 probe outputs changed): fruit καρπός (νίκη "victory"), lie ψεῦδος (ἀλήθεια!), morning ἕως (ἠώς poetic), month μήν (σελήνη),
+  back νῶτον (λόφος), shield ἀσπίς (σάκος), cave σπήλαιον (σπῆλυγξ), forest ὕλη (δρυμός), toy παίγνιον (ἄθυρμα), chair
+  καθέδρα (θᾶκος), roof στέγη (στέγος), life βίος (ψυχή), goddess θεά (ὁ θεός), young man νεανίας; old παλαιός (for
+  Spanish viejo: γεραιός is poetic). Spanish nouns by noun rows (the pivot fails there): bebé βρέφος (ποτόν "a drink"),
+  oveja πρόβατον (μῆλον), cabra αἴξ (κόρη), roca πέτρα (πέλεια "dove"), estrella ἀστήρ (λέμνα), hora ὥρα (γενετή),
+  ejército στρατιά (στόμα), cuerpo σῶμα (ψυχή), vida βίος, muerte θάνατος (πάθος), verdad ἀλήθεια (ναμέρτεια), mentira
+  ψεῦδος, ira ὀργή (unknown), cueva, mercado, fruta, carne, batalla, escudo, juguete, cuento, nariz, silla, sangre,
+  hierba πόα (ἄρωμα). A Spanish adjective used as a noun with a noun row is that noun ("La anciana duerme." -> ἡ γραῦς;
+  τὸ παλαιόν was produced).
+* **(2) end.** Verb rows: intransitive "end / terminar / acabar" -> τελευτάω ("the war will end" -> ὁ πόλεμος
+  τελευτήσει; διοίσει, περανεῖ, ἧξεν were produced), "end" + a thing -> παύω (τὸν πόλεμον ἔπαυσαν), any other "end"
+  -> τελευτάω. "When will the war end?" / "Will the rain stop?" (the verb read as a noun: "πότε τὸ τέλος πολέμου")
+  -> the C25 auxiliary repair (whAuxiliary) now also for will / can: the statement without the auxiliary, the tense
+  or modal from it (πότε ὁ πόλεμος τελευτήσει; Check).
+* **(3) bleed** (greek.vpl has no Attic verb; αἱμορραγέω is late): "blood flows" with the person in the dative (αἷμα
+  τῷ παιδὶ ῥεῖ, αἷμά μοι ῥεῖ) or out of the body part (αἷμα ἐκ τῆς ῥινός μου ῥεῖ; Spanish "me sangra la nariz" ->
+  αἷμά μοι ἐκ τῆς ῥινὸς ῥεῖ), the past as the imperfect (ἔρρει), "a lot / mucho" -> πολύ; new flag `idiom` (Check).
+  grc2x reads it back ("The boy bleeds.", "My nose bleeds.").
+* **(4) GRC -> EN / ES: accusative + infinitive** after ἐλπίζω / ὑπισχνέομαι / ὄμνυμι (hoping) and νομίζω / οἴομαι /
+  φημί / λέγω / ἡγέομαι (saying, thinking): the infinitive with its accusative subject (the first accusative before
+  it), its object or predicate and the adverbs and phrases on its side of the finite verb become a that-clause (frame
+  Relation::Complement): "ἐλπίζω σε αὔριον ἥξειν" -> "I hope that you will come tomorrow" / "Espero que llegues
+  mañana" (the Spanish subjunctive after esperar), "νομίζω σε σοφὸν εἶναι" -> "I think that you are wise" / "Creo que
+  eres sabio"; the tense from the infinitive (future, or aorist after hoping: "will"; aorist after saying: the past).
+  A catenative complement is no longer lost ("ἐλπίζομεν νικήσειν" -> "We hope to win", "κελεύω σε ἐλθεῖν" -> "I order
+  you to come"). "have come" (ἥκω) in the future -> "will come". readable_grc.tsv: βασιλεύς king (the lexicon's
+  "chief"), φημί say, νομίζω / οἴομαι think, κελεύω order, τελευτάω end, παύω (mid) stop, αὔριον tomorrow (Spanish
+  was "cras"), νικάω win, αἷμα, ῥέω, νεανίας, ναύτης, στρατιώτης. A neuter πολύ / ὀλίγον without another accusative is an
+  adverb ("a lot"); the enclitic μου / σου after a genitive is its possessor ("ἐκ τῆς ῥινός μου").
+* **(5) "The old king died."**: the parser hangs "The" and "old" on the verb (det / amod of "died"), so the frame lost
+  both on both paths. Repaired on the Greek side (engine_grc `lostModifiers`): the article and adjectives right before
+  an NP's head that no part of the analysis uses are given back to it, and a subject noun the parser made a compound
+  of the verb ("The old king died yesterday." lost the king) becomes the subject (Check). "old" of a man -> γέρων used
+  attributively (ὁ γέρων βασιλεύς, τὸν γέροντα βασιλέα; παλαιός is "of old, former"); things keep παλαιός. **Frame
+  wish** (C30 or later): attach det / amod dependents of a verb that precede its nsubj to that noun.
+* **(6) Loop-6 leftovers**: "hid behind the door" -> ἐκρύψατο (new verb-row frame `noobj-mid`: the middle without an
+  object, places allowed; ἔκρυψεν "hid something"), Spanish esconderse; "I hope you are well" -> ἐλπίζω σε ὑγιαίνειν
+  (state row well -> ὑγιαίνω; σε ἄλλον εἶναι), "you are right / tienes razón" -> ὀρθῶς λέγεις (state rows may give
+  "adverb + verb"; εὐθύν "straight"), "Children, be quiet!" -> ὦ παῖδες, σιγᾶτε (a plural address in the sentence
+  takes the phrasebook's plural; the C29 expectation σίγα in test_rules_grc6.cpp corrected). The loop-6 wishes (1)-(6)
+  repaired on the Greek side still hold (test_rules_grc6.cpp green on HEAD + C31).
+* **Spanish personal "a"** (found with work item 5: "Vi al viejo pastor" -> εἰς τὸν ...): a person after "a / al" with
+  no object, after a verb that is not one of motion, saying or giving, is the object (τὸν ποιμένα εἶδον, τῇ μητρί μου
+  ἐβοήθησα through the valency).
+* **After the Spanish blind run** (own sentences first): Spanish clauses joined by a comma that the parser made a time
+  clause without a subordinating word (engine_grc `esParataxis`) are coordinated: "no" + a 2nd-person subjunctive
+  first is a prohibition, a statement after a command takes γάρ (μὴ τρέχε, πεσεῖ γάρ), a clause after "¿" is a
+  question unit of its own (διψῶ, ἆρα δίδως μοι ὕδωρ;); compound prepositions (después de, antes de, debajo de,
+  detrás de, delante de, encima de, cerca de, dentro de, fuera de, alrededor de, a través de) through the English table,
+  also when the parser made the noun after "debajo de" the object; "por" through a place or with "todo" -> διά + gen;
+  the aspectual "se" (and a clitic of the subject's own person) with a direct object dropped; the doubled clitic "le
+  ... a X" is X; a time noun after llegar / venir / caer read as an oblique is the subject ("llegó la noche" -> ἡ νὺξ
+  ἐγένετο, with subject rows night / morning / winter + come / fall / llegar -> γίγνομαι; a subject row now wins over
+  a verb row of frame "sub"); "hace frío / calor" -> ψυχρόν / θερμόν ἐστιν (also when read as a command); "volver a
+  casa" -> οἴκαδε; "papá / mamá" first in the sentence read as a verb (papar) -> the subject (engine_grc
+  `familyFirst`); a trailing address after a command ("Cuéntanos un cuento, papá." -> ὦ πάτερ; it was "καὶ πατέρα":
+  an apposition only after a statement); "cada / todas las" + time noun -> the genitive of time with ἕκαστος (ἑκάστης
+  νυκτός, ἑκάστης ἡμέρας ἕωθεν); "older / mayor" of a person -> πρεσβύτερος, "younger / menor" -> νεώτερος; family
+  words papá πατήρ, abuela τήθη, abuelo πάππος, maestra ἡ διδάσκαλος (noun-row frame `f`), monte ὄρος, tarde ἑσπέρα,
+  without a determiner with the article (μετὰ τοῦ πατρός); tener hambre / sed / sueño -> πεινάω / διψάω / νυστάζω;
+  contar un cuento / una historia -> λέγω; gritar -> βοάω; quemarse -> καίω pass; dormirse / fall asleep -> κοιμάω pass
+  (ἐκοιμήθησαν; greek.vpl has no καταδαρθάνω; the frame's joined lemma "dormir_se" finds the row); subir / bajar ->
+  ἀναβαίνω / καταβαίνω; Spanish family words animate (the dative, μετά + gen).
+* **Morphology** (morph_grc): a comparative in -τερος whose table lists only the citation form (νέος: νεώτερος) is
+  declined by rule (νεωτέρα, νεωτέρου, νεώτεροι; from-rule: Check); the compounds of ἔρχομαι whose aorist indicative
+  cells lack the augment (ἐπανέρχομαι: ἐπάνελθον) are written augmented (ἐπανῆλθον, ἐπανήλθομεν) and read back by the
+  analysis.
+
+## Rows added
+lexical_en_grc.tsv +80 rows (noun 47, verb 13, subject 11, state 6, verbobj 2, phrasal 1) + 2 header notes (verb-row
+frame `noobj-mid`, adverb + verb state rows; noun-row frame `f` in the C31 block note); tiers_grc.tsv +16 rows (C31
+block) and the note "boy" on παῖς; readable_grc.tsv +14 rows. Gold file unchanged: **no gold alternative proposed**.
+One expectation of test_rules_grc6.cpp corrected ("Children, be quiet!" -> ὦ παῖδες, σιγᾶτε; σίγα was the singular).
+
+## API changes
+None in public headers. Internal only: transfer_grc (bleed, Spanish rewrites, compound prepositions, older / younger,
+γέρων, genitive of time, `noobj-mid`, adverb + verb state rows, noun-row frame `f`, subject rows over "sub" rows),
+engine_grc (`lostModifiers`, `esParataxis`, `familyFirst`, whAuxiliary will / can, the plural address of phrasebook
+commands, the trailing address after a command, flag `idiom`), grc2x/readable (acc + inf, complements, αἷμα ῥεῖ,
+adverbial πολύ, enclitic possessor after a genitive), morph_grc/forms (-τερος comparatives, the ἐπανῆλθον augment and
+its analysis). No edit in frame/, transfer/, realise_la/, check/, cue/, english.* or engine.cpp.
+**Wish for frame/** (repaired on the Greek side for now): (1) det / amod of the verb before its nsubj ("The old king
+died."), a subject noun as a compound of the verb; (2) Spanish comma-joined clauses as time clauses without
+"cuando"; (3) "debajo de" + noun as the object, compound prepositions kept as written; (4) a post-verbal Spanish
+subject read as a bare oblique ("llegó la noche"); (5) "papá / mamá" first read as verbs; (6) Spanish phrasebook rows
+of register adv matched only at the clause start ("cada mañana" at the end was missed); (7) "hace frío" read as a
+command; (8) the aspectual "se" read as an indirect object.
+
+## Still open (for loop 8 / LIB)
+* LIB: greek.vpl's ἐπανέρχομαι aorist cells are unaugmented (repaired in morph); νέος has only the comparative
+  citation form; no καταδαρθάνω, no ἀνίσταμαι; "bleed" has no Attic verb (idiom used).
+* Seen while probing (Check, not tuned): "Life is good." without the article (ὁ βίος), "La muerte es triste." ->
+  μέλας "black", "Mi cuerpo es fuerte." -> δυνατόν "able", "six years old" -> ἓξ ἔτεσι παλαιά (age), "tall / alto" ->
+  μακρός / βαθύς "deep" for persons, "appeared" -> ἐδόκει "seemed", "ἐλεύσῃ" (Ionic future of ἔρχομαι; Attic εἶ),
+  "I saw the king, my father." made an address (pre-existing phrasebook row "my father").
+* The live tree held C30's work in progress during this loop: with it, '"Woof!" said the dog.' (test_rules_grc5.cpp)
+  lost the speech inversion (Τὸν κύνα ἔλεξεν); on HEAD + C31 alone it passes. To re-check after C30 lands.

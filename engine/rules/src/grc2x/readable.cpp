@@ -242,7 +242,9 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
         }
       }
       // enclitic / pronoun possessor right after ("ὁ πατήρ μου", "τὴν κεφαλὴν αὐτοῦ")
-      if (kk < idx.size() && cs != Gen) {
+      // C31: also after a genitive NP when the pronoun is the enclitic μου / σου ("ἐκ τῆς ῥινός μου": "of me" was read)
+      if (kk < idx.size() && (cs != Gen || ((ti[idx[kk]].key == "ἐγώ" || ti[idx[kk]].key == "σύ") &&
+                                                grc::accentOf(ti[idx[kk]].text).accents == 0))) {
         const TokInfo& t = ti[idx[kk]];
         if (t.closed && t.lpos == Pron && t.f.case_ == Gen && (t.key == "ἐγώ" || t.key == "σύ" || t.key == "αὐτόσ" ||
                                                                t.key == "ἡμεῖσ" || t.key == "ὑμεῖσ")) {
@@ -420,6 +422,133 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
         if (notThird || (noms > 1 && &np != &merged.front())) np.case_ = Acc;
       }
     }
+    // C31: a neuter accusative of πολύς / ὀλίγος used as an adverb ("πολὺ ἔρρει" = it flowed a lot; it was read as the
+    // object "a much") when the verb has no other accusative
+    {
+      size_t accs = 0;
+      for (const NPInfo& m : merged) accs += m.case_ == Acc;
+      for (size_t a = 0; a < merged.size() && accs == 1; ++a) {
+        const NPInfo& m = merged[a];
+        if (m.case_ != Acc || !m.adjOnly || m.article || m.np.adjectives.size() != 1 || m.np.token < 0) continue;
+        const TokInfo& h = ti[(size_t)m.np.token];
+        const uint8_t g = h.f.gender ? h.f.gender : h.lgender;
+        if (g != N || h.f.number == Pl || !(h.key == "πολύσ" || h.key == "ὀλίγοσ")) continue;
+        frame::SemAdverb av;
+        av.lemma = h.key == "πολύσ" ? (esT ? "mucho" : "a lot") : (esT ? "un poco" : "a little");
+        av.token = m.np.token;
+        f.adverbs.push_back(av);
+        out.roles[(size_t)m.np.token] = "adverb";
+        merged.erase(merged.begin() + (long)a);
+        break;
+      }
+    }
+    // C31: accusative + infinitive after a verb of hoping, saying or thinking ("ἐλπίζω σε αὔριον ἥξειν" = "I hope that
+    // you will come tomorrow"; it was read "I hope you tomorrow"): the infinitive with its accusative subject (the
+    // first accusative before it), its object or predicate (a second accusative) and the adverbs and phrases on its
+    // side of the finite verb become a that-clause; the tense from the infinitive (future / aorist after hoping:
+    // "will"; aorist after saying: the past). Without an accusative subject, a verb of hoping keeps "hope to win" and a
+    // verb of saying or thinking repeats its own subject ("νομίζω σοφὸς εἶναι" -> "I think that I am wise").
+    if (vt && infinitive < n) {
+      static const char* const kHope[] = {"ἐλπίζω", "ὑπισχνέομαι", "ὄμνυμι", nullptr};
+      static const char* const kSay[] = {"νομίζω", "οἴομαι", "οἶμαι", "φημί", "λέγω", "ἡγέομαι", "δοκέω", nullptr};
+      auto listed = [&](const char* const* ks) {
+        for (const char* const* x = ks; *x; ++x) if (vkey == text::greek_key(*x)) return true;
+        return false;
+      };
+      bool dative = false;
+      for (const NPInfo& m : merged) dative = dative || m.case_ == Dat;
+      const bool hope = listed(kHope), say = !hope && listed(kSay) && !(vkey == text::greek_key("δοκέω") && vt->f.person == 3);
+      if (hope || say) {
+        const TokInfo& iv = ti[infinitive];
+        const bool einai = iv.key == "εἰμί";
+        std::vector<size_t> accs;
+        for (size_t a = 0; a < merged.size(); ++a)
+          if (merged[a].case_ == Acc && !(merged[a].np.interrogative)) accs.push_back(a);
+        long subjI = -1, secondI = -1;
+        if (accs.size() >= 2) { subjI = (long)accs[0]; secondI = (long)accs[1]; }
+        else if (accs.size() == 1 && merged[accs[0]].first < (int)infinitive) subjI = (long)accs[0];
+        else if (accs.size() == 1) secondI = (long)accs[0];
+        // a nominative predicate with εἶναι and the same subject ("νομίζω σοφὸς εἶναι")
+        long nomPred = -1;
+        if (einai && subjI < 0)
+          for (size_t a = 0; a < merged.size(); ++a)
+            if (merged[a].case_ == Nom && merged[a].first > (int)finite && merged[a].np.isPronoun == false) nomPred = (long)a;
+        // λέγω / δοκέω + infinitive without an accusative subject is a command or "seem": not a that-clause
+        const bool sameSubjectSay = say && subjI < 0 && !dative && vkey != text::greek_key("λέγω") &&
+                                    vkey != text::greek_key("δοκέω");
+        if (subjI >= 0 || sameSubjectSay) {
+          SemFrame sf;
+          sf.type = Kind::Decl;
+          sf.hasPred = true;
+          sf.pred.token = (int)infinitive;
+          sf.pred.lemma = einai ? std::string("be") : side.lex[infinitive].word;
+          sf.copula = einai;
+          switch (iv.f.tense) {
+            case Future: sf.pred.tense = Tense::Future; break;
+            case Aorist: sf.pred.tense = hope ? Tense::Future : Tense::Past; break;
+            case Perfect: sf.pred.tense = Tense::Present; sf.pred.aspect = Aspect::Perfect; break;
+            default: sf.pred.tense = hope ? Tense::Future : Tense::Present; break;
+          }
+          if (hope && esT) sf.pred.mood = frame::SrcMood::Subjunctive;   // "espero que vengas"
+          if (subjI >= 0) {
+            sf.hasSubject = true;
+            sf.subject = merged[(size_t)subjI].np;
+            for (int tk : sf.subject.tokens) out.roles[(size_t)tk] = "subject (infinitive)";
+          } else {   // the same subject as the finite verb
+            SemNP pr;
+            pr.isPronoun = true;
+            pr.pron.person = vt->f.person ? vt->f.person : 3;
+            pr.pron.number = vt->f.number == Pl ? 2 : 1;
+            pr.number = pr.pron.number;
+            for (const NPInfo& m : merged)
+              if (m.case_ == Nom && m.first < (int)finite) { pr = m.np; break; }
+            sf.hasSubject = true;
+            sf.subject = pr;
+            sf.implicitSubject = pr.token < 0;
+          }
+          auto asPred = [&](const NPInfo& np) {
+            if (np.adjOnly || (np.np.head.empty() && !np.np.adjectives.empty())) {
+              for (const SemAdj& a : np.np.adjectives) sf.predAdj.push_back(a);
+            } else {
+              sf.predicative.push_back(np.np);
+            }
+            for (int tk : np.np.tokens) out.roles[(size_t)tk] = "predicate (infinitive)";
+          };
+          if (secondI >= 0) {
+            if (einai) asPred(merged[(size_t)secondI]);
+            else {
+              sf.hasObject = true;
+              sf.object = merged[(size_t)secondI].np;
+              for (int tk : sf.object.tokens) out.roles[(size_t)tk] = "object (infinitive)";
+            }
+          }
+          if (nomPred >= 0) asPred(merged[(size_t)nomPred]);
+          // adverbs and prepositional phrases on the infinitive's side of the finite verb
+          const int lo = infinitive > finite ? (int)finite : -1;
+          const int hi = infinitive > finite ? (int)n : (int)finite;
+          for (size_t a = 0; a < f.adverbs.size();) {
+            const int tk = f.adverbs[a].token;
+            if (tk > lo && tk < hi) { frame::SemAdverb av = f.adverbs[a]; av.front = false; sf.adverbs.push_back(av); f.adverbs.erase(f.adverbs.begin() + (long)a); }
+            else ++a;
+          }
+          for (size_t a = 0; a < f.obliques.size();) {
+            const int tk = f.obliques[a].token;
+            if (tk > lo && tk < hi) { frame::SemOblique ob = f.obliques[a]; ob.front = false; sf.obliques.push_back(ob); f.obliques.erase(f.obliques.begin() + (long)a); }
+            else ++a;
+          }
+          std::vector<NPInfo> keep;
+          for (size_t a = 0; a < merged.size(); ++a)
+            if ((long)a != subjI && (long)a != secondI && (long)a != nomPred) keep.push_back(merged[a]);
+          merged.swap(keep);
+          frame::SemSub sb;
+          sb.relation = Relation::Complement;
+          sb.frame.push_back(sf);
+          f.subordinate.push_back(sb);
+          out.roles[infinitive] = "infinitive (that-clause)";
+          infinitive = n;
+        }
+      }
+    }
     for (NPInfo& np : merged) {
       SemNP& x = np.np;
       auto mark = [&](const char* r) { for (int tk : x.tokens) out.roles[(size_t)tk] = r; };
@@ -491,6 +620,25 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
       for (const SemAdj& a : f.predicative[0].adjectives) f.predAdj.push_back(a);
       f.predicative.clear();
     }
+    // C31: "αἷμα τῷ παιδὶ ῥεῖ" (blood flows to the boy) is "the boy is bleeding", "αἷμα ἐκ τῆς ῥινὸς ῥεῖ" "the nose is
+    // bleeding": the person in the dative (or the body part after ἐκ) is the subject of "bleed" / "sangrar"
+    bool bleed = false;
+    if (vt && vkey == text::greek_key("ῥέω") && f.hasSubject && f.subject.token >= 0 &&
+        ti[(size_t)f.subject.token].key == text::greek_key("αἷμα")) {
+      if (f.hasIndirect) {
+        f.subject = f.indirectObject;
+        f.hasIndirect = false;
+        bleed = true;
+      } else {
+        for (size_t a = 0; a < f.obliques.size(); ++a)
+          if (f.obliques[a].token >= 0 && keyIs(ti[(size_t)f.obliques[a].token], {"ἐκ", "ἐξ"})) {
+            f.subject = f.obliques[a].np;
+            f.obliques.erase(f.obliques.begin() + (long)a);
+            bleed = true;
+            break;
+          }
+      }
+    }
     // ---- verb ----
     p.hasContent = vt || infinitive < n || !merged.empty() || !f.obliques.empty() || !f.adverbs.empty() ||
                    !f.connectors.empty() || f.type == Kind::Wh;
@@ -524,6 +672,7 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
         f.pred.lemma = side.lex[vi].word;
       }
       if (eimi && mod == Modality::None) { f.pred.lemma = "be"; f.copula = true; }
+      if (bleed) f.pred.lemma = esT ? "sangrar" : "bleed";
       uint8_t tense = v.f.tense;
       if (vkey == "οἶδα") tense = tense == Pluperfect ? Imperfect : Present;   // perfect with present meaning
       switch (tense) {
@@ -740,6 +889,8 @@ std::vector<std::string> enVerb(const SemFrame& f, const Agr& a, bool question, 
     return v;
   }
   if (p.tense == Tense::Future) {
+    // C31: a present-perfect gloss ("have come" for ἥκω) in the future is the plain verb: ἥξειν -> "will come"
+    if (base == "have come") base = "come";
     v.push_back("will");
     if (f.negative) v.push_back("not");
     v.push_back(base);
@@ -812,6 +963,20 @@ std::string enClause(const SemFrame& f, const Side& side) {
   if (ioFirst) rest.push_back(io);
   if (!obj.empty()) rest.push_back(obj);
   if (f.hasIndirect && !ioFirst) rest.push_back(f.hasObject || f.type != Kind::Imp ? "to " + io : io);
+  // C31: a catenative complement ("ἐλπίζομεν νικήσειν" -> "we hope to win"; it was left out): "to" + the verb, after a
+  // person object of a verb of commanding or teaching ("κελεύω σε ἐλθεῖν" -> "I order you to come"), else before the
+  // objects (they belong to the infinitive: "we hope to win the war")
+  if (f.hasPred && f.pred.modality == Modality::None && !f.pred.complementVerb.empty()) {
+    const std::string comp = "to " + f.pred.complementVerb;
+    bool after = false;
+    if (f.pred.token >= 0 && (size_t)f.pred.token < side.ti.size()) {
+      const std::string& vk = side.ti[(size_t)f.pred.token].key;
+      for (const char* g : {"κελεύω", "ἐάω", "κωλύω", "διδάσκω", "πείθω", "ἀναγκάζω", "αἰτέω", "λέγω", "παρακαλέω"})
+        after = after || vk == text::greek_key(g);
+    }
+    if (after) rest.push_back(comp);
+    else rest.insert(rest.begin(), comp);
+  }
   for (const SemNP& pn : f.predicative) rest.push_back(enNP(pn, side, false));
   {
     std::vector<std::string> adjs;
@@ -1048,6 +1213,9 @@ std::string withA(const std::string& np) {
 
 es::VTense esTense(const SemFrame& f) {
   const frame::SemPredicate& p = f.pred;
+  // C31: the that-clause after "esperar" ("espero que vengas"): the subjunctive
+  if (p.mood == frame::SrcMood::Subjunctive)
+    return p.tense == Tense::Past ? es::VTense::SubjImperfect : es::VTense::SubjPresent;
   if (p.tense == Tense::Future) return es::VTense::Future;
   if (p.tense == Tense::Past) return p.aspect == Aspect::Progressive || p.pastModal ? es::VTense::Imperfect : es::VTense::Preterite;
   return es::VTense::Present;
@@ -1106,6 +1274,12 @@ std::string esClause(const SemFrame& f, const Side& side) {
     }
   }
   std::string verb = f.pred.lemma.empty() ? "hacer" : f.pred.lemma;
+  // C31: "haber llegado" (ἥκω) in the future or the subjunctive is the plain verb ("que vengas", "llegarás")
+  if ((f.pred.tense == Tense::Future || f.pred.mood == frame::SrcMood::Subjunctive) && verb.compare(0, 6, "haber ") == 0 &&
+      verb.size() > 6) {
+    const std::string pp = verb.substr(6);
+    if (pp.size() > 3 && pp.compare(pp.size() - 3, 3, "ado") == 0) verb = pp.substr(0, pp.size() - 3) + "ar";   // llegado
+  }
   // ser / estar: location, "where", no predicate -> estar
   if (f.copula) {
     const bool location = (f.predicative.empty() && f.predAdj.empty() && f.wh.role != frame::Role::Predicate) ||
@@ -1149,6 +1323,8 @@ std::string esClause(const SemFrame& f, const Side& side) {
     } else {
       vg.push_back(conj(verb, esTense(f)));
     }
+    // C31: a catenative complement ("ἐλπίζομεν νικήσειν" -> "esperamos ganar")
+    if (p.modality == Modality::None && !p.complementVerb.empty()) vg.push_back(p.complementVerb);
   }
   std::vector<std::string> rest;
   if (!obj.empty()) rest.push_back(obj);

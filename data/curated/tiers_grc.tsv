@@ -94,7 +94,7 @@
 εἶμι	εἶμι	verb	1	derived	
 ἔρχομαι	ἔρχομαι	verb	1	derived	come, go
 ἀγοράζω	ἀγοράζω	verb	1	derived	
-παῖς	παῖς	noun	1	derived	
+παῖς	παῖς	noun	1	derived	boy
 πατήρ	πατήρ	noun	1	derived	
 μήτηρ	μήτηρ	noun	1	derived	
 ἀδελφός	ἀδελφός	noun	1	derived	
@@ -371,3 +371,23 @@
 τήθη	τήθη	noun	2	derived	grandmother
 νίζω	νίζω	verb	2	derived	wash (hands, feet: middle νίζομαι)
 ποταμόσ	ποταμός	noun	1	derived	river
+# C31 (Greek loop 7): common nouns for which the reverse index chose a poetic, figurative or wrong sense (probe of
+# 173 English and 151 Spanish children's nouns: fruit -> νίκη, lie -> ἀλήθεια, morning -> ἠώς, month -> σελήνη, back ->
+# λόφος, shield -> σάκος, cave -> σπῆλυγξ, forest -> δρυμός, toy -> ἄθυρμα, chair -> θᾶκος, roof -> στέγος, life ->
+# ψυχή, goddess -> ὁ θεός); notes = English glosses (the teacher's reverse index)
+καρπόσ	καρπός	noun	2	derived	fruit
+ψεῦδοσ	ψεῦδος	noun	2	derived	lie, falsehood
+ἕωσ	ἕως	noun	2	derived	morning, dawn, daybreak
+μήν	μήν	noun	2	derived	month
+νῶτον	νῶτον	noun	2	derived	back
+ἀσπίσ	ἀσπίς	noun	2	derived	shield
+σπήλαιον	σπήλαιον	noun	2	derived	cave, cavern
+ὕλη	ὕλη	noun	2	derived	forest, wood, woods
+παίγνιον	παίγνιον	noun	2	derived	toy, plaything
+καθέδρα	καθέδρα	noun	2	derived	chair, seat
+στέγη	στέγη	noun	2	derived	roof
+βίοσ	βίος	noun	2	derived	life
+θεά	θεά	noun	2	derived	goddess
+νεανίασ	νεανίας	noun	2	derived	young man, youth, lad
+τελευτάω	τελευτάω	verb	2	derived	come to an end
+παλαιόσ	παλαιός	adj	2	derived	old, ancient

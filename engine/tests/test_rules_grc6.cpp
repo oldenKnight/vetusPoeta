@@ -247,7 +247,7 @@ TEST_CASE("rules-grc6: C29 after the blind check (address interjections, a lot o
       {"Grandmother, where are you?", "ὦ τήθη, ποῦ εἶ;", true},
       {"We ate a lot of bread.", "πολὺν ἄρτον ἐφάγομεν.", false},
       {"She has lots of friends.", "πολλοὺς φίλους ἔχει.", false},
-      {"Children, be quiet!", "ὦ παῖδες, σίγα!", true},
+      {"Children, be quiet!", "ὦ παῖδες, σιγᾶτε!", true},   // C31: the plural command (σίγα was singular)
       {"Listen to me, children.", "ἀκούετέ μου, ὦ παῖδες.", false},
       {"The rain started.", "ὁ ὄμβρος ἤρξατο.", false},
       {"The rain is starting again.", "αὖθις ὁ ὄμβρος ἄρχεται.", false},
