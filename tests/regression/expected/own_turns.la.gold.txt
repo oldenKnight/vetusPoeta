@@ -4,7 +4,7 @@
 # phrase; an answer fragment takes the case its question gives it; speaker dashes are kept as in the source.
 # Speakers: Marcus (boy), Julia (girl, his sister), their mother and father, a farmer, a baker, a thief, a teacher,
 # Peter (a man, an old friend). Register: beginner reader (Orberg-like), macrons on long vowels.
-# C28 review: the alternatives after the last " | " of cues 16 21 25 27 35 37 39 41 42 47 49 57 78 105 106 110 113 116 117
+# C28 review: the alternatives after the last " | " of cues 16 21 25 27 35 37 39 41 42 47 49 57 78 105 106 110 113 116 (117 vetoed by the main agent: cēterōs piscēs changes the meaning; the bare answer Nōn of 37 is accepted as school Latin next to minimē)
 # were proposed by the implementer after the first run (correct Latin the gold did not list; docs/rules_en_notes.md
 # "Quality loop 6"); cue 6: veterī corrected to vetere (vetere is the ablative of vetus). Veto freely.
 Marce!
@@ -123,7 +123,7 @@ In tenebrīs viam āmīsī. | Viam in tenebrīs āmīsī. | In tenebrīs errāv�
 Ēsurīsne?
 - Paulum.
 Iūlia, affer pānem | Iūlia, pānem affer | Iūlia, pānem fer
-et reliquum piscem. | et piscem reliquum. | et cēterōs piscēs.
+et reliquum piscem. | et piscem reliquum.
 Manē nōbīscum hāc nocte. | Hāc nocte nōbīscum manē.
 Bonam noctem, puerī! | Bene dormīte, puerī!
 ♪ Dormīte, puerī meī, dormīte ♪ | ♪ Dormīte, līberī meī, dormīte ♪
