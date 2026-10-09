@@ -6,38 +6,43 @@
 # Latin order; alternatives after " | " where another phrase split (or another equally right word) is as good.
 # Characters: Anna (a girl), her grandmother, the goat (capra, feminine), the dog Rufus (Rūfus), a black bird, an old
 # fisherman. Register: beginner reader (Orberg-like), macrons on long vowels; direct speech with inquit or dīxit.
+# C30 proposals (veto freely): the alternative after the last " | " of cues 3 9 12 16 18 19 23 26 27 31 32 40 41 47 48 51 53 55 56 57 58 59 60 61 66 69 70 71 79 80 81 86 89 91 93 95 97 98 104 106 114 117 118 119
+# was added by the implementer after the rules run: correct Latin the gold did not list (the engine's conjunction with
+# its clause (C28 cue rule), domus / nāvis / saxum for house / boat / stone, solum, ieiūnus, cervīx, tranquillus,
+# cautē, ostendō, alter after its noun, word order); docs/rules_en_notes.md "Quality loop 7 (C30)". Cue 49 (piscātor
+# vetus) is not proposed.
 Ōlim erat puella parva | Ōlim erat parva puella
 nōmine Anna, quae cum aviā suā habitābat | quae Anna vocābātur et cum aviā suā habitābat | nōmine Anna, quae cum aviā habitābat
-in casā parvā prope silvam magnam. | in parvā casā prope magnam silvam. | in casā parvā prope magnam silvam.
+in casā parvā prope silvam magnam. | in parvā casā prope magnam silvam. | in casā parvā prope magnam silvam. | in domō parvā prope silvam magnam.
 Cotīdiē māne Anna gallīnīs aquam dabat | Omnī māne Anna gallīnīs aquam dabat | Cotīdiē māne Anna aquam gallīnīs dabat | Omnī māne Anna aquam gallīnīs dabat
 et ligna in culīnam portābat, | et ligna in culīnam portābat, et | et ligna in culīnam ferēbat,
 et avia capram albam mulgēbat. | et avia eius capram albam mulgēbat. | avia capram albam mulgēbat. | avia eius capram albam mulgēbat.
 Quōdam diē autem capra nōn erat | Quōdam diē tamen capra nōn erat | Ūnō diē autem capra nōn erat | Ūnō diē tamen capra nōn erat | Quōdam diē tamen capra
 in hortō. Avia valdē trīstis erat, | in hortō. Avia eius valdē trīstis erat, | in hortō nōn erat. Avia valdē trīstis erat,
-quia capra eīs cotīdiē lac dabat. | quia capra cotīdiē eīs lac dabat. | quod capra eīs cotīdiē lac dabat. | quia capra eīs lac cotīdiē dabat.
+quia capra eīs cotīdiē lac dabat. | quia capra cotīdiē eīs lac dabat. | quod capra eīs cotīdiē lac dabat. | quia capra eīs lac cotīdiē dabat. | quia capra lac eīs omnī diē dabat.
 "Ubi est capra mea?" clāmāvit anus. | "Ubi est capra mea?" exclāmāvit anus. | "Ubi est capra mea?" clāmāvit fēmina vetus. | "Ubi est capra mea?" clāmāvit mulier vetus.
 "Herī hīc erat, sed nunc porta | "Hīc herī erat, sed nunc porta | "Herī hīc erat, sed nunc iānua
-aperta est." Anna terram spectāvit et | aperta est." Anna humum spectāvit et | aperta est." Anna terram spectāvit | aperta est." Anna humum spectāvit
+aperta est." Anna terram spectāvit et | aperta est." Anna humum spectāvit et | aperta est." Anna terram spectāvit | aperta est." Anna humum spectāvit | aperta est. Anna solum spectāvit
 vestīgia caprae in sēmitā vīdit | et vestīgia caprae in sēmitā vīdit | vestīgia caprae in viā vīdit | et vestīgia caprae in viā vīdit
 ad silvam. "Nōlī timēre, | quae ad silvam dūcit. "Nōlī timēre, | quae ad silvam dūcēbat. "Nōlī timēre,
 avia," inquit. "Capram tuam inveniam | avia," dīxit. "Capram tuam inveniam | avia," inquit. "Inveniam | avia," dīxit. "Inveniam
-et ante noctem domum dūcam." | et eam ante noctem domum dūcam." | capram tuam et ante noctem domum dūcam." | et ante noctem domum redūcam."
+et ante noctem domum dūcam." | et eam ante noctem domum dūcam." | capram tuam et ante noctem domum dūcam." | et ante noctem domum redūcam." | capram tuam et eam ante noctem domum dūcam.
 Tum pānem et cāseum | Tum pānem et cāseum posuit | Tum pānem et cāseum in corbe posuit
-in corbe posuit et canem suum vocāvit, cui nōmen erat | et canem suum vocāvit, cui nōmen erat | in corbe et canem suum vocāvit, cui nōmen erat
-Rūfus. Ūnā in silvam ambulāvērunt, | Rūfus. Simul in silvam ambulāvērunt, | Rūfus. Ūnā ambulāvērunt | Rūfus. Simul ambulāvērunt | Rūfus. Ūnā in silvam iērunt,
+in corbe posuit et canem suum vocāvit, cui nōmen erat | et canem suum vocāvit, cui nōmen erat | in corbe et canem suum vocāvit, cui nōmen erat | in corbe et canem suum vocāvit, cui nōmen
+Rūfus. Ūnā in silvam ambulāvērunt, | Rūfus. Simul in silvam ambulāvērunt, | Rūfus. Ūnā ambulāvērunt | Rūfus. Simul ambulāvērunt | Rūfus. Ūnā in silvam iērunt, | erat Rūfus. Ūnā ambulāvērunt,
 ubi arborēs altae et veterēs erant | in silvam, ubi arborēs altae et veterēs erant
 et āēr etiam aestāte frīgidus erat. | et āēr etiam aestāte frīgidus.
 Avēs in arboribus canēbant, | Avēs in arboribus cantābant, | Avēs in arboribus cecinērunt, | Avēs in arboribus cantāvērunt, | Avēs in arboribus canēbant, et
-et rīvus parvus prope sēmitam fluēbat. Prīmō Anna | et parvus rīvus prope sēmitam fluēbat. Prīmō Anna | et rīvus parvus iuxtā sēmitam fluēbat. Prīmō Anna | et rīvus parvus prope viam fluēbat. Prīmō Anna | rīvus parvus prope sēmitam fluēbat. Prīmō Anna
+et rīvus parvus prope sēmitam fluēbat. Prīmō Anna | et parvus rīvus prope sēmitam fluēbat. Prīmō Anna | et rīvus parvus iuxtā sēmitam fluēbat. Prīmō Anna | et rīvus parvus prope viam fluēbat. Prīmō Anna | rīvus parvus prope sēmitam fluēbat. Prīmō Anna | et rīvus parvus iuxtā viam fluēbat. Prīmō Anna
 laeta erat, quia sōl lūcēbat et | laeta erat, quod sōl lūcēbat et | laeta erat, quia sōl lūcēbat
 canis ante eam currēbat. | et canis ante eam currēbat.
-Rūfus cunīculum agitāvit, sed | Rūfus cunīculum persecūtus est, sed | Rūfus cunīculum secūtus est, sed
-eum nōn cēpit. Post hōram autem sēmita | eum nōn cēpit. Post hōram tamen sēmita | eum nōn cēpit. Post hōram autem via | eum nōn cēpit. Post hōram tamen via
+Rūfus cunīculum agitāvit, sed | Rūfus cunīculum persecūtus est, sed | Rūfus cunīculum secūtus est, sed | Rūfus cunīculum agitāvit
+eum nōn cēpit. Post hōram autem sēmita | eum nōn cēpit. Post hōram tamen sēmita | eum nōn cēpit. Post hōram autem via | eum nōn cēpit. Post hōram tamen via | sed eum nōn cēpit. Post hōram autem via
 angusta et obscūra facta est, et Anna | angusta et obscūra fiēbat, et Anna | angusta et obscūra facta est, et Anna nōn poterat
 caelum per folia vidēre nōn poterat. | caelum per folia vidēre. | caelum per folia vidēre nōn potuit.
 Subitō Rūfus cōnstitit et allātrāre coepit | Subitō Rūfus cōnstitit et lātrāre coepit
-avem magnam nigram, quae | magnam avem nigram, quae | in avem magnam nigram, quae | in magnam avem nigram, quae
-in rāmō sedēbat. "Salvē," inquit avis. | in rāmō sedēbat. "Salvē," dīxit avis.
+avem magnam nigram, quae | magnam avem nigram, quae | in avem magnam nigram, quae | in magnam avem nigram, quae | avem magnam nigram quae sedēbat
+in rāmō sedēbat. "Salvē," inquit avis. | in rāmō sedēbat. "Salvē," dīxit avis. | in rāmō. "Salvē," inquit avis.
 "Cūr sōla in silvā ambulās, | "Cūr in silvā sōla ambulās,
 puella parva?" Anna avī dīxit sē | parva puella?" Anna avī dīxit sē | puella parva?" Anna avī dīxit | parva puella?" Anna avī dīxit | puellula?" Anna avī dīxit sē
 capram aviae suae quaerere. | sē capram aviae suae quaerere.
@@ -45,38 +50,38 @@ capram aviae suae quaerere. | sē capram aviae suae quaerere.
 respondit avis. "Currēbat | respondit avis. "Ad flūmen currēbat
 ad flūmen, et omnem flōrem edēbat | ad flūmen, et omnēs flōrēs edēbat | et omnem flōrem edēbat | et omnēs flōrēs edēbat
 in viā." Anna avī grātiās ēgit et | in itinere." Anna avī grātiās ēgit et | in viā." Anna avī grātiās ēgit | in itinere." Anna avī grātiās ēgit
-celeriter ad flūmen ambulāvit. | ad flūmen celeriter ambulāvit. | et celeriter ad flūmen ambulāvit. | celeriter ad flūmen iit.
-Ubi ad rīpam pervēnit, vīdit | Cum ad rīpam pervēnisset, vīdit | Ubi ad rīpam advēnit, vīdit
+celeriter ad flūmen ambulāvit. | ad flūmen celeriter ambulāvit. | et celeriter ad flūmen ambulāvit. | celeriter ad flūmen iit. | et ad flūmen celeriter ambulāvit.
+Ubi ad rīpam pervēnit, vīdit | Cum ad rīpam pervēnisset, vīdit | Ubi ad rīpam advēnit, vīdit | Cum ad rīpam pervēnit, vīdit
 pontem frāctum esse. Aqua | pontem frāctum esse. Aqua erat
 alta et rapida erat, et Anna nāre nōn poterat. | alta et celeris erat, et Anna nāre nōn poterat. | alta et rapida, et Anna nāre nōn poterat.
 Nūllus alius pōns erat, et | Nūllus alius pōns erat, | Nūllus pōns alius erat, et | Nūllus pōns alius erat,
 vīcus proximus procul aberat. Intereā sōl | et vīcus proximus procul aberat. Intereā sōl | proximus vīcus procul aberat. Intereā sōl | et proximus vīcus procul aberat. Intereā sōl | vīcus proximus longē aberat. Intereā sōl
 per caelum movēbātur. Anna | per caelum movēbātur. Anna cōnsēdit | per caelum ībat. Anna
-in saxō cōnsēdit et flēre coepit. Fessa erat | in lapide cōnsēdit et flēre coepit. Fessa erat | in saxō et flēre coepit. Fessa erat | in lapide et flēre coepit. Fessa erat
-et ēsuriēns, et nesciēbat quid | et ēsuriēns, nec sciēbat quid | et ēsuriēns, et nesciēbat | et ēsuriēns, nec sciēbat
+in saxō cōnsēdit et flēre coepit. Fessa erat | in lapide cōnsēdit et flēre coepit. Fessa erat | in saxō et flēre coepit. Fessa erat | in lapide et flēre coepit. Fessa erat | in saxō et flēre coepit. Fessa
+et ēsuriēns, et nesciēbat quid | et ēsuriēns, nec sciēbat quid | et ēsuriēns, et nesciēbat | et ēsuriēns, nec sciēbat | et ieiūna erat et nesciēbat quid
 faceret. Tum piscātor senex | quid faceret. Tum piscātor senex | faceret. Tum senex piscātor | quid faceret. Tum senex piscātor
 barbā longā et cānā secundum rīpam vēnit | barbā longā cānāque secundum rīpam vēnit | barbā longā et albā secundum rīpam vēnit | cum barbā longā et albā secundum rīpam vēnit
-in nāviculā parvā. "Cūr flēs?" rogāvit | in parvā nāviculā. "Cūr flēs?" rogāvit | in nāviculā parvā. "Cūr flēs?" | in parvā nāviculā. "Cūr flēs?"
+in nāviculā parvā. "Cūr flēs?" rogāvit | in parvā nāviculā. "Cūr flēs?" rogāvit | in nāviculā parvā. "Cūr flēs?" | in parvā nāviculā. "Cūr flēs?" | in nāve parvā. "Cūr flēs?" rogāvit
 benignē. "Capra aviae meae | benignē rogāvit. "Capra aviae meae
-trāns flūmen est," inquit Anna, "et | in alterā rīpā flūminis est," inquit Anna, "et | trāns flūmen est," dīxit Anna, "et | in alterā rīpā flūminis est," dīxit Anna, "et
+trāns flūmen est," inquit Anna, "et | in alterā rīpā flūminis est," inquit Anna, "et | trāns flūmen est," dīxit Anna, "et | in alterā rīpā flūminis est," dīxit Anna, "et | in parte alterā flūminis est," inquit Anna, "et
 pōns frāctus est." Piscātor
-subrīsit et dīxit sē eam | rīsit et dīxit sē eam | subrīsit et dīxit sē eam vectūrum esse | rīsit et dīxit sē eam vectūrum esse | subrīsit et dīxit sē eam portātūrum esse
-trāns flūmen nāviculā suā vectūrum esse. Anna et | trāns flūmen in nāviculā suā vectūrum esse. Anna et | in nāviculā suā trāns flūmen vectūrum esse. Anna et | trāns flūmen in nāviculā suā. Anna et | trāns flūmen nāviculā suā. Anna et
-Rūfus nāviculam cōnscendērunt, et senex | Rūfus in nāviculam ascendērunt, et senex | Rūfus nāviculam ascendērunt, et senex
-lentē trāns aquam rēmigāvit. Dum | lentē trāns aquam rēmigāvit. | lentē per aquam rēmigāvit. Dum | lentē per aquam rēmigāvit.
-rēmigat, Anna eī nārrāvit dē | rēmigābat, Anna eī nārrāvit dē | Dum rēmigat, Anna eī nārrāvit dē | Dum rēmigābat, Anna eī nārrāvit dē | rēmigat, Anna eī | rēmigābat, Anna eī | Dum rēmigat, Anna eī | Dum rēmigābat, Anna eī
-aviā suā et dē casā parvā prope | aviā suā et dē parvā casā prope | dē aviā suā et dē casā parvā prope | dē aviā suā et dē parvā casā prope | aviā suā et dē casā parvā | dē aviā suā et dē casā parvā nārrāvit
-silvam. In alterā rīpā erat | prope silvam. In alterā rīpā erat | silvam. Ex alterā parte erat | prope silvam. Ex alterā parte erat | silvam nārrāvit. In alterā rīpā erat
+subrīsit et dīxit sē eam | rīsit et dīxit sē eam | subrīsit et dīxit sē eam vectūrum esse | rīsit et dīxit sē eam vectūrum esse | subrīsit et dīxit sē eam portātūrum esse | rīsit et dīxit sē eam portātūrum esse
+trāns flūmen nāviculā suā vectūrum esse. Anna et | trāns flūmen in nāviculā suā vectūrum esse. Anna et | in nāviculā suā trāns flūmen vectūrum esse. Anna et | trāns flūmen in nāviculā suā. Anna et | trāns flūmen nāviculā suā. Anna et | trāns flūmen in nāve suā. Anna et
+Rūfus nāviculam cōnscendērunt, et senex | Rūfus in nāviculam ascendērunt, et senex | Rūfus nāviculam ascendērunt, et senex | Rūfus nāvem cōnscendērunt et senex
+lentē trāns aquam rēmigāvit. Dum | lentē trāns aquam rēmigāvit. | lentē per aquam rēmigāvit. Dum | lentē per aquam rēmigāvit. | trāns aquam lentē rēmigāvit. Dum
+rēmigat, Anna eī nārrāvit dē | rēmigābat, Anna eī nārrāvit dē | Dum rēmigat, Anna eī nārrāvit dē | Dum rēmigābat, Anna eī nārrāvit dē | rēmigat, Anna eī | rēmigābat, Anna eī | Dum rēmigat, Anna eī | Dum rēmigābat, Anna eī | rēmigābat, Anna eī dīxit
+aviā suā et dē casā parvā prope | aviā suā et dē parvā casā prope | dē aviā suā et dē casā parvā prope | dē aviā suā et dē parvā casā prope | aviā suā et dē casā parvā | dē aviā suā et dē casā parvā nārrāvit | dē aviā suā et domō parvā
+silvam. In alterā rīpā erat | prope silvam. In alterā rīpā erat | silvam. Ex alterā parte erat | prope silvam. Ex alterā parte erat | silvam nārrāvit. In alterā rīpā erat | prope silvam. In parte alterā erat
 ager viridis multīs cum flōribus. Rūfus | ager viridis cum multīs flōribus. Rūfus | ager viridis flōribus plēnus. Rūfus | ager viridis plēnus flōrum. Rūfus
 prīmus exsiluit et trāns agrum cucurrit, | prīmus exsiluit et per agrum cucurrit, | prīmus exsiluit et trāns agrum currit,
 laetē lātrāns. Capra tamen | laetē lātrāns. Capra autem | laetē lātrāns. Tamen capra | laetē lātrāns. Capra tamen nōn erat | laetē lātrāns. Capra autem nōn erat | laetē lātrāns. Tamen capra nōn erat
 in agrō nōn erat. Anna et canis | nōn erat in agrō. Anna et canis | in agrō. Anna et canis
-ubīque quaesīvērunt, sub dūmīs, | ubīque quaesīvērunt, sub fruticibus,
+ubīque quaesīvērunt, sub dūmīs, | ubīque quaesīvērunt, sub fruticibus, | sub dūmīs ubīque quaesīvērunt
 post saxa et in herbā altā, | post saxa et in altā herbā,
 sed eam invenīre nōn potuērunt. Anna | sed eam invenīre nōn poterant. Anna | sed eam invenīre nōn potuērunt. Anna vocāvit | sed eam invenīre nōn poterant. Anna vocāvit
-capram iterum atque iterum vocāvit, sed nēmō | capram iterum iterumque vocāvit, sed nēmō | capram iterum atque iterum, sed nēmō | capram iterum iterumque, sed nēmō
-respondit. Tandem sonum trīstem audīvērunt | respondit. Tandem trīstem sonum audīvērunt | respondit. Tandem audīvērunt sonum trīstem | respondit. Tandem audīvērunt trīstem sonum
-ex altō saxō in extrēmō agrō. | ex saxō altō in extrēmō agrō. | ab altō saxō in extrēmō agrō. | ā saxō altō in extrēmō agrō. | ex altō saxō in margine agrī. | ex saxō altō in margine agrī.
+capram iterum atque iterum vocāvit, sed nēmō | capram iterum iterumque vocāvit, sed nēmō | capram iterum atque iterum, sed nēmō | capram iterum iterumque, sed nēmō | iterum atque iterum capram sed nēmō
+respondit. Tandem sonum trīstem audīvērunt | respondit. Tandem trīstem sonum audīvērunt | respondit. Tandem audīvērunt sonum trīstem | respondit. Tandem audīvērunt trīstem sonum | respondit. Tandem sonitum trīstem audīvērunt
+ex altō saxō in extrēmō agrō. | ex saxō altō in extrēmō agrō. | ab altō saxō in extrēmō agrō. | ā saxō altō in extrēmō agrō. | ex altō saxō in margine agrī. | ex saxō altō in margine agrī. | in extrēmō agrō ā saxō altō.
 Capra in summō saxō stābat, | Capra stābat | Capra stābat in summō saxō,
 et dēscendere nōn poterat. | nec dēscendere poterat. | in summō saxō, et dēscendere nōn poterat. | in summō saxō, nec dēscendere poterat.
 "Quōmodo illūc ascendistī, | "Quōmodo illūc ascendistī, stulta | "Quō modō illūc ascendistī,
@@ -84,34 +89,34 @@ capra stulta?" rogāvit Anna. Capra eam spectāvit | stulta capra?" rogāvit Ann
 et nihil dīxit. Anna diū cōgitāvit. | nec quicquam dīxit. Anna diū cōgitāvit. | et nihil dīxit. Anna cōgitāvit | nec quicquam dīxit. Anna cōgitāvit
 Tum pānem et | diū. Tum pānem et | Tum pānem et cāseum | diū. Tum pānem et cāseum
 cāseum ē corbe suō prōmpsit. Posuit | cāseum ex corbe prōmpsit. Posuit | cāseum ē corbe suō prōmpsit. | cāseum ex corbe prōmpsit. | ē corbe suō prōmpsit. Posuit | ex corbe prōmpsit. Posuit | ē corbe suō prōmpsit. | ex corbe prōmpsit.
-cāseum in lapide humilī prope saxum et | cāseum in humilī lapide prope saxum et | cāseum in lapide humilī prope saxum posuit et | cāseum in humilī lapide prope saxum posuit et
-recessit. Capra ēsuriēbat, quia | recessit. Capra ēsuriēns erat, quia | recessit. Capra ēsuriēbat, quod | recessit. Capra ēsuriēns erat, quod
-ā māne nōn ēderat. | inde ā māne nōn ēderat. | ā māne nihil ēderat. | inde ā māne nihil ēderat.
+cāseum in lapide humilī prope saxum et | cāseum in humilī lapide prope saxum et | cāseum in lapide humilī prope saxum posuit et | cāseum in humilī lapide prope saxum posuit et | cāseum in saxō humilī prope saxum
+recessit. Capra ēsuriēbat, quia | recessit. Capra ēsuriēns erat, quia | recessit. Capra ēsuriēbat, quod | recessit. Capra ēsuriēns erat, quod | et recessit. Capra ēsuriēbat
+ā māne nōn ēderat. | inde ā māne nōn ēderat. | ā māne nihil ēderat. | inde ā māne nihil ēderat. | quia ā māne nōn ēderat.
 Lentē et cautē dēscendit | Lentē et cautē | Lentē cautēque dēscendit
 dē saxō et cāseum edere coepit. | dē saxō dēscendit et cāseum edere coepit. | ē saxō et cāseum edere coepit. | ē saxō dēscendit et cāseum edere coepit.
 Dum capra edit, Anna | Dum capra edēbat, Anna | Dum capra edit, Anna accessit | Dum capra edēbat, Anna accessit
 valdē tacitē propius accessit. Anna celeriter | propius valdē tacitē. Anna celeriter | propius valdē tacitē accessit. Anna celeriter | valdē tacitē propius accessit. Anna celeriter ligāvit | propius valdē tacitē. Anna celeriter ligāvit
-fūnem circum collum caprae ligāvit. "Nunc | fūnem circum collum caprae. "Nunc | fūnem circā collum caprae ligāvit. "Nunc | fūnem circā collum caprae. "Nunc
+fūnem circum collum caprae ligāvit. "Nunc | fūnem circum collum caprae. "Nunc | fūnem circā collum caprae ligāvit. "Nunc | fūnem circā collum caprae. "Nunc | fūnem circum cervīcem caprae. "Nunc
 mēcum domum veniēs," inquit. | mēcum domum veniēs," dīxit. | mēcum domum veniēs," inquit. Rediērunt | mēcum domum veniēs," dīxit. Rediērunt
 Ad flūmen rediērunt, ubi piscātor | ad flūmen, ubi piscātor
-eōs in nāviculā suā exspectābat. Senex | eōs nāviculā suā exspectābat. Senex
+eōs in nāviculā suā exspectābat. Senex | eōs nāviculā suā exspectābat. Senex | eōs in nāve suā exspectābat. Senex
 rīsit ubi capram vīdit cum fūne | rīsit cum capram vīdit cum fūne | rīsit ubi capram cum fūne vīdit | rīsit cum capram cum fūne vīdit
-circum collum. Eōs | circum collum. Eōs vēxit | circā collum. Eōs | circā collum. Eōs vēxit
+circum collum. Eōs | circum collum. Eōs vēxit | circā collum. Eōs | circā collum. Eōs vēxit | circum cervīcem eius. Eōs portāvit
 trāns aquam vēxit, et Anna eī | trāns aquam, et Anna eī dedit | trāns aquam vēxit, et Anna eī dedit | trāns aquam, et Anna eī
-reliquum pānem suum dedit. Intereā advesperāscēbat, | reliquum pānem suum. Intereā advesperāscēbat, | reliquum pānem dedit. Intereā advesperāscēbat, | reliquum pānem. Intereā advesperāscēbat, | reliquum pānem suum dedit. Intereā nox appetēbat, | reliquum pānem suum. Intereā nox appetēbat,
+reliquum pānem suum dedit. Intereā advesperāscēbat, | reliquum pānem suum. Intereā advesperāscēbat, | reliquum pānem dedit. Intereā advesperāscēbat, | reliquum pānem. Intereā advesperāscēbat, | reliquum pānem suum dedit. Intereā nox appetēbat, | reliquum pānem suum. Intereā nox appetēbat, | cēterum pānem suum. Intereā advesperāscēbat,
 et prīmae stēllae in caelō appāruērunt | et prīmae stēllae appāruērunt in caelō
-suprā silvam. Silva tacita erat, | super silvam. Silva tacita erat, | suprā silvam. Silva quiēta erat, | super silvam. Silva quiēta erat,
+suprā silvam. Silva tacita erat, | super silvam. Silva tacita erat, | suprā silvam. Silva quiēta erat, | super silvam. Silva quiēta erat, | suprā silvam. Silva tranquilla erat,
 et Anna paulum timēbat. Tamen | et Anna paulum timēbat. | et Anna paulum timida erat. Tamen | et Anna paulum timida erat.
-Rūfus ante eam ambulāvit et eī mōnstrāvit | Rūfus ante eam ambulāvit et | Rūfus ante eam ambulābat et eī mōnstrābat | Rūfus ante eam ambulābat et | Rūfus tamen ante eam ambulāvit et | Rūfus tamen ante eam ambulābat et
-viam. Ambulāvērunt et ambulāvērunt | viam eī mōnstrāvit. Ambulāvērunt et ambulāvērunt | viam eī mōnstrābat. Ambulābant et ambulābant | viam. Ambulābant et ambulābant | viam eī mōnstrāvit. Ambulābant et ambulābant | viam eī mōnstrābat. Ambulāvērunt et ambulāvērunt
+Rūfus ante eam ambulāvit et eī mōnstrāvit | Rūfus ante eam ambulāvit et | Rūfus ante eam ambulābat et eī mōnstrābat | Rūfus ante eam ambulābat et | Rūfus tamen ante eam ambulāvit et | Rūfus tamen ante eam ambulābat et | Rūfus ante eam ambulāvit et ostendit
+viam. Ambulāvērunt et ambulāvērunt | viam eī mōnstrāvit. Ambulāvērunt et ambulāvērunt | viam eī mōnstrābat. Ambulābant et ambulābant | viam. Ambulābant et ambulābant | viam eī mōnstrāvit. Ambulābant et ambulābant | viam eī mōnstrābat. Ambulāvērunt et ambulāvērunt | viam eī. Ambulāvērunt et ambulāvērunt
 per silvam obscūram, dōnec lūna | per obscūram silvam, dōnec lūna
 suprā arborēs orta est. Interdum | super arborēs orta est. Interdum | suprā arborēs surrēxit. Interdum | super arborēs surrēxit. Interdum | suprā arborēs orta est. Interdum audiēbant | super arborēs orta est. Interdum audiēbant
 vōcem būbōnis audiēbant, et semel vulpēs | vōcem būbōnis, et semel vulpēs | vōcem ululae audiēbant, et semel vulpēs | vōcem noctuae audiēbant, et semel vulpēs | vōcem ululae, et semel vulpēs | vōcem noctuae, et semel vulpēs
 viam ante eōs trānsiit. | sēmitam ante eōs trānsiit. | ante eōs viam trānsiit. | ante eōs sēmitam trānsiit.
 Tandem lūmen vīdērunt | Tandem lūmen in fenestrā vīdērunt | Tandem lūmen in fenestrā
-in fenestrā casae parvae. Avia | casae parvae. Avia | in fenestrā parvae casae. Avia | parvae casae. Avia | casae parvae vīdērunt. Avia | parvae casae vīdērunt. Avia
+in fenestrā casae parvae. Avia | casae parvae. Avia | in fenestrā parvae casae. Avia | parvae casae. Avia | casae parvae vīdērunt. Avia | parvae casae vīdērunt. Avia | domūs parvae. Avia
 ad iānuam stābat cum lucernā | ad iānuam stābat lucernam | ad portam stābat cum lucernā | ad ōstium stābat cum lucernā
-in manū. Ubi Annam et canem et | manū tenēns. Ubi Annam et canem et | in manū. Cum Annam et canem et
+in manū. Ubi Annam et canem et | manū tenēns. Ubi Annam et canem et | in manū. Cum Annam et canem et | in manū suā. Cum Annam et canem et
 capram vīdit, ad eōs cucurrit. "Anna!" | capram vīdit, ad eōs accucurrit. "Anna!"
 clāmāvit. "Eam invēnistī!" | exclāmāvit. "Eam invēnistī!" | clāmāvit. "Eam invēnistī!" Amplexa est | exclāmāvit. "Eam invēnistī!" Amplexa est | clāmāvit. "Invēnistī eam!" | exclāmāvit. "Invēnistī eam!"
 Puellam amplexa est et canī magnum os dedit. | puellam et canī magnum os dedit. | Puellam amplexa est et canī os magnum dedit. | puellam et canī os magnum dedit.
@@ -119,10 +124,10 @@ Tum Anna aviae suae | Tum Anna aviae suae nārrāvit | Tum Anna aviae | Tum Anna
 tōtam fābulam nārrāvit, dum cēnābant. | tōtam fābulam, dum cēnābant. | tōtam fābulam nārrāvit, dum cēnant. | tōtam fābulam, dum cēnant.
 Eā nocte capra in hortō dormīvit, | Illā nocte capra in hortō dormīvit, | Eā nocte capra in hortō dormiēbat,
 et avia portam clausit | et avia portam | et avia iānuam clausit | et avia iānuam
-dīligenter. Postrīdiē māne | dīligenter clausit. Postrīdiē māne | dīligenter. Postrīdiē māne avia | dīligenter clausit. Postrīdiē māne avia
+dīligenter. Postrīdiē māne | dīligenter clausit. Postrīdiē māne | dīligenter. Postrīdiē māne avia | dīligenter clausit. Postrīdiē māne avia | cautē. Postrīdiē māne
 avia capram mulsit et fēcit | avia capram mulsit et | capram mulsit et fēcit | capram mulsit et
 cāseum recentem. "Hic cāseus tibi est," | cāseum recentem fēcit. "Hic cāseus tibi est," | recentem cāseum. "Hic cāseus tibi est," | recentem cāseum fēcit. "Hic cāseus tibi est," | cāseum recentem. "Hic cāseus tuus est," | cāseum recentem fēcit. "Hic cāseus tuus est,"
-Annae dīxit, "quia | dīxit Annae, "quia | inquit Annae, "quia | Annae dīxit, "quod | dīxit Annae, "quod
-puella fortis es." Anna rīsit et | fortis puella es." Anna rīsit et | puella fortis es." Anna rīsit et dedit | fortis puella es." Anna rīsit et dedit
-paulum eius Rūfō dedit. Et ex eō diē | paulum eius Rūfō dedit. Et ab eō diē | Rūfō paulum eius. Et ex eō diē | Rūfō paulum eius. Et ab eō diē | paulum eius Rūfō. Et ex eō diē | paulum eius Rūfō. Et ab eō diē
+Annae dīxit, "quia | dīxit Annae, "quia | inquit Annae, "quia | Annae dīxit, "quod | dīxit Annae, "quod | dīxit Annae,
+puella fortis es." Anna rīsit et | fortis puella es." Anna rīsit et | puella fortis es." Anna rīsit et dedit | fortis puella es." Anna rīsit et dedit | "quia puella fortis es." Anna rīsit et dedit
+paulum eius Rūfō dedit. Et ex eō diē | paulum eius Rūfō dedit. Et ab eō diē | Rūfō paulum eius. Et ex eō diē | Rūfō paulum eius. Et ab eō diē | paulum eius Rūfō. Et ex eō diē | paulum eius Rūfō. Et ab eō diē | Rūfō paulum eius. Et ab illō diē
 capra numquam posteā aufūgit. | capra numquam iterum aufūgit. | capra numquam posteā effūgit. | capra numquam iterum effūgit.

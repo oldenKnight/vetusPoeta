@@ -79,6 +79,9 @@ struct Memory {
   uint32_t whPrep = kNone;
   bool whSubj3 = false, answer = false;
   bool lastImp = false;   // C28: the last clause translated was an order ("Don't complain," + "or ..." -> aliter)
+  // C30: main clauses translated since the last one with a noun or a name as its subject or object; a third-person
+  // pronoun object (or a subject with a predicate adjective) two or more clauses after it is a guess (Check)
+  uint8_t sinceNoun = 0;
 };
 
 struct Settings {

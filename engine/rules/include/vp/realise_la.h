@@ -81,6 +81,8 @@ struct LaNP {
   // `calledRel` the relative "cui nōmen erat / est" + the name in the nominative
   std::vector<LaNP> called;
   bool calledRel = false, calledPast = false;
+  // C30: a noun said of the head in its case, without commas ("an old fisherman" -> piscātor senex)
+  std::vector<LaNP> nounAttr;
 };
 
 struct LaOblique {

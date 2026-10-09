@@ -399,6 +399,8 @@ std::vector<SourceSentence> mapSentences(const std::vector<std::string>& cueText
               if (w0 == cc) lowerStart = false;
           }
           const bool inQuote = quoteOpen(out[(size_t)open].text);
+          // a speaker's turn (a dash) stays a turn of dialogue: no narrative join ("- After dinner," | "if you ...")
+          if (out[(size_t)open].dash) lowerStart = false;
           if (!narrative || !(lowerStart || inQuote || connectorOnly(piece))) open = -1;
         }
         // an ellipsis at the end of a cue continues only when the next cue starts with "..." or lower case

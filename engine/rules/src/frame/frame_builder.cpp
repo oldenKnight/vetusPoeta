@@ -4215,6 +4215,20 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
       s.units.pop_back();
     }
   }
+  // C30: "The road was long; however, we were happy.": "however" between two clauses opens the second (tamen)
+  for (size_t ui = 1; lang_ == SrcLang::En && ui + 1 < s.units.size(); ++ui) {
+    Unit& pv = s.units[ui - 1];
+    Unit& ph = s.units[ui];
+    Unit& nx = s.units[ui + 1];
+    if (ph.type != Unit::Phrase || text::lower(ph.phrase.pattern) != "however" || pv.type != Unit::Clause ||
+        nx.type != Unit::Clause || nx.vocative || !pv.frame.hasPred || !nx.frame.hasPred || ph.first < 1 ||
+        (s.tokens[(size_t)ph.first - 1].text != ";" && s.tokens[(size_t)ph.first - 1].text != ":"))
+      continue;   // ("..., however; you must ..." closes the first clause: it stays there)
+    nx.frame.connectors.insert(nx.frame.connectors.begin(), "however");
+    for (int k = ph.first; k <= ph.last; ++k) c.drop(k, Drop::Marker);
+    nx.first = ph.first;
+    s.units.erase(s.units.begin() + (long)ui);
+  }
   // separators and final punctuation of clause units
   for (size_t ui = 0; ui < s.units.size(); ++ui) {
     Unit& u = s.units[ui];
@@ -4303,6 +4317,189 @@ void FrameBuilder::repairTree(SemSentence& s) const {
             if (tk[(size_t)h2].head == v + 1 && tk[(size_t)h2].deprel == "conj") { tk[(size_t)g].head = h2 + 1; break; }
         }
     }
+  // C30: "Last summer a boy called Marcus found an old boat.": "called" + a name between a noun and the sentence's verb
+  // describes the noun (acl, nōmine Marcus); the noun is the subject of the verb after the name
+  if (lang_ == SrcLang::En)
+    for (int v = 1; v + 2 < n; ++v) {
+      nlp::Token& t = tk[(size_t)v];
+      if (!in(t.lower, {"called", "named"}) || t.upos != "VERB" || tk[(size_t)v + 1].upos != "PROPN") continue;
+      const int x = v - 1;   // the noun before
+      if (!in(tk[(size_t)x].upos, {"NOUN"})) continue;
+      int w = -1;   // the next verb
+      for (int g = v + 2; g < n && w < 0; ++g)
+        if (tk[(size_t)g].upos == "VERB") w = g;
+        else if (!in(tk[(size_t)g].upos, {"PROPN", "PUNCT"})) break;
+      if (w < 0) continue;
+      bool subj = false;
+      for (int g = 0; g < n; ++g) subj = subj || (tk[(size_t)g].head == w + 1 && tk[(size_t)g].deprel == "nsubj");
+      if (subj) continue;
+      if (tk[(size_t)w].head == v + 1) {   // the verb hung on "called": it takes its place
+        tk[(size_t)w].head = t.head == x + 1 ? tk[(size_t)x].head : t.head;
+        tk[(size_t)w].deprel = t.head == x + 1 ? tk[(size_t)x].deprel : t.deprel;
+        for (int g = 0; g < n; ++g)
+          if (g != w && tk[(size_t)g].head == v + 1 && tk[(size_t)g].upos == "PUNCT") tk[(size_t)g].head = w + 1;
+      }
+      t.head = x + 1;
+      t.deprel = "acl";
+      tk[(size_t)v + 1].head = v + 1;
+      tk[(size_t)v + 1].deprel = "xcomp";
+      tk[(size_t)x].head = w + 1;
+      tk[(size_t)x].deprel = "nsubj";
+    }
+  // C30: "a long white beard": a colour word read as a noun compound before a noun is its adjective
+  if (lang_ == SrcLang::En)
+    for (int k = 0; k + 1 < n; ++k) {
+      nlp::Token& t = tk[(size_t)k];
+      if (t.upos != "NOUN" || t.deprel != "compound" || !en::colourWord(t.lower) || t.head != k + 2) continue;
+      t.upos = "ADJ";
+      t.deprel = "amod";
+      for (int g = 0; g < k; ++g)   // "a long white beard": "long" hung on the colour word goes to the noun
+        if (tk[(size_t)g].head == k + 1 && tk[(size_t)g].upos == "ADJ") tk[(size_t)g].head = k + 2;
+    }
+  // C30: "He walked home alone.": "home" hung on another adverb belongs to the verb
+  if (lang_ == SrcLang::En)
+    for (int k = 0; k < n; ++k)
+      if (tk[(size_t)k].lower == "home" && tk[(size_t)k].head > 0 && tk[(size_t)tk[(size_t)k].head - 1].upos == "ADV" &&
+          tk[(size_t)tk[(size_t)k].head - 1].head > 0)
+        tk[(size_t)k].head = tk[(size_t)tk[(size_t)k].head - 1].head;
+  // C30: "bring her home": "her" before "home" after a verb of bringing is the object (eam domum dūcam), not a
+  // possessive ("her home")
+  if (lang_ == SrcLang::En)
+    for (int k = 1; k + 1 < n; ++k) {
+      nlp::Token& t = tk[(size_t)k];
+      if (!in(t.lower, {"her", "him", "them", "it"}) || tk[(size_t)k + 1].lower != "home" || tk[(size_t)k + 1].head <= 0)
+        continue;
+      const int v = tk[(size_t)k + 1].head - 1;
+      if (tk[(size_t)v].upos != "VERB" || !in(tk[(size_t)v].lemma, {"bring", "take", "carry", "lead", "send", "drive", "walk"}))
+        continue;
+      t.head = v + 1;
+      t.deprel = "obj";
+      tk[(size_t)k + 1].deprel = "advmod";
+      tk[(size_t)k + 1].upos = "ADV";
+    }
+  // C30: "until the sun set": the parser read "set" as a noun with "sun" as its compound; it is the verb of a time clause
+  if (lang_ == SrcLang::En)
+    for (int k = 1; k < n; ++k) {
+      nlp::Token& t = tk[(size_t)k];
+      nlp::Token& sj = tk[(size_t)k - 1];
+      if (t.lower != "set" || t.upos != "NOUN" || (sj.lower != "sun" && sj.lower != "moon") || sj.head != k + 1 ||
+          sj.deprel != "compound")
+        continue;
+      int mk = -1;
+      for (int g = 0; g < k; ++g)
+        if (tk[(size_t)g].head == k + 1 && tk[(size_t)g].deprel == "case" &&
+            in(tk[(size_t)g].lower, {"until", "till", "before", "after", "when"}))
+          mk = g;
+      if (mk < 0) continue;
+      t.upos = "VERB";
+      t.lemma = "set";
+      t.feats = nlp::morph::fromString("Number=Sing|Person=3|Tense=Past|VerbForm=Fin|Mood=Ind");
+      if (t.head > 0) {
+        t.deprel = "advcl";
+        int h = t.head - 1, guard = 0;   // a time clause hangs on the verb, not on the noun before it ("in the trees")
+        while (h >= 0 && tk[(size_t)h].upos != "VERB" && tk[(size_t)h].head > 0 && guard++ < n) h = tk[(size_t)h].head - 1;
+        if (h >= 0 && tk[(size_t)h].upos == "VERB") t.head = h + 1;
+      }
+      sj.deprel = "nsubj";
+      tk[(size_t)mk].deprel = "mark";
+      tk[(size_t)mk].upos = "SCONJ";
+    }
+  // C30: "The road was long;": "long" with a copula of its own is the adjective (longa), not the adverb (diū)
+  if (lang_ == SrcLang::En)
+    for (int k = 0; k < n; ++k) {
+      nlp::Token& t = tk[(size_t)k];
+      if (t.lower != "long" || t.upos != "ADV") continue;
+      bool cop = false;
+      for (int g = 0; g < n; ++g) cop = cop || (tk[(size_t)g].head == k + 1 && tk[(size_t)g].deprel == "cop");
+      if (cop) t.upos = "ADJ";
+    }
+  // C30: "Anna and the dog searched everywhere ...": the parser made the first name the root and the verb its conjunct
+  // with "the dog" as subject; the two are the verb's coordinated subject
+  if (lang_ == SrcLang::En) {
+    int r = -1;
+    for (int k = 0; k < n; ++k)
+      if (tk[(size_t)k].head == 0) r = k;
+    if (r >= 0 && in(tk[(size_t)r].upos, {"PROPN", "NOUN"})) {
+      int v = -1, sj = -1, cc = -1;
+      for (int k = r + 1; k < n && v < 0; ++k)
+        if (tk[(size_t)k].head == r + 1 && in(tk[(size_t)k].deprel, {"conj", "dep", "parataxis"}) && tk[(size_t)k].upos == "VERB") v = k;
+      if (v >= 0)
+        for (int k = r + 1; k < v; ++k) {
+          if (tk[(size_t)k].head == v + 1 && tk[(size_t)k].deprel == "nsubj" && sj < 0) sj = k;
+          if (tk[(size_t)k].head == v + 1 && tk[(size_t)k].deprel == "cc" && tk[(size_t)k].lower == "and" && cc < 0) cc = k;
+        }
+      // ... or the verb hung on the name without a subject while "the dog" is the name's conjunct ("Marcus and the dog
+      // ran to the river.")
+      if (v < 0 || sj < 0) {
+        bool coordNoun = false;
+        for (int k = r + 1; k < n; ++k)
+          coordNoun = coordNoun || (tk[(size_t)k].head == r + 1 && tk[(size_t)k].deprel == "conj" && in(tk[(size_t)k].upos, {"NOUN", "PROPN"}));
+        int pv = -1;
+        for (int k = r + 1; k < n && pv < 0; ++k)
+          if (tk[(size_t)k].head == r + 1 && in(tk[(size_t)k].deprel, {"parataxis", "dep"}) && tk[(size_t)k].upos == "VERB") pv = k;
+        bool own = false;
+        for (int k = 0; pv >= 0 && k < n; ++k) own = own || (tk[(size_t)k].head == pv + 1 && tk[(size_t)k].deprel == "nsubj");
+        const bool past = pv >= 0 && nlp::morph::get(tk[(size_t)pv].feats, nlp::morph::TenseShift) == nlp::morph::TensePast;
+        if (coordNoun && pv >= 0 && !own && past) {
+          tk[(size_t)pv].head = 0;
+          tk[(size_t)pv].deprel = "root";
+          tk[(size_t)r].head = pv + 1;
+          tk[(size_t)r].deprel = "nsubj";
+          for (int k = 0; k < n; ++k)
+            if (k != pv && tk[(size_t)k].head == r + 1 && k > pv) tk[(size_t)k].head = pv + 1;
+          v = -1;
+        }
+      }
+      if (v >= 0 && sj >= 0 && cc >= 0 && cc < sj) {
+        tk[(size_t)v].head = 0;
+        tk[(size_t)v].deprel = "root";
+        tk[(size_t)r].head = v + 1;
+        tk[(size_t)r].deprel = "nsubj";
+        tk[(size_t)sj].head = r + 1;
+        tk[(size_t)sj].deprel = "conj";
+        tk[(size_t)cc].head = sj + 1;
+        for (int k = 0; k < n; ++k)   // the sentence's punctuation and later clauses go with the verb
+          if (k != v && tk[(size_t)k].head == r + 1 && k > v) tk[(size_t)k].head = v + 1;
+      }
+    }
+  }
+  // C30: "gave a little of it to Rufus": "a little" before "of" + a noun or pronoun is the object (paulum eius), not an
+  // adverb; "came along the bank": "along" before a noun phrase is its preposition, not the verb's particle
+  if (lang_ == SrcLang::En)
+    for (int k = 1; k + 2 < n; ++k) {
+      nlp::Token& t = tk[(size_t)k];
+      if (t.lower == "little" && tk[(size_t)k - 1].lower == "a" && tk[(size_t)k + 1].lower == "of" &&
+          in(tk[(size_t)k + 2].upos, {"PRON", "NOUN", "PROPN", "DET"})) {
+        int x = -1;   // the noun / pronoun of "of"
+        for (int g = k + 2; g < n && x < 0; ++g)
+          if (in(tk[(size_t)g].upos, {"PRON", "NOUN", "PROPN"})) x = g;
+        int v = -1;   // the verb before it
+        for (int g = k - 1; g >= 0 && v < 0; --g)
+          if (tk[(size_t)g].upos == "VERB") v = g;
+        if (x < 0 || v < 0) continue;
+        bool obj = false;
+        for (int g = 0; g < n; ++g) obj = obj || (tk[(size_t)g].head == v + 1 && tk[(size_t)g].deprel == "obj");
+        if (obj) continue;
+        t.head = v + 1;
+        t.upos = "NOUN";
+        t.deprel = "obj";
+        tk[(size_t)k - 1].head = k + 1;
+        tk[(size_t)k - 1].deprel = "det";
+        tk[(size_t)x].head = k + 1;
+        tk[(size_t)x].deprel = "nmod";
+      }
+      if (t.lower == "along" && t.upos == "ADV" && in(tk[(size_t)k + 1].upos, {"DET", "NOUN", "PROPN"})) {
+        int x = -1;
+        for (int g = k + 1; g < n && x < 0; ++g) {
+          if (in(tk[(size_t)g].upos, {"NOUN", "PROPN"})) x = g;
+          else if (!in(tk[(size_t)g].upos, {"DET", "ADJ"})) break;
+        }
+        if (x < 0) continue;
+        t.upos = "ADP";
+        t.deprel = "case";
+        t.head = x + 1;
+      }
+    }
   // C30: "Every morning Anna gave ...": a time noun read as a second subject is a time phrase; "gave water to the
   // hens": a to-phrase the parser hung on the object of a verb of giving belongs to the verb (dative)
   if (lang_ == SrcLang::En)
@@ -4344,10 +4541,12 @@ void FrameBuilder::repairTree(SemSentence& s) const {
       for (int g = 0; g < k; ++g)
         if (tk[(size_t)g].head == k + 1 && in(tk[(size_t)g].lower, {"where", "which", "who", "whom", "that"})) rel = g;
       int ante = -1;
-      if (rel >= 1 && tk[(size_t)rel - 1].text == ",")
-        for (int g = rel - 2; g >= 0 && ante < 0; --g)
+      if (rel >= 1 && tk[(size_t)rel - 1].text == ",") {
+        for (int g = rel - 2; g >= 0 && ante < 0; --g) {
           if (tk[(size_t)g].upos == "NOUN" || tk[(size_t)g].upos == "PROPN") ante = g;
           else if (tk[(size_t)g].upos == "PUNCT" || tk[(size_t)g].upos == "VERB") break;
+        }
+      }
       if (ante >= 0) {
         tk[(size_t)k].head = ante + 1;
         tk[(size_t)k].deprel = "acl";
@@ -4366,9 +4565,10 @@ void FrameBuilder::repairTree(SemSentence& s) const {
       const int x = tk[(size_t)nameTok].head - 1;   // the word the name is the subject of
       if (x <= nameTok || tk[(size_t)nameTok].deprel != "nsubj") continue;
       int ante = -1;
-      for (int k = w - 2; k >= 0 && ante < 0; --k)
+      for (int k = w - 2; k >= 0 && ante < 0; --k) {
         if (tk[(size_t)k].upos == "NOUN" || tk[(size_t)k].upos == "PROPN") ante = k;
         else if (tk[(size_t)k].upos == "PUNCT") break;
+      }
       if (ante < 0) continue;
       tk[(size_t)x].head = ante + 1;
       tk[(size_t)x].deprel = "acl";
@@ -5341,6 +5541,7 @@ void FrameBuilder::repairTree(SemSentence& s) const {
     for (int i = 1; i + 1 < n; ++i) {
       if (tk[(size_t)i].lower != "a" || tk[(size_t)i + 1].lower != "little" || tk[(size_t)i - 1].upos != "VERB") continue;
       if (i + 2 < n && in(tk[(size_t)i + 2].upos, {"NOUN", "ADJ", "PROPN"})) continue;   // "a little girl", "a little cold"
+      if (i + 2 < n && tk[(size_t)i + 2].lower == "of") continue;   // C30: "gave a little of it": the object
       bool kids = false;
       for (int j = 0; j < n; ++j)
         if (tk[(size_t)j].head == i + 2 && j != i) kids = true;

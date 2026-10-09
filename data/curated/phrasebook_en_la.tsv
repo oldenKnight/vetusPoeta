@@ -327,7 +327,6 @@ very much	valdē	1	answer	C28: "- Yes, very much."
 # C30 (Latin loop 7): narrative register: connectors, time phrases and frames of a told story
 called {NAME}	nōmine {1}	1	narr	C30: "a little girl called Anna" -> puella nōmine Anna (ablative of respect)
 named {NAME}	nōmine {1}	1	narr	C30
-every day	cotīdiē	1	adv	C30
 every night	omnī nocte	1	adv	C30
 one day	quōdam diē	1	narr	C30: the opening of an episode ("One day, however, the goat ...")
 that night	eā nocte	1	narr	C30

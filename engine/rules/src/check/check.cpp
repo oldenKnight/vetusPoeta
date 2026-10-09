@@ -416,6 +416,7 @@ struct LatinChecker::Impl {
           for (size_t j = 0; j < n; ++j) verbs += isVerb[j];
           if (verbs >= 2) continue;   // "Cum māter vēnit, puer dormiēbat"; one verb: it is the preposition
         }
+        if (rep.tokens[x].analysis.key == "mane") continue;   // C30: māne is indeclinable ("ā māne", "ad māne")
         issue("A4", (int)x, "preposition '" + T(i) + "' does not govern the case of '" + T(x) + "'");
         continue;
       }
@@ -769,7 +770,13 @@ struct LatinChecker::Impl {
                   if (!isNominal(r) || r.f.case_ != Nom) continue;
                   if (!numberCompat(r.f.number, vr.f.number)) continue;
                   if (!copula && isHead(r) && personOf(r) != vr.f.person) continue;
-                  if (!copula && !isHead(r) && vr.f.person != 3) continue;
+                  // C30: an adjective alone said of a dropped "I" / "you" ("Sōla ambulās", "Prīmus vēnī") agrees
+                  if (!copula && !isHead(r) && vr.f.person != 3 &&
+                      !(subj.size() == 1 && (rep.tokens[j].analysis.key == "solus" || rep.tokens[j].analysis.key == "sola" ||
+                                             rep.tokens[j].analysis.key == "soli" || rep.tokens[j].analysis.key == "solae" ||
+                                             rep.tokens[j].analysis.key == "primus" || rep.tokens[j].analysis.key == "prima" ||
+                                             rep.tokens[j].analysis.key == "primi" || rep.tokens[j].analysis.key == "primae")))
+                    continue;
                   agrees = true;
                 }
             }

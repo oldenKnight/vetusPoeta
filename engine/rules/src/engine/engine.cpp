@@ -835,6 +835,7 @@ class RulesEngine final : public Engine {
       return false;
     };
     int quotes = 0, frames = 0;
+    char frameGender = 0;
     for (const QSeg& g : segs) {
       if (!hasLetters(g)) continue;
       if (g.quote) {
@@ -852,9 +853,36 @@ class RulesEngine final : public Engine {
         bool alone = false;
         if (!reportingFrame(text, g.a, g.b, canon, cs, ca, alone)) return false;
         ++frames;
+        // the speaker the frame names says the quotation: its sex sets the first person's gender ("I am tired," said
+        // Marcus -> fessus)
+        for (size_t k = 0; k < canon.size() && !frameGender;) {
+          while (k < canon.size() && !std::isalpha((unsigned char)canon[k])) ++k;
+          size_t e = k;
+          while (e < canon.size() && std::isalpha((unsigned char)canon[e])) ++e;
+          if (e == k) break;
+          std::string w = canon.substr(k, e - k), lw = text::lower(w);
+          k = e;
+          if (lw == "he") frameGender = 'm';
+          else if (lw == "she") frameGender = 'f';
+          else if (w[0] >= 'A' && w[0] <= 'Z' && lw != "the") {
+            if (const curated::NameEntry* ne = cd_->nameByEnglish(w))
+              frameGender = ne->gender == feat::F ? 'f' : ne->gender == feat::M ? 'm' : 0;
+          }
+          if (frameGender) break;
+          static const char* const kM[] = {"man", "boy", "father", "brother", "king", "son", "grandfather", "uncle",
+                                           "fisherman", "farmer", "husband", "prince"};
+          static const char* const kF[] = {"woman", "girl", "mother", "sister", "queen", "daughter", "grandmother",
+                                           "aunt", "wife", "princess"};
+          for (const char* x : kM)
+            if (lw == x) frameGender = 'm';
+          for (const char* x : kF)
+            if (lw == x) frameGender = 'f';
+        }
       }
     }
     if (quotes == 0 || frames == 0) return false;
+    transfer::Settings stq = st;   // the quotation's settings: the speaker's gender when the frame tells it
+    if (frameGender) { stq.speakerGender = frameGender; stq.flipSpeakerGender = false; }
     const transfer::Memory memFrame = mem;
     std::vector<int> offs;
     cue::Latin L;
@@ -879,7 +907,7 @@ class RulesEngine final : public Engine {
           while (!q.empty() && q.back() == ' ') q.pop_back();
           q += '.';   // analysed as the sentence it is
         }
-        speech(q, fb, opt, ctx, mem, st, po, false);
+        speech(q, fb, opt, ctx, mem, stq, po, false);
         if (po.latin.text.empty()) return false;
         for (int o : po.srcOffset) mapped.push_back(o >= 0 ? o + base : -1);
         if (!tail.empty()) {   // the Latin ends with the source's comma
@@ -1284,6 +1312,34 @@ class RulesEngine final : public Engine {
               bool allowSplit = true) {
     // C30: direct speech with its reporting frame
     if (st.lang == frame::SrcLang::En && allowSplit && speechQuoted(text, fb, opt, ctx, mem, st, so)) return;
+    // C30: a sentence inside quotation marks (or the first / last sentence of a longer quotation) without a reporting
+    // frame: the marks are no words; the sentence is translated without them and they are put back around the Latin
+    if (st.lang == frame::SrcLang::En && allowSplit) {
+      size_t a = 0, b = text.size(), la = 0, lb = 0;
+      while (a < b && text[a] == ' ') ++a;
+      while (b > a && text[b - 1] == ' ') --b;
+      const bool lead = b > a && (text[a] == '"' || text.compare(a, 3, "\xE2\x80\x9C") == 0);
+      if (lead) la = text[a] == '"' ? 1 : 3;
+      const bool trail = b > a + la && (text[b - 1] == '"' || (b >= a + la + 3 && text.compare(b - 3, 3, "\xE2\x80\x9D") == 0));
+      if (trail) lb = text[b - 1] == '"' ? 1 : 3;
+      bool inner = false;   // another mark inside: a quotation with a frame or several quotations (handled above)
+      for (size_t i = a + la; (lead || trail) && i + lb < b && !inner; ++i) {
+        size_t ml = 0;
+        inner = quoteMarkAt(text, i, ml);
+      }
+      if ((lead || trail) && !inner && b > a + la + lb) {
+        const size_t from = a + la;
+        speech(text.substr(from, b - lb - from), fb, opt, ctx, mem, st, so, alternatives, allowSplit);
+        for (int& o : so.srcOffset)
+          if (o >= 0) o += (int)from;
+        if (lead && !so.latin.text.empty()) {
+          so.latin.text = "\"" + so.latin.text;
+          for (auto& t : so.latin.tokens) { ++t.start; ++t.end; }
+        }
+        if (trail && !so.latin.text.empty()) so.latin.text += "\"";
+        return;
+      }
+    }
     SemSentence s;
     const transfer::Memory memEntry = mem;   // C24: for the clause split before the word-by-word fallback
     // C17: editorial text in square brackets ("They are rusted [so badly] that ...") is analysed with the sentence
@@ -1305,6 +1361,22 @@ class RulesEngine final : public Engine {
     // "it" in its place (spaces keep the offsets) and the Latin word of that pronoun is replaced by the quoted word
     std::vector<std::pair<size_t, size_t>> soundSpans;
     if (st.lang == frame::SrcLang::En && en_) quotedSounds(parseText, soundSpans);
+    // C30: the quotation marks of a quoted sentence (no reporting frame in it) are no words: the parser reads spaces
+    // ("Why are you walking alone ...," was a fragment with "Et")
+    bool wholeQuote = false;
+    {
+      size_t q0 = 0;
+      while (q0 < parseText.size() && parseText[q0] == ' ') ++q0;
+      wholeQuote = q0 < parseText.size() && (parseText[q0] == '"' || parseText.compare(q0, 3, "\xE2\x80\x9C") == 0);
+    }
+    if (st.lang == frame::SrcLang::En && soundSpans.empty() && wholeQuote)
+      for (size_t q = 0; q < parseText.size(); ++q) {
+        if (parseText[q] == '"') parseText[q] = ' ';
+        else if (parseText.compare(q, 3, "\xE2\x80\x9C") == 0 || parseText.compare(q, 3, "\xE2\x80\x9D") == 0) {
+          parseText.replace(q, 3, "   ");
+          q += 2;
+        }
+      }
     fb.analyse(parseText, s, st.classical);
     swapPhrases(s, st);
     if (allowSplit && frame::FrameBuilder::troubled(s)) {
@@ -1898,10 +1970,21 @@ class RulesEngine final : public Engine {
           static const char* const kNomine[] = {"called", "named", nullptr};
           static const char* const kNomen[] = {"name", nullptr};
           static const char* const kErat[] = {"was", "is", nullptr};
+          // C30: a modal verb is found by its English modal ("Can I sail ...?" -> Possumne ...)
+          static const char* const kCan[] = {"can", "could", "able", nullptr};
+          static const char* const kMust[] = {"must", "should", "ought", nullptr};
+          static const char* const kWant[] = {"want", "wants", "wanted", nullptr};
+          if (!src && t.hasLemma && t.features.pos == "verb") {
+            const std::string lk = text::latin_key(std::string(la_->lemma(t.lemmaId).head));
+            if (lk == "possum") src = kCan;
+            else if (lk == "debeo") src = kMust;
+            else if (lk == "uolo") src = kWant;
+          }
           if (k == "nomine") src = kNomine;
           else if (k == "nomen") src = kNomen;
           else if ((k == "erat" || k == "est") && &t != &ut.latin.tokens[0] && text::latin_key((&t - 1)->text) == "nomen")
             src = kErat;
+          bool oblPron = false;   // C30
           static const char* const kEgo[] = {"me", "i", "my", "myself", nullptr};
           static const char* const kTu[] = {"you", "your", "yourself", nullptr};
           static const char* const kNos[] = {"us", "we", "our", "ourselves", nullptr};
@@ -1918,14 +2001,18 @@ class RulesEngine final : public Engine {
             static const char* const kIsObl[] = {"him", "her", "it", "them", nullptr};
             static const char* const kIsGen[] = {"his", "her", "its", "their", nullptr};
             if (src == kIs) {
-              if (k == "eum" || k == "eam" || k == "ei" || k == "eo" || k == "eos" || k == "eas" || k == "eis" || k == "iis")
+              if (k == "eum" || k == "eam" || k == "ei" || k == "eo" || k == "eos" || k == "eas" || k == "eis" || k == "iis") {
                 src = kIsObl;
+                oblPron = true;
+              }
               else if (k == "eius" || k == "eorum" || k == "earum")
                 src = kIsGen;
             }
           }
           for (int q = ut.first; src && !hit && q <= ut.last && q < (int)s.tokens.size(); ++q) {
             if (q < 0 || usedSrc.count(q)) continue;
+            // C30: an oblique form is never the subject's pronoun ("it did not bite" | "him." -> eum is "him")
+            if (oblPron && s.tokens[(size_t)q].deprel == "nsubj") continue;
             for (const char* const* w = src; *w && !hit; ++w)
               if (s.tokens[(size_t)q].lower == *w) {
                 off = s.tokens[(size_t)q].start;
@@ -2567,6 +2654,7 @@ class RulesEngine final : public Engine {
       bool nonverbal = false, song = false, copied = false, latinText = false;
       int sentences = 0, wholeSentences = 0;
       std::vector<Alternative> alternatives;
+      bool agreeWhole = true;   // C30: every sentence with a piece here passes A3 / A4 as a whole sentence
     };
     std::vector<CueAcc> acc(texts.size());
     transfer::Memory mem;
@@ -2878,6 +2966,15 @@ class RulesEngine final : public Engine {
         }
       }
       if (cueSplit[si]) addFlag(so.flags, "cue-split");
+      // C30: a sentence over several cues is checked whole for agreement and government: a subject and its verb in two
+      // cues ("Anna et" | "Rūfus nāviculam cōnscendērunt") are no fault of either cue
+      bool agreeWhole = true;
+      if (ss.kind == frame::CueKind::Speech && ss.parts.size() > 1 && !so.latin.text.empty()) {
+        CueOutput probe;
+        CueInput none;
+        runChecks(so.latin.text, so.latin.tokens, opt, none, true, probe, false, false);
+        agreeWhole = checkOk(probe, "A3") && checkOk(probe, "A4");
+      }
       size_t tokBase = 0;
       for (size_t p = 0; p < pieces.size() && p < ss.parts.size(); ++p) {
         CueAcc& a = acc[ss.parts[p].cue];
@@ -2895,6 +2992,7 @@ class RulesEngine final : public Engine {
           }
         }
         tokBase += pieces[p].tokens.size();
+        a.agreeWhole = a.agreeWhole && agreeWhole;
         for (const std::string& f : so.flags) addFlag(a.flags, f);
         a.unknown.insert(a.unknown.end(), so.unknown.begin(), so.unknown.end());
         a.missing.insert(a.missing.end(), so.missing.begin(), so.missing.end());
@@ -3065,6 +3163,12 @@ class RulesEngine final : public Engine {
         o.checks.push_back(a7);
         std::stable_sort(o.checks.begin(), o.checks.end(), [](const Check& x, const Check& y) { return x.id < y.id; });
       }
+      // C30: agreement split over a cue boundary, checked on the whole sentence
+      if (a.sentences > a.wholeSentences && a.agreeWhole && (!checkOk(o, "A3") || !checkOk(o, "A4"))) {
+        for (Check& k : o.checks)
+          if ((k.id == "A3" || k.id == "A4") && !k.ok) { k.ok = true; k.detail = "checked on the whole sentence (it runs over the cue boundary)"; }
+        addFlag(o.flags, "split-agreement");
+      }
       // confidence (§10.4)
       bool unknown = false;
       for (const auto& t : o.tokens) unknown = unknown || t.unknown;
@@ -3082,7 +3186,8 @@ class RulesEngine final : public Engine {
                             "derived-word",   // C19
                             "cue-split", "addressee-gender",   // C22
                             "speaker-reply", "free-relative", "clause-split", "song-relative",   // C24
-                            "antecedent-guess"})   // C28
+                            "antecedent-guess",   // C28
+                            "split-agreement"})   // C30
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       // a tier 3 word chosen while a tier 1/2 word of the same sense existed (fidelity 1, a correction aside)
       for (const transfer::Choice& c : a.choices)

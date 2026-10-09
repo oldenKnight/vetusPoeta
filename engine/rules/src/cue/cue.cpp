@@ -3,7 +3,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
 
 #include "vp/text.h"
 
@@ -256,12 +255,30 @@ bool regroupSentence(const frame::SourceSentence& src, const Latin& latin, const
       if (np2 >= 0 && np2 != part[i]) part[i] = np2;
     }
   }
+  // C30: a verb never lands right after the "et" of a noun phrase cut by the cue boundary ("Tum pānem et" | "cāseum ē
+  // corbe prōmpsit", not "Tum pānem et prōmpsit"): it goes with the words right before it
+  for (size_t i = 1; i < nt; ++i) {
+    if (latin.tokens[i].features.pos != "verb" || part[i - 1] <= part[i]) continue;
+    long j = (long)i - 1;
+    while (j >= 0 && part[(size_t)j] != part[i]) --j;
+    if (j < 0) continue;
+    const std::string kj = text::latin_key(latin.tokens[(size_t)j].text);
+    if ((kj == "et" || kj == "atque" || kj == "aut") && j > 0 && nominal(latin.tokens[(size_t)j - 1].features) &&
+        nominal(latin.tokens[(size_t)j + 1].features))
+      part[i] = part[i - 1];
+  }
   // linkers: right to left, so "et nōn" moves together
   for (size_t i = nt - 1; i-- > 0;) {
     const rules::TokenView& t = latin.tokens[i];
     const std::string k = text::latin_key(t.text);
     if (part[i + 1] <= part[i]) continue;
     if (t.features.pos == "prep" && preposition(k)) { part[i] = part[i + 1]; continue; }
+    // C30: et / aut between two nouns of the same case joins a noun phrase, not a clause: it stays where its source
+    // word is ("Anna et" | "Rūfus nāviculam cōnscendērunt")
+    if ((k == "et" || k == "aut" || k == "atque") && i > 0 && i + 1 < nt && nominal(latin.tokens[i - 1].features) &&
+        nominal(latin.tokens[i + 1].features) && !latin.tokens[i - 1].features.case_.empty() &&
+        latin.tokens[i - 1].features.case_ == latin.tokens[i + 1].features.case_)
+      continue;
     if (conjunction(k) || relativeWord(k) || k == "non" || k == "donec" || k == "antequam") {
       // with the verb of the clause it opens (the first verb after it), else the nearest later part
       long best = -1;
@@ -277,8 +294,29 @@ bool regroupSentence(const frame::SourceSentence& src, const Latin& latin, const
         for (size_t j = i + 1; j < nt; ++j)
           if (part[j] > part[i] && part[j] < best) best = part[j];
       }
-      if (best > part[i]) part[i] = best;
+      // C30: never the last Latin word of its cue ("While he" | "was rowing, ...": Dum stays, the cue keeps a word)
+      size_t same = 0;
+      for (size_t j = 0; j < nt; ++j) same += part[j] == part[i] && letters(latin.tokens[j].text);
+      if (best > part[i] && same > 1) part[i] = best;
     }
+  }
+  // C30: a part left without a Latin word whose source words a phrase of the part before covers ("Anna thought for a
+  // long" | "time."): the word of that part nearest the boundary (the phrase, diū) goes to it
+  for (size_t p = 1; p < np; ++p) {
+    const frame::CuePart& cp = src.parts[p];
+    if (!letters(src.text.substr((size_t)cp.start, (size_t)std::max(0, cp.end - cp.start)))) continue;
+    bool any = false;
+    for (size_t i = 0; i < nt && !any; ++i) any = part[i] == (long)p && letters(latin.tokens[i].text);
+    if (any) continue;
+    long best = -1;
+    size_t inPrev = 0;
+    for (size_t i = 0; i < nt; ++i)
+      if (part[i] == (long)p - 1 && letters(latin.tokens[i].text)) {
+        ++inPrev;
+        if (srcOffset[i] >= 0 && latin.tokens[i].features.pos != "verb" && (best < 0 || srcOffset[i] > srcOffset[(size_t)best]))
+          best = (long)i;
+      }
+    if (best >= 0 && inPrev > 1) part[(size_t)best] = (long)p;
   }
   // every part with source letters gets a Latin word
   for (size_t p = 0; p < np; ++p) {
@@ -302,6 +340,27 @@ bool regroupSentence(const frame::SourceSentence& src, const Latin& latin, const
       if (!isSpace(g[q])) (sp != std::string::npos && q > sp && i + 1 < nt ? n : m) += g[q];
     after[i] = m;
     if (i + 1 < nt) before[i + 1] = n;
+  }
+  // C30: the mark that closes a quotation or a sentence inside the unit ("?\"", ".\"", "!") stays at the end of its
+  // segment in the last cue the segment reaches ("Possumne nāvigāre" | "nunc ad īnsulam?\" rogāvit Marcus.")
+  {
+    size_t segStart = 0;
+    for (size_t i = 0; i + 1 < nt; ++i) {
+      const std::string& m = after[i];
+      const bool closes = m.find('"') != std::string::npos || m.find('?') != std::string::npos ||
+                          m.find('!') != std::string::npos || m.find('.') != std::string::npos;
+      if (!closes) continue;
+      long pm = -1;
+      for (size_t j = segStart; j <= i; ++j) pm = std::max(pm, part[j]);
+      size_t carrier = i;
+      for (size_t j = segStart; j <= i; ++j)
+        if (part[j] == pm) carrier = j;
+      if (carrier != i && pm > part[i]) {
+        after[carrier] += m;
+        after[i].clear();
+      }
+      segStart = i + 1;
+    }
   }
   const std::string finalMark = after[nt - 1];
   after[nt - 1].clear();

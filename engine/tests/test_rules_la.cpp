@@ -398,7 +398,8 @@ TEST_CASE("rules-la: curated data loads; missing file is an error with a hint; m
   const auto conn = d.conditionSet("order.conn");
   CHECK(std::find(conn.begin(), conn.end(), "igitur") != conn.end());
   const auto quant = d.orderingList("order.adj", "quantity");
-  CHECK(quant == std::vector<std::string>{"multi", "omnes", "pauci", "nullus", "totus", "alius", "ullus"});   // C15
+  CHECK(quant == std::vector<std::string>{"multi", "omnes", "pauci", "nullus", "totus", "alius", "ullus", "primus", "summus",
+                                          "extremus", "ceterus"});   // C15; C30: prīmus and the words of a part
   const auto cumList = d.orderingList("order.prep", "enclitic");
   CHECK(std::find(cumList.begin(), cumList.end(), "nobiscum") != cumList.end());
 

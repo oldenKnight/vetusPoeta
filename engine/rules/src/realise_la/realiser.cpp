@@ -247,6 +247,7 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
       if (ad.capitalise) Punctuation::capitaliseFirst(out.back().form);
     }
     if (n.possessive != kNone && !n.possContrast) out.push_back(modifierWord(n.possessive, 0, "order.poss"));
+    for (const LaNP& na : n.nounAttr) np(na, case_, owner, o, out);   // C30: "piscātor senex"
     for (const LaNP& g : n.genitive) np(g, Gen, nullptr, o, out);
     // C30: the name the noun is called by: "puella nōmine Anna" (the name in the noun's case), or the relative "canem
     // suum, cui nōmen erat Rūfus"
