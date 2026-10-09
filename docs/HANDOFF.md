@@ -18,8 +18,8 @@ Last updated: 2026-10-05 (session 1, step 1 of the production process).
   missing, check `data/raw/dl-*.log` and rerun the curl commands (they resume with `-C -`).
 
 ## Next step (updated 2026-10-06, evening)
-- 54 tasks DONE through C27 / E13 (Latin loops 1-5, two acceptance loops, Greek loops 1-5, Orbergise on real material,
-  latinity toggle D18, release passes R1-R3). No implementer running; every commit is pushed to
+- 60 tasks DONE through C29 / E14 (Latin loops 1-5, two acceptance loops, Greek loops 1-5, Orbergise on real material,
+  latinity toggle D18, Latin loop 6 on cue context, Greek loop 6, release passes R1-R4). No implementer running; every commit is pushed to
   claude/fervent-cannon-6qif8i. The tree is release-ready on Linux; nothing engineering-side is pending that does not
   need the owner's input (second file, main branch, Google Translate run, Windows smoke test).
 - Waiting on the owner: the Alice .srt (acceptance run: `tools/eval/run_eval.py --tuned`, then a tuning loop C18 on
@@ -34,7 +34,7 @@ Last updated: 2026-10-05 (session 1, step 1 of the production process).
 - Gold Latin: tests/regression/expected/*.gold.txt (main agent). Held-out hygiene: nobody reads tests/heldout,
   tests/eval_gold or data/work/eval/heldout-*; BURNED.txt lists the 100 cues moved to the tuning sample.
 - Quality state (honest): tuned EN 114/114, ES 100/100, Greek 114/114 (ES->GRC 39/40), oz_sample 78/100; held-out
-  automatic errors own 3/74 (4.1 %), oz 98/700 (14.0 %); wrong among OK 0 everywhere; model gate 74.9 % so Latin
+  automatic errors own 3/74 (4.1 %), oz 99/700 (14.1 %); wrong among OK 0 everywhere; model gate 74.9 % so Latin
   reranking is off. Acceptance file (owner's partial Alice, 82 cues): expert wrong rate 79 % at first run, 27 % after
   loop 1 (C22), 3.7 % after loop 2 (C24; tuned number, no < 1 % claim). Latinity toggle (D18) done in UI and engine.
   Next honest test: the owner's second file (held-out, never tuned on).
