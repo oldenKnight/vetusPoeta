@@ -192,7 +192,9 @@ const char* connector(const std::string& w, bool afterFirst) {
       {"if", "sī"},        {"nor", "neque"},      {"also", "quoque"},     {"yet", "tamen"},   {"therefore", "itaque"},
       {"however", "tamen"}, {"however-mid", "autem"},   // C30: "After an hour, however, the path ..." -> Post hōram autem
       {"when", "cum"}, {"when-time", "ubi"},   // C22: a when-clause standing alone (ubi)
-      {"what-if", "quid"},   // C22: "What if ...?" -> Quid sī ...?      {"although", "quamquam"}, {"while", "dum"},  {"unless", "nisi"},
+      {"what-if", "quid"},   // C22: "What if ...?" -> Quid sī ...?
+      // C32: these three sat inside the comment of the row above since C22 and were never found
+      {"although", "quamquam"}, {"while", "dum"},  {"unless", "nisi"},
       {"for", "nam"},      {"besides", "praetereā"}, {"moreover", "praetereā"}, {"still", "tamen"}, {"thus", "ita"},
       {"hence", "itaque"}};
   return lookup(kC, w);

@@ -44,4 +44,8 @@ bool compoundParts(const lex::Lexicon& lx, const std::string& lower, std::string
 // part of a compound that is an adjective ("bluebird" -> avis caerulea), not a genitive.
 bool colourWord(const std::string& lower);
 
+// C32: the sex an English person noun states by itself (lemma, lower case): 'm' for boy, son, brother, king, man ...,
+// 'f' for girl, daughter, sister, queen, woman ...; 0 for words of either sex (child, teacher, friend, cousin).
+char nounSex(const std::string& lemma);
+
 }  // namespace vp::frame::en

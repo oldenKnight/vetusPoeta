@@ -1580,3 +1580,125 @@ E15 (held-out, measured by the main agent; not read here): on the public-domain 
 - Numbers: own_story 119/120 (wrong among OK 0), own_turns 118/120, EN 114/114, ES 100/100, oz 89/100 (wrong among
   OK 0), blind story output unchanged (19/20); EN/ES/turns/la2x/Orbergise and all Greek reports byte-identical to
   49fbc2d (oz: Latin identical, only the C30 antecedent-guess flags).
+
+## Quality loop 8 (C32, 2026-10-09): missing forms, gender inference, restored connectors
+Material: no new tuning file (E16 named the classes: among the newly wrong held-out cues, 3 missing-form with an unknown
+token, 2 A3 after a speaker- or addressee-gender inference, 1 new A1; flags only, tests/heldout/, tests/eval_gold/,
+data/work/eval/heldout-* and data/acceptance/ were not opened). Twenty blind cues (children's dialogue with first- and
+second-person predicates, names of both genders, rare forms) were written at 12:04 UTC before any change
+(data/work/eval/c32-blind/, gitignored) and run once at the end. The Greek side (C33) ran at the same time in the same
+tree: every number below was measured on an isolated copy of HEAD dad41d7 plus exactly the C32 files.
+
+### Before / after
+| file | start of C32 | end of C32 |
+|---|---|---|
+| own_dialogue EN (114) / ES (100) | 114 / 114 (ok 64), 100 / 100 (ok 80) | reports byte-identical |
+| oz_sample EN (100) | 89 / 100, wrong among OK 0 | 89 / 100, wrong among OK 0; Latin byte-identical (one Check cue gained gender-inferred) |
+| own_turns EN (120) | 118 / 120 | 118 / 120; Latin byte-identical (cues 12 and 90, already Check through speaker-reply, gained gender-inferred) |
+| own_story EN (120) | 119 / 120 | report byte-identical |
+| sample.en.srt 12, la2x 201 / 201, Orbergise 60 / 60, 20 / 20, 20 / 20, 22 / 22 | | unchanged (la2x and Orbergise reports byte-identical) |
+| Greek EN->GRC / ES->GRC / GRC->EN, ES | 114 / 114, 39 / 40, 40 / 40 | unchanged, reports byte-identical (isolated copy) |
+| form coverage of tiers_la.tsv (new test) | 197 of 23,065 cells bracketed in 13 lemmas | 0 bracketed, 0 unknown (66 cells from the paradigm generator, 161 form guesses) |
+| blind check (20 own cues) | first run **12 / 20** acceptable, 1 wrong among OK | 20 / 20, wrong among OK 0 |
+
+### (1) A known lemma never reaches the output as a bracket or an unknown word (morph, realise_la, check, engine)
+The ladder for a cell is now: the lexicon cell (morph::generate) -> **the paradigm generator** (new
+morph::generateGap, DESIGN §6: the cell built from the lemma's other cells or its principal parts by the rules of its
+class) -> **the next candidate lemma** (C19 retry, unchanged) -> **the dictionary form**, flag **form-guess** (Check).
+- generateGap (paradigm_la.cpp gapCell): case syncretism inside the lemma's own cells (vocative = nominative except
+  -us / -ius of the 2nd declension, nominative plural = vocative plural, dative = ablative plural, neuter nominative =
+  accusative = vocative); the declension endings on the genitive stem (1st-5th declension nouns, consonant and i-stems,
+  neuters; 1st/2nd and 3rd class adjectives); the conjugation endings on the present stem (1st, 2nd, 3rd, 3rd -iō, 4th;
+  active and personal passive; imperatives, infinitives, present participle) and on the perfect stem (perfect system
+  active, perfect infinitive); perfect-only verbs (meminī: a past is the pluperfect form memineram, the future the
+  future perfect form, the imperative mementō; these are attested cells, not marked from-rule). It never builds a
+  person, number or voice the lemma does not have: impersonal verbs (3rd singular only), verbs without a personal
+  passive (veniō has ventum est only), plural-only nouns in the singular, names in a plural they do not list, deponents,
+  defective words (aiō, vicis: only their own forms and the syncretic ones). Forms built from endings carry
+  fromRule (Check, A1 passes through the engine's hint).
+- FormSelector::select and the realiser's verb group: after the generator, the dictionary form (FormSelector::formGuess,
+  Word::missing) instead of "[head]". The engine keeps the internal flag missing-form for the C19 retry and the C30b
+  join guard; at the cue output it becomes **form-guess** (reason "form guess: ..."), and the checker gets a guess hint
+  (check::TokenHint::guess): the token has no reading, takes part in no A1 / A3 / A4 check, so a guessed cell makes the
+  cue Check, never Fix. joinWorse also compares form-guess.
+- "The feared king came." was "Rēx [timeō] vēnit." (Fix: missing-form + unknown); now "Rēx timeō vēnit." (Check,
+  form-guess). "I remembered your name." -> Nōminis tuī memineram.
+- Test "rules-n: every tier lemma gives a form for every cell the realiser asks for": every noun, adjective and verb
+  of data/curated/tiers_la.tsv (462 lemmas) x nouns 6 cases x 2 numbers (plural-only nouns plural only, nouns without
+  plural cells singular only), adjectives 6 x 2 x 3 genders, verbs indicative 6 tenses and subjunctive 4 tenses x 6
+  persons (active; passive when the lemma has a 1st / 2nd person passive cell; impersonal verbs 3rd singular), present
+  infinitive, imperative, perfect infinitive, present / perfect participle: 23,065 cells, 0 bracketed, 0 unknown to the
+  checker. Before C32 the same walk had 197 bracketed cells.
+  - **From the paradigm generator** (fromRule, Check): dīves (neuter plural nominative / accusative / vocative: dīvita,
+    rare in the readers' Latin: dītia; 3 cells); sitiō, occurrō, libet (their perfect passive participle from the 1st /
+    2nd paradigm, as before C32; 63 cells). Attested cells found by the generator: meminī (33 cells: perfect, pluperfect,
+    future perfect, imperative, perfect infinitive).
+  - **Form guesses** (161 cells, 9 lemmas; cells Latin does not have, so the next candidate or the dictionary form):
+    timeō, discō, tremō, saliō, feriō (no supine: no perfect passive system, no perfect participle), sum and adsum (no
+    present participle), possum and volō (no imperative).
+- Test "rules-n: the paradigm generator rebuilds the lexicon's own cells of regular lemmas": 29 lemmas of every class
+  (rosa ... rēs, bonus, fortis, ingēns, ācer, miser, amō ... audiō, rapiō): 1,212 of the 1,215 cells it builds equal
+  the lexicon's (fortīs / ingentīs as the lexicon's accusative plural, dūc); 102 cells not built (periphrastic forms).
+- Diagnostic (VP_FORM_WALK_RANK=3000, not a test): the 6,500 nouns / adjectives / verbs of frequency rank 1-3000:
+  333,574 cells, 0 bracketed; 4 "unknown" cells are lexicon cells of the future perfect infinitive ("quassūrum fuisse")
+  whose participle the checker does not read (no realiser path asks for them).
+
+### (2) Gender of "you" / "I" from a dialogue guess (engine, transfer, english)
+- The explicit noun wins: a predicate noun that says male or female (en::nounSex: boy, son, brother, king ... / girl,
+  daughter, sister, queen ...) sets the gender of "you" / "I" for its sentence and for the rest of the cue (the turn; a
+  speaker dash starts a new one), also when it comes later in the cue ("Are you ready? You are a good son." -> Esne
+  parātus? Fīlius bonus es.; was parāta ... Fīlia bona es, OK); a partitive group too ("I am the oldest of the four
+  sisters" -> ... maxima sum). Questions and negations state nothing. The C17 rule that makes a person noun feminine for
+  a feminine subject never touches a noun that says male ("You are a brave boy" after a name Anna was "puella fortis";
+  "- I am a very busy boy" after "- Julia, come here!" was "Puella valdē occupāta sum").
+- The person addressed in the sentence wins over a name elsewhere in the cue ("Marcus, did you see Julia? You are
+  tired." -> Fessus es; was Fessa es).
+- A gender of "you" taken from a name that is not addressed in the sentence (elsewhere in the cue, or in the cue
+  before: C22 Memory::addresseeGender) is a guess: the sentence is translated again with the other gender, and when the
+  Latin differs the cue is Check, flag **gender-inferred** (the other reading as an alternative). The speaker of a reply
+  guessed from the cue before (C24 / C28 turnHint) gets the same flag where it already had speaker-reply.
+- The A3 guard: a sentence with a guessed gender (addressee, speaker, or antecedent-guess) that fails A3 while the
+  reading without the guess passes takes the reading without the guess (flag gender-inferred, reason "the noun
+  decides"). On every regression file, the C32 tests and the probes of this loop it never fired (counted with a
+  temporary trace) after the explicit-noun rules above; it stays as the net.
+- A named subject of known gender takes the feminine of a person noun ("Anna is my friend." -> Anna amīca mea est; was
+  amīcus meus, OK).
+
+### (3) "it" with an explicit noun (transfer)
+"it" with a predicate noun takes that noun's gender, and so do the predicate adjectives ("It was golden and beautiful,
+a royal crown." -> Aurea et pulchra erat et corōna rēgia; was Aureum ... Fix A3); a guessed antecedent never decides
+when the cue names the thing.
+
+### (4) Connectors (transfer/tables.cpp)
+although -> quamquam, while -> dum, unless -> nisi sat inside the comment of the C22 row "what-if" and were never found:
+a cue that opens with them lost the conjunction ("Although it was raining." -> Pluēbat., OK). Restored; "while" + a
+simple past cut from its sentence is dum + imperfect ("I was reading. While you slept." -> Legēbam. Dum dormiēbās.).
+
+### Blind check
+Twenty own cues written before any change, run once at the end (speaker setting m): first run **12 / 20** acceptable,
+1 wrong among OK (#10 "You are my best friend, Paul." -> Prīmus amīcus meus es, OK). Not acceptable: a vocative not in
+the names table kept as in English and an unknown name read with a "we" answer as a group (Claudia ... fortēs erātis,
+Lucius, Titus), "angry with me" as mēcum, "the oldest of the four sisters" as vetustissima (this sentence had been used
+as a probe of the partitive rule before the blind run: count 12 / 19 without it), "but I am better" lost into the noun
+phrase, "howled at the moon" as in lūnā. Fixed with own sentences ("rules-n: fixes after the blind check"): names
+Claudia, Līvia, Lūcius, Titus; one person addressed by name is singular whatever the next sentence answers; best / worst
+-> optimus / pessimus; angry with + the dative (also in the checker: an adjectival participle with a dative person is no
+agent: "Māter nōbīs īrāta erat" was A4 Fix); howl at -> ad + accusative; older / younger of a person -> maior / minor
+nātū; an adjective with its own subject coordinated with a predicate noun is a clause of its own, the contrasted
+pronoun said ("..., sed ego melior sum", "sed ea celerior est"); a time word after "where were you" is no subject
+("Where were you yesterday?" was "Hesternum tuī ubi?", OK). After: 20 / 20, wrong among OK 0.
+
+### Rows
+names_la +4 (Claudia, Līvia, Lūcius, Titus), verbprep_en_la +1 (howl at).
+
+### API changes (additive)
+morph.h: morph::generateGap. realise_la.h: FormSelector::formGuess. check.h: TokenHint::guess. english.h: en::nounSex.
+New flags: form-guess (Check; replaces missing-form at the cue output), gender-inferred (Check). Behaviour: a missing
+cell is never "[head]" (the dictionary form instead).
+
+### Still open
+"It was a big dog and very dirty." -> canis magnus et sordidum (the coordinated adjective of the predicate noun as a
+neuter, OK); "I have been loved and feared." -> Amāta sum et timēbam (the second verb loses the passive, OK); "it" of
+an animal with a copula and only adjectives stays neuter (Ieiūnum et tenue erat, Check); "You are her brother?" read as
+a question states nothing (Check with gender-inferred); dīvita (dītia); the generator's i-stem default for 3rd-class
+adjectives without a genitive plural cell (iuvenis -> iuvene as a neuter).

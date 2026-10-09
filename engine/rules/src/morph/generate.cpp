@@ -397,4 +397,17 @@ bool generate(const lex::Lexicon& lx, uint32_t lemma, const Features& f, std::st
   return false;
 }
 
+bool generateGap(const lex::Lexicon& lx, uint32_t lemma, const Features& f, std::string& out, bool macrons,
+                 GenInfo* info) {
+  if (info) *info = GenInfo{};
+  const lex::Lemma l = lx.lemma(lemma);
+  if (l.id == lex::kNoLemma) return false;
+  std::string form;
+  bool attested = false;
+  if (!detail::gapCell(lx, l, f, form, attested)) return false;
+  out = displayForm(form, macrons);
+  if (info) { info->fromRule = !attested; info->lemmaUsed = lemma; info->packed = pack(f); }
+  return true;
+}
+
 }  // namespace vp::morph

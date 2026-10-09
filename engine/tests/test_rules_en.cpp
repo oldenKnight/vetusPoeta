@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 
+#include "vp/check.h"
 #include "vp/cue.h"
 #include "vp/curated.h"
 #include "vp/engine_config.h"
@@ -3786,4 +3787,232 @@ TEST_CASE("rules-m: C30b a join is never worse than the cue alone (lists, senten
   CHECK(hasFlag(f[4], "join-discarded"));
   CHECK(f[3].conf != rules::Confidence::Ok);
   CHECK(f[3].text == "Tum eum portāvit");
+}
+
+// ================================================================================================================
+// C32 (RULES-N, quality loop 8): missing forms, gender inference, restored connectors. Own sentences only, two or
+// more per rule (docs/rules_en_notes.md "Quality loop 8 (C32)").
+namespace {
+bool checkPasses(const Out& o, const char* id) {
+  for (const rules::Check& k : o.checks)
+    if (k.id == id) return k.ok;
+  return true;
+}
+}  // namespace
+
+TEST_CASE("rules-n: a cell nobody has is a form guess (Check), never a bracket, an unknown word or a missing form") {
+  NEED_REAL();
+  // timeō has no supine: no perfect passive participle in any candidate (metuō, paveō ... neither)
+  for (const char* s : {"The feared king came.", "He has been feared for years.", "The feared wolf ran away."}) {
+    const std::vector<Out> o = runBatch({s});
+    CHECK_MESSAGE(o[0].text.find('[') == std::string::npos, s << " -> " << o[0].text);
+    CHECK_MESSAGE(hasFlag(o[0], "form-guess"), s << " -> " << o[0].text);
+    CHECK_MESSAGE(!hasFlag(o[0], "missing-form"), s << " -> " << o[0].text);
+    CHECK_MESSAGE(!hasFlag(o[0], "unknown"), s << " -> " << o[0].text);
+    CHECK_MESSAGE(checkPasses(o[0], "A1"), s << " -> " << o[0].text);
+    CHECK_MESSAGE(o[0].conf == rules::Confidence::Check, s << " -> " << o[0].text);
+  }
+  // another candidate with the form wins over a guess (C19 retry): strike -> pulsō
+  for (const char* s : {"The boy was struck by a stone.", "The boys have been struck."}) {
+    const std::vector<Out> o = runBatch({s});
+    CHECK_MESSAGE(o[0].text.find("puls") != std::string::npos, s << " -> " << o[0].text);
+    CHECK_MESSAGE(!hasFlag(o[0], "form-guess"), s << " -> " << o[0].text);
+  }
+  // a perfect-only verb: the perfect form means the present, a past takes the pluperfect form (generator, attested)
+  {
+    const std::vector<Out> o = runBatch({"I remembered your name.", "Remember me!", "We had remembered the song."});
+    CHECK_MESSAGE(o[0].text == "Nōminis tuī memineram.", o[0].text);
+    CHECK_MESSAGE(o[1].text == "Mementō meī!", o[1].text);
+    CHECK_MESSAGE(o[2].text == "Carminis meminerāmus.", o[2].text);
+  }
+}
+
+TEST_CASE("rules-n: the realiser and checker on a form guess and on a generated cell") {
+  NEED_REAL();
+  const lex::Lexicon& lx = real().la;
+  realise::FormSelector fs(lx);
+  const uint32_t ferio = morph::findLemma(lx, "feriō", feat::Verb);
+  REQUIRE(ferio != lex::kNoLemma);
+  realise::Word w;
+  CHECK(!fs.select(ferio, morph::verbForm(3, feat::Sg, feat::Perfect, feat::Indicative, feat::Passive), w));
+  CHECK(w.missing);
+  CHECK(w.form == "feriō");   // the dictionary form, no bracket
+  // a cell the table lacks, built by the class's rules (Check): dīves has no neuter plural nominative in the library
+  const uint32_t dives = morph::findLemma(lx, "dīves", feat::Adj);
+  REQUIRE(dives != lex::kNoLemma);
+  CHECK(fs.select(dives, morph::adjForm(feat::Nom, feat::Pl, feat::N), w));
+  CHECK(w.fromRule);
+  CHECK(!w.missing);
+  // the checker exempts a form guess from A1 / A3 / A4 when the engine hints it
+  check::LatinChecker ck(lx, cur());
+  const std::string t = "Puerī feriō sunt.";
+  std::vector<check::TokenHint> hints(1);
+  hints[0].start = 6;
+  hints[0].end = 6 + (int)std::string("feriō").size();
+  hints[0].lemma = ferio;
+  hints[0].guess = true;
+  check::Options co;
+  co.hints = &hints;
+  const check::Report rep = ck.check(t, co);
+  CHECK(rep.ok("A1"));
+  CHECK(rep.ok("A3"));
+}
+
+TEST_CASE("rules-n: a gender of 'you' / 'I' from a dialogue guess is Check; the explicit noun wins") {
+  NEED_REAL();
+  // a noun that says male is never made feminine by a guessed (or set) gender
+  {
+    const std::vector<Out> o = runBatch({"Anna is my friend.", "You are a brave boy."});
+    CHECK_MESSAGE(o[0].text == "Anna amīca mea est.", o[0].text);
+    CHECK_MESSAGE(o[1].text == "Puer fortis es.", o[1].text);
+  }
+  {
+    const std::vector<Out> o = runBatch({"- Julia, come here!", "- I am a very busy boy."});
+    CHECK_MESSAGE(o[1].text == "- Puer valdē occupātus sum.", o[1].text);
+    CHECK(checkPasses(o[1], "A3"));
+  }
+  {   // the speaker setting is feminine; the sentence itself says "son" (also in its first clause)
+    const std::vector<Out> o = runBatch({"- I am busy, I am the king's son.", "I am the oldest of the four sisters."}, 'm');
+    CHECK_MESSAGE(o[0].text == "- Occupātus sum et fīlius rēgis sum.", o[0].text);
+    // the partitive group says it: "the oldest of the four sisters" is a woman whatever the setting
+    const bool fem = o[1].text.size() > 6 && o[1].text.compare(o[1].text.size() - 6, 6, "a sum.") == 0;
+    CHECK_MESSAGE(fem, o[1].text);
+    const std::vector<Out> p = runBatch({"I am busy, I am a boy."}, 'f');
+    CHECK_MESSAGE(p[0].text == "Occupātus sum et puer sum.", p[0].text);
+  }
+  {   // a later sentence of the cue says it: the whole turn follows ("ready" agrees with "son")
+    const std::vector<Out> o = runBatch({"Julia called her brother.", "Are you ready? You are a good son."});
+    CHECK_MESSAGE(o[1].text == "Esne parātus? Fīlius bonus es.", o[1].text);
+    const std::vector<Out> p = runBatch({"Look, Claudia is here.", "Are you hungry? You are a good brother."});
+    CHECK_MESSAGE(p[1].text.find("bonus") != std::string::npos, p[1].text);
+  }
+  {   // the person addressed in the sentence wins over a name elsewhere in it
+    const std::vector<Out> o = runBatch({"Marcus, did you see Julia? You are tired."});
+    CHECK_MESSAGE(o[0].text == "Marce, vīdistīne Iūliam? Fessus es.", o[0].text);
+  }
+  {   // a name in the cue before is a guess: the cue is Check (gender-inferred) when the Latin depends on it
+    const std::vector<Out> o = runBatch({"Julia is here.", "Are you the new teacher? You are very tall."});
+    CHECK(hasFlag(o[1], "gender-inferred"));
+    CHECK(o[1].conf != rules::Confidence::Ok);
+    const std::vector<Out> p = runBatch({"Look at Anna.", "You are her brother? You are tired."});
+    CHECK(hasFlag(p[1], "gender-inferred"));
+    CHECK(p[1].conf != rules::Confidence::Ok);
+  }
+  {   // the speaker of a reply guessed from the cue before (C24): Check
+    const std::vector<Out> o = runBatch({"- Marcus, are you ready?", "- I am ready, mother."});
+    CHECK(hasFlag(o[1], "gender-inferred"));
+    CHECK(o[1].conf != rules::Confidence::Ok);
+    const std::vector<Out> p = runBatch({"- Marcus, are you hungry?", "- Yes, I am very tired."});
+    CHECK(p[1].conf != rules::Confidence::Ok);
+  }
+  // never an A3 failure on these
+  for (const auto& b : std::vector<std::vector<std::string>>{
+           {"Julia is here.", "You are a brave boy and you are very tired."},
+           {"- Anna, are you tired?", "- No, I am a strong boy."},
+           {"Look, Anna is here.", "You are a tired old man."}}) {
+    const std::vector<Out> o = runBatch(b);
+    for (const Out& x : o) CHECK_MESSAGE(checkPasses(x, "A3"), x.text);
+  }
+}
+
+TEST_CASE("rules-n: 'it' with a predicate noun takes the noun's gender (never a guessed antecedent's)") {
+  NEED_REAL();
+  {
+    const std::vector<Out> o = runBatch({"The queen had a crown.", "She gave a feast.", "Then she lost it.",
+                                         "It was golden and beautiful, a royal crown."});
+    CHECK_MESSAGE(o[3].text.rfind("Aurea et pulchra erat", 0) == 0, o[3].text);
+    CHECK(checkPasses(o[3], "A3"));
+  }
+  {
+    const std::vector<Out> o = runBatch({"It was big and heavy, an old chest."});
+    CHECK(checkPasses(o[0], "A3"));
+    const std::vector<Out> p = runBatch({"It is a small house.", "It was a white bird."});
+    CHECK_MESSAGE(p[0].text == "Domus parva est.", p[0].text);
+    CHECK_MESSAGE(p[1].text == "Avis alba erat.", p[1].text);
+  }
+}
+
+TEST_CASE("rules-n: although / while / unless cut from their sentence keep their conjunction") {
+  NEED_REAL();
+  expectEach({
+      {"Although it was raining.", "Quamquam pluēbat."},
+      {"Although the road was long.", "Quamquam via longa erat."},
+      {"Unless you hurry.", "Nisi festīnās."},
+      {"While the boys were sleeping.", "Dum puerī dormiēbant."},
+      {"While the mother was cooking.", "Dum māter coquēbat."},
+  });
+  const std::vector<Out> o = runBatch({"I was reading. While you slept."});
+  CHECK_MESSAGE(o[0].text == "Legēbam. Dum dormiēbās.", o[0].text);
+  const std::vector<Out> p = runBatch({"- Can we go out?", "- Although it is cold."});
+  CHECK_MESSAGE(p[1].text == "- Quamquam frīgidum est.", p[1].text);
+  const std::vector<Out> q = runBatch({"We will play. Unless it rains."});
+  CHECK_MESSAGE(q[0].text == "Lūdēmus. Nisi pluit.", q[0].text);
+}
+
+TEST_CASE("rules-n: fixes after the blind check (own sentences)") {
+  NEED_REAL();
+  // best / worst are the superlatives of good / bad (was prīmus)
+  expectEach({
+      {"She is my best friend.", "Amīca optima mea est."},
+      {"This is the worst day of my life.", "Hic diēs pessimus vītae meae est."},
+      // angry with a person: the dative (was cum + ablative)
+      {"The teacher is angry with the boys.", "Magister puerīs īrātus est."},
+      {"Mother was angry with us.", "Māter nōbīs īrāta erat."},
+      // howl at: ad + accusative (was in + ablative, "on the moon")
+      {"The dog howled at the moon.", "Canis ad lūnam ululāvit."},
+      // names of the table (C32 rows): declined, the vocative too
+      {"Lucius, come here!", "Lūcī, venī hūc!"},
+      {"Titus and Claudia are in the garden.", "Titus et Claudia in hortō sunt."},
+      // older / younger of a person: nātū (vetustior is for things)
+      {"My brother is younger than me.", "Frāter meus nātū minor est quam ego."},
+      {"You are older than Marcus.", "Nātū maior es quam Marcus."},
+      {"This house is older than the town.", "Haec domus vetustior est quam oppidum."},
+      // "but I am better": a clause of its own (was an adjective of the noun), the contrasted pronoun said
+      {"He is a fast runner, but she is faster.", "Cursor celer est sed ea celerior est."},
+      {"My uncle is a good singer, but I am better.", "Avunculus meus cantor bonus est sed ego melior sum."},
+  });
+  // one person addressed by name is singular even when the next sentence answers with "we"
+  const std::vector<Out> o = runBatch({"Marcus, why are you laughing?", "We saw a funny dog."});
+  CHECK_MESSAGE(o[0].text == "Marce, cūr rīdēs?", o[0].text);
+  const std::vector<Out> p = runBatch({"Julia, where were you today?", "We were at the river."});
+  CHECK_MESSAGE(p[0].text == "Iūlia, ubi hodiē erās?", p[0].text);
+  // the time word after "where were you" is no subject (was "Hesternum tuī ubi?", OK)
+  expectEach({
+      {"Where were you yesterday?", "Ubi heri erās?"},
+      {"Where was the cat yesterday?", "Ubi heri erat fēlēs?"},
+  });
+}
+
+TEST_CASE("rules-n: deterministic in both latinity modes") {
+  NEED_REAL();
+  const std::vector<std::string> src = {"Julia is here.", "Are you ready? You are a good son.", "The feared king came.",
+                                        "- Marcus, are you ready?", "- I am ready, mother.", "Although it was raining.",
+                                        "It was golden and beautiful, a royal crown."};
+  for (rules::Latinity lt : {rules::Latinity::Wide, rules::Latinity::Classical}) {
+    std::string first;
+    for (int k = 0; k < 2; ++k) {
+      std::unique_ptr<rules::Engine> e = engine();
+      std::vector<rules::CueInput> in;
+      for (size_t i = 0; i < src.size(); ++i) {
+        rules::CueInput c;
+        c.index = (uint32_t)i;
+        c.sourceText = src[i];
+        c.startMs = (int64_t)i * 4000;
+        c.endMs = c.startMs + 3500;
+        in.push_back(c);
+      }
+      rules::Options o;
+      o.latinity = lt;
+      auto r = e->translate(in, o, rules::Context{}, nullptr, nullptr);
+      REQUIRE(r.ok());
+      std::string all;
+      for (const auto& c : r.value()) {
+        all += c.target + "|";
+        for (const auto& f : c.flags) all += f + ",";
+        all += "\n";
+      }
+      if (k == 0) first = all;
+      else CHECK(all == first);
+    }
+  }
 }

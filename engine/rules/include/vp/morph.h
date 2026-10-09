@@ -54,6 +54,14 @@ struct GenInfo {
 bool generate(const lex::Lexicon&, uint32_t lemma, const Features&, std::string& out, bool macrons);
 bool generate(const lex::Lexicon&, uint32_t lemma, const Features&, std::string& out, bool macrons, GenInfo* info);
 
+// C32 addition: the paradigm generator for a cell generate() did not find (a gap in the lemma's own table, or a
+// lemma without a table outside the 1st/2nd class fallback): the form is derived from the lemma's other cells or its
+// principal parts by the rules of its declension / conjugation (fromRule = true: the checker reports Check; a cell
+// Latin grammar makes identical to one the lemma has, such as vocative = nominative, keeps fromRule false). Returns
+// false when the class cannot be told or the lemma has no such person / number / voice (impersonal verbs, verbs
+// without a personal passive, plural-only nouns, irregular verbs).
+bool generateGap(const lex::Lexicon&, uint32_t lemma, const Features&, std::string& out, bool macrons, GenInfo* info);
+
 // Feature builders (vp::feat enumerations).
 Features nounForm(uint8_t case_, uint8_t number);
 Features adjForm(uint8_t case_, uint8_t number, uint8_t gender, uint8_t degree = feat::Positive);

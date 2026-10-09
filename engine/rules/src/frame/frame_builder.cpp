@@ -1896,7 +1896,8 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
     if (d == "conj") {
       // C26: a verb with its own subject coordinated with a predicate noun ("you will be a great man, for I have
       // given you ...") is a clause of its own (the clause builder takes it as a coordinated clause), never a conjunct
-      if (en && (kt.upos == "VERB" || kt.upos == "AUX") && k > h) {
+      // C32: also an adjective with its own subject and copula ("My aunt is a good cook, but I am better.")
+      if (en && (kt.upos == "VERB" || kt.upos == "AUX" || (kt.upos == "ADJ" && c.ownClause(k))) && k > h) {
         bool ownSubj = false;
         for (int g : c.kids[(size_t)k]) ownSubj = ownSubj || (c.ok(g) && c.dep(g) == "nsubj");
         if (ownSubj) continue;
@@ -4256,6 +4257,29 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
 void FrameBuilder::repairTree(SemSentence& s) const {
   std::vector<nlp::Token>& tk = s.tokens;
   const int n = (int)tk.size();
+  // C32: "Where were you yesterday?" / "Where was the cat today?": the parser made the time word the subject of
+  // "where" with the real subject hanging on it (the Latin was "Hesternum tuī ubi?"); after its head it is an adverb
+  // ("Today is Monday." keeps its subject: the time word comes first)
+  if (lang_ == SrcLang::En)
+    for (int k = 1; k < n; ++k) {
+      nlp::Token& t = tk[(size_t)k];
+      if (!in(t.lower, {"yesterday", "today", "tomorrow", "tonight"}) || t.deprel != "nsubj" || t.head <= 0 ||
+          t.head - 1 >= k)
+        continue;
+      bool cop = false;
+      for (int j = 0; j < k; ++j) cop = cop || (tk[(size_t)j].deprel == "cop" && tk[(size_t)j].head == k + 1);
+      if (!cop) continue;
+      const int h = t.head;
+      for (int j = 0; j < n; ++j) {
+        if (tk[(size_t)j].head != k + 1) continue;
+        tk[(size_t)j].head = h;
+        if (tk[(size_t)j].deprel == "nmod" || tk[(size_t)j].deprel == "nmod:poss" || tk[(size_t)j].deprel == "compound")
+          tk[(size_t)j].deprel = "nsubj";
+      }
+      t.upos = "ADV";
+      t.deprel = "advmod";
+      t.feats = 0;
+    }
   // C30: "Anna told the bird that she was looking for ...": "that" before the subject of the clause it opens is its
   // conjunction (the parser made it an oblique relative and it was left in brackets)
   if (lang_ == SrcLang::En)

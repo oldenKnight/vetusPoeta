@@ -20,6 +20,8 @@ struct TokenHint {                 // byte span in the checked text (e.g. from L
   uint32_t lemma = lex::kNoLemma;  // A6 uses this lemma's tier
   bool fromRule = false;           // paradigm-fallback form: A1 passes, the cue is Check
   bool name = false;               // a name (A1 exempt)
+  bool guess = false;              // C32 addition: a form guess (dictionary form for a missing cell): no reading,
+                                   // A1 exempt, outside A3 / A4 (the engine flags the cue form-guess, Check)
 };
 
 struct Options {

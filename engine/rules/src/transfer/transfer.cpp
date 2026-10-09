@@ -725,6 +725,15 @@ uint32_t Transfer::adjectiveInto(const frame::SemAdj& a, Ctx& c, LaAdj& la, Choi
       return adjectiveInto(g, c, la, ch);
     }
   }
+  // C32 (after the blind check): "best" / "better" / "worst" / "worse" left as their own lemma are the degrees of
+  // good / bad ("my best friend" -> amīcus meus optimus, was prīmus)
+  if (c.st.lang == frame::SrcLang::En && (a.lemma == "best" || a.lemma == "better" || a.lemma == "worst" || a.lemma == "worse")) {
+    frame::SemAdj g = a;
+    g.lemma = a.lemma == "best" || a.lemma == "better" ? "good" : "bad";
+    g.degree = a.lemma == "best" || a.lemma == "worst" ? feat::Superlative : feat::Comparative;
+    la.degree = g.degree;
+    return adjectiveInto(g, c, la, ch);
+  }
   if (a.lemma == "what-like") {   // C17: quālis (see clauseInto)
     ch.source = "what ... like";
     ch.lemma = latin("quālis", Adj);
@@ -2806,7 +2815,8 @@ bool Transfer::obliqueInto(const frame::SemOblique& ob, Ctx& c, LaClause& cl) co
       o.case_ = Nom;
       npInto(n, c, o.np);
       o.np.case_ = Nom;
-      if (c.subjGender == F && animate(n) && o.np.head != kNone && !o.np.isName) o.np.head = feminineOf(o.np.head);
+      if (c.subjGender == F && animate(n) && o.np.head != kNone && !o.np.isName && frame::en::nounSex(text::lower(n.head)) != 'm')
+        o.np.head = feminineOf(o.np.head);   // C32: never for a noun that says "male" (boy, son, king)
       o.front = ob.front;
       cl.obliques.push_back(o);
       return true;
@@ -4140,7 +4150,7 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
       if (x.head != kNone && !x.isPronoun && !x.isName) {
         const uint8_t og = cl.object.gender ? cl.object.gender : cl.object.isPronoun ? cl.object.pron.gender
                          : cl.object.head != kNone ? la_.lemma(cl.object.head).gender : (uint8_t)0;
-        if (og == F) x.head = feminineOf(x.head);
+        if (og == F && frame::en::nounSex(text::lower(pn.head)) != 'm') x.head = feminineOf(x.head);
       }
       cl.objPredicative.push_back(x);
     }
@@ -4314,9 +4324,13 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
       x.indefinite = pn.determiner == "a" || pn.determiner == "an";   // C17
       // C17: a person noun predicate of a feminine subject takes its feminine ("She is only a child" -> puella)
       if (c.st.lang == frame::SrcLang::En && x.head != kNone && !x.isName && !x.nameWords && !x.capitalise && !x.isPronoun && cl.hasSubject) {
-        const uint8_t sg = cl.subject.gender ? cl.subject.gender : cl.subject.isPronoun ? cl.subject.pron.gender
+        uint8_t sg = cl.subject.gender ? cl.subject.gender : cl.subject.isPronoun ? cl.subject.pron.gender
                          : cl.subject.head != kNone ? simpleGender(la_.lemma(cl.subject.head).gender) : (uint8_t)0;
-        if (sg == F && animate(pn)) x.head = feminineOf(x.head);
+        // C32: a name of known gender ("Anna is my friend." -> amīca mea)
+        if (!sg && cl.subject.isName && !cl.subject.name.empty())
+          if (const curated::NameEntry* ne = cd_.nameByEnglish(cl.subject.name)) sg = ne->gender == F ? (uint8_t)F : (uint8_t)0;
+        // C32: the explicit noun wins: a noun that says "male" (boy, son, brother) is never made feminine
+        if (sg == F && animate(pn) && frame::en::nounSex(text::lower(pn.head)) != 'm') x.head = feminineOf(x.head);
       }
       // C17: an exclamation stresses the quality: the adjective of the predicate noun comes first ("You are a wicked
       // creature!" -> Mala bēstia es!)
@@ -4374,6 +4388,37 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
       for (size_t i = 0; i < a.adverbs.size(); ++i) {
         const uint32_t av = adverb(a.adverbs[i], i < a.advTokens.size() ? a.advTokens[i] : -1, c, false);
         if (av != kNone) la.adverbs.push_back(av);
+      }
+      // C32 (after the blind check): older / oldest, younger / youngest of a person are maior / maximus and minor /
+      // minimus nātū ("I am the oldest of the four sisters." -> nātū maxima; vetustissimus is for things)
+      if (c.st.lang == frame::SrcLang::En && (a.lemma == "old" || a.lemma == "young") && (la.degree >= Comparative || a.degree >= Comparative) &&
+          f.hasSubject && (f.subject.isPronoun ? f.subject.pron.person <= 2 || f.subject.pronLemma == "he" ||
+                                                     f.subject.pronLemma == "she" || f.subject.pronLemma == "they"
+                                               : f.subject.isName || animate(f.subject))) {
+        const uint32_t big = latin(a.lemma == "old" ? "magnus" : "parvus", Adj);
+        uint32_t natu = kNone;   // nātus, -ūs (birth): its ablative nātū
+        {
+          std::vector<lex::Analysis> an;
+          la_.lookup("natu", an);
+          for (const lex::Analysis& x : an)
+            if (la_.lemma(x.lemma).pos == Noun && unpack(la_.feature(x.feat)).case_ == Abl && natu == kNone) {
+              std::string probe;
+              if (morph::generate(la_, x.lemma, morph::nounForm(Abl, Sg), probe, false) && text::latin_key(probe) == "natu")
+                natu = x.lemma;
+            }
+        }
+        if (big != kNone && natu != kNone) {
+          la.lemma = big;
+          if (!la.degree) la.degree = a.degree;
+          realise::LaOblique o;
+          o.case_ = Abl;
+          o.np.head = natu;
+          o.np.case_ = Abl;
+          o.np.number = Sg;
+          cl.obliques.push_back(o);
+          c.out.choices.back().lemma = big;
+          c.out.choices.back().note = "older / younger of a person: maior / minor nātū";
+        }
       }
       cl.predAdj.push_back(la);
     }
@@ -4452,6 +4497,18 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
     } else if (!cl.predAdj.empty() && (!f.hasSubject || f.pred.impersonal || (itSubj && (impersAdj || !c.mem.lastGender)))) {
       cl.predGender = N;
       if (itSubj) { cl.subject.pron.gender = N; cl.subject.gender = N; }
+    }
+    // C32 (work item 3): "it" with a predicate noun ("It was a big dog and very dirty.", "It was golden, a royal
+    // crown."): the explicit noun gives "it" and the predicate adjectives their gender, never a guessed antecedent
+    if (itSubj && f.copula && !cl.predicative.empty() && cl.predicative[0].head != kNone && !cl.predicative[0].isPronoun &&
+        !cl.predicative[0].isName && la_.lemma(cl.predicative[0].head).pos == Noun) {
+      const LaNP& pn = cl.predicative[0];
+      const uint8_t g = pn.gender ? simpleGender(pn.gender) : simpleGender(la_.lemma(pn.head).gender);
+      if (g) {
+        cl.subject.pron.gender = g;
+        cl.subject.gender = g;
+        if (!cl.predAdj.empty()) cl.predGender = g;
+      }
     }
   }
   std::vector<realise::LaSub> tailSubs;   // C30
@@ -5016,6 +5073,11 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
     const char* la = tables::connector(k, c.mem.prevFirst);
     if (!la) continue;
     const uint32_t id = latin(la);
+    // C32: "while" cut from its sentence is the background of something else: dum + imperfect for the past (as C30's
+    // time clause: "While you slept." -> Dum dormiēbās.)
+    if (k == "while" && c.st.lang == frame::SrcLang::En && cl.pred.tense == Perfect && cl.pred.mood == Indicative &&
+        f.pred.tense == frame::Tense::Past && f.pred.aspect == frame::Aspect::Simple)
+      cl.pred.tense = Imperfect;
     if (k == "if") {   // C15: "even if" -> etiam sī (the adverb goes with the conjunction)
       const uint32_t etiam = latin("etiam", Adv);
       auto ev = std::find_if(cl.adverbs.begin(), cl.adverbs.end(), [&](const realise::LaAdverb& a) { return a.lemma == etiam; });
@@ -5419,6 +5481,14 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
           }
         }
         if (sb.marker == "nor") sc.polarity = realise::Polarity::Pos;
+        // C32 (after the blind check): "..., but I am better" / "but she is faster": a personal pronoun subject set
+        // against a different subject of the clause before is said (pron.drop b: contrast)
+        if (c.st.lang == frame::SrcLang::En && sb.marker == "but" && sc.hasSubject && sc.subject.isPronoun &&
+            !sc.subject.pron.reflexive && sf.hasSubject && sf.subject.isPronoun && !sf.implicitSubject && f.hasSubject &&
+            // "I" / "you" against anyone else; he against she (never "Rufus ..., but he ...": the same one)
+            ((sf.subject.pron.person <= 2 && (!f.subject.isPronoun || f.subject.pron.person != sf.subject.pron.person)) ||
+             (f.subject.isPronoun && f.subject.pronLemma != sf.subject.pronLemma)))
+          sc.subject.emphasis = true;
         // C28: "It's only me, your old friend from the village.": a noun phrase after a comma without a conjunction is
         // an apposition (the comma stays, no et)
         if (c.st.lang == frame::SrcLang::En && sb.marker.empty() && sf.type == Kind::Frag && !sf.hasPred &&
@@ -5505,6 +5575,36 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
   c.motion = keepMotion;
   c.negative = keepNeg;
   for (realise::LaSub& ts : tailSubs) cl.subs.push_back(std::move(ts));   // C30
+  // C32 (work item 3): "It was golden and beautiful, a royal crown.": the noun phrase after the predicate adjectives
+  // names what "it" is; the adjectives agree with that explicit noun, not with a neuter or guessed "it"
+  if (c.st.lang == frame::SrcLang::En && f.copula && f.hasSubject && f.subject.isPronoun && f.subject.pronLemma == "it" &&
+      cl.predicative.empty() && !cl.predAdj.empty())
+    for (const realise::LaSub& sb : cl.subs) {
+      if (sb.rel != realise::SubRel::Coord || sb.clause.size() != 1) continue;
+      const LaClause& fc = sb.clause[0];
+      if (fc.type != realise::ClauseType::Frag || !fc.hasSubject || fc.subject.isPronoun || fc.subject.isName ||
+          fc.subject.head == kNone || la_.lemma(fc.subject.head).pos != Noun)
+        continue;
+      const uint8_t g = fc.subject.gender ? simpleGender(fc.subject.gender) : simpleGender(la_.lemma(fc.subject.head).gender);
+      if (!g) continue;
+      cl.predGender = g;
+      cl.subject.pron.gender = g;
+      cl.subject.gender = g;
+      break;
+    }
+  // C32 (after the blind check): angry with / at a person is the dative ("Are you angry with me?" -> Esne mihi īrātus?,
+  // was mēcum)
+  if (c.st.lang == frame::SrcLang::En && f.copula && !cl.predAdj.empty() && cl.predAdj[0].lemma != kNone &&
+      (la_.lemma(cl.predAdj[0].lemma).key == "iratus" || la_.lemma(cl.predAdj[0].lemma).key == "infensus")) {
+    const uint32_t cum = latin("cum", Prep), ad = latin("ad", Prep), in = latin("in", Prep);
+    for (realise::LaOblique& o : cl.obliques)
+      if ((o.prep == cum || o.prep == ad || o.prep == in) && o.prep != kNone &&
+          (o.np.isPronoun || o.np.isName || o.np.head != kNone)) {   // īrātus fortūnae: things too
+        o.prep = kNone;
+        o.case_ = Dat;
+        o.np.case_ = Dat;
+      }
+  }
   // C30: "bring the goat home" -> dūcam: one brings an animal by leading it (ferō is for things; people keep ferō, the
   // tuning sample's choice);
   // "a stream ran beside the path" -> fluēbat: water runs by flowing, and goes on (imperfect)

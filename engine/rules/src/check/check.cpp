@@ -74,6 +74,7 @@ struct LatinChecker::Impl {
   std::vector<char> advHint;   // C17: the generator chose an adverb that has an adjective homograph (tantum)
   std::vector<char> verbHint;  // C17: the generator chose a finite verb that has a participle homograph (habitō)
   std::vector<char> nounHint;  // C26: the generator chose a noun / adjective that has a finite-verb homograph (flāvī)
+  std::vector<char> guessHint; // C32: a form guess (the dictionary form for a cell nobody has): no reading, no A1
 
   // ---- reading classes ----
   static bool isFinite(const Reading& r) {
@@ -259,12 +260,16 @@ struct LatinChecker::Impl {
     advHint.assign(rep.tokens.size(), 0);
     verbHint.assign(rep.tokens.size(), 0);
     nounHint.assign(rep.tokens.size(), 0);
+    guessHint.assign(rep.tokens.size(), 0);
     if (opt.hints)
       for (const TokenHint& h : *opt.hints)
         for (size_t ti = 0; ti < rep.tokens.size(); ++ti) {
           CheckedToken& t = rep.tokens[ti];
           if (t.start >= h.start && t.end <= h.end) {
             if (h.name) t.name = true;
+            // C32: the dictionary form standing for a cell nobody has says nothing about case or person: it takes
+            // part in no agreement or government check (the cue is Check through the flag form-guess)
+            if (h.guess) { guessHint[ti] = 1; rd[ti].clear(); continue; }
             if (h.fromRule) { t.fromRule = true; rep.fromRule = true; }
             // C17: an adverb chosen by the generator ("Terriculum tantum sum") is not checked as an adjective when
             // the word really has that adverb reading
@@ -829,11 +834,13 @@ struct LatinChecker::Impl {
       // verbs of the segment with a valency entry (finite or infinitive)
       std::vector<std::pair<size_t, const curated::Valency*>> vv;
       bool passive = false, active = false, sumFinite = false, perfPart = false;
+      bool partAdj = false;   // C32: the participle is also an adjective (īrātus, parātus): "nōbīs īrāta erat" is a dative
       for (size_t j = b; j < e; ++j) {
         const curated::Valency* found = nullptr;
         for (const Reading& r : rd[j]) {
           if (r.f.mood == ParticipleMood && r.f.tense == Perfect && r.f.voice == Passive) perfPart = true;
           if (r.lpos == Participle && !verbish(j)) perfPart = true;
+          if (r.lpos == Participle && r.f.pos == Adj) partAdj = true;
           if (!(isFinite(r) || isInfinitive(r)) || (!isVerb[j] && !isInfinitive(r))) continue;
           if (isFinite(r)) {
             if (r.f.voice == Passive) passive = true;
@@ -923,6 +930,7 @@ struct LatinChecker::Impl {
         for (size_t j = b; j < e; ++j) {
           // a bare oblique person (ablative reading, no nominative: mē, tē, nōbīs, eō, Marcō) with a passive verb
           if (governed[j] || !hasCase(j, Abl) || hasCase(j, Nom) || !allNominal(j)) continue;
+          if (partAdj && hasCase(j, Dat)) continue;   // C32: īrātus / cārus + the dative of the person
           bool person = rep.tokens[j].name;
           for (const Reading& r : rd[j])
             if (r.lpos == Pron && (r.key == "ego" || r.key == "tu" || r.key == "nos" || r.key == "uos" || r.key == "is"))
@@ -950,7 +958,7 @@ struct LatinChecker::Impl {
     for (size_t i = 0; i < rep.tokens.size(); ++i) {
       const CheckedToken& t = rep.tokens[i];
       if (!rd[i].empty() || t.name) continue;
-      if (t.fromRule) continue;
+      if (t.fromRule || guessHint[i]) continue;
       // C19: a number in Roman numerals ("XXI ovēs") is a known form
       bool roman = t.text.size() >= 2;
       for (char ch : t.text) roman = roman && (ch == 'I' || ch == 'V' || ch == 'X' || ch == 'L' || ch == 'C' || ch == 'D' || ch == 'M');
@@ -1058,7 +1066,7 @@ LatinChecker::LatinChecker(const lex::Lexicon& lx, const curated::CuratedData& c
 
 void LatinChecker::check(std::string_view text, const Options& o, Report& out) {
   out.clear();
-  Impl im{lx_, cd_, nameKeys_, o, out, {}, {}, {}, {}, {}, {}, {}, {}, {}};
+  Impl im{lx_, cd_, nameKeys_, o, out, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}};
   im.tokenise(text);
   im.analyse(hasMacron(text));
   im.names();

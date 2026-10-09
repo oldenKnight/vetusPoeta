@@ -1336,3 +1336,195 @@ TEST_CASE("rules-la: debug dump (VP_RULES_DEBUG=<sentence>)") {
   }
   for (const auto& is : rep.issues) MESSAGE(is.id << (is.warning ? "~" : "!") << " tok " << is.token << ": " << is.detail);
 }
+
+// ---- C32 (RULES-N): form coverage -----------------------------------------------------------------------------------
+namespace {
+struct CellWalk {
+  size_t lemmas = 0, cells = 0, missing = 0, fromRule = 0, bracket = 0, unknown = 0;
+  std::vector<std::string> missingList, ruleLemmas, guessLemmas;
+};
+// Every lemma of data/curated/tiers_la.tsv (nouns, adjectives, verbs) through FormSelector::select on every cell the
+// realiser asks for: nouns 6 cases x 2 numbers (plural-only nouns plural only), adjectives 6 cases x 2 numbers x
+// 3 genders (positive) and the nominative of the comparative and superlative, verbs active (and passive when the
+// lemma has any passive cell; deponents active only) indicative 6 tenses, subjunctive 4 tenses x 6 persons,
+// imperative 2nd person, present / perfect infinitive, present and perfect participle (nom sg).
+CellWalk walkTierCells(const lex::Lexicon& lx) {
+  CellWalk w;
+  realise::FormSelector fs(lx);
+  check::LatinChecker checker(lx, cur());
+  auto rows = readTsv(repoRoot() / "data" / "curated" / "tiers_la.tsv");
+  // VP_FORM_WALK_RANK=<n> (diagnostics only): walk the lemmas of frequency rank 1..n instead of the tier list
+  if (const char* rk = std::getenv("VP_FORM_WALK_RANK")) {
+    rows.clear();
+    const long lim = std::atol(rk);
+    for (uint32_t i = 0; i < lx.lemmaCount(); ++i) {
+      const lex::Lemma l = lx.lemma(i);
+      if (!l.freqRank || (long)l.freqRank > lim) continue;
+      const char* ps = l.pos == Noun ? "noun" : l.pos == Adj ? "adj" : l.pos == Verb ? "verb" : "";
+      if (*ps) rows.push_back({std::string(l.key), std::string(l.head), ps});
+    }
+  }
+  std::vector<uint32_t> seen;
+  for (const auto& r : rows) {
+    if (r.size() < 3) continue;
+    const uint8_t pos = posOf(r[2]);
+    if (pos != Noun && pos != Adj && pos != Verb) continue;
+    const uint32_t id = morph::findLemma(lx, r[1], pos);
+    if (id == kNone || std::find(seen.begin(), seen.end(), id) != seen.end()) continue;
+    seen.push_back(id);
+    const lex::Lemma l = lx.lemma(id);
+    if (l.pos != pos || (l.flags & lex::Indeclinable)) continue;
+    ++w.lemmas;
+    std::vector<Features> want;
+    std::vector<std::pair<uint32_t, std::string_view>> cells;
+    lx.cells(id, cells);
+    bool hasSg = false, hasPl = false;
+    for (const auto& c : cells) {
+      hasSg = hasSg || unpack(c.first).number == Sg;
+      hasPl = hasPl || unpack(c.first).number == Pl;
+    }
+    if (pos == Noun) {
+      for (uint8_t n : {Sg, Pl}) {
+        // a plural-only noun (tenebrae) has no singular, a mass noun without plural cells (stannum) no plural
+        if (((l.flags & lex::PluralOnly) || (hasPl && !hasSg)) && n == Sg) continue;
+        if (hasSg && !hasPl && n == Pl) continue;
+        for (uint8_t c : {Nom, Gen, Dat, Acc, Abl, Voc}) want.push_back(morph::nounForm(c, n));
+      }
+    } else if (pos == Adj) {
+      for (uint8_t n : {Sg, Pl})
+        for (uint8_t g : {M, F, N})
+          for (uint8_t c : {Nom, Gen, Dat, Acc, Abl, Voc}) want.push_back(morph::adjForm(c, n, g));
+    } else {
+      // a personal passive only when the lemma has a 1st or 2nd person passive cell (veniō has the impersonal
+      // ventum est only); an impersonal verb (pluit, licet) has the 3rd singular only
+      bool passive = false, personal = false;
+      for (const auto& c : cells) {
+        const Features cf = unpack(c.first);
+        passive = passive || (cf.voice == Passive && (cf.person == P1 || cf.person == P2));
+        personal = personal || cf.person == P1 || cf.person == P2;
+      }
+      const bool dep = (l.flags & lex::Deponent) != 0;
+      std::vector<uint8_t> voices{Active};
+      if (passive && !dep) voices.push_back(Passive);
+      for (uint8_t v : voices) {
+        for (uint8_t t : {Present, Imperfect, Future, Perfect, Pluperfect, FuturePerfect})
+          for (uint8_t n : {Sg, Pl})
+            for (uint8_t p : {P1, P2, P3})
+              if (personal || (p == P3 && n == Sg)) want.push_back(morph::verbForm(p, n, t, Indicative, v));
+        for (uint8_t t : {Present, Imperfect, Perfect, Pluperfect})
+          for (uint8_t n : {Sg, Pl})
+            for (uint8_t p : {P1, P2, P3})
+              if (personal || (p == P3 && n == Sg)) want.push_back(morph::verbForm(p, n, t, Subjunctive, v));
+        want.push_back(morph::infinitive(Present, v));
+      }
+      if (personal) {
+        want.push_back(morph::imperative(Sg));
+        want.push_back(morph::imperative(Pl));
+      }
+      want.push_back(morph::infinitive(Perfect, Active));
+      want.push_back(morph::participle(Present, Active));
+      if (passive || dep) want.push_back(morph::participle(Perfect, dep ? Active : Passive));
+    }
+    bool rule = false, guess = false;
+    for (Features f : want) {
+      f.pos = pos;
+      realise::Word out;
+      const bool ok = fs.select(id, f, out);
+      ++w.cells;
+      if (!ok || out.missing) {   // a form guess: the dictionary form (the engine flags it form-guess, Check)
+        ++w.missing;
+        guess = true;
+        char b[64];
+        std::snprintf(b, sizeof b, " c%d n%d g%d p%d t%d m%d v%d", f.case_, f.number, f.gender, f.person, f.tense, f.mood,
+                      f.voice);
+        w.missingList.push_back(std::string(l.head) + b + " -> " + out.form);
+      }
+      if (out.form.empty() || out.form.find('[') != std::string::npos) ++w.bracket;
+      if (out.fromRule) {
+        ++w.fromRule;
+        rule = true;
+        char b[64];
+        std::snprintf(b, sizeof b, " c%d n%d g%d p%d t%d m%d v%d", f.case_, f.number, f.gender, f.person, f.tense, f.mood,
+                      f.voice);
+        w.missingList.push_back("generated: " + std::string(l.head) + b + " -> " + out.form);
+      }
+      // every form reads back as a known word through the checker (a generated form through its hint, as the
+      // engine passes it)
+      std::vector<check::TokenHint> hints(1);
+      hints[0].start = 0;
+      hints[0].end = (int)out.form.size();
+      hints[0].lemma = id;
+      hints[0].fromRule = out.fromRule;
+      check::Options co;
+      co.hints = &hints;
+      const check::Report rep = checker.check(out.form, co);
+      if (!rep.ok("A1")) {
+        ++w.unknown;
+        w.missingList.push_back("unknown: " + std::string(l.head) + " -> " + out.form);
+      }
+    }
+    if (rule) w.ruleLemmas.push_back(std::string(l.head));
+    if (guess) w.guessLemmas.push_back(std::string(l.head));
+  }
+  return w;
+}
+}  // namespace
+
+TEST_CASE("rules-n: every tier lemma gives a form for every cell the realiser asks for (no bracket, no unknown)") {
+  NEED_REAL();
+  const CellWalk w = walkTierCells(real().lx);
+  std::string rl, gl;
+  for (const std::string& s : w.ruleLemmas) rl += " " + s;
+  for (const std::string& s : w.guessLemmas) gl += " " + s;
+  MESSAGE("lemmas " << w.lemmas << ", cells " << w.cells << ", bracketed " << w.bracket << ", unknown " << w.unknown
+                    << ", from the paradigm generator " << w.fromRule << " (" << w.ruleLemmas.size() << " lemmas:" << rl
+                    << "), form guesses " << w.missing << " (" << w.guessLemmas.size() << " lemmas:" << gl << ")");
+  if (std::getenv("VP_FORM_WALK_DUMP"))
+    for (const std::string& s : w.missingList) MESSAGE(s);
+  CHECK(w.lemmas >= 450);
+  CHECK(w.cells >= 20000);
+  CHECK(w.bracket == 0);
+  CHECK(w.unknown == 0);
+  // the cells only a form guess covers are the ones Latin does not have (no supine: no perfect passive of timeō,
+  // discō, tremō, saliō, feriō; no present participle of sum / adsum; no imperative of possum / volō): bounded
+  CHECK(w.missing <= 170);
+  CHECK(w.guessLemmas.size() <= 10);
+}
+
+TEST_CASE("rules-n: the paradigm generator rebuilds the lexicon's own cells of regular lemmas (every class)") {
+  NEED_REAL();
+  const lex::Lexicon& lx = real().lx;
+  struct L { const char* head; uint8_t pos; };
+  const L lemmas[] = {{"rosa", Noun},   {"dominus", Noun}, {"bellum", Noun}, {"rēx", Noun},   {"urbs", Noun},
+                      {"corpus", Noun}, {"mare", Noun},    {"manus", Noun},  {"diēs", Noun},  {"rēs", Noun},
+                      {"bonus", Adj},   {"fortis", Adj},   {"ingēns", Adj},  {"ācer", Adj},   {"amō", Verb},
+                      {"moneō", Verb},  {"regō", Verb},    {"capiō", Verb},  {"audiō", Verb}, {"dūcō", Verb},
+                      {"nox", Noun},    {"animal", Noun},  {"portus", Noun}, {"puer", Noun},  {"miser", Adj},
+                      {"videō", Verb},  {"dormiō", Verb},  {"rapiō", Verb},  {"laudō", Verb}};
+  size_t total = 0, same = 0, none = 0;
+  std::string diffs;
+  for (const L& x : lemmas) {
+    const uint32_t id = morph::findLemma(lx, x.head, x.pos);
+    REQUIRE_MESSAGE(id != kNone, x.head);
+    std::vector<std::pair<uint32_t, std::string_view>> cells;
+    lx.cells(id, cells);
+    for (const auto& c : cells) {
+      Features f = unpack(c.first);
+      if ((f.extra & (Supine | Gerundive | Alternative)) || f.degree > Positive || f.case_ == Loc ||
+          (f.mood == ParticipleMood && f.case_) || f.mood == Gerund || c.second.find(' ') != std::string_view::npos)
+        continue;
+      if (f.mood == Imperative && f.tense == Future) continue;
+      std::string out;
+      morph::GenInfo gi;
+      ++total;
+      if (!morph::generateGap(lx, id, f, out, true, &gi)) { ++none; continue; }
+      if (out == morph::displayForm(c.second, true)) ++same;
+      else if (diffs.size() < 2000) diffs += std::string(" ") + x.head + ":" + out + "/" + std::string(c.second);
+    }
+  }
+  MESSAGE("paradigm generator vs the lexicon's own cells: " << same << " / " << total << " equal, " << none
+                                                           << " not built (periphrastic or irregular)" << diffs);
+  CHECK(total >= 1000);
+  CHECK(same * 100 >= (total - none) * 97);
+  CHECK(none * 100 <= total * 25);
+}

@@ -177,12 +177,16 @@ struct Word {
 
 // ---- components ---------------------------------------------------------------------------------------------------
 // Picks lexicon cells (morph::generate: exact FEAT id, tolerant match, periphrasis), falls back to the paradigm,
-// else reports missing ("[head]"). Invariable parts of speech give the headword.
+// then (C32) to the paradigm generator (morph::generateGap), else reports missing with the dictionary form (no
+// bracket since C32). Invariable parts of speech give the headword.
 class FormSelector {
  public:
   explicit FormSelector(const lex::Lexicon& lx) : lx_(lx) {}
   bool select(uint32_t lemma, const feat::Features& f, Word& out) const;   // false = missing (out.missing)
   void invariable(uint32_t lemma, Word& out) const;
+  // C32 addition: the dictionary form of a lemma for a cell neither the table nor the paradigm generator has
+  // (out.missing = true; the engine reports it as the flag form-guess, Check, when no other candidate has the form)
+  void formGuess(uint32_t lemma, const feat::Features& f, Word& out) const;
   const lex::Lexicon& lexicon() const { return lx_; }
  private:
   const lex::Lexicon& lx_;

@@ -782,4 +782,24 @@ bool colourWord(const std::string& w) {
                   "pink", "orange", "purple", "violet", "scarlet", "crimson"});   // C26: + orange ... crimson
 }
 
+char nounSex(const std::string& lemma) {
+  static const char* const kM[] = {"boy", "son", "brother", "father", "dad", "daddy", "papa", "king", "man", "husband",
+                                   "uncle", "grandfather", "grandpa", "grandson", "nephew", "prince", "lord", "gentleman",
+                                   "sir", "mister", "monk", "emperor", "duke", "hero", "god", "waiter", "actor", "fisherman",
+                                   "lad", "bridegroom", "groom", "stepfather", "stepson", "schoolboy", "master", "gentlemen",
+                                   "men", "boys", "sons", "brothers", "kings", "fellow", "widower", "wizard", "ram", "bull",
+                                   "rooster", "cock", "stallion"};
+  static const char* const kF[] = {"girl", "daughter", "sister", "mother", "mum", "mom", "mummy", "mommy", "mama", "queen",
+                                   "woman", "wife", "aunt", "grandmother", "grandma", "granddaughter", "niece", "princess",
+                                   "lady", "madam", "miss", "nun", "empress", "duchess", "heroine", "goddess", "waitress",
+                                   "actress", "maid", "bride", "stepmother", "stepdaughter", "schoolgirl", "mistress",
+                                   "women", "girls", "daughters", "sisters", "queens", "ladies", "widow", "witch", "cow",
+                                   "hen", "mare", "ewe"};
+  for (const char* w : kM)
+    if (lemma == w) return 'm';
+  for (const char* w : kF)
+    if (lemma == w) return 'f';
+  return 0;
+}
+
 }  // namespace vp::frame::en

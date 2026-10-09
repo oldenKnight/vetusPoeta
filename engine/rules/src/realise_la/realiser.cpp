@@ -408,9 +408,19 @@ void LatinRealiser::verbGroup(const LaClause& c, const AgreeInfo& subj, std::vec
       }
       return;
     }
-    w.lemma = lemma;
-    w.form = "[" + morph::displayForm(l.head, true) + "]";
-    w.missing = true;
+    // C32: the paradigm generator for a cell the table lacks, else the dictionary form (missing: next candidate,
+    // then form-guess); never a bracket
+    if (l.id != kNone && morph::generateGap(lx_, lemma, f, form, true, &gi)) {
+      w.lemma = lemma;
+      w.form = std::move(form);
+      w.packed = gi.packed;
+      w.fromRule = gi.fromRule;
+      w.rule = rule;
+      dst.push_back(std::move(w));
+      return;
+    }
+    if (l.id != kNone) forms_.formGuess(lemma, f, w);
+    else { w.lemma = lemma; w.form = "[verb]"; w.missing = true; }
     w.rule = rule;
     dst.push_back(std::move(w));
   };

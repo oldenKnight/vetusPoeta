@@ -26,6 +26,16 @@ void comparative(std::string_view stem, uint8_t pos, std::vector<Cell>& out);
 std::string adjStem(std::string_view nomM, std::string_view feminine);
 std::string superlativeNom(std::string_view nomM, std::string_view stem);   // altissimus, pulcherrimus
 
+// C32: a cell the lemma's own table lacks, derived from its other cells (or its principal parts) by the rules of its
+// class: case syncretism (vocative = nominative, dative = ablative plural, neuter nominative = accusative), the
+// declension endings on the genitive stem (1st-5th declension nouns, 1st/2nd and 3rd class adjectives), the
+// conjugation endings on the present / perfect stem (1st-4th and -iō verbs, active and personal passive), perfect-only
+// verbs (meminī: perfect = present form), the future imperative for a missing present one. Never a person, number
+// or voice the lemma does not have (impersonal verbs, verbs without a personal passive, plural-only nouns).
+// `attested`: the form is another cell of the lemma that Latin grammar makes identical (syncretism, the perfect-only
+// verbs, the future imperative), not built from endings.
+bool gapCell(const lex::Lexicon&, const lex::Lemma&, const Features& want, std::string& form, bool& attested);
+
 // UTF-8 helpers on strings with macrons.
 bool endsWith(std::string_view s, std::string_view suffix);
 std::string dropSuffix(std::string_view s, std::string_view suffix);

@@ -50,18 +50,30 @@ bool FormSelector::select(uint32_t lemma, const Features& f, Word& out) const {
   thread_local std::vector<std::pair<uint32_t, std::string_view>> cells;
   cells.clear();
   lx_.cells(lemma, cells);
-  if ((l.flags & lex::Indeclinable) || cells.empty()) {
-    if (cells.empty() && (l.pos == Noun || l.pos == Adj || l.pos == Verb) && !(l.flags & lex::Indeclinable)) {
-      out.form = "[" + morph::displayForm(l.head, true) + "]";
-      out.missing = true;
-      return false;
-    }
+  if ((l.flags & lex::Indeclinable) || (cells.empty() && !(l.pos == Noun || l.pos == Adj || l.pos == Verb))) {
     invariable(lemma, out);
     return true;
   }
-  out.form = "[" + morph::displayForm(l.head, true) + "]";
-  out.missing = true;
+  // C32: a cell the table lacks comes from the paradigm generator (Check); failing that the dictionary form stands,
+  // marked missing (the engine tries the next candidate, then keeps it as a form guess, Check): never a bracket
+  if (morph::generateGap(lx_, lemma, f, form, true, &gi)) {
+    out.form = std::move(form);
+    out.packed = gi.packed;
+    out.fromRule = gi.fromRule;
+    return true;
+  }
+  formGuess(lemma, f, out);
   return false;
+}
+
+void FormSelector::formGuess(uint32_t lemma, const Features& f, Word& out) const {
+  const lex::Lemma l = lx_.lemma(lemma);
+  out.lemma = lemma;
+  out.form = morph::displayForm(l.head, true);
+  Features g = f;
+  g.pos = l.pos;
+  out.packed = pack(g);
+  out.missing = true;
 }
 
 // ---- Agreement ----------------------------------------------------------------------------------------------------

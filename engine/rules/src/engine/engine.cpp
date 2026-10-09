@@ -18,6 +18,7 @@
 #include "vp/curated.h"
 #include "vp/engine_config.h"
 #include "vp/frame.h"
+#include "frame/english.h"   // C32 en::nounSex
 #include "engine_grc/engine_grc.h"   // C12 grc hook
 #include "vp/la2x.h"   // C11 la2x hook
 #include "vp/orberg.h"   // C14 orberg hook
@@ -54,6 +55,10 @@ namespace {
 using frame::Kind;
 using frame::SemSentence;
 using frame::SourceSentence;
+
+// C32: the reason a realiser gives for a cell it could not find, and what the cue reports when no candidate had it
+const char* const kNoCell = "no lexicon cell for these features";
+const char* const kFormGuess = "form guess: the dictionary form stands for a form ";
 
 const char* kModelHint = "The language analysis files (english/spanish .tag.vpt and .dep.vpt) are missing from the "
                          "data folder. Reinstall the app or point VP_NLP_DIR at them.";
@@ -134,6 +139,9 @@ struct SentOut {
   // C28: the role of the wh word when the sentence is a wh question (frame::Role; 0 = none): "quid" is nominative or
   // accusative by its role
   uint8_t whRole = 0;
+  // C32: the gender this sentence states itself for "you" (a person addressed, or a noun that says male / female as
+  // the predicate of "you": "You are a brave boy") and for "I" ("I am the oldest of the sisters"): feat::M / F, 0
+  uint8_t explicitAddr = 0, explicitSpeaker = 0;
 };
 
 void addFlag(std::vector<std::string>& f, const std::string& x) {
@@ -1309,8 +1317,9 @@ class RulesEngine final : public Engine {
   }
 
   void speech(const std::string& text, const frame::FrameBuilder& fb, const Options& opt, const Context& ctx,
-              transfer::Memory& mem, const transfer::Settings& st, SentOut& so, bool alternatives,
+              transfer::Memory& mem, const transfer::Settings& stIn, SentOut& so, bool alternatives,
               bool allowSplit = true) {
+    transfer::Settings st = stIn;   // C32: the sentence may state the speaker's gender itself ("I am a boy")
     // C30: direct speech with its reporting frame
     if (st.lang == frame::SrcLang::En && allowSplit && speechQuoted(text, fb, opt, ctx, mem, st, so)) return;
     // C30: a sentence inside quotation marks (or the first / last sentence of a longer quotation) without a reporting
@@ -1618,6 +1627,7 @@ class RulesEngine final : public Engine {
             if (u.type == frame::Unit::Clause && u.frame.type == frame::Kind::Imp) u.frame.imperativePlural = true;
         } else if (voc == 1) {
           mem.addresseePlural = false;
+          mem.answerWe = false;   // C32: one person addressed by name is no group, whoever answers "we"
         }
       }
       for (const frame::Unit& u : s.units)
@@ -1625,8 +1635,22 @@ class RulesEngine final : public Engine {
           so.whRole = (uint8_t)u.frame.wh.role;
       addressInfo(s, st, mem, ctx, so);
       // C24: a person addressed by a noun of known gender ("Mother, are you tired?") sets the gender of "you" when no
-      // name did (C22 Memory::addresseeGender)
-      if (!mem.addresseeGender && so.vocGender) mem.addresseeGender = so.vocGender;
+      // name did (C22 Memory::addresseeGender). C32: the person addressed in this sentence wins over a name found
+      // elsewhere in the cue or in the cue before ("Marcus, did you see Julia? You are tired." -> fessus)
+      if (so.vocGender) {
+        mem.addresseeGender = so.vocGender;
+        so.explicitAddr = so.vocGender;
+      }
+      // C32: the explicit noun wins: a predicate noun that says male or female ("You are a brave boy", "I am the
+      // oldest of the four sisters") sets the gender of "you" / "I" for this sentence (and the rest of the cue)
+      if (st.lang == frame::SrcLang::En) {
+        if (const uint8_t g = statedGender(s, 2)) { mem.addresseeGender = g; so.explicitAddr = g; }
+        if (const uint8_t g = statedGender(s, 1)) {
+          st.speakerGender = g == feat::F ? 'f' : 'm';
+          st.flipSpeakerGender = false;
+          so.explicitSpeaker = g;
+        }
+      }
     }
     mem.sawFirst = false;
     std::vector<int> covered;
@@ -2405,6 +2429,64 @@ class RulesEngine final : public Engine {
     }
   }
 
+  // C32: the gender a sentence states for "you" (person 2) or "I" (person 1) through a predicate noun that says male or
+  // female ("You are a brave boy", "I am the oldest of the four sisters"; not a question, not a negation): M / F, 0
+  static uint8_t statedGender(const frame::SemFrame& f, int person, int depth = 0) {
+    if (f.copula && f.hasSubject && f.subject.isPronoun && f.subject.pron.number != 2 && f.subject.pron.person == person &&
+        !f.negative && f.type == frame::Kind::Decl) {   // a question asks
+      char sex = 0;
+      if (!f.predicative.empty() && !f.predicative[0].isPronoun && !f.predicative[0].isName) {
+        const frame::SemNP& pn = f.predicative[0];
+        sex = frame::en::nounSex(text::lower(pn.head));
+        // "the oldest of the four sisters": the partitive group says it
+        if (!sex && pn.genitive.size() == 1 && !pn.genitive[0].isPronoun)
+          sex = frame::en::nounSex(text::lower(pn.genitive[0].head));
+      }
+      if (!sex && !f.predAdj.empty())   // the same group as an "of" phrase of the predicate adjective
+        for (const frame::SemOblique& o : f.obliques)
+          if (o.prep == "of" && !o.np.isPronoun && !o.np.isName && o.np.number == 2) sex = frame::en::nounSex(text::lower(o.np.head));
+      if (sex) return sex == 'f' ? (uint8_t)feat::F : (uint8_t)feat::M;
+    }
+    if (depth < 4)   // "I am busy, I am the king's son": the second clause is coordinated
+      for (const frame::SemSub& sub : f.subordinate)
+        if (sub.relation != frame::Relation::Relative && sub.relation != frame::Relation::Complement &&
+            sub.relation != frame::Relation::Condition && sub.relation != frame::Relation::Purpose)   // "if I were a boy"
+          for (const frame::SemFrame& sf : sub.frame)
+            if (const uint8_t g = statedGender(sf, person, depth + 1)) return g;
+    return 0;
+  }
+  static uint8_t statedGender(const SemSentence& s, int person) {
+    for (const frame::Unit& u : s.units) {
+      if (u.type != frame::Unit::Clause || u.vocative) continue;
+      if (const uint8_t g = statedGender(u.frame, person)) return g;
+    }
+    return 0;
+  }
+
+  // C32: the sentence's Latin fails A3 (agreement), checked as a sentence of its own
+  bool latinA3Fails(const SentOut& x, const Options& opt) {
+    if (x.latin.text.empty()) return false;
+    cue::Latin l = x.latin;
+    display(l, opt.macrons);
+    CueOutput probe;
+    CueInput none;
+    runChecks(l.text, l.tokens, opt, none, true, probe, false, false);
+    return !checkOk(probe, "A3");
+  }
+
+  // C32: the reading without the guessed gender replaces the guessed one (flags of both kept: Check)
+  static void keepOtherReading(SentOut& so, SentOut& other, transfer::Memory& mem, const transfer::Memory& m2,
+                               const char* what) {
+    std::vector<std::string> flags = so.flags;
+    so = std::move(other);
+    for (const std::string& f : flags) addFlag(so.flags, f);
+    addFlag(so.flags, "gender-inferred");
+    so.reasons.push_back(Reason{-1, "form", std::string("the gender guessed for the ") + what +
+                                                " made the sentence fail agreement with a noun of its own: the noun decides",
+                                ""});
+    mem = m2;
+  }
+
   // C22: gender of the people named in a text (names_la.tsv rows with a gender, titles Miss / Mr included): F when a
   // feminine name is there, M when only masculine ones, 0 when none
   uint8_t namesGender(const std::string& t) const {
@@ -2555,6 +2637,13 @@ class RulesEngine final : public Engine {
         if (r.kind == "name" && r.tokenIndex >= 0 && (size_t)r.tokenIndex < tokens.size())
           for (check::TokenHint& h : hints)
             if (h.start == tokens[(size_t)r.tokenIndex].start) h.name = true;
+      // C32: a form guess (the dictionary form for a cell neither the table, the paradigm generator nor another
+      // candidate has) takes part in no agreement check
+      for (const Reason& r : o.reasons)
+        if (r.kind == "form" && (r.text == kNoCell || r.text.rfind(kFormGuess, 0) == 0) && r.tokenIndex >= 0 &&
+            (size_t)r.tokenIndex < tokens.size())
+          for (check::TokenHint& h : hints)
+            if (h.start == tokens[(size_t)r.tokenIndex].start) h.guess = true;
       co.hints = &hints;
       check::Report rep;
       checker_->check(target, co, rep);
@@ -2629,6 +2718,7 @@ class RulesEngine final : public Engine {
       if (fails(joined, id) && !fails(alone, id)) return true;
     if (unknown(joined) && !unknown(alone)) return true;
     if (flag(joined, "missing-form") && !flag(alone, "missing-form")) return true;
+    if (flag(joined, "form-guess") && !flag(alone, "form-guess")) return true;   // C32: the cue-level name of it
     return false;
   }
 
@@ -2745,6 +2835,10 @@ class RulesEngine final : public Engine {
     std::vector<uint8_t> cueVoc(texts.size(), 0);
     std::vector<char> cueInv(texts.size(), 0);
     char turnHint = 0;
+    // C32: the gender a sentence of this cue stated itself for "you" / "I" (a person addressed, a predicate noun that
+    // says male / female): it holds for the rest of the cue (the turn: a speaker dash starts a new one)
+    long explicitCue = -1;
+    uint8_t cueAddr = 0, cueSpeaker = 0;
     std::string prevSongText;
     uint8_t lastSentVoc = 0;
     bool lastSentInv = false;
@@ -2832,10 +2926,28 @@ class RulesEngine final : public Engine {
       }
       // C22: the person addressed: a name of names_la.tsv in this cue, else in the previous cue ("Alice", "Dinah" ->
       // feminine: "puella cāra", "callida es")
+      // C32: a gender of "you" taken from a name that is not the person addressed in this sentence (elsewhere in the
+      // cue, or in the cue before) is a dialogue guess: the cue is Check when the Latin depends on it (gender-inferred)
+      uint8_t agInferred = 0;
+      if (firstCue != explicitCue) { explicitCue = firstCue; cueAddr = cueSpeaker = 0; }
+      if (ss.dash) cueAddr = cueSpeaker = 0;
       if (lang == frame::SrcLang::En) {
         uint8_t ag = firstCue >= 0 && (size_t)firstCue < texts.size() ? namesGender(texts[(size_t)firstCue]) : 0;
         if (!ag && firstCue > 0) ag = namesGender(texts[(size_t)firstCue - 1]);
-        mem.addresseeGender = ag;
+        // a later sentence of the same turn may say it ("Are you ready? You are a good son."): the explicit noun wins
+        // for the whole turn
+        if (ss.kind == frame::CueKind::Speech && (!cueAddr || !cueSpeaker))
+          for (size_t sj = si; sj < sents.size(); ++sj) {
+            const SourceSentence& nx = sents[sj];
+            if (nx.parts.empty() || (long)nx.parts.front().cue != firstCue || (sj > si && nx.dash)) break;
+            if (nx.kind != frame::CueKind::Speech) continue;
+            SemSentence ns;
+            fb.analyse(nx.text, ns, st.classical);
+            if (!cueAddr) cueAddr = statedGender(ns, 2);
+            if (!cueSpeaker) cueSpeaker = statedGender(ns, 1);
+          }
+        mem.addresseeGender = cueAddr ? cueAddr : ag;
+        if (!cueAddr) agInferred = ag;
       }
       mem.songLine = ss.kind == frame::CueKind::Song;   // C22
       mem.answer = ss.kind == frame::CueKind::Speech && (mem.whCase || mem.whPlace);   // C28
@@ -2859,8 +2971,12 @@ class RulesEngine final : public Engine {
         addFlag(so.flags, "nonverbal");
       } else {
         transfer::Settings sts = st;
-        const bool hinted = turnHint && lang == frame::SrcLang::En && ss.kind == frame::CueKind::Speech;
+        const bool hinted = turnHint && lang == frame::SrcLang::En && ss.kind == frame::CueKind::Speech && !cueSpeaker;
         if (hinted) sts.speakerGender = turnHint;
+        if (cueSpeaker && lang == frame::SrcLang::En) {   // C32: "I" stated earlier in this turn
+          sts.speakerGender = cueSpeaker == feat::F ? 'f' : 'm';
+          sts.flipSpeakerGender = false;
+        }
         // C24: a song line that opens with a relative word ("That ...", "Where ...") after a line ending in a noun
         // without punctuation continues that line as its relative clause: it is analysed with the noun in front
         // ("a boat that carries me") and the noun's Latin word is taken out again ("quae mē ...")
@@ -2937,8 +3053,46 @@ class RulesEngine final : public Engine {
             so.alternatives.insert(so.alternatives.begin(), Alternative{b.text, std::string("speaker: ") +
                                                                        (st.speakerGender == 'f' ? "feminine" : st.speakerGender == 'm' ? "masculine" : "unknown") +
                                                                        " (project setting)", 0.5});
+            // C32: the speaker's gender is a dialogue guess; when the guessed reading fails agreement and the
+            // setting's reading passes, the setting's wins (an explicit noun of the cue decides)
+            addFlag(so.flags, "gender-inferred");
+            if (latinA3Fails(so, opt) && !latinA3Fails(other, opt)) keepOtherReading(so, other, mem, m2, "speaker");
           }
         }
+        // C32: "you" got its gender from a name that is not the person addressed in this sentence: when the Latin
+        // depends on it, the cue is Check (gender-inferred); a reading that fails agreement gives way to the other
+        // gender's when that one passes
+        if (agInferred && !so.explicitAddr && ss.kind == frame::CueKind::Speech) {
+          transfer::Memory m2 = memBefore_;
+          m2.addresseeGender = agInferred == feat::F ? (uint8_t)feat::M : (uint8_t)feat::F;
+          SentOut other;
+          speech(ss.text, fb, opt, ctx, m2, sts, other, false);
+          cue::Latin a = so.latin, b = other.latin;
+          display(a, opt.macrons);
+          display(b, opt.macrons);
+          if (a.text != b.text) {
+            addFlag(so.flags, "gender-inferred");
+            so.reasons.push_back(Reason{-1, "form", std::string("the gender of \"you\" is taken from a name that is not "
+                                                                "addressed in this sentence (") +
+                                                        (agInferred == feat::F ? "feminine" : "masculine") + "): check it", ""});
+            if (latinA3Fails(so, opt) && !latinA3Fails(other, opt)) keepOtherReading(so, other, mem, m2, "addressee");
+            else so.alternatives.insert(so.alternatives.begin(),
+                                        Alternative{b.text, std::string("the person addressed: ") +
+                                                                (agInferred == feat::F ? "masculine" : "feminine"), 0.5});
+          }
+        }
+        // C32 (work item 3): a pronoun whose gender is a guess from an antecedent several clauses back never makes the
+        // sentence fail agreement against a noun of its own: without the guess the noun decides
+        if (std::find(so.flags.begin(), so.flags.end(), "antecedent-guess") != so.flags.end() && latinA3Fails(so, opt)) {
+          transfer::Memory m2 = memBefore_;
+          m2.lastGender = 0;
+          m2.lastAnimate = false;
+          SentOut other;
+          speech(ss.text, fb, opt, ctx, m2, sts, other, false);
+          if (!latinA3Fails(other, opt)) keepOtherReading(so, other, mem, m2, "antecedent");
+        }
+        if (so.explicitAddr) cueAddr = so.explicitAddr;
+        if (so.explicitSpeaker) cueSpeaker = so.explicitSpeaker;
         display(so.latin, opt.macrons);
         // C28: a speaker dash of the source stays in front of the turn's Latin ("- Veniō! - Festīnā!")
         if (ss.kind == frame::CueKind::Speech && ss.dash && !so.latin.text.empty()) {
@@ -3254,6 +3408,14 @@ class RulesEngine final : public Engine {
         }
       }
       la2xSources_ = la2xSourceLemmas(a.choices);   // C11 la2x hook
+      // C32: a cell that neither the table, the paradigm generator nor the next candidate had is the dictionary form,
+      // reported as a form guess (Check), never as a missing form or an unknown word
+      for (std::string& f : o.flags)
+        if (f == "missing-form") f = "form-guess";
+      for (Reason& rs : o.reasons)
+        if (rs.kind == "form" && rs.text == kNoCell) {
+          rs.text = std::string(kFormGuess) + "that neither the dictionary nor the paradigm rules give: check it";
+        }
       runChecks(o.target, o.tokens, opt, cues[i], a.latinText && !a.copied, o, lay.overflow, tagsApprox);
       // A7 source coverage
       {
@@ -3294,7 +3456,8 @@ class RulesEngine final : public Engine {
                             "speaker-reply", "free-relative", "clause-split", "song-relative",   // C24
                             "antecedent-guess",   // C28
                             "split-agreement",   // C30
-                            "join-discarded", "join-neighbour"})   // C30b
+                            "join-discarded", "join-neighbour",   // C30b
+                            "form-guess", "gender-inferred"})   // C32
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       // a tier 3 word chosen while a tier 1/2 word of the same sense existed (fidelity 1, a correction aside)
       for (const transfer::Choice& c : a.choices)
