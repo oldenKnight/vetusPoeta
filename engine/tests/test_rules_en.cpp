@@ -2456,7 +2456,8 @@ TEST_CASE("rules-h: unreal conditions and would: imperfect subjunctive throughou
                         "Then everything would be toys."})
     CHECK_MESSAGE(run({s})[0].conf != rules::Confidence::Fix, s);
   expectEach({
-      {"The boys promised to wash the dog and feed the cat.", "Puerī canem lavāre prōmīsērunt et fēlem alere prōmīsērunt."},
+      {"The boys promised to wash the dog and feed the cat.",   // C28: promise + accusative and future infinitive
+       "Puerī canem sē lavātūrōs esse prōmīsērunt et fēlem sē altūrōs esse prōmīsērunt."},
       {"Robert agreed to meet the king and give him the ring.", "Rōbertus rēgī occurrere cōnsēnsit et ānulum eī dare cōnsēnsit."},
       {"She wants to sing and dance.", "Canere vult et saltāre vult."},
       {"I wish it was always summer.", "Optō ut semper aestās sit."},   // C24: primary sequence after optō
@@ -2850,11 +2851,11 @@ TEST_CASE("rules-j: the speaker of a reply is the person addressed in the cue be
 TEST_CASE("rules-j: long quoted narrative sentences: reroot, cue split, clause split (work item b)") {
   NEED_REAL();
   CHECK(run({"\"Even Paul, the Bishop of Rome, promised to visit the duke and bring him a horse.\""})[0].text ==
-        "Etiam Paulus, Episcopus Rōmae, ducem vīsitāre prōmīsit et equum eī ferre prōmīsit.");
+        "Etiam Paulus, Episcopus Rōmae, ducem sē vīsitātūrum esse prōmīsit et equum eī sē lātūrum esse prōmīsit.");   // C28
   {
     const std::vector<Out> o = run({"\"Even Paul, the Bishop of Rome,", "promised to visit the duke and bring him a horse.\""});
     CHECK(o[0].text == "Etiam Paulus, Episcopus Rōmae,");
-    CHECK(o[1].text == "ducem vīsitāre prōmīsit et equum eī ferre prōmīsit.");
+    CHECK(o[1].text == "ducem sē vīsitātūrum esse prōmīsit et equum eī sē lātūrum esse prōmīsit.");   // C28
     for (const Out& x : o) CHECK(x.conf != rules::Confidence::Fix);
   }
   // a sentence the parser cannot build whole: clause by clause, never the word-by-word Fix
@@ -3271,51 +3272,200 @@ TEST_CASE("rules-l: end to end on own_turns.en.srt vs the gold Latin (report; de
   MESSAGE("own_turns regression: " << matches << " / 120 match the gold; confidence ok " << conf["ok"] << " / check "
                                    << conf["check"] << " / fix " << conf["fix"] << "; wrong among OK " << wrongOk);
   CHECK(wrongOk == 0);
-  CHECK(matches >= 0);   // C28: first run before any rule (docs/rules_en_notes.md "Quality loop 6"); raised at the end
+  // C28: first run before any rule 48 / 120; after the rules 100 / 120 without the 19 alternatives proposed to the main
+  // agent (119 / 120 with them; docs/rules_en_notes.md "Quality loop 6 (C28)")
+  CHECK(matches >= 100);
 }
 
-// C28-DEBUG (temporary)
-TEST_CASE("zz-debug: translate VP_DEBUG_FILE") {
-  const char* path = std::getenv("VP_DEBUG_FILE");
-  if (!path || !*path) return;
+// C28 rules, each with own sentences (not from own_turns.en.srt).
+TEST_CASE("rules-l: a sentence over several cues is re-split by clause at the same cue boundary (work item a)") {
   NEED_REAL();
-  std::ifstream f(path);
-  std::vector<std::vector<std::string>> batches(1);
-  std::string line;
-  while (std::getline(f, line)) {
-    if (line.empty()) { if (!batches.back().empty()) batches.emplace_back(); continue; }
-    batches.back().push_back(line);
-  }
-  frame::FrameBuilder fb(frame::SrcLang::En, &real().pen, &real().en, cur());
-  const char* g = std::getenv("VP_DEBUG_GENDER");
-  for (const auto& b : batches) {
-    if (b.empty()) continue;
-    const auto o = run(b, g && *g ? g[0] : 'm');
-    for (size_t i = 0; i < b.size(); ++i) {
-      std::string fl;
-      for (const auto& x : o[i].flags) fl += x + " ";
-      for (const auto& k : o[i].checks) if (!k.ok) fl += k.id + "(" + k.detail + ") ";
-      std::printf("%s\n   -> %s   [%s] %s\n", b[i].c_str(), o[i].text.c_str(), confName(o[i].conf), fl.c_str());
-      if (std::getenv("VP_DEBUG_CAND")) {
-        static std::unique_ptr<rules::Engine> e2 = engine();
-        rules::CueInput c;
-        c.sourceText = b[i];
-        c.startMs = 0;
-        c.endMs = 3000;
-        rules::Options o2;
-        auto r = e2->translate({c}, o2, rules::Context{}, nullptr, nullptr);
-        if (r.ok())
-          for (const auto& rr : r.value()[0].reasons)
-            if (rr.kind == "candidate" || rr.kind == "sense") std::printf("   %s %s %s\n", rr.kind.c_str(), rr.text.c_str(), rr.data.c_str());
-      }
-      if (std::getenv("VP_DEBUG_FRAME")) {
-        frame::SemSentence s;
-        fb.analyse(b[i], s);
-        std::printf("   %s\n", frame::describe(s).c_str());
-        if (std::getenv("VP_DEBUG_TOK"))
-          for (const auto& t : s.tokens) std::printf("      [%s|%s|%s|%s|%d]\n", t.text.c_str(), t.lower.c_str(), t.upos.c_str(), t.deprel.c_str(), t.head);
-      }
+  auto pieces = [](const std::vector<std::string>& src, const std::vector<std::string>& want, char g = 'm') {
+    const std::vector<Out> o = run(src, g);
+    REQUIRE(o.size() == want.size());
+    for (size_t i = 0; i < want.size(); ++i) {
+      CHECK_MESSAGE(o[i].text == want[i], src[i] << " -> " << o[i].text << " (expected " << want[i] << ")");
+      CHECK(!o[i].text.empty());   // C22: no cue is ever emptied
     }
-    std::printf("\n");
+  };
+  pieces({"The old man sat", "under the big tree."}, {"Senex sedēbat", "sub arbore magnā."});
+  pieces({"We will wait for you", "at the gate."}, {"Tē exspectābimus", "in portā."});
+  // a relative word goes with its own clause, a copula left at the end of a cue with its predicate
+  pieces({"This is the house that", "my father built."}, {"Haec est domus", "quam pater meus aedificāvit."});
+  pieces({"This is the man who", "saved my dog."}, {"Hic est vir", "quī canem meum servāvit."});
+  pieces({"My sister is", "very tired."}, {"Soror mea", "valdē fessa est."});
+  // a preposition left at the end of a cue goes with its noun; a perfect stays whole
+  pieces({"He stood in front of", "the door."}, {"Stābat", "ante iānuam."});
+  CHECK(run({"When the sun rose,", "the birds sang", "in the trees."})[0].text == "Cum sōl ortus est,");
+  pieces({"The girls played", "in the garden", "until the evening."}, {"Puellae lūsērunt", "in hortō", "ad vesperum."});
+}
+
+TEST_CASE("rules-l: an answer takes the case its question gives it (work item b)") {
+  NEED_REAL();
+  auto answer = [](const char* q, const char* a, const char* want) {
+    const std::vector<Out> o = run({q, a});
+    CHECK_MESSAGE(o[1].text == want, q << " / " << a << " -> " << o[1].text << " (expected " << want << ")");
+  };
+  answer("Whom do you love?", "My mother.", "Mātrem meam.");
+  answer("What did you eat?", "Bread and cheese.", "Pānem et cāseum.");
+  answer("To whom did you give the book?", "To my brother.", "Frātrī meō.");
+  answer("To whom did she send the letter?", "To her aunt.", "Amitae suae.");
+  answer("Whose horse is this?", "The king's.", "Rēgis.");
+  answer("Where are you going?", "Home.", "Domum.");
+  answer("How many apples do you want?", "Three.", "Tria.");
+  answer("What are you reading?", "A letter from my father.", "Epistulam ā patre meō.");
+  // a subject question keeps the nominative, a place answer its preposition
+  answer("Who is there?", "The queen.", "Rēgīna.");
+  answer("Where did you find the cat?", "In the kitchen.", "In culīnā.");
+  // the answer of a short follow-up question ("And then?") still answers the question before it
+  const std::vector<Out> f = run({"Where are you going?", "To the river.", "And then?", "Home."});
+  CHECK(f[3].text == "Domum.");
+  // the fragment says how it was attached; with no question before it nothing is guessed
+  CHECK(hasFlag(run({"Whom do you love?", "My mother."})[1], "answer-case"));
+  CHECK(run({"My mother."})[0].text == "Māter mea.");
+}
+
+TEST_CASE("rules-l: speaker turns: dashes, people addressed, replies (work item c)") {
+  NEED_REAL();
+  CHECK(run({"- Come here! - I am coming!"})[0].text == "- Venī hūc! - Veniō!");
+  CHECK(run({"- I am tired. - So am I."}, 'm')[0].text == "- Fessus sum. - Et ego.");
+  // a group addressed makes the orders, greetings and "you" of its sentence plural
+  CHECK(run({"Boys, sit down."})[0].text == "Puerī, sedēte.");
+  CHECK(run({"Hello, girls!"})[0].text == "Salvēte, puellae!");
+  // a name or a word of address alone is called out (vocative); after a "who" question it is the answer
+  CHECK(run({"Peter!"})[0].text == "Petre!");
+  CHECK(run({"Mother!"})[0].text == "Māter!");
+  CHECK(run({"Who did it?", "Peter!"})[1].text == "Petrus!");
+  // a question with the person addressed last; the person addressed before a question
+  CHECK(run({"Is he your brother, Julia?"})[0].text == "Estne frāter tuus, Iūlia?");
+  CHECK(run({"Children, who broke the window?"})[0].text == "Puerī, quis fenestram frēgit?");
+  // the reply's speaker is the person asked
+  const std::vector<Out> r = run({"Anna, are you tired?", "- Yes, very tired."}, 'm');
+  CHECK(r[0].text == "Anna, esne fessa?");
+  CHECK(r[1].text == "- Ita, valdē fessa.");
+  // a speaker dash ends the continuation: a lower-case turn after a dash is not glued to the line before
+  const std::vector<Out> d = run({"I saw the queen", "- and the king?"});
+  CHECK(d[0].text.find("Rēgīnam") != std::string::npos);
+  CHECK(d[1].text == "- Et rēx?");   // a new turn: no continuation case
+  CHECK(!d[1].text.empty());
+}
+
+TEST_CASE("rules-l: a cue of one or two words is OK only from the phrasebook or the names table (work item d)") {
+  NEED_REAL();
+  for (const char* s : {"Yes.", "Thank you.", "Peter!", "Why not?"}) {
+    const Out o = run({s})[0];
+    CHECK_MESSAGE(o.conf == rules::Confidence::Ok, s << " -> " << o.text);
   }
+  for (const char* s : {"The queen.", "The garden.", "Mother!"}) {
+    const Out o = run({s})[0];
+    CHECK_MESSAGE(o.conf != rules::Confidence::Ok, s << " -> " << o.text);
+    CHECK(hasFlag(o, "short-cue"));
+  }
+  // a piece of a sentence over two cues is attached: no short-cue flag
+  CHECK(!hasFlag(run({"He stood in front of", "the door."})[1], "short-cue"));
+}
+
+TEST_CASE("rules-l: agreement inside fragments, as in a clause (work item e)") {
+  NEED_REAL();
+  // a state said alone speaks of the speaker (the reply's speaker when the cue before addressed someone)
+  CHECK(run({"Anna, go home.", "Alone?"}, 'm')[1].text == "Sōla?");
+  CHECK(run({"Tired?"}, 'm')[0].text == "Fessus?");
+  CHECK(run({"Tired?"}, 'f')[0].text == "Fessa?");
+  CHECK(run({"Tired?"}, 'm')[0].conf != rules::Confidence::Ok);
+  // a number alone agrees with what it counts; "a little" + a mass noun is a partitive
+  CHECK(run({"How many loaves do you want?", "Two."})[1].text == "Duōs.");
+  CHECK(run({"Give me a little water."})[0].text == "Dā mihi paulum aquae.");
+  CHECK(run({"A little wine, please."})[0].text == "Paulum vīnī, quaesō.");
+  // a possessor alone is a genitive; a pronoun alone stays
+  CHECK(run({"The baker's."})[0].text == "Pānificis.");
+  CHECK(run({"Whose dog is this?", "My father's."})[1].text == "Patris meī.");
+  CHECK(run({"And you, Peter?"})[0].text == "Et tū, Petre?");
+  // "It's me, your brother.": the pronoun is the subject, the noun phrase an apposition
+  CHECK(run({"It's me, your brother."}, 'm')[0].text == "Ego sum, frāter tuus.");
+  CHECK(run({"It's us!"})[0].text == "Nōs sumus!");
+}
+
+TEST_CASE("rules-l: words and phrases of dialogue (own sentences, C28)") {
+  NEED_REAL();
+  expectEach({
+      {"We haven't eaten yet.", "Nōndum ēdimus."},
+      {"She is not here yet.", "Hīc nōndum est."},
+      {"Come back tonight.", "Redī hāc nocte."},
+      {"He arrived last week.", "Superiōre hebdomade pervēnit."},
+      {"I would like a cup of water.", "Calicem aquae velim."},
+      {"Got her!", "Eam cēpī!"},
+      {"That way, children!", "Illūc, puerī!"},
+      {"Here, drink this.", "Ecce, bibe hoc."},
+      {"They live by the sea.", "Prope mare habitant."},
+      {"We live in a small house.", "In domō parvā habitāmus."},
+      {"We walked past the school.", "Praeter lūdum ambulāvimus."},
+      {"He stood in front of the door.", "Ante iānuam stābat."},
+      {"There!", "Ibi!"},
+      {"Did you see that?", "Vīdistīne illud?"},
+      {"Give the book back to your teacher.", "Redde magistrō tuō librum."},
+      {"She came from Rome.", "Rōmā vēnit."},
+      {"The window was open.", "Fenestra aperta erat."},
+      {"The soup is ready.", "Iūs parātum est."},
+      {"The crowd ran away.", "Turba aufūgit."},
+      {"This is the man who saved my dog.", "Hic est vir quī canem meum servāvit."},
+  });
+  // ", or" after an order: aliter; "until" opening a cue: dōnec + subjunctive
+  CHECK(run({"Be quiet,", "or you will wake the baby."})[1].text == "Aliter īnfantem excitābis.");
+  CHECK(run({"Hurry,", "or we will be late."})[1].text.find("Aliter") == 0);
+  CHECK(run({"♪ Sing, my child, sing ♪"}, 'm')[0].text == "♪ Cane, mī fīlī, cane ♪");
+  // "it" after a person or an animal points further back: a guess (Check)
+  CHECK(hasFlag(run({"A story about a horse.", "The horse could fly.", "I finished it."})[2], "antecedent-guess"));
+}
+
+TEST_CASE("rules-l: deterministic with the new rules, in both latinity modes") {
+  NEED_REAL();
+  const std::vector<std::string> src = {"Marcus, where are you going?", "To the market.", "And then?", "Home.",
+                                        "This is the boy who", "found our cat.", "- Are you tired? - Very tired.",
+                                        "Boys, sit down.", "Whose bag is this?", "The teacher's.", "Two, and a little milk."};
+  for (rules::Latinity lt : {rules::Latinity::Wide, rules::Latinity::Classical}) {
+    std::string first;
+    for (int k = 0; k < 2; ++k) {
+      std::unique_ptr<rules::Engine> e = engine();
+      std::vector<rules::CueInput> in;
+      for (size_t i = 0; i < src.size(); ++i) {
+        rules::CueInput c;
+        c.index = (uint32_t)i;
+        c.sourceText = src[i];
+        c.startMs = (int64_t)i * 4000;
+        c.endMs = c.startMs + 3500;
+        in.push_back(c);
+      }
+      rules::Options o;
+      o.latinity = lt;
+      auto r = e->translate(in, o, rules::Context{}, nullptr, nullptr);
+      REQUIRE(r.ok());
+      REQUIRE(r->size() == src.size());
+      std::string all;
+      for (const auto& c : r.value()) {
+        CHECK(!c.target.empty());
+        all += c.target + "\n";
+      }
+      if (k == 0) first = all;
+      else CHECK(all == first);
+    }
+    CHECK(first.find("Domum.") != std::string::npos);
+    CHECK(first.find("quī fēlem nostram invēnit.") != std::string::npos);
+  }
+}
+
+TEST_CASE("rules-l: fixes after the blind check (own sentences, C28)") {
+  NEED_REAL();
+  // "the one" + a place: a relative clause
+  CHECK(run({"Which cup?", "The one on the table."})[1].text == "Is quī in mēnsā est.");
+  CHECK(run({"Which girl?", "The one in the garden."})[1].text == "Ea quae in hortō est.");
+  // promise / swear: accusative and future infinitive
+  CHECK(run({"She promised to come."})[0].text == "Sē ventūram esse prōmīsit.");
+  CHECK(run({"We promised to help him."}, 'm')[0].text == "Eum nōs adiūtūrōs esse prōmīsimus.");
+  // "a lot" alone; "a lot of" stays the partitive
+  CHECK(run({"Is it raining?", "- Yes, a lot."})[1].text == "- Ita, multum.");
+  CHECK(run({"A lot of children came."})[0].text == "Multī puerī vēnērunt.");
+  CHECK(run({"Do you like the garden?", "Yes, very much."})[1].text == "Ita, valdē.");
+  // the reply to a question asked as "we" speaks to them all
+  CHECK(run({"Mother, can we go out?", "- After dinner,", "if you are good."})[2].text == "Sī bonī estis.");
+  CHECK(run({"Can we play now?", "Yes, if you are quiet."})[1].text == "Ita, sī tranquillī estis.");
 }

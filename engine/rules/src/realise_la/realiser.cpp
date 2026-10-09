@@ -413,7 +413,18 @@ void LatinRealiser::verbGroup(const LaClause& c, const AgreeInfo& subj, std::vec
   q.mood = mood;
   if (p.modal != kNone) {
     push(fin, p.modal, agree_.finiteVerb(subj, q), "order.inf");
-    push(inf, p.lemma, morph::infinitive(p.infTense, p.infVoice), "order.inf");
+    // C28: a future active infinitive after promise / swear (prōmīsit sē allātūrum esse): the future participle in the
+    // accusative agreeing with the subject, and esse
+    std::string fp;
+    const Features pf = morph::participle(Future, Active, Acc, subj.number ? subj.number : (uint8_t)Sg,
+                                          subj.gender ? subj.gender : (uint8_t)M);
+    if (p.infTense == Future && p.infVoice == Active && p.lemma != kNone && k_.sum != kNone &&
+        morph::generate(lx_, p.lemma, pf, fp, true)) {
+      push(inf, p.lemma, pf, "order.inf");
+      push(inf, k_.sum, morph::infinitive(Present, Active), "order.inf");
+    } else {
+      push(inf, p.lemma, morph::infinitive(p.infTense, p.infVoice), "order.inf");
+    }
   } else {
     push(fin, p.lemma, agree_.finiteVerb(subj, q), "order.decl");
   }

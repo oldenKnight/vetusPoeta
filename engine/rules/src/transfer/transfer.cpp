@@ -3072,7 +3072,14 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     else if (ph->frame == "dat") c.phrasalCase = Dat;
     else if (ph->frame == "abl") c.phrasalCase = Abl;
   } else if (c.st.lang == frame::SrcLang::En && sp.lemma == "live" && !hasObj && latin("habitō", Verb) != kNone &&
-             (f.wh.word == "where" || [&] { for (const frame::SemAdverb& a : f.adverbs) if (a.lemma == "where" || a.lemma == "here" || a.lemma == "there") return true; return false; }())) {
+             (f.wh.word == "where" || [&] { for (const frame::SemAdverb& a : f.adverbs) if (a.lemma == "where" || a.lemma == "here" || a.lemma == "there") return true; return false; }() ||
+              // C28: a place after it ("They live by the sea.", "He lives near the bridge.", "We live in a small house.")
+              [&] { for (const frame::SemOblique& o : f.obliques)
+                      if ((o.prep == "by" || o.prep == "near" || o.prep == "in" || o.prep == "at" || o.prep == "on" ||
+                           o.prep == "beside" || o.prep == "behind" || o.prep == "under") && !o.np.isPronoun &&
+                          !tables::timeNoun(text::lower(o.np.head)))
+                        return true;
+                    return false; }())) {
     verb = latin("habitō", Verb);   // C19: "where the dragon lives", "we live here": dwell (habitō), not be alive
     Choice ch;
     ch.token = sp.token;
@@ -3208,6 +3215,23 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     c.cover(sp.complementToken);
     p.modal = verb;
     p.lemma = comp;
+    // C28: "He promised to bring a ball." -> pilam sē allātūrum esse prōmīsit: promise / swear / threaten take the
+    // accusative and future infinitive (the subject repeated as sē, nōs, ...)
+    if (c.st.lang == frame::SrcLang::En && (sp.lemma == "promise" || sp.lemma == "swear" || sp.lemma == "threaten") &&
+        sp.modality == Modality::None && comp != kNone) {
+      p.infTense = Future;
+      LaOblique se;
+      se.case_ = Acc;
+      se.np.isPronoun = true;
+      const bool pr = f.hasSubject && f.subject.isPronoun && f.subject.pron.person >= 1;
+      se.np.pron.person = pr ? f.subject.pron.person : 3;
+      se.np.pron.number = f.hasSubject && (f.subject.isPronoun ? f.subject.pron.number == 2 : f.subject.number == 2) ? Pl : Sg;
+      se.np.pron.reflexive = se.np.pron.person == 3;
+      se.np.pron.gender = pr && f.subject.pron.gender ? f.subject.pron.gender : (uint8_t)M;
+      se.np.number = se.np.pron.number;
+      se.np.case_ = Acc;
+      cl.obliques.push_back(se);
+    }
   }
   // modality (order_la.txt RULE modal.*)
   switch (sp.modality) {
@@ -3356,7 +3380,7 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
     for (const frame::SemAdverb& a : f.adverbs)
       if (a.lemma == "always") tense = Perfect;
   p.tense = tense;
-  if (p.modal != kNone) { p.infTense = Present; p.infVoice = p.voice; p.voice = Active; }
+  if (p.modal != kNone) { if (p.infTense != Future) p.infTense = Present; p.infVoice = p.voice; p.voice = Active; }   // C28: promise + future
   if (p.lemma != kNone) {
     c.mem.lastVerb = p.lemma;
     c.mem.lastMotion = c.motion;
@@ -5261,6 +5285,27 @@ void Transfer::clause(const SemFrame& f0, const SemSentence& s, const Settings& 
       oc.hasSubject = false;
       oc.subject = realise::LaNP{};
       out.flags.push_back("answer-case");
+    }
+  }
+  // C28: "The one in the kitchen." / "The ones by the door.": a place phrase on "the one" is a relative clause (ea quae
+  // in culīnā est); the bare ablative of place would read as "she in the kitchen"
+  if (st.lang == frame::SrcLang::En && f.type == frame::Kind::Frag && !f.hasPred && f.hasSubject && f.subject.isPronoun &&
+      (f.subject.pronLemma == "one" || f.subject.pronLemma == "ones") && f.subject.determiner != "this" &&
+      f.subject.determiner != "that" && f.subject.determiner != "these" && f.subject.determiner != "those" && oc.hasSubject &&
+      !oc.obliques.empty() &&
+      oc.subject.relative.empty() && latin("sum", Verb) != kNone) {
+    bool place = true;
+    for (const frame::SemOblique& o : f.obliques)
+      place = place && (o.prep == "in" || o.prep == "on" || o.prep == "under" || o.prep == "near" || o.prep == "by" ||
+                        o.prep == "behind" || o.prep == "beside" || o.prep == "at");
+    if (place) {
+      LaClause rc;
+      rc.type = realise::ClauseType::Decl;
+      rc.pred.lemma = latin("sum", Verb);
+      rc.relRole = realise::Role::Subject;
+      rc.obliques = oc.obliques;
+      oc.obliques.clear();
+      oc.subject.relative.push_back(rc);
     }
   }
   // C28: "The farmer's." (a noun phrase that ends in 's with no noun after it) is a genitive: Agricolae.

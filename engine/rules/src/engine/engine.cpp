@@ -2351,6 +2351,28 @@ class RulesEngine final : public Engine {
           mem.answerWe = w == "nosotros" || w == "nosotras" || (w.size() > 4 && w.compare(w.size() - 3, 3, "mos") == 0);
         }
       }
+      // C28: the reply to a question asked as "we" ("Mother, can we go out?" - "If you are good.") speaks to them all:
+      // "you" there is plural
+      if (lang == frame::SrcLang::En && ss.kind == frame::CueKind::Speech && si > 0 &&
+          sents[si - 1].kind == frame::CueKind::Speech) {
+        size_t qi = si - 1;   // the question, also across the first part of the reply ("- After dinner," "if you ...")
+        {
+          std::string pt = sents[qi].text;
+          while (!pt.empty() && pt.back() == ' ') pt.pop_back();
+          if (qi > 0 && !pt.empty() && (pt.back() == ',' || pt.back() == ';') && sents[qi - 1].kind == frame::CueKind::Speech)
+            --qi;
+        }
+        std::string pq = " " + text::lower(sents[qi].text);
+        while (!pq.empty() && (pq.back() == ' ' || pq.back() == '"')) pq.pop_back();
+        bool askedWe = false;
+        for (const char* w : {" can we ", " may we ", " shall we ", " could we ", " are we ", " do we ", " will we ",
+                              " should we ", " must we "})
+          askedWe = askedWe || pq.find(w) != std::string::npos;
+        const std::string low = " " + text::lower(ss.text) + " ";
+        bool you = false;
+        for (const char* w : {" you ", " you.", " you,", " you!", " you?", " your "}) you = you || low.find(w) != std::string::npos;
+        if (askedWe && you && !pq.empty() && pq.back() == '?') mem.answerWe = true;
+      }
       SentOut so;
       // C19: a sentence cut at a comma continues in the next one of the same speaker (no speaker dash): its last object
       // case is offered to a fragment "and the queen."
@@ -2498,17 +2520,15 @@ class RulesEngine final : public Engine {
       if (ss.kind == frame::CueKind::Song) so.srcOffset.assign(so.latin.tokens.size(), -1);
       std::vector<cue::Latin> pieces = cue::splitSentence(ss, so.latin, &so.srcOffset);
       // C28: a sentence over several cues is re-split by clause: each cue gets the Latin of its own words, in Latin
-      // order ("Librum legit" | "sub arbore veterī."); the sentence capital moves to the new first word
+      // order ("Librum legit" | "sub arbore vetere."); the sentence capital moves to the new first word
       if (ss.kind == frame::CueKind::Speech && ss.parts.size() > 1) {
         std::vector<cue::Latin> rg;
         std::vector<std::vector<size_t>> ord;
         if (cue::regroupSentence(ss, so.latin, so.srcOffset, rg, &ord)) {
+          std::vector<size_t> flatOrder;   // the original token indices in their new order
+          for (const auto& o2 : ord) flatOrder.insert(flatOrder.end(), o2.begin(), o2.end());
           bool moved = false;
-          for (size_t p = 0; p < ord.size(); ++p)
-            for (size_t q = 0; q < ord[p].size(); ++q)
-              moved = moved || (p > 0 && q == 0 && ord[p][0] < ord[p - 1].back()) || (q > 0 && ord[p][q] < ord[p][q - 1]);
-          for (size_t p = 0; p < rg.size(); ++p)
-            for (size_t q = 1; q < ord[p].size(); ++q) moved = moved || ord[p][q] < ord[p][q - 1];
+          for (size_t q = 1; q < flatOrder.size(); ++q) moved = moved || flatOrder[q] < flatOrder[q - 1];
           if (moved && !rg[0].tokens.empty() && ord[0][0] != 0) {
             const auto nameTok = [&](const rules::TokenView& t) {
               return t.hasLemma && (la_->lemma(t.lemmaId).flags & lex::ProperName);
@@ -2535,8 +2555,7 @@ class RulesEngine final : public Engine {
             // reasons follow their tokens into the new order
             std::vector<long> newIndex(so.latin.tokens.size(), -1);
             long k = 0;
-            for (const auto& o2 : ord)
-              for (size_t q : o2) newIndex[q] = k++;
+            for (size_t q : flatOrder) newIndex[q] = k++;
             for (Reason& rr : so.reasons)
               if (rr.tokenIndex >= 0 && (size_t)rr.tokenIndex < newIndex.size()) rr.tokenIndex = (int)newIndex[(size_t)rr.tokenIndex];
           }
@@ -2800,7 +2819,7 @@ class RulesEngine final : public Engine {
       // C28: a cue of one or two words without a verb ("The queen.", "Fish again?") leans on the cues around it: it is
       // OK only when every word came from the phrasebook, the names table or a closed-class table ("Yes.", "Marcus!",
       // "Why not?"); a dictionary choice there is Check (flag short-cue)
-      if (!a.song && !a.nonverbal && !a.copied) {
+      if (!a.song && !a.nonverbal && !a.copied && a.sentences > 0 && a.wholeSentences == a.sentences) {   // not a piece
         int words = 0;
         bool inWord = false;
         for (char ch : cues[i].sourceText) {

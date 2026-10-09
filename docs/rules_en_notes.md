@@ -1277,3 +1277,158 @@ reports (build-rules-k-asan, LLM off), VP_WITH_LLM=OFF tools/xcompile_check.sh O
   or with a dative verb they would be wrong (the rows match only at the end of a clause).
 - Guard sentences: the rules of (d) and (b) had their sentences written before the code; for the oz rules of (a) and
   for (c) the sentences were written after the code was in place but before they were run.
+
+## Quality loop 6 (C28, 2026-10-08/09): cue context for fragments
+Material: a new own tuning file tests/regression/own_turns.en.srt (120 cues of our own subtitle-style dialogue: speaker
+dashes, sentences over two or three cues, lower-case continuations, noun-phrase and prepositional-phrase answers,
+interjections, vocatives, yes / no answers, five song lines) with its gold expected/own_turns.la.gold.txt, both
+written and committed (f13f62e) before the engine was run on the file; the held-out flag class (fragment 46 of the 98
+wrong held-out cues, STATUS E13, flags only). tests/heldout/, tests/eval_gold/, data/work/eval/heldout-* and
+data/acceptance/ were not opened. Twenty blind cues of the same kind were written at 23:24 UTC before any rule
+(data/work/eval/c28-blind/, gitignored) and run once at the end. The Greek side (C29) ran at the same time in the same
+working tree: every build and measurement here ran in an isolated copy (git archive of HEAD plus the C28 files), no
+Greek file was touched, and the shared frame builder was checked against the Greek suites after every change.
+
+### Before / after
+| file | start of C28 | end of C28 |
+|---|---|---|
+| own_turns EN (120, new) | first run **48 / 120** (53 if the dropped speaker dash is not counted), ok 56 / check 60 / fix 4, wrong among OK 33 | **100 / 120** without and **119 / 120** with the 19 proposed gold alternatives below; ok 61 / check 59 / fix 0; wrong among OK 0 |
+| oz_sample EN (100) | 89 / 100 (with C26's accepted alternatives), wrong among OK 0 | 89 / 100, wrong among OK 0 (3 wrong cues changed wording, all still Check) |
+| own_dialogue EN (114) / ES (100) | 114 / 114 (ok 64), 100 / 100 (ok 80) | reports byte-identical |
+| sample.en.srt 12, la2x 201 / 201, Orbergise 60 / 60, 20 / 20, blind 20 / 20, with original 22 / 22 | | unchanged |
+| Greek EN->GRC / ES->GRC / GRC->EN, ES / C18 review | 114 / 114, 39 / 40, 40 / 40, 13 / 13 | unchanged (EN->GRC and ES->GRC reports byte-identical) |
+| blind check (20 own cues) | first run **16 / 20** acceptable | 20 / 20 after the fixes |
+
+The own_turns test ("rules-l: end to end on own_turns.en.srt ...") checks determinism with a fresh engine, that no cue
+is empty, wrong among OK 0 and matches >= 100 (the count without the proposed alternatives). One gold error of mine was
+corrected (cue 6: the ablative of vetus is vetere, veterī kept as the rare variant); it counts in the 100.
+
+### (a) A sentence over several cues, re-split by clause (cue/cue.cpp regroupSentence, engine)
+- The sentence is translated whole (the cue mapping already joined cues without a final mark) and the Latin goes back
+  to its cues by the source word each Latin word translates: every cue gets the Latin of its own words, in Latin order,
+  so the split falls at the cue boundary of the source, by clause and never by word count ("She is reading a book" |
+  "under the old tree." -> Librum legit | sub arbore vetere.; "Once upon a time there was a horse" | "who could fly" |
+  "over the mountains and the sea." -> Ōlim erat equus | quī volāre poterat | super montēs et mare.).
+- A preposition goes with the noun after it ("We waited for him in front of" | "the city gate." -> Eum exspectāvimus |
+  ante portam urbis.), a conjunction, relative word or nōn with the verb of the clause it opens ("This is the boy who" |
+  "found our dog" -> Hic est puer | quī canem nostrum ... invēnit), the Latin verb of an auxiliary or copula left at the
+  end of a cue with the next cue ("Your brother is" | "very brave." -> Frāter tuus | valdē fortis est.), the
+  auxiliary of a perfect participle with it (Cum sōl ortus est,). The final mark closes the last cue; the sentence
+  capital moves to the new first word. When too few Latin words are mapped to source words, or a cue would get no Latin
+  word, the old proportional split is kept (and C22's guard still re-translates per cue when a cue would be empty).
+- Better source offsets for that: relative / interrogative words, nōn, et / sed / aut / sī / quia / dum and personal
+  pronouns are found by their English word in the unit; a phrasebook piece moved into a clause keeps its source offset;
+  names are found by their first two letters without length marks (Rōmae for Rome).
+- Speaker dashes of the source stay in front of the turn's Latin ("- Veniō! - Festīnā!"); subs::breakLines already
+  starts a dash turn on its own line.
+- order.copula.rel (order_la.txt, new): a predicate noun with a relative clause follows the copula ("Hic est puer quī
+  ...", was "Hic puer quī ... est").
+
+### (b) Answers take the case their question gives them (engine whInfo, transfer Memory::wh*)
+- After a wh question the engine keeps the case the wh word had in the Latin (quem -> accusative, cui -> dative, cuius
+  -> genitive; quid / quod by the role of the wh word), the preposition before it (cum quō), a place question (ubi /
+  quō / unde) and the gender of an interrogative noun (quot pānēs); the next sentence is an answer (Memory::answer) and
+  a noun-phrase fragment takes that case: "Whom did you see?" - "The queen." -> Rēgīnam.; "Whose dog is it?" - "The
+  farmer's." -> Agricolae.; "And what did she write?" - "A short story about a horse." -> Fābulam brevem dē equō.;
+  "home" answers a place question as domum / domī / domō; a number alone agrees with what it counts ("How many apples
+  do you want?" - "Three." -> Tria.). A short follow-up question without a wh word ("And then?") keeps the question it
+  follows up, also after an answer. Flag answer-case (information, OK-capable).
+- "To whom did she write it?" - "To her grandmother." -> Aviae suae: a third-person possessive in an answer about a
+  third person is suus.
+- Frame builder (shared): "whom" is interrogative ("Whom did you see?" was a yes / no question "Vīdistīne quem?"), and
+  a wh word after its preposition opens a wh question ("To whom ...?", "With whom ...?" -> Cui ...?, Cum quō ...?).
+- "it" points at the last clause's object (else subject), not at a noun inside a prepositional phrase ("A short story
+  about a horse." - "Read it to us." -> eam); an object "it" after a clause about a person or an animal is a guess
+  (flag antecedent-guess, Check).
+
+### (c) Speaker turns
+- A dash ends the continuation (C19 / C26 already) and is kept in the Latin. A group addressed in the sentence makes its
+  orders, greetings and "you" plural for the rest of the cue ("Stay here, children." -> Manēte; "Hello, children! Where
+  are you going?" -> Salvēte, puerī! Quō ītis?; "Good night, children!" -> Bene dormīte), also for phrasebook orders
+  without a plural note (the row's imperative in the lexicon's plural cell: "Boys, sit down." -> sedēte); one person
+  addressed makes them singular. The reply to a question asked as "we" ("Mother, can we go out?" - "If you are good.")
+  says "you" in the plural (Check).
+- A name or a word of address alone, called out ("Marcus!", "Peter!", "Father!" which was read as generā, "Mother?")
+  is a vocative; after a "who" question it is the answer (nominative). "Children, who wrote this letter?" (the parser
+  hung the question on the children as a relative clause and the question was lost: "Līberī?") -> Puerī, quis hanc
+  epistulam scrīpsit?. "Sleep, my child, sleep" -> Dormī, mī fīlī, dormī (a bare verb around a person addressed is the
+  order, not a second vocative). A question whose person addressed comes last keeps -ne ("Is he your brother, Julia?"
+  -> Estne frāter tuus, Iūlia?; was "Frāter tuus est, Iūlia?").
+- In an answer a place noun before a comma is no person addressed ("Home, before dark." was the vocative "Domus").
+
+### (d) Cues of one or two words
+- A cue of one or two words without a verb is OK only when every word came from the phrasebook, the names table or a
+  closed-class table ("Yes.", "Marcus!", "Why not?"); a dictionary choice there is Check, flag short-cue ("The queen.",
+  "Mother!"). A piece of a sentence over two cues is attached and is not a short cue.
+
+### (e) Agreement inside fragments
+- A state said alone ("Very tired.", "Alone?", "Hungry?") agrees with the speaker (the reply's speaker when the cue
+  before addressed someone): "Julia, are you tired?" - "- Yes, very tired." -> Ita, valdē fessa. (was fessum); Check.
+- A verbless fragment keeps its pronoun ("And you, Marcus?" -> Et tū, Marce?, was "Et, Marce?"; "Nōn ego!").
+- "a little" + a mass noun is the partitive (paulum lactis, was "lac parvum"); "Two, and a little milk." keeps both
+  conjuncts; "The one in the kitchen." -> Ea quae in culīnā est (a place phrase on "the one" is a relative clause).
+- "It's only me, your old friend ..." -> Ego modo sum, amīcus ...: the pronoun is the subject (was "Ego tantum est") and
+  the noun phrase after the comma an apposition (no et, no vocative).
+
+### Words and phrases of the material (each with own sentences in "rules-l: words and phrases of dialogue")
+not ... yet -> nōndum (no nōn); tonight -> hāc nocte (was hodiē); last year / month / week / summer / winter / night ->
+annō superiōre ... / hesternā nocte (was ultimō); "I would like X" -> X velim (also "would like to"); so would / do / am
+/ can / did / will I, me too -> et ego; anything / nothing else; that way, -> illūc, this way, -> hūc,; got him / her /
+you -> eum / eam / tē cēpī; "stop, thief" -> cōnsiste, fūr (dēsine is "stop doing it"); "Here, take ..." -> Ecce, ...;
+"There!" / "Here!" alone -> Ibi! / Hīc!; by + a place -> prope (was the ablative of means); past -> praeter; in front of
+-> ante (the parser's "in front of the gate" was "in fronte portae"); from / to a town -> the bare ablative / accusative
+(names_la.tsv note "city": Athēnīs vēnit, Rōmam iimus); give back to a person -> dative; "Did you hear / see that?" ->
+illud; ", or" after an order -> aliter (also after a phrasebook order: "Be quiet," / "or ..."); "until ..." opening a
+cue -> dōnec + subjunctive of what is awaited; open / shut / ready of things -> apertus / clausus / parātus (states rows
+noted "things too"); crowd -> turba; live + a place -> habitō; promise / swear + to-infinitive -> accusative and future
+infinitive (prōmīsit sē allātūrum esse; the realiser builds the future active infinitive after a catenative verb).
+Checker: cum at the start of a clause before a word that can only be nominative / accusative is the conjunction ("Cum
+domum pervēnimus," was A4 Fix when its clause's verb was the only one in the cue); an ablative of time is no misplaced
+object ("Manē nōbīscum hāc nocte" was A4 Fix).
+
+### Blind check
+20 own cues of the same kind (written 23:24 UTC before any rule, run once at the end): first run **16 / 20** acceptable
+(counted acceptable though borderline: "Quō clāvēs posuistī?" (quō with pōnere), "- Nōn. - Vidē igitur iterum.").
+Wrong: "The one in the kitchen." -> Ea in culīnā. (OK, and wrong: one wrong OK), "He promised to bring" -> Ferre
+prōmīsit (classical Latin wants the future infinitive), "- Yes, a lot." -> Ita, pars., "if you are good." (the children
+asked "can we") -> Sī bonus es. Fixed with own sentences ("rules-l: fixes after the blind check"): the one + place ->
+relative clause, promise + future infinitive, "a lot" alone -> multum, the reply to a "we" question in the plural.
+After: 20 / 20 (the same borderlines; "sī bonī estis" in the present).
+
+### Rows
+phrasebook_en_la.tsv +26 (i would like {NP}, so would / do / am / can / did / will I, me too, anything else, nothing else,
+that way ,, this way ,, last night / year / month / week / summer / winter, got him / her / you, stop , thief, stop thief,
+here ,, a lot, very much) and 2 notes (good night: plural bene dormīte; where are you going: plural quō ītis);
+states_en_la.tsv +3 (open, shut, closed) and 1 note (ready: things too); tiers_la.tsv +2 (turba 1, caterva 3);
+preps_en_la.tsv +1 (past); names_la.tsv 4 notes (London, Rome, Athens, Paris: city); order_la.txt +1 rule
+(order.copula.rel). A tier row natō 1 (swim) was tried and withdrawn: nō is as classical and five earlier expectations
+used it.
+
+API changes (additive): cue.h `cue::regroupSentence`; transfer.h `Memory::whCase, whPlace, whGender, whNumber, whPrep,
+whSubj3, answer, lastImp`; order_la.txt rule order.copula.rel (built-in default in the Orderer); new flags short-cue
+(Check), antecedent-guess (Check), answer-case (information). Behaviour: speaker dashes are kept in the Latin.
+
+Changed expectations (earlier tests): "- Peter, are you ready? - Yes, I am ready." -> "- Petre, esne parātus? - Ita,
+parātus sum." (dashes kept); "Are you tired, Lucy / Mary?" -> "Esne fessa, Lūcia / Marīa?" (was "Fessa es, ...?");
+"The boys promised to wash the dog and feed the cat." -> "Puerī canem sē lavātūrōs esse prōmīsērunt et fēlem sē altūrōs
+esse prōmīsērunt."; "Even Paul, the Bishop of Rome, promised to visit the duke and bring him a horse." -> "... ducem sē
+vīsitātūrum esse prōmīsit et equum eī sē lātūrum esse prōmīsit." (whole and over two cues).
+
+### Proposed gold alternatives (added after the last " | " in own_turns.la.gold.txt; veto freely)
+Correct Latin the gold did not list (the owner's table choices: follis for bag (teacher row), sūmō for take and ferō
+for bring (teacher glosses), "No" -> nōn (phrasebook row); synonyms and word order): #16 "- Ita, in folle meō.", #21
+"Vetus et valdē lēnis est.", #25 "cum uxōre et tribus fīliīs suīs.", #27 "quī canem nostrum annō superiōre invēnit.",
+#35 "Duo et paulum lactis." (the question "Quot pānēs?" is itself nominative), #37 "Nōn, grātiās tibi agō." (as #13),
+#39 "Follem meum sūmpsit", #41 "Quā viā?", #42 "Illūc, praeter aedem!", #47 "Redde sorōrī meae follem!", #49 "Ecce,
+sūme hunc pānem.", #57 "Lege nōbīs eam, Iūlia.", #78 "Nārem sī aqua calida esset.", #105 "Pater! Ēvigilā!", #106 "In
+culīnā est aliquis.", #110 "amīcus vetus tuus ā vīcō.", #113 "Viam meam in tenebrīs āmīsī.", #116 "Iūlia, pānem fer",
+#117 "et cēterōs piscēs." (the fish read as several). Not proposed: #64 "Quia id nōn fīnīvī." ("it" is the story told
+five cues before: eam; now Check, antecedent-guess).
+
+### Open points
+- "The birds sang in the trees." is read as a present (canunt) while "The birds sang." is a past: a tagger / frame
+  slip on irregular pasts before a prepositional phrase (seen in a guard sentence, not fixed).
+- "until the moon rises" alone is misparsed ("Surgit"); "until the sun rises" works.
+- Long-range "it": only the last clause's object or subject is remembered; further back the gender is a guess (Check).
+- The question that makes a fragment an answer is taken from the sentence before it, whoever speaks: a fragment that
+  is no answer right after a wh question would take the question's case (answer-case flag shows it).
