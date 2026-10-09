@@ -1545,3 +1545,38 @@ fovea for "hole" (lexicon); piscātor vetus vs senex; "How long is the river?" (
 parser reads close as a noun); "it" for an animal across sentences takes the lexicon's gender (canis common gender ->
 eam); cum vs ubi for "when" + perfect in narrative; the plural-only flag of ager in the library; "Marce et Anna, venī"
 (a coordinated address with a singular order); the commented-out connectors in transfer/tables.cpp.
+
+### C30b: never-worse guard for cue joins (after E15)
+E15 (held-out, measured by the main agent; not read here): on the public-domain file the joins were net negative
+(automatic errors 99 -> 104: 5 new A3 failures after a join, 3 missing-form with an unknown token after the re-split,
+1 new A1). The fix round adds a guard so that a join can no longer make a cue worse than the cue read on its own:
+- **Word-local findings stay with their cue** (engine): a missing form, a paradigm fallback, an unknown word and a source
+  word not accounted for (A7) were copied to every cue of a joined sentence; now each goes only to the cue whose Latin
+  token (or source word) it belongs to. This alone turned cues that held no faulty word back from Fix / Check.
+- **Never worse than the cue alone** (engine, after the per-cue checks): every cue that holds a piece of a sentence over
+  several cues is also translated on its own (the same engine, that cue alone). When the joined reading is a Fix and
+  the cue alone is not, fails A1 / A3 / A4 where the cue alone passes, or has an unknown word or a missing form the
+  cue alone does not have, the cue takes its own reading (flag join-discarded, Check). The other cues of the sentences
+  through it keep their joined reading but are never OK (flag join-neighbour, Check): a phrase of the discarded cue
+  may sit in their Latin. A6 / A7 differences do not discard a join: the first version did, and on the blind story it
+  dropped "Postrīdiē māne" (tier 3) because the cue alone simply left "The next morning" out.
+- **No join when each cue stands alone** (engine partsStandAlone): when every cue part of a joined sentence, translated
+  alone, is a whole sentence (no fragment, no guessed name, no unknown word or missing form, no fallback), the cues are
+  translated apart (two speakers, a missing full stop: "Wait for me" | "I am coming!" was "... | cum veniō!", OK). A
+  cue that opens in lower case is a fragment alone, so narrative continuations still join.
+- **No join for a far pronoun**: a joined sentence with antecedent-guess is translated cue by cue (join-discarded).
+- **The missing-form retry** (C19) runs on each cue alone through the guard; a joined cue with missing-form or an
+  unknown word that the cue alone avoids takes the cue alone.
+- A list cut by a cue ("The cat, the dog," | "the hens and the goat.") gave "Fēlēs canis" | "et et gallīnae et capra.":
+  every inserted et was mapped to the one "and"; an et between two nominals of one case now stays with the nominal
+  after it (cue.cpp) -> "Fēlēs et canis" | "et gallīnae et capra.".
+- A word of address alone without a mark ("Mother") was an unknown name; it is the noun (vocative), not a repair.
+- Tests (test_rules_en.cpp, own pairs): "rules-m: C30b two cues that each stand alone ..." 26 pairs (two speakers,
+  no full stop, interjection / address lines, two song lines): each cue's output equals the cue alone and is never a
+  Fix the cue alone is not; "rules-m: C30b a join is never worse ..." 7 groups (lists, mid-phrase cuts, a quotation
+  with its frame, reported speech): no Fix and no A1-A7 finding only the joined reading has, plus the far-pronoun case.
+- Audit on our own files (each cue in context vs alone): own_story 120, own_turns 120, oz_sample 100: no cue is a Fix
+  in context while it is not alone; the blind story: 0 Fix, 1 A6 finding kept on purpose (above).
+- Numbers: own_story 119/120 (wrong among OK 0), own_turns 118/120, EN 114/114, ES 100/100, oz 89/100 (wrong among
+  OK 0), blind story output unchanged (19/20); EN/ES/turns/la2x/Orbergise and all Greek reports byte-identical to
+  49fbc2d (oz: Latin identical, only the C30 antecedent-guess flags).

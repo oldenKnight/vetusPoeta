@@ -3710,3 +3710,80 @@ TEST_CASE("rules-m: deterministic with the new rules, in both latinity modes") {
     CHECK(first.find("Intereā advesperāscēbat.") != std::string::npos);
   }
 }
+
+// C30b: the never-worse guard for cue joins (own cue pairs; where joining is wrong or risky the cue keeps the reading it
+// has on its own)
+TEST_CASE("rules-m: C30b two cues that each stand alone keep their own readings (two speakers, no full stop, address)") {
+  NEED_REAL();
+  const std::vector<std::pair<const char*, const char*>> pairs = {
+      {"Where are you going", "To the market with my mother."}, {"I am so tired", "Let us go home now."},
+      {"Oh", "The door is open."},                              {"Hey", "Who took my bread?"},
+      {"Wait for me", "I am coming!"},                          {"Come here, Rufus", "Good dog."},
+      {"The water is cold", "But I will swim."},                {"Look at the sky", "It will rain soon."},
+      {"Thank you", "You are very kind."},                      {"I saw a wolf", "No, it was a big dog."},
+      {"Is it you, Marcus", "Yes, it is me."},                  {"Please sit down", "The soup is hot."},
+      {"No, no, no", "That is not my hat."},                    {"He is late again", "As always."},
+      {"What a beautiful day", "Let us go to the sea."},        {"Good night", "Sleep well, my child."},
+      {"Help", "The boat is sinking!"},                         {"Mother", "Where are my shoes?"},
+      {"Listen", "Someone is at the door."},                    {"Yes", "I will come with you."},
+      {"Hello, Anna", "How are you today?"},                    {"Hurry up", "The bus is leaving."},
+      {"I know", "You told me yesterday."},                     {"Be careful", "The ice is thin."},
+      {"\xE2\x99\xAA The river runs and runs", "down to the sea \xE2\x99\xAA"},
+      {"\xE2\x99\xAA Sing with me", "under the moon \xE2\x99\xAA"},
+  };
+  for (const auto& p : pairs) {
+    const std::vector<Out> j = run({p.first, p.second});
+    const Out a = run({p.first})[0], b = run({p.second})[0];
+    REQUIRE(j.size() == 2);
+    CHECK_MESSAGE(j[0].text == a.text, p.first << " | " << p.second << " -> " << j[0].text << " (alone " << a.text << ")");
+    CHECK_MESSAGE(j[1].text == b.text, p.first << " | " << p.second << " -> " << j[1].text << " (alone " << b.text << ")");
+    CHECK((j[0].conf != rules::Confidence::Fix || a.conf == rules::Confidence::Fix));
+    CHECK((j[1].conf != rules::Confidence::Fix || b.conf == rules::Confidence::Fix));
+  }
+  // the word of address alone is the noun (vocative), not an unknown name
+  CHECK(run({"Mother"})[0].text == "Māter");
+}
+
+TEST_CASE("rules-m: C30b a join is never worse than the cue alone (lists, sentences cut mid-phrase, far pronouns)") {
+  NEED_REAL();
+  auto fails = [](const Out& o, const std::string& id) {
+    for (const auto& c : o.checks)
+      if (c.id == id) return !c.ok;
+    return false;
+  };
+  const std::vector<std::vector<std::string>> groups = {
+      {"Apples, pears,", "bread and milk."},
+      {"The cat, the dog,", "the hens and the goat."},
+      {"We need eggs, flour", "and a little sugar."},
+      {"The birds sang in the trees", "until the sun set."},
+      {"When the boys came home,", "their mother was cooking", "and their father was", "reading a book in the garden."},
+      {"\"Where is my hat?\" asked", "the old man."},
+      {"The girl said that", "her brother was ill."},
+  };
+  for (const auto& g : groups) {
+    const std::vector<Out> j = run(g);
+    REQUIRE(j.size() == g.size());
+    for (size_t i = 0; i < g.size(); ++i) {
+      const Out a = run({g[i]})[0];
+      CHECK_MESSAGE((j[i].conf != rules::Confidence::Fix || a.conf == rules::Confidence::Fix), g[i] << " -> " << j[i].text);
+      bool joinedOnly = false, aloneOnly = false;
+      for (const char* id : {"A1", "A2", "A3", "A4", "A5", "A6", "A7"}) {
+        joinedOnly = joinedOnly || (fails(j[i], id) && !fails(a, id));
+        aloneOnly = aloneOnly || (fails(a, id) && !fails(j[i], id));
+      }
+      CHECK_MESSAGE(!(joinedOnly && !aloneOnly), g[i] << " -> " << j[i].text << " (alone " << a.text << ")");
+      CHECK(!j[i].text.empty());
+    }
+  }
+  // a list keeps its et with the noun it joins ("Fēlēs et canis" | "et gallīnae et capra.", not "et et")
+  const std::vector<Out> l = run({"The cat, the dog,", "the hens and the goat."});
+  CHECK(l[0].text == "Fēlēs et canis");
+  CHECK(l[1].text == "et gallīnae et capra.");
+  // a pronoun two clauses after its noun: the cues are not joined (join-discarded, Check)
+  const std::vector<Out> f = run({"Anna found a kitten in the garden.", "She was very happy.", "She laughed and sang.",
+                                  "Then she carried it", "to her mother."});
+  CHECK(hasFlag(f[3], "join-discarded"));
+  CHECK(hasFlag(f[4], "join-discarded"));
+  CHECK(f[3].conf != rules::Confidence::Ok);
+  CHECK(f[3].text == "Tum eum portāvit");
+}

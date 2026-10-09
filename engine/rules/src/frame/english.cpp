@@ -180,6 +180,17 @@ bool addressWord(const std::string& w) {
 bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
   bool changed = false;
   const int n = (int)tk.size();
+  // C30b: a cue of one capitalised word of address and nothing else ("Mother") is that noun, not an unknown name
+  {
+    int words = 0, w0 = -1;
+    for (int k = 0; k < n; ++k)
+      if (tk[(size_t)k].upos != "PUNCT") { ++words; w0 = k; }
+    if (words == 1 && tk[(size_t)w0].upos == "PROPN" && addressWord(tk[(size_t)w0].lower)) {
+      tk[(size_t)w0].upos = "NOUN";
+      tk[(size_t)w0].lemma = tk[(size_t)w0].lower;
+      changed = true;
+    }
+  }
   // C24: a capitalised first word before a comma tagged as a verb that the lexicon knows only as a noun
   // ("Grandfather, are you tired?"): the noun of address
   if (n >= 3 && tk[0].upos == "VERB" && tk[1].text == "," && !tk[0].text.empty() && tk[0].text[0] >= 'A' &&

@@ -8,6 +8,7 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <mutex>
 #include <set>
 #include <sstream>
@@ -1475,8 +1476,16 @@ class RulesEngine final : public Engine {
       }
       // C28: a name or a word of address alone, called out ("Marcus!", "Father!", "Mother?"), is a vocative; not
       // the answer to a question ("Who wrote it?" - "Julia.")
+      // C30b: also a word of address alone without a mark ("Mother" as a cue of its own)
+      int nWords = 0;
+      for (const nlp::Token& t : s.tokens) nWords += t.upos != "PUNCT";
+      bool bareAddress = false;
+      if (s.finalPunct.empty() && nWords == 1 && st.lang == frame::SrcLang::En && !s.tokens.empty())
+        for (const char* w : {"father", "mother", "dad", "mum", "mom", "grandmother", "grandfather", "grandma", "grandpa",
+                              "brother", "sister", "son", "daughter", "uncle", "aunt", "teacher", "doctor", "captain"})
+          bareAddress = bareAddress || s.tokens[0].lower == w;
       if (s.units.size() == 1 && s.units[0].type == frame::Unit::Clause && !s.units[0].vocative &&
-          (s.finalPunct == "!" || s.finalPunct == "?") && !mem.answer) {
+          (s.finalPunct == "!" || s.finalPunct == "?" || bareAddress) && !mem.answer) {
         frame::Unit& u = s.units[0];
         frame::SemFrame& f = u.frame;
         // "Father!" read as an order (generā): one word, no complements
@@ -2598,6 +2607,68 @@ class RulesEngine final : public Engine {
     std::stable_sort(o.checks.begin(), o.checks.end(), [](const Check& x, const Check& y) { return x.id < y.id; });
   }
 
+  // C30b: the joined reading of a cue is worse than the cue alone: a Fix where the cue alone is not, a failed A1 / A3 /
+  // A4 the cue alone passes, an unknown word or a missing form the cue alone does not have
+  static bool joinWorse(const CueOutput& joined, const CueOutput& alone) {
+    auto fails = [](const CueOutput& x, const char* id) {
+      for (const Check& c : x.checks)
+        if (c.id == id) return !c.ok;
+      return false;
+    };
+    auto unknown = [](const CueOutput& x) {
+      for (const auto& t : x.tokens)
+        if (t.unknown) return true;
+      return false;
+    };
+    auto flag = [](const CueOutput& x, const char* f) { return std::find(x.flags.begin(), x.flags.end(), f) != x.flags.end(); };
+    if (joined.confidence == Confidence::Fix && alone.confidence != Confidence::Fix) return true;
+    // the checks that make a Fix (A1 unknown form, A3 agreement, A4 government); a tier (A6) or coverage (A7) finding
+    // only the joined reading has mostly means the cue alone left a phrase out ("Postrīdiē māne" is tier 3, the cue
+    // alone drops "The next morning"): no reason to discard the join
+    for (const char* id : {"A1", "A3", "A4"})
+      if (fails(joined, id) && !fails(alone, id)) return true;
+    if (unknown(joined) && !unknown(alone)) return true;
+    if (flag(joined, "missing-form") && !flag(alone, "missing-form")) return true;
+    return false;
+  }
+
+  // C30b: every cue part of a sentence over several cues, translated alone, is a whole sentence: not a fragment, no
+  // guessed name, no unknown word or missing form, something translated
+  bool partsStandAlone(const SourceSentence& ss, const frame::FrameBuilder& fb, const Options& opt, const Context& ctx,
+                       const transfer::Settings& st) {
+    if (ss.kind != frame::CueKind::Speech || ss.parts.size() < 2) return false;
+    for (const frame::CuePart& p : ss.parts) {
+      std::string part = ss.text.substr((size_t)p.start, (size_t)std::max(0, p.end - p.start));
+      while (!part.empty() && part.back() == ' ') part.pop_back();
+      size_t a = 0;
+      while (a < part.size() && part[a] == ' ') ++a;
+      part.erase(0, a);
+      if (part.empty()) return false;
+      transfer::Memory m2 = memBefore_;
+      SentOut po;
+      speech(part, fb, opt, ctx, m2, st, po, true);
+      if (po.latin.tokens.empty() || !po.unknown.empty()) return false;
+      for (const char* f : {"fragment", "name-guessed", "unknown", "missing-form", "could-not-parse", "frame-fallback",
+                            "clause-split"})
+        if (std::find(po.flags.begin(), po.flags.end(), f) != po.flags.end()) return false;
+      for (const auto& t : po.latin.tokens)
+        if (t.unknown) return false;
+    }
+    return true;
+  }
+
+  // C30b: `w` occurs in `text` as a whole word (ASCII case-insensitive)
+  static bool hasWord(const std::string& text, const std::string& w) {
+    if (w.empty()) return false;
+    const std::string lt = text::lower(text), lw = text::lower(w);
+    for (size_t at = lt.find(lw); at != std::string::npos; at = lt.find(lw, at + 1)) {
+      const bool l = at == 0 || !std::isalnum((unsigned char)lt[at - 1]);
+      const bool r = at + lw.size() >= lt.size() || !std::isalnum((unsigned char)lt[at + lw.size()]);
+      if (l && r) return true;
+    }
+    return false;
+  }
+
   static bool checkOk(const CueOutput& o, const char* id) {
     for (const Check& c : o.checks)
       if (c.id == id) return c.ok;
@@ -2944,7 +3015,16 @@ class RulesEngine final : public Engine {
             for (char ch : pieces[p].text) latinWords = latinWords || (unsigned char)ch >= 0x80 || std::isalpha((unsigned char)ch);
           if (letters && !latinWords) empty = true;
         }
-        if (empty) {
+        // C30b: a joined sentence whose pronoun points back over more than a clause (antecedent-guess) is not joined:
+        // a guess made across cues is more often wrong than the cue's own reading
+        const bool farPronoun = !empty && lang == frame::SrcLang::En &&
+                                std::find(so.flags.begin(), so.flags.end(), "antecedent-guess") != so.flags.end();
+        // C30b: no join is needed when every cue of the sentence reads as a whole sentence of its own ("Wait for me" |
+        // "I am coming!", "Thank you" | "You are very kind."; a cue that opens in lower case continues and is a
+        // fragment alone): two speakers or a missing full stop are likelier than one sentence, so each cue keeps its
+        // own reading
+        const bool selfStanding = !empty && !farPronoun && lang == frame::SrcLang::En && partsStandAlone(ss, fb, opt, ctx, st);
+        if (empty || farPronoun || selfStanding) {
           std::vector<SourceSentence> one;
           for (size_t p = 0; p < ss.parts.size(); ++p) {
             SourceSentence x;
@@ -2958,14 +3038,15 @@ class RulesEngine final : public Engine {
           sents.erase(sents.begin() + (long)si);
           sents.insert(sents.begin() + (long)si, std::make_move_iterator(one.begin()), std::make_move_iterator(one.end()));
           cueSplit.erase(cueSplit.begin() + (long)si);
-          cueSplit.insert(cueSplit.begin() + (long)si, n, (char)1);
+          cueSplit.insert(cueSplit.begin() + (long)si, n, (char)(selfStanding ? 3 : farPronoun ? 2 : 1));
           mapLast();
           mem = memBefore_;
           --si;
           continue;
         }
       }
-      if (cueSplit[si]) addFlag(so.flags, "cue-split");
+      if (cueSplit[si] == 1) addFlag(so.flags, "cue-split");
+      if (cueSplit[si] == 2) addFlag(so.flags, "join-discarded");   // C30b
       // C30: a sentence over several cues is checked whole for agreement and government: a subject and its verb in two
       // cues ("Anna et" | "Rūfus nāviculam cōnscendērunt") are no fault of either cue
       bool agreeWhole = true;
@@ -2991,11 +3072,34 @@ class RulesEngine final : public Engine {
             a.reasons.push_back(x);
           }
         }
-        tokBase += pieces[p].tokens.size();
         a.agreeWhole = a.agreeWhole && agreeWhole;
-        for (const std::string& f : so.flags) addFlag(a.flags, f);
-        a.unknown.insert(a.unknown.end(), so.unknown.begin(), so.unknown.end());
-        a.missing.insert(a.missing.end(), so.missing.begin(), so.missing.end());
+        if (ss.parts.size() > 1) {
+          // C30b: what belongs to one word stays with the cue of that word: a form without a lexicon cell, a paradigm
+          // fallback, an unknown word, a source word not accounted for (a join spread them to every cue of the sentence)
+          bool cell = false, rule = false, unk = false;
+          for (const Reason& rr : so.reasons)
+            if (rr.tokenIndex >= 0 && (size_t)rr.tokenIndex >= tokBase && (size_t)rr.tokenIndex < tokBase + pieces[p].tokens.size() &&
+                rr.kind == "form") {
+              cell = cell || rr.text == "no lexicon cell for these features";
+              rule = rule || rr.text.rfind("paradigm fallback", 0) == 0;
+            }
+          for (const auto& t : pieces[p].tokens) unk = unk || t.unknown;
+          const std::string part = ss.text.substr((size_t)ss.parts[p].start,
+                                                  (size_t)std::max(0, ss.parts[p].end - ss.parts[p].start));
+          for (const std::string& f : so.flags) {
+            if ((f == "missing-form" && !cell) || (f == "from-rule" && !rule) || (f == "unknown" && !unk)) continue;
+            addFlag(a.flags, f);
+          }
+          for (const std::string& w : so.unknown)
+            if (hasWord(part, w)) a.unknown.push_back(w);
+          for (const std::string& w : so.missing)
+            if (hasWord(part, w)) a.missing.push_back(w);
+        } else {
+          for (const std::string& f : so.flags) addFlag(a.flags, f);
+          a.unknown.insert(a.unknown.end(), so.unknown.begin(), so.unknown.end());
+          a.missing.insert(a.missing.end(), so.missing.begin(), so.missing.end());
+        }
+        tokBase += pieces[p].tokens.size();
         a.choices.insert(a.choices.end(), so.choices.begin(), so.choices.end());
         a.minMargin = std::min(a.minMargin, so.minMargin);
         a.nonverbal = a.nonverbal || so.nonverbal;
@@ -3041,6 +3145,8 @@ class RulesEngine final : public Engine {
       doneCues = cues.size();
     }
     outs.reserve(doneCues);
+    std::vector<std::unique_ptr<CueOutput>> solo(doneCues);   // C30b: each cue translated on its own (joined cues only)
+    std::vector<char> worse(doneCues, 0);                    // C30b: ... and the joined reading is worse
     for (size_t i = 0; i < doneCues; ++i) {
       CueAcc& a = acc[off + i];
       // a remembered whole-cue correction (key as the CLI stores it) replaces the translation
@@ -3187,7 +3293,8 @@ class RulesEngine final : public Engine {
                             "cue-split", "addressee-gender",   // C22
                             "speaker-reply", "free-relative", "clause-split", "song-relative",   // C24
                             "antecedent-guess",   // C28
-                            "split-agreement"})   // C30
+                            "split-agreement",   // C30
+                            "join-discarded", "join-neighbour"})   // C30b
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       // a tier 3 word chosen while a tier 1/2 word of the same sense existed (fidelity 1, a correction aside)
       for (const transfer::Choice& c : a.choices)
@@ -3250,7 +3357,63 @@ class RulesEngine final : public Engine {
           x.score = std::round(x.score * 1000) / 1000;
           o.alternatives.push_back(x);
         }
+      // C30b: never worse than the cue alone. A cue that holds a piece of a sentence running over several cues is also
+      // translated on its own; when the joined reading fails A1 / A3 / A4 where the cue alone passes, has an unknown
+      // word or a missing form the cue alone does not have, or is a Fix where the cue alone is not, the cue takes its
+      // own reading (below)
+      if (soloDepth_ == 0 && a.sentences > a.wholeSentences && !a.song && !a.nonverbal) {
+        CueInput one = cues[i];
+        one.prevSource.clear();
+        one.nextSource.clear();
+        ++soloDepth_;
+        Result<std::vector<CueOutput>> rs = translateImpl({one}, opt, ctx, nullptr, nullptr);
+        --soloDepth_;
+        glossary_ = &ctx.glossary;
+        if (rs.ok() && rs.value().size() == 1) {
+          solo[i] = std::make_unique<CueOutput>(rs.value()[0]);
+          worse[i] = joinWorse(o, *solo[i]);
+        }
+      }
       outs.push_back(std::move(o));
+    }
+    // C30b: the worse cue takes its own reading (flag join-discarded); the other cues of the sentences that run through
+    // it keep their joined reading, but a phrase of the worse cue may sit in their Latin ("The" | "next morning" ->
+    // Postrīdiē māne in the first), so they are never OK (flag join-neighbour, Check)
+    {
+      std::vector<char> neighbour(outs.size(), 0);
+      for (size_t i = 0; i < outs.size(); ++i) {
+        if (!worse[i]) continue;
+        for (const SourceSentence& ss : sents) {
+          if (ss.parts.size() < 2) continue;
+          bool here = false;
+          for (const frame::CuePart& cp : ss.parts) here = here || cp.cue == off + i;
+          if (!here) continue;
+          for (const frame::CuePart& cp : ss.parts)
+            if (cp.cue >= off && cp.cue - off < outs.size() && cp.cue != off + i) neighbour[cp.cue - off] = 1;
+        }
+      }
+      for (size_t i = 0; i < outs.size(); ++i) {
+        if (worse[i] && solo[i]) {
+          CueOutput so2 = *solo[i];
+          so2.index = cues[i].index;
+          addFlag(so2.flags, "join-discarded");
+          so2.reasons.push_back(Reason{-1, "form", "the sentence runs over several cues; read as a whole this cue failed a "
+                                                   "check it passes on its own: its own translation is kept", ""});
+          if (so2.confidence == Confidence::Ok) {
+            so2.confidence = Confidence::Check;
+            so2.score = std::round(so2.score * 0.7 * 1000) / 1000;
+          }
+          outs[i] = std::move(so2);
+        } else if (neighbour[i]) {
+          addFlag(outs[i].flags, "join-neighbour");
+          outs[i].reasons.push_back(Reason{-1, "form", "a cue of this sentence kept its own translation: check that no "
+                                                       "phrase is missing or said twice across the cues", ""});
+          if (outs[i].confidence == Confidence::Ok) {
+            outs[i].confidence = Confidence::Check;
+            outs[i].score = std::round(outs[i].score * 0.7 * 1000) / 1000;
+          }
+        }
+      }
     }
     if (progress && outs.size() > reported) progress(outs.size());
     glossary_ = nullptr;
@@ -3407,6 +3570,7 @@ class RulesEngine final : public Engine {
   std::unique_ptr<frame::FrameBuilder> fbEn_, fbEs_;
   const std::vector<GlossaryEntry>* glossary_ = nullptr;
   transfer::Memory memBefore_;
+  int soloDepth_ = 0;   // C30b: inside the never-worse guard's translation of one cue alone
 
   // ==== C12 grc (Greek engine path: en-grc, es-grc, grc-en, grc-es): BEGIN ==========================================
   // Owned by task C12 (engine/rules/src/{transfer_grc,grc2x,engine_grc}). Reached only through the one-line hooks

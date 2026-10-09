@@ -16,6 +16,8 @@ namespace vp::frame::en {
 //  * a past form tagged as a noun in a sentence without a verb ("The bell rang."): a finite verb;
 //  * a word the lexicon knows only as an adjective, tagged as a noun ("My sister is braver than me"): an adjective.
 bool retagForms(std::vector<nlp::Token>& tk, const lex::Lexicon& lx);
+// C24: kinship words and titles are nouns of address (C30b: also used for a one-word cue)
+bool addressWord(const std::string& w);
 
 // The verb whose past (or past participle, or -ing form) this form is, when the lexicon lists the form only as such
 // under another lemma ("lighted" -> light, "sang" -> sing). `present` is set for -ing forms. Empty when none.

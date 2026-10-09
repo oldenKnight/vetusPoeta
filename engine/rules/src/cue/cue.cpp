@@ -267,6 +267,16 @@ bool regroupSentence(const frame::SourceSentence& src, const Latin& latin, const
         nominal(latin.tokens[(size_t)j + 1].features))
       part[i] = part[i - 1];
   }
+  // C30b: an et / aut / atque between two nominals of the same case that the source mapping put in a later part than the
+  // nominal after it (a list "The cat, the dog," | "the hens and the goat.": every et was found at the one "and")
+  // stays with that nominal
+  for (size_t i = 1; i + 1 < nt; ++i) {
+    const std::string k = text::latin_key(latin.tokens[i].text);
+    if ((k == "et" || k == "aut" || k == "atque") && part[i] > part[i + 1] && nominal(latin.tokens[i - 1].features) &&
+        nominal(latin.tokens[i + 1].features) && !latin.tokens[i - 1].features.case_.empty() &&
+        latin.tokens[i - 1].features.case_ == latin.tokens[i + 1].features.case_)
+      part[i] = part[i + 1];
+  }
   // linkers: right to left, so "et nōn" moves together
   for (size_t i = nt - 1; i-- > 0;) {
     const rules::TokenView& t = latin.tokens[i];

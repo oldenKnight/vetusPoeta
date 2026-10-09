@@ -5807,7 +5807,11 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
     bool again = en::retagForms(tk, *lex_);
     // C19: a sentence-initial word the tagger took for a name and the lexicon gives back as a verb or a common noun
     // ("Hurry, ...", "Grandmother, ..."): a repaired analysis (Check), as every rebuilt structure
-    if (!tk.empty() && (firstTag == "PROPN" || firstTag == "INTJ") && tk[0].upos != firstTag) out.repairs.emplace_back("retag");
+    // (C30b: not a word of address alone, "Mother": a sure reading)
+    int words = 0;
+    for (const nlp::Token& t : tk) words += t.upos != "PUNCT";
+    const bool lone = words == 1 && tk[0].upos == "NOUN" && en::addressWord(tk[0].lower);
+    if (!tk.empty() && (firstTag == "PROPN" || firstTag == "INTJ") && tk[0].upos != firstTag && !lone) out.repairs.emplace_back("retag");
     // C24: "After this he will ...", "Before that, we ...": the preposition and the pronoun "this" / "that" (an
     // oblique of time), not a subordinator and a subject
     if (n >= 4 && in(tk[0].lower, {"after", "before"}) && in(tk[1].lower, {"this", "that"}) &&
