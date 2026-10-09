@@ -31,6 +31,7 @@
 #         -> ἐλπίζω, while "esperar a" stays μένω).
 #   C31: verb rows may have frame "noobj-mid" (the middle voice whenever the verb has no object, places allowed: "hid
 #         behind the door" -> ἐκρύψατο); state rows may give "adverb(s) + verb" ("right" -> ὀρθῶς λέγω: ὀρθῶς λέγεις).
+#   C35: verb rows may have frame "approx" (the nearest verb greek.vpl has: the cue is never OK); kinds adj / adv.
 #   C33: verb rows may have frame "pass" (the passive voice: "appear" -> φαίνομαι, ἐφάνη); verbprep sources may be a
 #         phrasal verb written with "_" ("go_out of" -> ἐκ + gen); state rows may have frame "adj-person" (as "adj",
 #         only with a person subject: "tall" -> μακρός of a person, a thing keeps ὑψηλός) or "adj-thing" (only with a
@@ -581,3 +582,83 @@ noun	street	ὁδός		C33
 noun	calle	ὁδός		C33
 noun	plaza	ἀγορά		C33
 verb	reunirse	συνέρχομαι		C33
+# C35 (Greek loop 9, Spanish source into Greek: own_dialogue2.es.srt). New kinds adj / adv: a fixed adjective / adverb for a source
+# word whose reverse-index sense is wrong (attributive and predicative uses; state rows still win for "be" + adj); a
+# pronominal verb row of frame "thing" applies only with a thing as the object.
+noun	cuarto	δωμάτιον		C35: "mi cuarto" (es-MX: the bedroom) -> τὸ δωμάτιον (τετράς "the fourth" was produced)
+noun	lápiz	γραφίς		C35: the writing stylus (γραφιοθήκη "pencil case" was produced)
+noun	perrito	κυνίδιον		C35: the diminutive puppy (unknown before)
+noun	perritos	κυνίδιον		C35
+noun	conejo	κύνικλος		C35: the rabbit (Hellenistic, Polybius; λαγώς is the hare)
+noun	conejito	κύνικλος		C35
+noun	niñito	παιδίον		C35: "el niñito" (unknown before)
+noun	niñita	παιδίον		C35
+noun	salón	διδασκαλεῖον		C35: es-MX "el salón" (de clases) -> the classroom
+noun	idea	γνώμη		C35: "¡Qué buena idea!" -> ὡς καλὴ ἡ γνώμη (λόγος was produced)
+noun	cama	κλίνη		C35: the bed (κοίτη is the lair or the marriage-bed)
+noun	vaso	ποτήριον		C35: a drinking cup (ἀγγεῖον "vessel" was produced)
+noun	mamá	μήτηρ		C35: ὦ μῆτερ; "su mamá" -> ἡ μήτηρ (μάμμη is a nursery word)
+noun	perdón	συγγνώμη		C35: "pedir perdón" -> συγγνώμην αἰτεῖν
+noun	cuaderno	δέλτος		C35: the writing tablet (greek.vpl has no γραμματεῖον)
+adj	flojo	ἀργός		C35: es-MX lazy (χαλαρός "slack" was produced)
+adj	azul	κυάνεος		C35: blue (πελιδνός "livid" was produced)
+adj	bonito	καλός		C35: pretty (ἁβρός "delicate" was produced)
+adj	estricto	χαλεπός		C35: strict, harsh (ἀτρεκής "exact" was produced)
+adj	cierto	ἀληθής		C35: "no es cierto" -> οὐκ ἀληθές ἐστιν
+adj	curioso	φιλομαθής		C35: a curious (inquisitive) child or animal (unknown before)
+verb	ponerse	ἐνδύω	thing	C35: "Ponte el abrigo" -> put on oneself (θές "put" was produced); only with a thing as the object ("el sol se pone" keeps the subject row δύω)
+verb	levantarse	ἀνίστημι	mid-pres	C35: "¡levántate!" -> ἀνάστηθι (ἆρόν σε "lift yourself" was produced)
+verb	quitar	ἀφαιρέω	mid	C35: "me quitó mi lápiz" -> ἀφείλετο (ἐκίνησε "moved" was produced)
+verb	jurar	ὄμνυμι		C35: "te lo juro" -> ὄμνυμι (ἐξορκίζω "adjure" was produced)
+verbobj	pedir perdón	αἰτέω		C35: "pedirle perdón" -> συγγνώμην αἰτεῖν (ἐρωτῆσαι was produced)
+verb	callar	σιγάω		C35: "cállate" -> σίγα (κλεῖε "shut" was produced)
+verb	callarse	σιγάω		C35
+verb	enojarse	ὀργίζω	pass	C35: "se enojó" -> ὠργίσθη (ὤργισεν "angered someone" was produced)
+verb	temer	φοβέω	mid	C35: "temo que" -> φοβοῦμαι μή (ἅζομαι is poetic)
+verb	estudiar	μανθάνω		C35: to study, learn (μελετάω "practise" was produced)
+verb	gustar	ἀρέσκω		C35: "¿te gustó?" -> ἤρεσέ σοι (ἐπάσατο "tasted" was produced)
+verb	extrañar	ποθέω		C35: to miss someone (ἁμαρτάνω "miss the mark" was produced)
+verb	doler	ἀλγέω		C35: "me duele la cabeza" -> ἡ κεφαλή μοι ἀλγεῖ (λυπεῖ was produced)
+verb	jalar	ἕλκω		C35: es-MX to pull (κατασπάω "pull down" was produced)
+verb	meterse	εἰσέρχομαι		C35: "se metió en el agua" -> εἰς τὸ ὕδωρ εἰσῆλθεν (ἔσαξε "packed" was produced)
+state	preocupado	φροντίζω	verb	C35: "estaba muy preocupada" -> πάνυ ἐφρόντιζον (unknown before)
+state	preocupada	φροντίζω	verb	C35
+state	callado	σιγάω	verb	C35: "¿por qué estás tan callada?" -> οὕτω σιγᾷς (ἤρεμος "quiet" was produced)
+state	callada	σιγάω	verb	C35
+state	escondido	κρύπτω	pass	C35: "está escondido" -> κρύπτεται (κρυπτή ἐστιν was produced)
+state	escondida	κρύπτω	pass	C35
+state	dormido	καθεύδω	verb	C35: "todavía está dormido" -> ἔτι καθεύδει (ἐνύπνιόν ἐστιν was produced)
+state	dormida	καθεύδω	verb	C35
+adv	temprano	πρωΐ		C35: early (πρώϊμον "early-ripe" was produced)
+adv	lejos	μακράν		C35: far (τῆλε is poetic)
+adv	por fin	τέλος		C35: finally (ὧδε [fin] was produced)
+adv	otra vez	αὖθις		C35: again ([otra] was produced)
+adv	de nuevo	αὖθις		C35
+adv	ya_no	οὐκέτι		C35: "no lo vuelvo a hacer" (no + otra vez) -> οὐκέτι ποιήσω
+adv	still	ἔτι		C35: "seguía hablando" -> ἔτι ἐλάλει
+verbobj	lavarse mano	νίζω	mid	C35: "lavarse las manos" -> νίψασθαι τὰς χεῖρας (the middle: one's own hands)
+verbobj	lavar mano	νίζω	mid	C35
+verbobj	seguir camino	πορεύω	mid	C35: "siguió su camino" -> τὴν ὁδὸν ἐπορεύετο (ἕσπετο "followed" was produced)
+durative	estudiar	μανθάνω		C35
+durative	callar	σιγάω		C35: "cállate" -> σίγα
+verb	dejar	καταλείπω		C35: "dejó la puerta abierta" -> τὴν θύραν ἀνεῳγμένην κατέλιπεν (ἔλιπεν was produced)
+state	dormir	καθεύδω	verb	C35: the frame gives "estar dormido" the verb lemma (predadj=dormir)
+state	esconder	κρύπτω	pass	C35: "está escondido" (predadj=esconder) -> κρύπτεται
+state	callar	σιγάω	verb	C35: "estás tan callada" (predadj=callar) -> οὕτω σιγᾷς
+state	preocupar	φροντίζω	verb	C35: "estaba muy preocupada" (predadj=preocupar) -> πάνυ ἐφρόντιζον
+pp	to mesa	τράπεζα	prep:πρός+acc def	C35: "ven a la mesa" -> πρὸς τὴν τράπεζαν (εἰς "into" was produced)
+verb	llevar	φέρω	thing	C35: carry a thing; a person or an animal: ἄγω (the next row)
+verb	llevar	ἄγω		C35: "¿puedo llevar a mi perrito?" -> ἄγειν (λαβεῖν "take" was produced)
+verb	sentarse	καθίζω		C35: "se sentó" -> ἐκάθισεν (ἐκάθητο "was sitting" was produced); "siéntense" -> καθίζετε
+noun	señor	δεσπότης		C35: "¿Está usted enfermo, señor?" -> ὦ δέσποτα (δυναστεία was produced)
+verbprep	pensar in	ἐνθυμέομαι	prep:περί+gen	C35: "pensar en X" -> περὶ X ἐνθυμοῦμαι (ἐν ... οἴομαι was produced)
+noun	amiga	φίλος	f	C35: "mi amiga" -> ἡ φίλη (τοῦ φίλου was produced)
+noun	palabra	λέξις		C35: a word (written, taught): "Escriban la palabra" -> τὴν λέξιν (λόγος "speech, account" was produced)
+# C35 after the blind check (own sentences first; docs/rules_grc3_notes.md "Loop 9")
+verb	comprar	ἀγοράζω		C35: to buy (ὀψωνέω "buy provisions" was produced)
+verb	prestar	δίδωμι	approx	C35: greek.vpl has no κίχρημι / δανείζω: "give", never OK (new frame "approx"; ἀκούω was produced; LIB gap)
+noun	ruido	θόρυβος		C35: "no hagas ruido" -> μὴ ποίει θόρυβον (ψόφος "a sound")
+adj	delicioso	ἡδύς		C35: tasty (μελίφρων is poetic)
+pp	with valor	ἀνδρείως	adv	C35: "lucharon con valor" -> ἀνδρείως (λόγῳ "by word" was OK and wrong)
+pp	con valor	ἀνδρείως	adv	C35
+adv	despacio	βραδέως		C35: slowly (unknown before)

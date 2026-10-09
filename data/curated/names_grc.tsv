@@ -8,11 +8,11 @@
 # a New-Latin style coinage, the cue is never OK).
 Alice	Ἀλίκη	Ἀλίκης	f	1	decline	
 Mary	Μαρία	Μαρίας	f	1	decline	
-Anna	Ἄννα	Ἄννης	f	1	decline	
+Anna	Ἄννα	Ἄννης	f	1	decline	es=Ana
 Anne	Ἄννα	Ἄννης	f	1	decline	
 Julia	Ἰουλία	Ἰουλίας	f	1	decline	
-Lucy	Λουκία	Λουκίας	f	1	decline	
-Sophia	Σοφία	Σοφίας	f	1	decline	
+Lucy	Λουκία	Λουκίας	f	1	decline	es=Lucía
+Sophia	Σοφία	Σοφίας	f	1	decline	es=Sofía
 Sophie	Σοφία	Σοφίας	f	1	decline	
 Helen	Ἑλένη	Ἑλένης	f	1	decline	
 Irene	Εἰρήνη	Εἰρήνης	f	1	decline	
@@ -31,7 +31,7 @@ Zoe	Ζωή	Ζωῆς	f	1	decline
 Athena	Ἀθηνᾶ	Ἀθηνᾶς	f	1	decline	
 Mark	Μᾶρκος	Μάρκου	m	2	decline	
 Peter	Πέτρος	Πέτρου	m	2	decline	
-Paul	Παῦλος	Παύλου	m	2	decline	
+Paul	Παῦλος	Παύλου	m	2	decline	es=Pablo
 Philip	Φίλιππος	Φιλίππου	m	2	decline	
 Alexander	Ἀλέξανδρος	Ἀλεξάνδρου	m	2	decline	
 Nicholas	Νικόλαος	Νικολάου	m	2	decline	
@@ -39,7 +39,7 @@ George	Γεώργιος	Γεωργίου	m	2	decline
 Stephen	Στέφανος	Στεφάνου	m	2	decline	
 Theodore	Θεόδωρος	Θεοδώρου	m	2	decline	
 Timothy	Τιμόθεος	Τιμοθέου	m	2	decline	
-Matthew	Ματθαῖος	Ματθαίου	m	2	decline	
+Matthew	Ματθαῖος	Ματθαίου	m	2	decline	es=Mateo
 Dennis	Διονύσιος	Διονυσίου	m	2	decline	
 Christopher	Χριστόφορος	Χριστοφόρου	m	2	decline	
 James	Ἰάκωβος	Ἰακώβου	m	2	decline	
@@ -48,7 +48,7 @@ Leo	Λέων	Λέοντος	m	3	decline
 Philemon	Φιλήμων	Φιλήμονος	m	3	decline	
 Plato	Πλάτων	Πλάτωνος	m	3	decline	
 Socrates	Σωκράτης	Σωκράτους	m	3	decline	voc=Σώκρατες
-John	Ἰωάννης	Ἰωάννου	m	1	decline	
+John	Ἰωάννης	Ἰωάννου	m	1	decline	es=Juan
 Andrew	Ἀνδρέας	Ἀνδρέου	m	1	decline	
 Xanthias	Ξανθίας	Ξανθίου	m	1	decline	
 Thomas	Θωμᾶς	Θωμᾶ	m	1	decline	
@@ -77,3 +77,4 @@ Queen	βασίλεια	βασιλείας	f	1	translate	title; an ordinary noun 
 King	βασιλεύς	βασιλέως	m	3	translate	title; an ordinary noun for the checker
 Master	δεσπότης	δεσπότου	m	1	translate	title
 Mistress	δέσποινα	δεσποίνης	f	1	translate	title
+Pablito	Παῦλος	Παύλου	m	2	decline	C35: the Spanish diminutive of Pablo (Παῦλε in address) es=Pablito

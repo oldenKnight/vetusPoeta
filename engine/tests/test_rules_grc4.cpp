@@ -264,7 +264,7 @@ TEST_CASE("rules-grc4: C21 constructions (degree words, weather verbs, negation 
       {"La niña cantaba.", "ἡ παῖς ᾖδεν.", false},
       {"Los niños jugaban en el jardín.", "οἱ παῖδες ἐν τῷ κήπῳ ἔπαιζον.", false},
       {"Perdí mi anillo.", "τὸν δακτύλιόν μου ἀπώλεσα.", false},
-      {"El niño perdió su pelota.", "ὁ παῖς τὴν σφαῖραν αὐτοῦ ἀπώλεσεν.", false},
+      {"El niño perdió su pelota.", "ὁ παῖς τὴν σφαῖραν αὐτοῦ ἀπώλεσεν. | ὁ παῖς τὴν σφαῖραν ἀπώλεσεν.", false},   // C35: alternative added ("su" -> the article)
   };
   const int okEs = run4(*e, es, true, "C21 constructions ES");
   CHECK(okEs == (int)es.size());

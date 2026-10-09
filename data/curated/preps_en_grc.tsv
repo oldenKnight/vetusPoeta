@@ -67,3 +67,6 @@ except	-	πλήν	gen	πλὴν τοῦ δούλου
 between	place	μεταξύ	gen	
 since	time	ἐκ	gen	ἐκ παιδός
 like	comparison	-	dat	ὅμοιος + dative
+durante	duration (C35: Spanish "durante muchos días")	-	acc	accusative of extent of time: πολλὰς ἡμέρας ἐβάδισεν
+ago	time before now (C35: Spanish "hace tres días", "hace una hora")	πρό	gen	πρὸ τριῶν ἡμερῶν (Hellenistic in this sense; Attic τρίτην ἡμέραν)
+than	comparison (C35: Spanish "más ... que X")	-	gen	the genitive of comparison: μακρότερός ἐστι τοῦ ἀδελφοῦ

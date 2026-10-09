@@ -112,6 +112,10 @@ struct GrcAdj {
   // πεινῶν ὄρνις, τῷ πεινῶντι ὄρνιθι), agreeing like an adjective
   bool participle = false;
   uint8_t voice = 0;
+  // C35 (additive): a predicative adjective (after the noun and outside the article: "τὴν θύραν ἀνεῳγμένην
+  // κατέλιπεν", "ἡ χελώνη μόνη"), and the tense of a participle (0 = Present; Perfect for "ἀνεῳγμένην")
+  bool predicative = false;
+  uint8_t tense = 0;
 };
 
 struct GrcNP {
@@ -145,6 +149,8 @@ struct GrcNP {
   // C29 (additive): a pronoun subject that is never dropped (the accusative subject of an infinitive of another person:
   // "ἐλπίζω σε ἥξειν"); unlike `emphasis` it keeps the enclitic forms
   bool keep = false;
+  // C35 (additive): a name in apposition after the noun, in the same case ("περὶ τῆς φίλης μου Λουκίας")
+  std::vector<GrcNP> apposition;
 };
 
 struct GrcOblique { uint32_t prep = kNone; uint8_t case_ = 0; GrcNP np; bool front = false;

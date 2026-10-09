@@ -43,7 +43,7 @@ ya sé	οἶδα	1	answer
 no importa	οὐδὲν διαφέρει	1	answer	
 basta	ἅλις	1	answer	
 tienes razón	ὀρθῶς λέγεις	1	answer	
-muy bien	εὖ γε	1	answer	
+muy bien	πάνυ καλῶς	1	answer	C35: a reply ("Muy bien, gracias.") and praise (εὖ γε "well done" only praises)
 bien hecho	εὖ γε	1	praise	
 bravo	εὖ γε	1	praise	
 cómo estás	πῶς ἔχεις	1	q	
@@ -82,3 +82,30 @@ cada mañana	ἑκάστης ἡμέρας ἕωθεν	1	adv
 va a llover	ὕσει	1	state	
 # C18 (quality loop 3)
 que les corten {NP}	ἀποτέμετε {1:acc} αὐτῶν	2	excl	"les" is the possessor (possessive dative)
+# C35 (Greek loop 9: own_dialogue2.es.srt, Mexican Spanish)
+de veras	ἀληθῶς	1	answer	"¿De veras?" (αἱ οὐσίαι "the properties" was produced)
+fue sin querer	ἀκουσίως ἐποίησα	1	answer	"it was not on purpose" (no gender: ἄκων / ἄκουσα would need the speaker)
+te lo juro	ὄμνυμί σοι	1	answer	
+y ustedes	καὶ ὑμεῖς	1	q	"¿Y ustedes?" (καί alone was produced)
+y tú	καὶ σύ	1	q	
+y usted	καὶ σύ	1	q	usted: σύ
+que le vaya bien	εὖ πράττοις	1	greet	a wish at parting (optative)
+que te vaya bien	εὖ πράττοις	1	greet	
+en voz alta	μεγάλῃ τῇ φωνῇ	1	adv	"read aloud" (ἐν ὑψηλῇ φωνῇ was produced)
+en latín	Ῥωμαϊστί	1	adv	
+en griego	Ἑλληνιστί	1	adv	
+a la mañana siguiente	τῇ ὑστεραίᾳ	1	adv	the next day
+al día siguiente	τῇ ὑστεραίᾳ	1	adv	
+por fin	τέλος	1	adv	finally
+en la noche	νύκτωρ	1	adv	es-MX "at night" (as "de noche", "por la noche": C25 / C33)
+no es cierto	οὐκ ἀληθές ἐστιν	1	answer	
+no es verdad	οὐκ ἀληθές ἐστιν	1	answer	
+ahora mismo	αὐτίκα	1	adv	right now
+y colorín colorado , este cuento se ha acabado	καὶ οὗτος ὁ μῦθος τέλος ἔχει	1	narr	the closing formula of a tale
+y colorín colorado	καὶ	1	narr	before the closing line of a tale (the comma keeps it apart)
+este cuento se ha acabado	οὗτος ὁ μῦθος τέλος ἔχει	1	narr	
+un día	ἡμέρᾳ τινὶ	1	adv	"one day" in a story (ἡμέρᾳ alone was produced)
+cuidado	εὐλαβοῦ	1	excl	C35: "¡Cuidado, ...!" -> beware (ὦ μελέτη "o practice" was produced); plural εὐλαβεῖσθε
+cuántos años tienes	πόσων ἐτῶν εἶ	1	q	C35: the genitive of age (πόσοις ἔτεσιν ἔχεις was produced)
+cuántos años tiene usted	πόσων ἐτῶν εἶ	1	q	C35: usted
+cuántos años tienen ustedes	πόσων ἐτῶν ἐστε	1	q	C35

@@ -3,8 +3,6 @@
 #include "engine_grc/engine_grc.h"
 
 #include <algorithm>
-#include <cstdio>
-#include <cstdlib>
 #include <cctype>
 #include <cmath>
 #include <cstring>
@@ -38,9 +36,6 @@ namespace {
 
 namespace stdfs = std::filesystem;
 
-void gtraceTMP(const char* what, const std::string& t) {
-  if (std::getenv("VP_GRC_TRACE")) std::fprintf(stderr, "TRACE %s\t%s\n", what, t.c_str());
-}
 std::string jsonEscape(const std::string& s) {
   std::string o;
   for (char c : s) {
@@ -993,6 +988,70 @@ bool esParataxis(frame::SemSentence& s) {
       }
       changed = true;
       break;
+    }
+  }
+  return changed;
+}
+
+// C35: Spanish units the frame builder parses correctly that Greek says otherwise (fixed readings, no flag):
+//  - "Mira, ..." / "Oye, ..." (a bare order to look or listen before a comma): ἰδού / ἄκουε as a word of its own
+//  - "Había una vez una tortuguita ..." (the phrase "había una vez" took the verb; the noun group is left as a
+//    fragment): the existential ἦν ποτε + the noun group
+//  - "Que duerman bien, mis niños." (que + the 3rd plural subjunctive to a group addressed in the sentence): the
+//    plural order (εὖ καθεύδετε, ὦ παῖδες)
+// True if changed.
+bool esUnits35(frame::SemSentence& s) {
+  if (s.lang != frame::SrcLang::Es) return false;
+  bool changed = false;
+  bool plAddress = false;
+  for (const frame::Unit& u : s.units)
+    plAddress = plAddress || (u.vocative && u.frame.hasSubject && u.frame.subject.number == 2 && !u.frame.subject.isPronoun);
+  for (size_t ui = 0; ui < s.units.size(); ++ui) {
+    frame::Unit& u = s.units[ui];
+    if (u.type != frame::Unit::Clause || u.vocative) continue;
+    frame::SemFrame& f = u.frame;
+    const std::string pl = text::lower(f.pred.lemma);
+    if (f.type == frame::Kind::Imp && f.hasPred && (pl == "mirar" || pl == "oír") && !f.hasObject && f.obliques.empty() &&
+        f.adverbs.empty() && f.subordinate.empty() && u.sepAfter == "," && ui + 1 < s.units.size()) {
+      frame::Unit ph;
+      ph.type = frame::Unit::Phrase;
+      ph.first = u.first;
+      ph.last = u.last;
+      ph.sepAfter = u.sepAfter;
+      ph.phrase.first = u.first;
+      ph.phrase.last = u.last;
+      ph.phrase.pattern = pl == "mirar" ? "mira" : "oye";
+      ph.phrase.latin = pl == "mirar" ? "ἰδού" : "ἄκουε";
+      ph.phrase.reg = "excl";
+      ph.phrase.tier = 1;
+      if (f.imperativePlural && pl == "oír") ph.phrase.latin = "ἀκούετε";
+      u = ph;
+      changed = true;
+      continue;
+    }
+    if (f.type == frame::Kind::Frag && !f.hasPred && f.hasSubject && !f.subject.isPronoun && ui > 0 &&
+        s.units[ui - 1].type == frame::Unit::Phrase && text::lower(s.units[ui - 1].phrase.pattern) == "había una vez") {
+      f.type = frame::Kind::Decl;
+      f.hasPred = true;
+      f.pred.lemma = "be";
+      f.pred.tense = frame::Tense::Past;
+      f.pred.aspect = frame::Aspect::Progressive;
+      f.copula = true;
+      f.existential = true;
+      changed = true;
+      continue;
+    }
+    if (plAddress && f.type == frame::Kind::Decl && f.hasPred && f.hasSubject && f.implicitSubject && f.subject.isPronoun &&
+        f.subject.pron.person == 3 && f.subject.pron.number == 2 && f.pred.mood == frame::SrcMood::Subjunctive) {
+      bool que = false;
+      for (const std::string& k : f.connectors) que = que || text::lower(k) == "that" || text::lower(k) == "que";
+      if (que) {
+        f.connectors.clear();
+        f.type = frame::Kind::Imp;
+        f.imperativePlural = true;
+        f.hasSubject = false;
+        changed = true;
+      }
     }
   }
   return changed;
@@ -2028,14 +2087,11 @@ struct GreekPath::Impl {
       };
       frame::SemSentence r;
       std::string pf;
-      const bool noAddrTMP = es && std::getenv("VP_GRC_EXP") && std::strstr(std::getenv("VP_GRC_EXP"), "noaddr");
-      if (!noAddrTMP && addressSplit(atext, s, es, gd, analyseFixed, r)) {
-        if (es) gtraceTMP("addressSplit", atext);
+      if (addressSplit(atext, s, es, gd, analyseFixed, r)) {
         s = std::move(r);
         whenRepaired = true;
         repairWhat = "an address before or after a comma analysed apart as a vocative (ὦ ...): check it";
       } else if (es && venImperative(atext, fb, s, r)) {
-        gtraceTMP("venImperative", atext);
         s = std::move(r);
         whenRepaired = true;
         repairWhat = "\"ven\" read as \"they see\": read as the command of venir: check it";
@@ -2049,12 +2105,10 @@ struct GreekPath::Impl {
         whenRepaired = true;
         repairWhat = "\"" + pf + "\" read as an adjective: analysed again as the subject noun: check it";
       } else if (es && queVerb(atext, fb, s, esLex, r)) {
-        gtraceTMP("queVerb", atext);
         s = std::move(r);
         whenRepaired = true;
         repairWhat = "\"qué\" + a verb read as a noun phrase: analysed again as a question: check it";
       } else if (es && esVerbAsNoun(atext, fb, s, esLex, r)) {
-        gtraceTMP("esVerbAsNoun", atext);
         s = std::move(r);
         whenRepaired = true;
         repairWhat = "a verb read as a noun in a sentence without a verb: analysed again as the verb: check it";
@@ -2073,7 +2127,6 @@ struct GreekPath::Impl {
                             sb.frame[0].hasPred && sb.frame[0].type == frame::Kind::Decl);
       frame::SemSentence merged;
       if (!fine && frontedWhen(atext, fb, merged)) {
-        if (st.lang == frame::SrcLang::Es) gtraceTMP("frontedWhen", atext);
         s = std::move(merged);
         whenRepaired = true;
       }
@@ -2084,7 +2137,6 @@ struct GreekPath::Impl {
         whenRepaired = true;
         repairWhat = "\"-ing phrase, clause\" analysed in two parts (participle + main clause): check it";
       } else if (!whenRepaired && soThat(atext, fb, s, es, merged)) {
-        if (es) gtraceTMP("soThat", atext);
         s = std::move(merged);
         whenRepaired = true;
         repairWhat = "\"so ... that\" analysed in two parts (main clause + result clause): check it";
@@ -2097,39 +2149,34 @@ struct GreekPath::Impl {
         whenRepaired = true;
         repairWhat = "a wh question analysed from its auxiliary on (yes / no question + the wh word): check it";
       } else if (!whenRepaired && es && nadaVerb(atext, fb, s, merged)) {   // C25
-        gtraceTMP("nadaVerb", atext);
         s = std::move(merged);
         whenRepaired = true;
         repairWhat = "\"nada\" read as \"nothing\" in a sentence without a verb: read as the verb nadar: check it";
       } else if (!whenRepaired && es && familyFirst(atext, fb, s, merged)) {   // C31
-        gtraceTMP("familyFirst", atext);
         s = std::move(merged);
         whenRepaired = true;
         repairWhat = "\"papá / mamá\" read as a verb at the start: analysed again as the subject: check it";
       } else if (!whenRepaired && es && estarFragment(atext, fb, s, merged)) {   // C25
-        gtraceTMP("estarFragment", atext);
         s = std::move(merged);
         whenRepaired = true;
         repairWhat = "a subject with \"estar / ser\" read as a fragment: the verb phrase analysed alone: check it";
       }
     }
     // C31: Spanish clauses joined by a comma read as a time clause ("¡No corras, te vas a caer!" -> ὅτε οὐ τρέχεις)
-    if (esCommaGar(s)) gtraceTMP("esCommaGar", atext);
+    esUnits35(s);    // C35
+    esCommaGar(s);   // C35
     if (esParataxis(s)) {
-      gtraceTMP("esParataxis", atext);
       if (!whenRepaired) repairWhat = "two clauses joined by a comma read as a time clause: coordinated: check it";
       whenRepaired = true;
     }
-    if (timeAttribute(s) && st.lang == frame::SrcLang::Es) gtraceTMP("timeAttribute", atext);   // C33: a fixed reading of a bare time word, not a guess (no flag)
+    timeAttribute(s);   // C33: a fixed reading of a bare time word, not a guess (no flag)
     // C33: "al atardecer / al amanecer" read as a verb clause: the time phrase (a rebuilt structure: Check)
     if (timeInfinitive(s)) {
-      gtraceTMP("timeInfinitive", atext);
       if (!whenRepaired) repairWhat = "\"al atardecer / al amanecer\" read as a verb: analysed again as a time phrase: check it";
       whenRepaired = true;
     }
     // C31: the article and the adjectives of a noun hung on the verb ("The old king died." -> βασιλεὺς ἀπέθανεν)
     if ((whenRepaired || !frame::FrameBuilder::troubled(s)) && lostModifiers(s)) {
-      if (st.lang == frame::SrcLang::Es) gtraceTMP("lostModifiers", atext);
       if (!whenRepaired) repairWhat = "an article or adjective the parser hung on the verb given back to its noun: check it";
       whenRepaired = true;
     }
@@ -2463,6 +2510,15 @@ struct GreekPath::Impl {
     for (const transfer::Choice& c : so.choices)
       if (c.kind == "sense" && c.candidates.size() > 1) so.minMargin = std::min(so.minMargin, c.margin);
     mem.prevFirst = mem.sawFirst;
+    // C35: a Spanish question put to "you" (a 2nd-person subject): the reply after it may speak as "I" / to ustedes
+    {
+      bool you = false;
+      if (st.lang == frame::SrcLang::Es && s.finalPunct.find('?') != std::string::npos)
+        for (const frame::Unit& u : s.units)
+          you = you || (u.type == frame::Unit::Clause && !u.vocative && u.frame.hasSubject && u.frame.subject.isPronoun &&
+                        u.frame.subject.pron.person == 2);
+      mem.askedYou = you;
+    }
     if (alternatives) {
       const transfer::Choice* amb = nullptr;
       for (const transfer::Choice& c : so.choices)

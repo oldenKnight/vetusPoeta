@@ -269,7 +269,8 @@ void GreekRealiser::adjWord(const GrcAdj& ad, const Agree& a, const char* rule, 
     std::string f;
     w.lemma = ad.lemma;
     w.rule = rule;
-    if (participle(lx_, ad.lemma, Present, ad.voice ? ad.voice : (uint8_t)Active, a.case_ ? a.case_ : (uint8_t)Nom,
+    if (participle(lx_, ad.lemma, ad.tense ? ad.tense : (uint8_t)Present, ad.voice ? ad.voice : (uint8_t)Active,
+                   a.case_ ? a.case_ : (uint8_t)Nom,
                    a.number, a.gender ? a.gender : (uint8_t)M, f, &gi)) {
       w.form = f;
       w.packed = gi.packed;
@@ -377,6 +378,9 @@ void GreekRealiser::np(const GrcNP& n, uint8_t case_, bool afterPrep, bool predi
     GWord w;
     pronounWord(n, case_, afterPrep, w);
     out.push_back(std::move(w));
+    // C35: a predicative adjective of a pronoun ("la deja abierta" -> αὐτὴν ἀνεῳγμένην καταλείπει)
+    for (const GrcAdj& ad : n.adjectives)
+      if (ad.predicative) adjWord(ad, a, "order.adj.pred", out);
   } else {
     const bool voc = case_ == Voc;
     const bool definite = (n.definite || n.dem != Demonstrative::None || n.possEmphatic) && !voc &&
@@ -407,10 +411,13 @@ void GreekRealiser::np(const GrcNP& n, uint8_t case_, bool afterPrep, bool predi
     }
     // attributive adjectives: definite -> between article and noun (one) or repeated article after the noun (two+);
     // indefinite -> after the noun, except quantity / negative / interrogative words
-    std::vector<const GrcAdj*> pre, post;
+    std::vector<const GrcAdj*> pre, post, predicative;
     for (const GrcAdj& ad : n.adjectives) {
-      if (beforeNoun(ad.lemma)) pre.push_back(&ad);
-      else if (definite && n.adjectives.size() == 1) pre.push_back(&ad);
+      if (ad.predicative) predicative.push_back(&ad);   // C35: after the noun, outside the article
+      else if (beforeNoun(ad.lemma)) pre.push_back(&ad);
+      else if (definite && n.adjectives.size() - (size_t)std::count_if(n.adjectives.begin(), n.adjectives.end(),
+                                                                      [](const GrcAdj& x) { return x.predicative; }) == 1)
+        pre.push_back(&ad);
       else if (!definite && n.adjFirst) pre.push_back(&ad);
       else post.push_back(&ad);
     }
@@ -455,6 +462,8 @@ void GreekRealiser::np(const GrcNP& n, uint8_t case_, bool afterPrep, bool predi
     }
     if (!n.genFirst)
       for (const GrcNP& g : n.genitive) np(g, Gen, false, false, o, out);
+    for (const GrcAdj* ad : predicative) adjWord(*ad, a, "order.adj.pred", out);
+    for (const GrcNP& ap : n.apposition) np(ap, case_, false, false, o, out);   // C35
     for (const GrcClause& rc : n.relative) {
       Ctx rctx;
       rctx.main = false;
@@ -845,7 +854,7 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
     seq.push_back(kFRONT);
     if (exist || c.verbFirst) addTemplate(tmpl("order.exist", {"CONN", "OBL", "V", "S"}));
     else if (isCopula) addTemplate(tmpl(id, {"VOC", "CONN", "S", "PRED", "NEG", "V"}));
-    else if (impersDei) addTemplate(tmpl(id, {"CONN", "NEG", "V", "S", "O", "OBL", "INF"}));
+    else if (impersDei) addTemplate(tmpl(id, {"CONN", "NEG", "V", "S", "O", "OBL", "ADV", "INF"}));   // C35: ADV with the INF
     else if (impersExesti) addTemplate(tmpl(id, {"CONN", "NEG", "V", "IO", "O", "OBL", "INF"}));
     else if (c.pred.modal != kNone && c.type == ClauseType::Yn && c.ara && c.bias == YnBias::Neutral) {
       // C16 (order.yn.inf): ἆρα + the modal first, the infinitive after the subject and the dative pronoun

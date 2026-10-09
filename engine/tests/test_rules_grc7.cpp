@@ -366,7 +366,7 @@ TEST_CASE("rules-grc7: C31 after the blind check (comma clauses, compound prepos
       {"Tengo hambre, ¿me das pan?", "πεινῶ, ἆρα δίδως μοι ἄρτον;", true},
       {"¡No toques el fuego, te vas a quemar!", "μὴ ἅπτου τοῦ πυρός, καυθήσῃ γάρ!", true},
       // compound prepositions; "por" through a place
-      {"El gato duerme debajo de la cama.", "ἡ γαλῆ ὑπὸ τῇ κοίτῃ καθεύδει.", true},
+      {"El gato duerme debajo de la cama.", "ἡ γαλῆ ὑπὸ τῇ κοίτῃ καθεύδει. | ἡ γαλῆ ὑπὸ τῇ κλίνῃ καθεύδει.", true},   // C35: alternative added (cama -> κλίνη)
       {"La niña se escondió detrás de la puerta.", "ἡ παῖς ὄπισθεν τῆς θύρας ἐκρύψατο.", false},
       {"Comimos después de la cena.", "μετὰ τὸ δεῖπνον ἐφάγομεν.", false},
       {"El niño está cerca de la casa.", "ὁ παῖς ἐγγὺς τοῦ οἴκου ἐστίν.", false},
@@ -375,11 +375,11 @@ TEST_CASE("rules-grc7: C31 after the blind check (comma clauses, compound prepos
       // the aspectual "se"; the doubled clitic le + a X
       {"¿Quién se bebió la leche?", "τίς τὸ γάλα ἔπιεν;", false},   // C35: relaxed (aspectual se: a fixed rule)
       {"El niño se comió el pan.", "ὁ παῖς τὸν ἄρτον ἔφαγεν.", false},   // C35: relaxed (aspectual se)
-      {"El niño le dio una manzana a su madre.", "ὁ παῖς τῇ μητρὶ αὐτοῦ μῆλον ἔδωκεν.", false},   // C35: relaxed (doubled clitic)
+      {"El niño le dio una manzana a su madre.", "ὁ παῖς τῇ μητρὶ αὐτοῦ μῆλον ἔδωκεν. | ὁ παῖς τῇ μητρὶ μῆλον ἔδωκεν.", false},   // C35: alternative added ("su" -> the article)   // C35: relaxed (doubled clitic)
       {"Le escribí una carta a mi abuela.", "τῇ τήθῃ μου ἐπιστολὴν ἔγραψα.", false},   // C35: relaxed (doubled clitic)
       // family words, maestra (feminine), papá / mamá first in the sentence or as an address
       {"Mi maestra es muy buena.", "ἡ διδάσκαλός μου πάνυ ἀγαθή ἐστιν.", false},
-      {"Vamos al mercado con mamá.", "εἰς τὴν ἀγορὰν μετὰ τῆς μάμμης βαίνομεν.", false},
+      {"Vamos al mercado con mamá.", "εἰς τὴν ἀγορὰν μετὰ τῆς μάμμης βαίνομεν. | εἰς τὴν ἀγορὰν μετὰ τῆς μητρὸς βαίνομεν.", false},   // C35: alternative added (mamá -> μήτηρ)
       {"Papá está en el jardín.", "ὁ πατὴρ ἐν τῷ κήπῳ ἐστίν.", true},
       {"Abuela, ¿quieres agua?", "ὦ τήθη, ἆρα βούλει ὕδωρ;", true},
       {"Cuéntanos un cuento, papá.", "λέγε ἡμῖν μῦθον, ὦ πάτερ.", true},

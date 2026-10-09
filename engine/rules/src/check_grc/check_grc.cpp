@@ -752,6 +752,10 @@ struct GreekChecker::Impl {
         for (size_t k = 1; k < subj.size(); ++k)
           for (size_t x = subj[k - 1] + 1; x < subj[k]; ++x)
             if (text::greek_key(grc::ultimaToAcute(T(x))) == "καί") coord = true;
+        // C35: "ἄρτος καὶ γάλα" (a neuter second subject the case test leaves ambiguous): καί right after the subject
+        if (subj.size() == 1 && subj[0] + 2 < e && text::greek_key(grc::ultimaToAcute(T(subj[0] + 1))) == "καί" &&
+            !isVerb[subj[0] + 2])
+          coord = true;
         bool anyAgree = false, allAgree = true;
         size_t bad = subj[0];
         for (size_t j : subj) {

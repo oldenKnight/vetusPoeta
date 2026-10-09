@@ -386,7 +386,7 @@ TEST_CASE("rules-grc8: C33 after the blind check (time words, anywhere, street, 
       {"Mi casa está en esta calle.", "ὁ οἶκός μου ἐν ταύτῃ τῇ ὁδῷ ἐστιν.", false},
       // the subject noun read as the root ("El maestro nos enseñó ..." lost the teacher), the double accusative
       {"La maestra nos enseñó un juego.", "ἡ διδάσκαλος ἡμᾶς παιδιὰν ἐδίδαξεν.", false},   // C35: relaxed (the frame reroots the subject noun since C34; esRootSubject removed)
-      {"Mi padre me enseñó una palabra nueva.", "ὁ πατήρ μού με καινὸν λόγον ἐδίδαξεν.", false},   // C35: relaxed (the frame reroots the subject noun since C34; esRootSubject removed)
+      {"Mi padre me enseñó una palabra nueva.", "ὁ πατήρ μού με καινὸν λόγον ἐδίδαξεν. | ὁ πατήρ μού με καινὴν λέξιν ἐδίδαξεν.", false},   // C35: alternative added (palabra -> λέξις)   // C35: relaxed (the frame reroots the subject noun since C34; esRootSubject removed)
       // the possessive after the address word
       {"¡Ven conmigo, hija mía!", "ἐλθὲ μετὰ ἐμοῦ, ὦ θύγατερ! | ἐλθὲ μετ' ἐμοῦ, ὦ θύγατερ!", true},
       {"¿Dónde estás, hijo mío?", "ποῦ εἶ, ὦ υἱέ;", true},

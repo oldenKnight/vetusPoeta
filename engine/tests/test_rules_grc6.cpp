@@ -225,14 +225,14 @@ TEST_CASE("rules-grc6: C29 constructions (pasts, places, hope, money, addresses,
       {"Ven aquí.", "ἐλθὲ δεῦρο.", false},   // C35: relaxed ("Ven" read by the frame since C34)
       {"Niña, ¿por qué lloras?", "ὦ παῖ, διὰ τί κλαίεις;", false},   // C35: relaxed (leading vocative segment of the frame since C34)
       {"Hijo, ven aquí.", "ὦ υἱέ, ἐλθὲ δεῦρο.", true},
-      {"¿Qué haces, mamá?", "τί ποιεῖς, ὦ μάμμα;", true},
+      {"¿Qué haces, mamá?", "τί ποιεῖς, ὦ μάμμα; | τί ποιεῖς, ὦ μῆτερ;", true},   // C35: alternative added (mamá -> μήτηρ)
       {"¿Qué comes?", "τί ἐσθίεις;", true},
       {"El perro duerme junto al fuego.", "ὁ κύων παρὰ τῷ πυρὶ καθεύδει.", false},
-      {"La niña se sentó junto a su madre.", "ἡ παῖς παρὰ τῇ μητρὶ αὐτῆς ἐκάθητο.", false},
+      {"La niña se sentó junto a su madre.", "ἡ παῖς παρὰ τῇ μητρὶ αὐτῆς ἐκάθητο. | ἡ παῖς παρὰ τῇ μητρὶ ἐκάθητο. | ἡ παῖς παρὰ τῇ μητρὶ ἐκάθισεν. | ἡ παῖς παρὰ τῇ μητρὶ αὐτῆς ἐκάθισεν.", false},   // C35: alternative added ("su" -> the article)
       {"El búho caza de noche.", "ἡ γλαῦξ νύκτωρ διώκει.", true},
       {"El perro ladra.", "ὁ κύων ὑλακτεῖ.", true},
-      {"La reina lloró por su hijo.", "ἡ βασίλεια τὸν υἱὸν αὐτῆς ἔκλαυσεν.", false},
-      {"El niño gastó su dinero.", "ὁ παῖς τὸ ἀργύριον αὐτοῦ ἀνήλωσεν.", false},
+      {"La reina lloró por su hijo.", "ἡ βασίλεια τὸν υἱὸν αὐτῆς ἔκλαυσεν. | ἡ βασίλεια τὸν υἱὸν ἔκλαυσεν.", false},   // C35: alternative added ("su" -> the article)
+      {"El niño gastó su dinero.", "ὁ παῖς τὸ ἀργύριον αὐτοῦ ἀνήλωσεν. | ὁ παῖς τὸ ἀργύριον ἀνήλωσεν.", false},   // C35: alternative added ("su" -> the article)
   };
   const int okEs = run6(*e, es, true, "C29 constructions ES");
   CHECK(okEs == (int)es.size());
