@@ -79,7 +79,11 @@ bool personNoun(const std::string& l) {
                 "marido", "doctor", "doctora", "médico", "soldado", "jardinero", "jardinera", "cocinero", "cocinera",
                 "agricultor", "campesino", "vecino", "vecina", "dios", "diosa", "bebé", "gato", "gata", "perro",
                 "perra", "caballo", "conejo", "pájaro", "ratón", "lobo", "animal", "pez", "todos", "nadie", "alguien",
-                "majestad", "duque", "duquesa", "guardia", "criado", "criada", "sirviente", "esclavo", "esclava"});
+                "majestad", "duque", "duquesa", "guardia", "criado", "criada", "sirviente", "esclavo", "esclava",
+                // C34
+                "abuelita", "abuelito", "vecino", "vecina", "tortuga", "zorro", "cuervo", "oveja", "vaca", "rana",
+                "oso", "león", "gallina", "pato", "burro", "cabra", "mono", "gigante", "bruja", "pastor", "ladrón",
+                "maestros", "niños", "bebé", "primo", "prima"});
 }
 
 bool motionVerb(const std::string& l) {
@@ -172,7 +176,7 @@ bool experiencerVerb(const std::string& l) {
 bool rareLemma(const std::string& l) {
   // homograph lemmas the lexicon lists next to a common verb with the same forms (our own list)
   return in(l, {"dolar", "vetar", "rotar", "profundar", "extrañar", "erar", "rosar", "ere", "pelotar",
-                "rosarse", "crear"});
+                "rosarse", "crear", "distar"});   // C34: "diste" is dar, not distar
 }
 
 std::string multiwordPrep(const std::string& w) {
@@ -254,6 +258,13 @@ bool retagWords(std::vector<Token>& tk, const lex::Lexicon& lex, const curated::
     const bool next = i + 1 < n && (tk[(size_t)i + 1].text == "," || tk[(size_t)i + 1].text == "!" ||
                                     tk[(size_t)i + 1].text == "?" || tk[(size_t)i + 1].text == ".");
     const bool afterComma = i > 0 && tk[(size_t)i - 1].text == ",";
+    // "¿Cómo ...?": the interrogative adverb (the tagger may read a pronoun)
+    if (low == "cómo" && t.upos != "ADV") {
+      t.upos = "ADV";
+      t.feats = 0;
+      changed = true;
+      continue;
+    }
     // "hace tres días", "hace una hora": the time before now ("ago"), a preposition of the time noun, not the verb
     if (in(low, {"hace", "hacía"}) && i + 2 < n &&
         (tk[(size_t)i + 1].upos == "NUM" || in(tk[(size_t)i + 1].lower, {"un", "una", "unos", "unas", "dos", "tres", "mucho",
@@ -315,6 +326,61 @@ bool retagWords(std::vector<Token>& tk, const lex::Lexicon& lex, const curated::
           changed = true;
           continue;
         }
+      }
+    }
+    // "¡Qué flojos!": a word after an exclamatory "qué" that the lexicon reads as an adjective
+    if (t.upos == "NOUN" && i > 0 && tk[(size_t)i - 1].lower == "qué" &&
+        (i + 1 >= n || punct(tk[(size_t)i + 1]) ||   // C34: also before ser ("¡Qué alta es la torre!")
+         in(tk[(size_t)i + 1].lower, {"es", "era", "son", "eran", "está", "estaba", "están", "fue"}))) {
+      std::vector<lex::Analysis> an;
+      lex.lookup(text::es_key(low), an);
+      bool adj = false;
+      for (const lex::Analysis& a : an) adj = adj || lex.lemma(a.lemma).pos == feat::Adj;
+      if (adj) {
+        t.upos = "ADJ";
+        t.feats = 0;
+        changed = true;
+        continue;
+      }
+    }
+    // "Ya es tarde.", "Es temprano.": the time of day said of the situation (the impersonal predicate), not the noun
+    // "tarde" (afternoon)
+    if (in(low, {"tarde", "temprano"}) && t.upos != "ADJ" && i > 0 &&
+        in(tk[(size_t)i - 1].lower, {"es", "era", "será", "fue", "muy", "demasiado", "tan", "más"}) &&
+        (i + 1 >= n || punct(tk[(size_t)i + 1]))) {
+      t.upos = "ADJ";
+      t.feats = 0;
+      changed = true;
+      continue;
+    }
+    // "La extraño mucho.": a clitic at the start before a 1st-person verb form tagged as an adjective
+    if (i == 1 && t.upos == "ADJ" && in(tk[0].lower, {"lo", "la", "los", "las"}) &&
+        (i + 1 >= n || tk[(size_t)i + 1].upos != "NOUN")) {
+      std::vector<VerbReading> vr;
+      verbReadings(lex, low, vr);
+      bool done = false;
+      for (const VerbReading& r : vr)
+        if (finite(r) && r.mood == feat::Indicative && r.person == 1) {
+          t.upos = "VERB";
+          t.feats = featsOf(r);
+          tk[0].upos = "PRON";
+          tk[0].feats = 0;
+          changed = true;
+          done = true;
+          break;
+        }
+      if (done) continue;
+    }
+    // "de la vecina": an adjective-tagged word after an article that ends its noun phrase is the noun the lexicon has
+    if (t.upos == "ADJ" && i > 0 && in(tk[(size_t)i - 1].lower, {"la", "el", "los", "las", "un", "una", "mi", "su", "tu"}) &&
+        tk[(size_t)i - 1].upos == "DET" && (i + 1 >= n || punct(tk[(size_t)i + 1]) || tk[(size_t)i + 1].upos == "VERB" ||
+                                            tk[(size_t)i + 1].upos == "AUX" || tk[(size_t)i + 1].upos == "ADP" ||
+                                            tk[(size_t)i + 1].upos == "ADV")) {   // "el cuarto antes de ..." 
+      bool plural = false;
+      if ((nounReading(lex, low, &plural) || personNoun(mascSingular(low))) &&
+          !(i >= 2 && tk[(size_t)i - 2].upos == "NOUN")) {   // "vecina": the noun of "vecino" for a woman
+        setNoun(t, "NOUN", plural);
+        continue;
       }
     }
     // "la vi": a clitic tagged as an article before a 1st-person preterite tagged as a noun
@@ -415,6 +481,14 @@ bool retag(std::vector<Token>& tk, const lex::Lexicon& lex, const curated::Curat
       }
     }
     if (t.upos == "VERB" || t.upos == "AUX") {
+      // C34: the readings of a rare homograph lemma ("diste" of distar beside dar) do not count when another lemma reads
+      // the form
+      {
+        bool common = false;
+        for (const VerbReading& r : vr) common = common || (finite(r) && !rareLemma(r.lemma));
+        if (common)
+          vr.erase(std::remove_if(vr.begin(), vr.end(), [](const VerbReading& r) { return rareLemma(r.lemma); }), vr.end());
+      }
       // features the tagger left out or got wrong, from the lexicon when its readings agree
       std::vector<uint8_t> tenses, moods;
       uint8_t p0 = 0, n0 = 0;
@@ -447,7 +521,10 @@ bool retag(std::vector<Token>& tk, const lex::Lexicon& lex, const curated::Curat
       // C34: the lexicon's one person / number wins over the tagger's ("¿Dormiste bien?", "¿Qué hiciste?": 2nd
       // singular, not 3rd)
       const uint32_t tp = nlp::morph::get(t.feats, nlp::morph::PersonShift);
-      if (onePn && p0 && tp && tp != p0 && !(tenses.empty() && moods.size() == 1 && moods[0] == feat::Imperative)) {
+      const uint32_t tn = nlp::morph::get(t.feats, nlp::morph::NumberShift);
+      const bool numberDiffers = n0 && tn && (tn == nlp::morph::NumPlur) != (n0 == feat::Pl);   // "vengas" is singular
+      if (onePn && p0 && tp && (tp != p0 || numberDiffers) &&
+          !(tenses.empty() && moods.size() == 1 && moods[0] == feat::Imperative)) {
         t.feats = setFeat(t.feats, nlp::morph::PersonShift, p0);
         if (n0) t.feats = setFeat(t.feats, nlp::morph::NumberShift, n0 == feat::Pl ? nlp::morph::NumPlur : nlp::morph::NumSing);
       }
@@ -602,6 +679,67 @@ void normalise(SemSentence& s, const lex::Lexicon* lex, const curated::CuratedDa
       }
     }
   }
+  // ---- C34: exclamations "¡Qué + adjective ...!": "¡Qué bonito cuento!" (the noun heads, quam + adjective + noun),
+  // "¡Qué grande era el mar!" (the adjective is the predicate of ser: quam magnum erat mare), "¡Qué flojos!" ---------
+  bool exclamation = false;
+  {
+    int q = 0;
+    while (q < n && (tk[(size_t)q].text == "\xC2\xA1" || punct(tk[(size_t)q]))) ++q;
+    if (q + 1 < n && tk[(size_t)q].lower == "qué" && tk[(size_t)q + 1].upos == "ADJ") {
+      const int adj = q + 1;
+      int end = adj + 1;   // the exclamation runs to the first comma / the end
+      while (end < n && !punct(tk[(size_t)end])) ++end;
+      auto hangAll = [&](int root, int from, int to) {
+        for (int k = from; k < to; ++k)
+          if (k != root && (T.head(k) < from || T.head(k) >= to || T.head(k) == k)) T.setHead(k, root);
+      };
+      if (adj + 1 < end && tk[(size_t)adj + 1].upos == "NOUN") {   // qué + adjective + noun
+        const int noun = adj + 1;
+        hangAll(noun, 0, end);
+        T.setHead(noun, -1);
+        tk[(size_t)noun].deprel = "root";
+        tk[(size_t)adj].deprel = "amod";
+        T.setHead(adj, noun);
+        tk[(size_t)q].deprel = "det";
+        tk[(size_t)q].upos = "DET";
+        T.setHead(q, noun);
+        for (int k = 0; k < q; ++k) { T.setHead(k, noun); tk[(size_t)k].deprel = "punct"; }
+        exclamation = true;
+      } else if (adj + 1 < end && T.verb(adj + 1) && in(text::lower(tk[(size_t)adj + 1].lemma), {"ser", "estar"})) {
+        hangAll(adj, 0, end);
+        T.setHead(adj, -1);
+        tk[(size_t)adj].deprel = "root";
+        tk[(size_t)adj + 1].deprel = "cop";
+        tk[(size_t)adj + 1].upos = "AUX";
+        T.setHead(adj + 1, adj);
+        tk[(size_t)q].deprel = "advmod";
+        tk[(size_t)q].upos = "ADV";
+        tk[(size_t)q].lower = "how";   // the clause builder's exclamatory "how" (quam)
+        T.setHead(q, adj);
+        for (int k = adj + 2; k < end; ++k)
+          if (tk[(size_t)k].upos == "NOUN" || tk[(size_t)k].upos == "PROPN") {
+            tk[(size_t)k].deprel = "nsubj";
+            T.setHead(k, adj);
+            for (int d = adj + 2; d < k; ++d) { T.setHead(d, k); tk[(size_t)d].deprel = "det"; }
+            break;
+          }
+        for (int k = 0; k < q; ++k) { T.setHead(k, adj); tk[(size_t)k].deprel = "punct"; }
+        exclamation = true;
+      } else if (adj + 1 == end) {   // "¡Qué flojos!"
+        hangAll(adj, 0, end);
+        T.setHead(adj, -1);
+        tk[(size_t)adj].deprel = "root";
+        tk[(size_t)q].deprel = "advmod";
+        tk[(size_t)q].upos = "ADV";
+        tk[(size_t)q].lower = "how";   // the clause builder's exclamatory "how" (quam)
+        T.setHead(q, adj);
+        exclamation = true;
+      }
+    }
+  }
+  // ---- C34: "tarde" / "temprano" read as the impersonal predicate keep their own lemma (not tardar) ---------------
+  for (int i = 0; i < n; ++i)
+    if (tk[(size_t)i].upos == "ADJ" && in(tk[(size_t)i].lower, {"tarde", "temprano"})) tk[(size_t)i].lemma = tk[(size_t)i].lower;
   // ---- C34: a trailing word of address after a comma ("Te lo juro, mamá.", "¿Te gustó, Pablito?", "¿Dónde estabas,
   // hija?"): a vocative of its own (its own root: the unit builder makes it the address), never an argument of the
   // clause; when the parser had made it one, the reading is rebuilt (doubt "addressee-guess": Check) -------------------------
@@ -612,8 +750,14 @@ void normalise(SemSentence& s, const lex::Lexicon* lex, const curated::CuratedDa
     for (int k = last; k > 0 && comma < 0; --k)
       if (tk[(size_t)k].text == ",") comma = k;
       else if (punct(tk[(size_t)k]) && tk[(size_t)k].text != "\xC2\xBF" && tk[(size_t)k].text != "\xC2\xA1") break;
-    bool verbBefore = false;
+    bool verbBefore = exclamation;   // C34: also after a "¡Qué ...!" exclamation ("¡Qué bonito cuento, abuelita!")
     for (int k = 0; k < comma; ++k) verbBefore = verbBefore || T.verb(k);
+    {   // ... and after a pronoun called out alone ("¡Yo, maestra!": ego, the answer to "who?")
+      int w = 0;
+      while (w < comma && punct(tk[(size_t)w])) ++w;
+      if (w + 1 == comma && tk[(size_t)w].upos == "PRON" && in(tk[(size_t)w].lower, {"yo", "tú", "nosotros", "nosotras"}))
+        verbBefore = true;
+    }
     if (comma > 0 && last > comma && last - comma <= 3 && verbBefore) {
       const int a = comma + 1;
       bool span = true, poss = false;
@@ -623,7 +767,14 @@ void normalise(SemSentence& s, const lex::Lexicon* lex, const curated::CuratedDa
       }
       const Token& h = tk[(size_t)last];
       const std::string hl = text::lower(h.lemma.empty() ? h.lower : h.lemma);
-      const bool address = h.upos == "PROPN" || addressNoun(h.lower) || addressNoun(hl) ||
+      // a diminutive called out after a question or an order ("¿A dónde vas, tortuguita?")
+      bool second = false;
+      for (int k = 0; k < comma; ++k)
+        second = second || (T.verb(k) && (fget(tk[(size_t)k], nlp::morph::PersonShift) == nlp::morph::Pers2 ||
+                                          fget(tk[(size_t)k], nlp::morph::MoodShift) == nlp::morph::MoodImp));
+      const bool dimAddress = lex && second && last + 1 < n && (tk[(size_t)last + 1].text == "?" || tk[(size_t)last + 1].text == "!") &&
+                              !diminutiveBase(*lex, h.lower).empty();
+      const bool address = h.upos == "PROPN" || addressNoun(h.lower) || addressNoun(hl) || dimAddress ||
                            (poss && h.upos == "NOUN") || in(h.lower, {"vida", "amor", "cielo", "corazón"});
       // "Vi a Pedro, mi amigo.": a possessed noun right after a noun is an apposition
       const bool appos = poss && (tk[(size_t)comma - 1].upos == "NOUN" || tk[(size_t)comma - 1].upos == "PROPN");
@@ -636,6 +787,9 @@ void normalise(SemSentence& s, const lex::Lexicon* lex, const curated::CuratedDa
           int v = -1;
           for (int k = 0; k < comma; ++k)
             if (T.verb(k) && (v < 0 || T.head(k) == last)) v = k;
+          if (v < 0)   // no verb: the first word before the comma heads its part ("¡Yo, maestra!")
+            for (int k = 0; k < comma && v < 0; ++k)
+              if (!punct(tk[(size_t)k])) v = k;
           if (v >= 0) {
             T.setHead(v, -1);
             tk[(size_t)v].deprel = "root";
@@ -681,6 +835,41 @@ void normalise(SemSentence& s, const lex::Lexicon* lex, const curated::CuratedDa
     vt.deprel = "cop";
     vt.upos = "AUX";
   }
+  // ---- C34: an adjective with ser / estar hung as its "aux" ("La niña está escondida detrás del árbol."): the copula
+  for (int k = 0; k < n; ++k) {
+    if (tk[(size_t)k].upos != "ADJ") continue;
+    for (int q = 0; q < k; ++q)
+      if (T.head(q) == k && tk[(size_t)q].deprel == "aux" && in(text::lower(tk[(size_t)q].lemma), {"estar", "ser"}))
+        tk[(size_t)q].deprel = "cop";
+  }
+  // ---- C34: "Fuimos a ver a la abuela.": the person after a purpose infinitive of a motion verb is the infinitive's
+  // object (the personal "a"), not where one goes ----------------------------------------------------------------------
+  for (int x = 0; x < n; ++x) {
+    if (!T.verb(x) || fget(tk[(size_t)x], nlp::morph::VerbFormShift) != nlp::morph::VfInf) continue;
+    const int v = T.head(x);
+    if (!T.verb(v) || !motionVerb(text::lower(tk[(size_t)v].lemma)) ||
+        !in(text::lower(tk[(size_t)x].lemma), {"ver", "visitar", "buscar", "ayudar", "saludar", "llamar", "conocer", "despertar"}))
+      continue;
+    bool aMark = false, hasObj = false;
+    for (int q = 0; q < n; ++q) {
+      if (T.head(q) != x) continue;
+      aMark = aMark || (q < x && tk[(size_t)q].lower == "a");
+      hasObj = hasObj || tk[(size_t)q].deprel == "obj";
+    }
+    if (!aMark || hasObj) continue;
+    for (int k = x + 1; k < n; ++k) {
+      if (T.head(k) != v || (tk[(size_t)k].upos != "NOUN" && tk[(size_t)k].upos != "PROPN")) continue;
+      int cs = -1;
+      for (int q = x + 1; q < k; ++q)
+        if (T.head(q) == k && tk[(size_t)q].lower == "a") cs = q;
+      const std::string kl = text::lower(tk[(size_t)k].lemma);
+      if (cs < 0 || !(tk[(size_t)k].upos == "PROPN" || personNoun(kl) || addressNoun(kl))) continue;
+      T.setHead(k, x);
+      tk[(size_t)k].deprel = "obj";
+      tk[(size_t)cs].deprel = "mark:a";
+      break;
+    }
+  }
   // ---- C34: "está escondido", "está dormido": estar + a participle that states_es_la.tsv lists as a state is the
   // copula and that adjective (the state, not the resultant passive) ------------------------------------------------
   for (int k = 0; k < n; ++k) {
@@ -694,18 +883,6 @@ void normalise(SemSentence& s, const lex::Lexicon* lex, const curated::CuratedDa
         t.feats = 0;
         t.lemma = mascSingular(t.lower);
       }
-  }
-  // ---- C34: a noun with its own preposition is never the object ("escondido debajo de la cama": cama is the place) --
-  for (int k = 0; k < n; ++k) {
-    Token& t = tk[(size_t)k];
-    if ((t.upos != "NOUN" && t.upos != "PROPN") || (t.deprel != "obj" && t.deprel != "nsubj")) continue;
-    bool prep = false;
-    for (int q = 0; q < k; ++q)
-      if (T.head(q) == k && tk[(size_t)q].deprel == "case" && tk[(size_t)q].upos == "ADP" &&
-          (!multiwordPrep(tk[(size_t)q].lower).empty() ||
-           in(tk[(size_t)q].lower, {"en", "sobre", "bajo", "entre", "tras", "hacia", "desde", "hasta"})))
-        prep = true;   // a place ("debajo de la cama"); "llorar por su hijo" keeps its object
-    if (prep && T.head(k) >= 0) t.deprel = "obl";
   }
   // ---- C34: "tener que" / "hay que" + infinitive: the infinitive is the complement of tener / haber, "que" its marker
   // (the parser may coordinate them: "tienen que lavarse las manos") ------------------------------------------------
@@ -723,6 +900,40 @@ void normalise(SemSentence& s, const lex::Lexicon* lex, const curated::CuratedDa
     T.setHead(i + 1, x);
     tk[(size_t)i + 1].deprel = "mark";
   }
+  // ---- C34: "Ya nos lavamos las manos.": a 1st plural in -amos / -imos is present and preterite alike; "ya", "ayer",
+  // "anoche" with it say the preterite (lāvimus) ------------------------------------------------------------------------
+  if (lex)
+    for (int v = 0; v < n; ++v) {
+      Token& t = tk[(size_t)v];
+      if (!T.verb(v) || t.lower.size() < 6) continue;
+      const std::string e4 = t.lower.substr(t.lower.size() - 4);
+      if (e4 != "amos" && e4 != "imos") continue;
+      bool past = false;
+      for (int k = 0; k < n; ++k)
+        if (T.head(k) == v && in(tk[(size_t)k].lower, {"ya", "ayer", "anoche", "anteayer"})) past = true;
+      if (!past) {
+        // C34: without such a word the ambiguous form is the present ("Vivimos en un pueblo pequeño.")
+        if (fget(t, nlp::morph::TenseShift) == nlp::morph::TensePast) {
+          std::vector<VerbReading> vr;
+          verbReadings(*lex, t.lower, vr);
+          bool pres = false;
+          for (const VerbReading& r : vr) pres = pres || (r.mood == feat::Indicative && r.tense == feat::Present && r.person == 1);
+          bool timeWord = false;
+          for (int k = 0; k < n; ++k)
+            timeWord = timeWord || in(tk[(size_t)k].lower, {"ayer", "anoche", "antes", "entonces", "luego", "después",
+                                                            "vez", "pasado", "pasada", "cuando"});
+          if (pres && !timeWord) t.feats = setFeat(t.feats, nlp::morph::TenseShift, nlp::morph::TensePres);
+        }
+        continue;
+      }
+      std::vector<VerbReading> vr;
+      verbReadings(*lex, t.lower, vr);
+      for (const VerbReading& r : vr)
+        if (r.mood == feat::Indicative && r.tense == feat::Perfect && r.person == 1) {
+          t.feats = setFeat(t.feats, nlp::morph::TenseShift, nlp::morph::TensePast);
+          break;
+        }
+    }
   // ---- C34: a sentence-initial coordinator the parser hung as an adverb ("Pero Pablo seguía hablando.", "Pero la
   // tortuguita no tenía miedo."): the clause's connector (sed) ------------------------------------------------------
   for (int i = 0; i < n; ++i) {
@@ -885,6 +1096,61 @@ void normalise(SemSentence& s, const lex::Lexicon* lex, const curated::CuratedDa
     T.setHead(i + 2, p);
     tk[(size_t)i + 2].deprel = "fixed";
   }
+  // ---- C34: a noun with its own preposition is never the object ("escondido debajo de la cama": cama is the place) --
+  for (int k = 0; k < n; ++k) {
+    Token& t = tk[(size_t)k];
+    if ((t.upos != "NOUN" && t.upos != "PROPN") || t.deprel != "obj") continue;
+    bool prep = false;
+    for (int q = 0; q < k; ++q)
+      if (T.head(q) == k && tk[(size_t)q].deprel == "case" && tk[(size_t)q].upos == "ADP" &&
+          (!multiwordPrep(tk[(size_t)q].lower).empty() ||
+           in(tk[(size_t)q].lower, {"en", "sobre", "bajo", "entre", "tras", "hacia", "desde", "hasta"})))
+        prep = true;   // a place ("debajo de la cama"); "llorar por su hijo" keeps its object
+    if (prep && T.head(k) >= 0) t.deprel = "obl";
+  }
+  // ---- C34: "Su mamá la estaba esperando.": a noun the parser made the root with the clause's verb as its acl (the
+  // verb has an auxiliary or a clitic object and no subject): the verb is the root, the noun its subject -----------
+  {
+    const int r = T.root();
+    if (r >= 0 && (tk[(size_t)r].upos == "NOUN" || tk[(size_t)r].upos == "PROPN"))
+      for (int v = r + 1; v < n; ++v) {
+        if (!T.verb(v) || T.head(v) != r || tk[(size_t)v].deprel != "acl") continue;
+        bool marker = false, subj = false;   // a relative ("que") keeps the acl
+        for (int k = 0; k < n; ++k)
+          if (T.head(k) == v) {
+            marker = marker || in(tk[(size_t)k].lower, {"que", "quien", "donde", "cual"});
+            subj = subj || tk[(size_t)k].deprel == "nsubj";
+          }
+        bool auxOrClitic = false;
+        for (int k = r + 1; k < v; ++k)
+          auxOrClitic = auxOrClitic || (T.head(k) == v && (tk[(size_t)k].deprel == "aux" || tk[(size_t)k].upos == "PRON"));
+        if (marker || subj || !auxOrClitic) continue;
+        T.setHead(v, -1);
+        tk[(size_t)v].deprel = "root";
+        T.setHead(r, v);
+        tk[(size_t)r].deprel = "nsubj";
+        for (int k = 0; k < n; ++k)
+          if (k != v && T.head(k) == r && (punct(tk[(size_t)k]) && k > v)) T.setHead(k, v);
+        s.repairs.emplace_back("reroot");   // a rebuilt structure (Check), as the C13 / C15 repairs
+        break;
+      }
+  }
+  // ---- C34: an interrogative adverb the parser hung as an oblique ("¿Cómo se dice esto?") ------------------------
+  for (int k = 0; k < n; ++k)
+    if (tk[(size_t)k].upos == "ADV" && in(tk[(size_t)k].lower, {"cómo", "dónde", "cuándo", "adónde"}) &&
+        in(tk[(size_t)k].deprel, {"obl", "nmod", "obj"}))
+      tk[(size_t)k].deprel = "advmod";
+  // ---- C34: "Se dice que ...": the que-clause the parser made a clausal subject is the complement of the verb of
+  // saying ----------------------------------------------------------------------------------------------------------------
+  for (int k = 0; k < n; ++k) {
+    if (tk[(size_t)k].deprel != "csubj") continue;
+    const int v = T.head(k);
+    if (!T.verb(v) || !in(text::lower(tk[(size_t)v].lemma), {"decir", "contar", "creer", "saber", "pensar", "esperar", "temer"}))
+      continue;
+    bool que = false;
+    for (int q = 0; q < k; ++q) que = que || (T.head(q) == k && tk[(size_t)q].lower == "que");
+    if (que) tk[(size_t)k].deprel = "ccomp";
+  }
   // ---- clitic pronouns -> arguments, or the particle "se" of a pronominal verb ------------------------------------------
   for (int i = 0; i < n; ++i) {
     Token& c = tk[(size_t)i];
@@ -919,7 +1185,8 @@ void normalise(SemSentence& s, const lex::Lexicon* lex, const curated::CuratedDa
     const std::string lemma = text::lower(tk[(size_t)main].lemma);
     bool coref = false;
     if (ce->role != "acc" && ce->role != "dat") {
-      if (c.lower == "se") coref = !vp || vp == 3;   // also the ustedes imperative ("inclínense")
+      if (c.lower == "se") coref = !vp || vp == 3 ||   // also the ustedes imperative ("inclínense")
+                                   (fin >= 0 && fget(tk[(size_t)fin], nlp::morph::MoodShift) == nlp::morph::MoodImp);   // C34: "Siéntense" (lexicon: 2nd plural)
       else coref = vp == ce->person && (!vn || !ce->number ||
                                         (ce->number == 2) == (vn == nlp::morph::NumPlur));
     }
@@ -938,7 +1205,8 @@ void normalise(SemSentence& s, const lex::Lexicon* lex, const curated::CuratedDa
             if (tk[(size_t)k].deprel == "nsubj") subj = k;
             if (tk[(size_t)k].deprel == "obj") obj = k;
           }
-        if (subj >= 0 && tk[(size_t)subj].upos == "NOUN" && !personNoun(text::lower(tk[(size_t)subj].lemma)))
+        if (subj >= 0 && ((tk[(size_t)subj].upos == "NOUN" && !personNoun(text::lower(tk[(size_t)subj].lemma))) ||
+                          in(tk[(size_t)subj].lower, {"esto", "eso", "aquello"})))   // C34: "¿Cómo se dice esto?"
           rel = "expl:pass";
         else if (subj < 0 && obj < 0 && vp == 3 && vn != nlp::morph::NumPlur && !intransitiveVerb(lemma))
           rel = "expl:impers";
@@ -953,6 +1221,7 @@ void normalise(SemSentence& s, const lex::Lexicon* lex, const curated::CuratedDa
       rel = "obj";
     } else if (ce->role == "dat" || seLo) {
       rel = "iobj";
+      if (seLo) { c.lower = "le"; c.lemma = "le"; }   // C34: "se lo voy a decir" -> eī dīcam (se = le), not sibi
     } else {
       bool otherObj = false;
       for (int k = 0; k < n; ++k) {
@@ -984,12 +1253,17 @@ void normalise(SemSentence& s, const lex::Lexicon* lex, const curated::CuratedDa
     const int v = T.head(h);
     if (!T.verb(v)) continue;
     const std::string vl = text::lower(tk[(size_t)v].lemma);
-    const bool person = np.upos == "PROPN" || personNoun(text::lower(np.lemma)) ||
+    const std::string npl = text::lower(np.lemma);
+    const bool person = np.upos == "PROPN" || personNoun(npl) ||
+                        (lex && personNoun(diminutiveBase(*lex, npl))) ||   // C34: "a un conejito"
+                        addressNoun(npl) ||
                         (np.upos == "PRON" && in(np.lower, {"él", "ella", "ellos", "ellas", "usted", "ustedes", "mí",
                                                             "ti", "nosotros", "nosotras", "todos", "nadie", "alguien",
                                                             "quién"}));
     const curated::VerbPrepEntry* vpe = cd.verbPrep(vl, "to");
-    if (!person || motionVerb(vl) || dativeVerb(vl) || (vpe && vpe->frame != "obj")) continue;
+    // C34: llevar / traer a person or an animal ("¿Puedo llevar a mi perrito?") carry it: the object
+    const bool carry = in(vl, {"llevar", "traer"});
+    if (!person || (motionVerb(vl) && !carry) || dativeVerb(vl) || (vpe && vpe->frame != "obj")) continue;
     bool otherObj = false;
     for (int k = 0; k < n; ++k)
       if (k != h && T.head(k) == v && tk[(size_t)k].deprel == "obj") otherObj = true;
@@ -997,7 +1271,6 @@ void normalise(SemSentence& s, const lex::Lexicon* lex, const curated::CuratedDa
     tk[(size_t)h].deprel = "obj";
     tk[(size_t)i].deprel = "mark:a";   // the personal "a" is no preposition
   }
-  (void)lex;
 }
 
 }  // namespace vp::frame::es

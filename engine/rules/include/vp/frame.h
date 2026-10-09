@@ -286,6 +286,9 @@ class FrameBuilder {
   std::string lemmaOf(const nlp::Token& t) const;
   const Phrasebook& phrasebook() const { return book_; }
   SrcLang lang() const { return lang_; }
+  // C34: Spanish main clauses joined by a comma ("Camina rápido, ya es tarde.") are parsed apart, one unit each. Off by
+  // default; the Latin engine turns it on (the Greek engine reads such sentences with its own repair, which adds γάρ).
+  void setCommaClauses(bool on) { commaClauses_ = on; }
 
  private:
   struct Ctx;
@@ -302,6 +305,7 @@ class FrameBuilder {
   const lex::Lexicon* lex_;
   const curated::CuratedData& cd_;
   Phrasebook book_;
+  bool commaClauses_ = false;   // C34
   std::vector<std::pair<std::string, std::vector<std::string>>> contractions_;   // sorted by form
 };
 

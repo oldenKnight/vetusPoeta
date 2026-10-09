@@ -211,3 +211,5 @@ un ratito	paulisper	1	adv	C34: es-MX "espérense un ratito"
 todo el día	tōtum diem	1	adv	C34: accusative of duration (as "all day long")
 toda la noche	tōtam noctem	1	adv	C34
 toda la tarde	tōtum vesperum	1	adv	C34
+ahí|allí|aquí viene {NP}	ecce {1:nom} venit	1	excl	C34: "¡Ahí viene el gigante!" -> ecce gigās venit (someone arriving)
+ahí|allí|aquí vienen {NP}	ecce {1:nom} veniunt	1	excl	C34

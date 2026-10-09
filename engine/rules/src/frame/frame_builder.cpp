@@ -110,7 +110,7 @@ std::string canonPrep(SrcLang lang, const std::string& w) {
       {"debajo de", "under"}, {"detrás de", "behind"}, {"delante de", "in front of"}, {"cerca de", "near"},
       {"junto a", "beside"}, {"junto de", "beside"}, {"al lado de", "beside"}, {"encima de", "on"}, {"dentro de", "inside"},
       {"fuera de", "out of"}, {"lejos de", "far from"}, {"alrededor de", "around"}, {"a través de", "through"},
-      {"frente a", "in front of"}, {"enfrente de", "in front of"},
+      {"frente a", "in front of"}, {"enfrente de", "in front of"}, {"antes de", "before"}, {"después de", "after"},
       {"a", "to"},         {"en", "in"},          {"de", "of"},         {"con", "with"},     {"sin", "without"},
       {"por", "by"},       {"para", "for"},       {"desde", "from"},    {"hasta", "until"},  {"sobre", "on"},
       {"bajo", "under"},   {"entre", "between"},  {"contra", "against"}, {"hacia", "toward"}, {"tras", "after"},
@@ -1160,7 +1160,7 @@ std::string FrameBuilder::lemmaOf(const Token& t) const {
       const std::string h = text::lower(lex_->lemma(a.lemma).head);
       if (lex_->lemma(a.lemma).pos == feat::Verb && h.size() > 4 && h.compare(h.size() - 2, 2, "se") == 0) sc -= 1;
       if (esAdjLemma && lex_->lemma(a.lemma).pos != feat::Adj) sc -= 3;
-      if (es::rareLemma(h)) sc -= 1;   // "duele" is doler, not dolar (hew)
+      if (es::rareLemma(h)) sc -= 3;   // "duele" is doler, not dolar (hew); C34: "diste" is dar (was -1)
     }
     return sc;
   };
@@ -1860,7 +1860,8 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
     }
     // C22: "Edwin and Paul, the Dukes of Rome, fought ...", "Robert, the Bishop of London, agreed ...": a definite
     // noun phrase after a comma without its own conjunction is an apposition, not a further conjunct
-    if (en && (d == "appos" || d == "conj") && (kt.upos == "NOUN" || kt.upos == "PROPN") && k > h) {
+    if ((en || (d == "appos" && kt.upos == "PROPN")) &&   // C34: Spanish "mi amiga Lucía" (a name in apposition)
+        (d == "appos" || d == "conj") && (kt.upos == "NOUN" || kt.upos == "PROPN") && k > h) {
       bool the = false, cc = false, commaKid = false;
       int first = k;
       for (int x : c.kids[(size_t)k]) {
@@ -2125,8 +2126,9 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
   // C17: the object complement of a factitive verb ("They made him king.", "That doesn't make me any braver.", "The
   // rain made the road wet."): a noun / adjective xcomp, an adjective the parser hung on the verb as a conj without a
   // conjunction, or an adjective after the object noun
-  if (en && hu == "VERB" && obj >= 0 &&
-      in(hl, {"make", "call", "name", "elect", "appoint", "crown", "render", "paint", "consider", "keep", "leave"})) {
+  if (hu == "VERB" && obj >= 0 &&
+      ((en && in(hl, {"make", "call", "name", "elect", "appoint", "crown", "render", "paint", "consider", "keep", "leave"})) ||
+       (!en && in(hl, {"dejar"})))) {   // C34: "Siempre la deja abierta." -> eam apertam relinquit
     int comp = -1;
     for (int k : c.kids[(size_t)h]) {
       if (!c.ok(k) || k < obj) continue;
@@ -3791,7 +3793,10 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
           f.subject.pron.number = 2;
           f.subject.number = 2;
         } else if (md != nlp::morph::MoodSub && pe != 1 && !(pe == 3 && nu == nlp::morph::NumPlur) &&
-                   lex_ && es::hasImperative2(*lex_, vt.lower) && !c.s.text.empty()) {
+                   lex_ && es::hasImperative2(*lex_, vt.lower) && !c.s.text.empty() &&
+                   // C34: a state verb after a word of time is told, not ordered ("Ahora vive en otra ciudad.")
+                   !(vtok > 0 && in(c.t(vtok - 1).lower, {"ahora", "ya", "todavía", "aún", "hoy"}) &&
+                     in(vl, {"vivir", "tener", "saber", "estar", "existir", "parecer", "dormir"}) && !excl)) {
           imp = true;
         } else if (excl && pe != 1 && pe != 3 && md != nlp::morph::MoodSub) {
           imp = true;
@@ -3825,6 +3830,11 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     f.subject = SemNP{};
   }
   if (f.type == Kind::Imp && f.hasSubject && f.subject.isPronoun && f.subject.pron.number == 2) f.imperativePlural = true;
+  // C34: an order in -n with the enclitic "se" is ustedes ("Siéntense", "Inclínense")
+  if (!en && f.type == Kind::Imp && f.pred.token >= 0 && f.pred.token + 1 < (int)c.s.tokens.size() &&
+      c.t(f.pred.token + 1).start == c.t(f.pred.token).start && c.t(f.pred.token + 1).lower == "se" &&
+      !c.t(f.pred.token).lower.empty() && c.t(f.pred.token).lower.back() == 'n')
+    f.imperativePlural = true;
   if (!f.hasSubject && f.hasPred && !en && f.type != Kind::Imp && esPe &&
       !(f.pred.impersonal && f.pred.modality == Modality::Must)) {   // C34: "hay que" has no subject
     f.hasSubject = true;
@@ -5839,6 +5849,26 @@ bool FrameBuilder::segmentParse(std::vector<Token>& tk) const {
         for (int j = 0; j < k; ++j) same = same && tk[(size_t)a + (size_t)j].lower == p[j];
         if (same) { cut = true; break; }
       }
+    // C34: Spanish clauses joined by a comma ("Camina rápido, ya es tarde."): a span after a comma with a finite verb
+    // of its own, that no subordinator or coordinator opens, after a span that is a main clause, is parsed apart
+    if (!cut && esl && commaClauses_ && a > 0 && tk[(size_t)a - 1].text == "," && b >= a) {
+      auto finiteIn = [&](int x, int y) {
+        for (int k = x; k <= y; ++k)
+          if ((tk[(size_t)k].upos == "VERB" || tk[(size_t)k].upos == "AUX") &&
+              (fget(tk[(size_t)k], nlp::morph::PersonShift) || fget(tk[(size_t)k], nlp::morph::MoodShift) == nlp::morph::MoodImp))
+            return true;
+        return false;
+      };
+      int p0 = si > 0 ? starts[si - 1] : 0;
+      while (p0 < a - 1 && (tk[(size_t)p0].text == "\xC2\xA1" || tk[(size_t)p0].text == "\xC2\xBF")) ++p0;
+      const std::string& w0 = tk[(size_t)a0].lower;
+      const bool opener = tk[(size_t)a0].upos == "SCONJ" || tk[(size_t)a0].upos == "CCONJ" || tk[(size_t)a0].upos == "PRON" ||
+                          in(w0, {"que", "cuando", "porque", "si", "y", "o", "pero", "como", "donde", "quien", "aunque",
+                                  "mientras", "pues", "ni", "sino"});
+      const bool prevOpener = tk[(size_t)p0].upos == "SCONJ" ||
+                              in(tk[(size_t)p0].lower, {"cuando", "si", "aunque", "porque", "mientras", "como", "que"});
+      if (!opener && !prevOpener && finiteIn(a0, b) && finiteIn(p0, a - 2) && b - a0 >= 1) cut = true;
+    }
     if (cut) { addCut(a); if (sep + 1 < n && sepIsBreak) addCut(sep + 1); }
   }
   if (cuts.empty()) return false;
@@ -6194,7 +6224,10 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
           if (ff.number) ud += ff.number == feat::Pl ? "|Number=Plur" : "|Number=Sing";
           tk[(size_t)firstWord].feats = nlp::morph::fromString(ud);
           tk[(size_t)firstWord].upos = "VERB";
-          if (!same && nlp_) nlp_->parser().parse(tk);   // the imperative heads the clause (C13)
+          if (!same && nlp_) {
+            nlp_->parser().parse(tk);   // the imperative heads the clause (C13)
+            segmentParse(tk);           // C34: and the segments stay apart ("¡Escóndete, niño, ahí viene ...!")
+          }
           break;
         }
     }

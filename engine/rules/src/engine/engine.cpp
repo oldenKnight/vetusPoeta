@@ -255,7 +255,10 @@ class RulesEngine final : public Engine {
                                                   kModelHint);
       pipe = std::make_unique<nlp::Pipeline>(std::move(r.value()));
     }
-    if (!fb) fb = std::make_unique<frame::FrameBuilder>(lang, pipe.get(), lang == frame::SrcLang::En ? en_ : es_, *cd_);
+    if (!fb) {
+      fb = std::make_unique<frame::FrameBuilder>(lang, pipe.get(), lang == frame::SrcLang::En ? en_ : es_, *cd_);
+      fb->setCommaClauses(true);   // C34: Spanish comma-joined clauses apart (English unaffected)
+    }
     return Result<const frame::FrameBuilder*>(fb.get());
   }
 
@@ -1841,7 +1844,10 @@ class RulesEngine final : public Engine {
       const rules::TokenView& h0 = host.tokens[0];
       const std::string k0 = text::latin_key(h0.text);
       const bool conj = k0 == "ut" || k0 == "et" || k0 == "sed" || k0 == "nam" || k0 == "itaque" || k0 == "aut" ||
-                        k0 == "ne" || k0 == "si" || k0 == "quia" || k0 == "cum";
+                        k0 == "ne" || k0 == "si" || k0 == "quia" || k0 == "cum" ||
+                        // C34: after an order's leading verb ("Lee en voz alta." -> Lege clārā vōce, not "Clārā vōce
+                        // lege", which reads as an ablative object)
+                        (st.lang == frame::SrcLang::Es && h0.features.pos == "verb" && h0.features.mood == "imperative");
       const size_t cut = conj ? (size_t)h0.end : 0;
       cue::Latin head, tail, merged;
       if (conj) {
@@ -1910,6 +1916,8 @@ class RulesEngine final : public Engine {
       while (k > 0 && (h.tokens[k - 1].features.pos == "verb" || text::latin_key(h.tokens[k - 1].text) == "non")) --k;
       // C24: a clause that is only its verb ("Est" + "in perīculō") takes the phrase first: "In perīculō est."
       if (k == h.tokens.size() || (k == 0 && h.tokens.size() > 1)) continue;
+      // C34: a Spanish order that is only its verb keeps the phrase after it ("Lee en voz alta." -> Lege clārā vōce)
+      if (k == 0 && st.lang == frame::SrcLang::Es && h.tokens[0].features.mood == "imperative") continue;
       cue::Latin head, tail, merged;
       const size_t cut = (size_t)h.tokens[k].start;
       head.text = h.text.substr(0, cut > 0 ? cut - 1 : 0);

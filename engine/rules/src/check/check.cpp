@@ -680,6 +680,15 @@ struct LatinChecker::Impl {
         }
         if (gen) continue;
         if (neutQty && genAfter) continue;   // C26: "Puer multum cerebrī vult": the quantity word heads the genitive
+        // C34: a feminine noun of the first declension in the genitive after its head is an attribute, not a modifier
+        // slip ("Puerulus vīcīnae flet": vīcīna the noun beside the adjective vīcīnus)
+        bool genNoun = false, headBefore = !cand.empty();
+        const std::string ti = T(i);
+        for (const Reading& r : rd[i])
+          genNoun = genNoun || (r.lpos == Noun && r.f.case_ == Gen && r.f.number == Sg && (r.f.gender == F || r.lgender == F) &&
+                                ti.size() > 2 && ti.compare(ti.size() - 2, 2, "ae") == 0);
+        for (size_t h : cand) headBefore = headBefore && h < i;
+        if (genNoun && headBefore) continue;
       }
       // C22: subject and predicate noun of a copula need not share the gender ("omnia nūgae essent", "mundus meus
       // Terra Mīrābilis esset"): a word that can stand as a noun (or a neuter plural substantive) next to a
@@ -899,7 +908,8 @@ struct LatinChecker::Impl {
           bool cause = false;
           for (const Reading& r : rd[j])
             for (const char* k : {"timor", "curiositas", "gaudium", "fames", "ira", "pudor", "misericordia", "invidia",
-                                  "superbia", "dolor", "sitis", "amor", "odium", "terror", "metus", "lassitudo"})
+                                  "superbia", "dolor", "sitis", "amor", "odium", "terror", "metus", "lassitudo",
+                                  "uox", "silentium"})   // C34: the ablative of manner ("Lege clārā vōce")
               cause = cause || r.key == k;
           if (cause) continue;
           // C28: an ablative of time ("Manē nōbīscum hāc nocte") is no misplaced object either (also its determiner)

@@ -40,7 +40,13 @@ bool animateNoun(const std::string& l) {
                 "hombre", "mujer", "niño", "niña", "chico", "chica", "persona",
                 "amigo", "amiga", "madre", "padre", "hermano", "hermana", "hijo", "hija", "rey", "reina", "maestro",
                 "maestra", "profesor", "profesora", "gato", "perro", "caballo", "conejo", "pájaro", "ratón", "señor",
-                "señora", "dios"});
+                "señora", "dios",
+                // C34: more Spanish family words, persons and animals (con -> cum, a -> the object)
+                "mamá", "papá", "abuela", "abuelo", "tía", "tío", "primo", "prima", "vecino", "vecina", "bebé",
+                "señorita", "alumno", "alumna", "doctor", "doctora", "esposo", "esposa", "soldado", "pastor", "ladrón",
+                "gente", "tortuga", "zorro", "lobo", "oveja", "vaca", "cerdo", "rana", "cuervo", "oso", "león", "pez",
+                "gallina", "pato", "burro", "cabra", "mono", "elefante", "gigante", "bruja", "princesa", "príncipe",
+                "perrito", "gatito", "niñito", "niñita", "conejito", "pajarito"});
 }
 
 // C19: what rises and sets ("the sun rose" -> sōl ortus est)
@@ -85,6 +91,7 @@ const char* adverb(const std::string& l, bool motion) {
       {"together", "ūnā"},     {"almost", "paene"},        {"enough", "satis"},       {"immediately", "statim"},
       {"later", "posteā"},     {"once", "semel"},          {"gladly", "libenter"},    {"badly", "male"},
       {"everywhere", "ubīque"}, {"nowhere", "nusquam"},    {"far", "procul"},         {"near", "prope"},
+      {"a long way", "longē"},   // C34: "muy lejos" -> valdē longē
       {"yes", "ita"},          {"no", "nōn"},              {"certainly", "certē"},    {"quite", "satis"},
       {"rather", "potius"},    {"even", "etiam"},     {"as", "tam"},     {"all", "omnīnō"},     {"hereafter", "posthāc"},
       {"besides", "praetereā"}, {"however", "tamen"},  {"exactly", "plānē"},          {"ever", "umquam"},        {"long", "diū"},

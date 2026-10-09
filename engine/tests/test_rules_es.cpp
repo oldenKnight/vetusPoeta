@@ -593,6 +593,17 @@ TEST_CASE("rules-o: end to end on own_dialogue2.es.srt vs the gold Latin (report
   for (size_t i = 0; i < 120; ++i)
     same = same && r1.value()[i].target == r2.value()[i].target && r1.value()[i].confidence == r2.value()[i].confidence;
   CHECK(same);
+  {   // both latinity modes are deterministic
+    rules::Options oc = o;
+    oc.latinity = rules::Latinity::Classical;
+    auto c1 = engine()->translate(in, oc, rules::Context{}, nullptr, nullptr);
+    auto c2 = engine()->translate(in, oc, rules::Context{}, nullptr, nullptr);
+    REQUIRE(c1.ok());
+    REQUIRE(c2.ok());
+    bool sameC = c1->size() == c2->size();
+    for (size_t i = 0; sameC && i < c1->size(); ++i) sameC = c1.value()[i].target == c2.value()[i].target;
+    CHECK(sameC);
+  }
   std::ifstream g(repo() / "tests" / "regression" / "expected" / "own_dialogue2.la.gold.txt");
   std::vector<std::string> gold;
   std::string line;
@@ -639,7 +650,7 @@ TEST_CASE("rules-o: end to end on own_dialogue2.es.srt vs the gold Latin (report
       << "; mismatches rated OK: " << okWrong << "\n\n"
       << all.str() << "\nFrames of the mismatches:\n" << frames.str();
   std::ofstream(buildDir() / "regression_report_es2.txt") << rep.str();
-  CHECK_MESSAGE(matches >= 0, "own_dialogue2 below the C34 threshold: " << matches << " / 120");
+  CHECK_MESSAGE(matches >= 117, "own_dialogue2 below the C34 threshold: " << matches << " / 120");
   MESSAGE("own_dialogue2 es: " << matches << " / 120 match the gold; confidence ok " << conf["ok"] << " / check "
                                << conf["check"] << " / fix " << conf["fix"] << "; mismatches rated OK " << okWrong);
 }
@@ -681,6 +692,9 @@ TEST_CASE("rules-o: try (VP_RULES_TRY_ES=<file>)") {
         if (!k.ok) extra += " " + k.id + "(" + k.detail + ")";
       std::printf("%d\t%s\t%s\t%s |%s\n", ++n, b[i].c_str(), flat(c.target).c_str(), confName(c.confidence),
                   extra.c_str());
+      if (std::getenv("VP_RULES_TRY_WHY"))
+        for (const auto& rs : c.reasons)
+          std::printf("    %s: %s %s\n", rs.kind.c_str(), rs.text.c_str(), rs.data.substr(0, 400).c_str());
       if (std::getenv("VP_RULES_TRY_FRAME")) {
         frame::SemSentence s;
         fb.analyse(b[i], s);
@@ -718,4 +732,74 @@ TEST_CASE("rules-o: try Greek (VP_GRC_TRY_ES=<file>)") {
     std::printf("%s\t%s\t%s |%s\n", line.c_str(), flat(r.value()[0].target).c_str(), confName(r.value()[0].confidence),
                 extra.c_str());
   }
+}
+
+// C34: the rules of the loop, each with own sentences that are neither in own_dialogue2 nor in the blind list
+// (docs/rules_es_notes.md "Spanish loop 2 (C34)"). Each sentence is translated alone.
+TEST_CASE("rules-o: constructions of the Spanish source (C34)") {
+  NEED_REAL();
+  const std::pair<const char*, const char*> cases[] = {
+      // names, words of address and trailing vocatives
+      {"Mateo, ¿tienes frío?", "Matthaee, frīgēsne?"},
+      {"Papá, ¿dónde está mi libro?", "Pater, ubi est liber meus?"},
+      {"¿Qué comiste, Sofía?", "Quid ēdistī, Sophia?"},
+      {"Te lo prometo, papá.", "Tibi id prōmittō, pater."},
+      {"¿Ya terminaste, Pablito?", "Fīnīvistīne iam, Paule?"},
+      {"Juan duerme en su cuarto.", "Iōannēs in cubiculō suō dormit."},
+      // the doubled indirect object, mandar a thing
+      {"Le di una manzana a mi hermana.", "Sorōrī meae pōmum dedī."},
+      {"Les mandé una carta a mis abuelos.", "Avīs meīs epistulam mīsī."},
+      // weather, ago
+      {"Hace frío en la escuela.", "In lūdō frīget."},
+      {"Mañana va a hacer calor.", "Crās calēbit."},
+      {"Mi tío llegó hace tres días.", "Abhinc trēs diēs avunculus meus vēnit."},
+      // hay que, volver a, seguir + gerund, ir a (purpose in the past)
+      {"Hay que comer bien.", "Bene edere oportet."},
+      {"Hay que cerrar la puerta.", "Iānuam claudere oportet."},
+      {"No lo vuelvo a decir.", "Id iterum nōn dīcam."},
+      {"El perro seguía ladrando.", "Canis lātrāre pergēbat."},
+      {"Fuimos a ver a la abuela.", "Iimus ut aviam vidērēmus."},
+      // que + subjunctive by the governing verb
+      {"Quiero que mi hermano venga.", "Volō frātrem meum venīre."},
+      {"Temo que la niña se caiga.", "Timeō nē puella cadat."},
+      {"Espero que ganes.", "Spērō tē victūrum esse."},
+      {"La maestra le dijo a Mateo que se sentara.", "Magistra Matthaeō imperāvit ut sedēret."},
+      {"Se dice que el bosque es oscuro.", "Dīcitur silvam obscūram esse."},
+      // exclamations
+      {"¡Qué bonito día!", "Quam pulcher diēs!"},
+      {"¡Qué alto es el árbol!", "Quam alta est arbor!"},
+      // usted / ustedes orders
+      {"Siéntense, por favor.", "Sedēte, quaesō."},
+      {"Abran sus libros.", "Aperīte librōs vestrōs."},
+      // estar + state, the adjective's gender
+      {"El gatito está dormido.", "Fēlēs parva dormit."},
+      {"La niña está escondida detrás del árbol.", "Puella post arborem latet."},
+      {"Mi hermana está muy cansada.", "Soror mea valdē fessa est."},
+      {"Eres muy buena, mamá.", "Valdē bona es, māter."},
+      // after the blind check (own sentences written before the fixes)
+      {"¿Le diste agua al gato?", "Dedistīne fēlī aquam?"},
+      {"Tengo que limpiar mi cuarto.", "Cubiculum meum pūrgāre dēbeō."},
+      {"Tenemos que cerrar el cuarto antes de la noche.", "Cubiculum ante noctem claudere dēbēmus."},
+      {"El gato de Pablo duerme.", "Fēlēs Paulī dormit."},
+      {"¡Qué alta es la torre!", "Quam alta est turris!"},
+      {"El mar es peligroso.", "Mare perīculōsum est."},
+      {"Vivimos en un pueblo pequeño.", "In vīcō parvō habitāmus."},
+      {"Mi abuelo nació en un pueblo.", "Avus meus in vīcō nātus est."},
+      {"¡Corre, Pablo, ahí viene el perro!", "Curre, Paule, ecce canis venit!"},
+      {"¡Cuidado, niña, ahí viene un coche!", "Cavē, puella, ecce currus venit!"},
+  };
+  int ok = 0;
+  for (const auto& c : cases) {
+    const std::vector<EsOut> o = runEs({c.first});
+    CHECK_MESSAGE(o[0].text == c.second, std::string(c.first) << " -> " << o[0].text << " (expected " << c.second << ")");
+    ok += o[0].text == c.second;
+  }
+  MESSAGE("C34 constructions: " << ok << " / " << sizeof(cases) / sizeof(cases[0]));
+  // a rebuilt or guessed reading is never OK: a trailing address the parser made an argument, the speaker's "I" in a
+  // reply, the ustedes of a reply
+  const auto g = runEs({"¿Por qué tienes las manos sucias?", "Estaba jugando en el jardín."});
+  CHECK(g[1].text == "In hortō lūdēbam.");
+  CHECK(g[1].conf != rules::Confidence::Ok);
+  const auto t = runEs({"Te lo prometo, papá."});
+  CHECK(t[0].conf != rules::Confidence::Ok);
 }

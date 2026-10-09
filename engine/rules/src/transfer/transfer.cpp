@@ -1590,7 +1590,8 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
             !c.frame->copula && c.frame->pred.lemma != "be" && c.frame->hasObject && c.frame->object.token == n.token)
           c.out.flags.push_back("antecedent-guess");
         else if (c.st.lang == frame::SrcLang::Es && p == "lo")
-          g = N;   // "Dámelo." without an antecedent: it (id)
+          g = c.mem.lastAnimate && c.mem.lastGender == M ? (uint8_t)M : (uint8_t)N;   // "Dámelo." without an antecedent:
+                                                                                     // it (id); C34: of a boy, eum
         // C30: in narrative a third-person pronoun two or more clauses after the last noun or name points back over a
         // clause: its gender / number is a guess when it shows (an object, or a subject with a predicate adjective)
         if (c.st.lang == frame::SrcLang::En && c.mem.sinceNoun >= 2 && c.frame && !n.pron.reflexive &&
@@ -1824,6 +1825,14 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
     }
     o.isName = true;
     o.name = esName ? esName->english : n.head;
+    // C34: a Spanish name is the antecedent a later "lo" / "la" points to ("¿Dónde está Pablo? ... Despiértalo" -> eum)
+    if (c.st.lang == frame::SrcLang::Es)
+      if (const curated::NameEntry* ne = esName ? esName : cd_.nameByEnglish(n.head))
+        if (ne->gender == F || ne->gender == M) {
+          c.mem.lastGender = ne->gender;
+          c.mem.lastAnimate = true;
+          c.mem.lastNumber = Sg;
+        }
     Choice ch;
     ch.token = n.token;
     ch.source = n.head;
@@ -3099,6 +3108,10 @@ bool Transfer::obliqueInto(const frame::SemOblique& ob, Ctx& c, LaClause& cl) co
   if (prep == "from") return withPrep("ab", Abl);
   if (prep == "out of") return withPrep("ex", Abl);
   if (prep == "in front of") return withPrep("ante", Acc);
+  // C34: Spanish "durante muchos días / tres horas" (a stretch of time) -> the accusative of duration (multōs diēs)
+  if (prep == "during" && c.st.lang == frame::SrcLang::Es && time &&
+      (n.number == 2 || !n.numeral.empty() || n.determiner == "many" || n.determiner == "all"))
+    return bare(Acc);
   // C34: Spanish "hace tres días" (the frame's "ago") -> abhinc trēs diēs (abhinc + accusative)
   if (prep == "ago" && c.st.lang == frame::SrcLang::Es && latin("abhinc") != kNone) {
     LaOblique o;
@@ -3570,8 +3583,18 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
   // stetērunt) stays an event
   if (c.st.lang == frame::SrcLang::En && sp.lemma == "declare")
     for (const frame::SemOblique& o : f.obliques) lightVerb = lightVerb || o.prep == "for";
-  const bool state = (!lightVerb && tables::stateVerb(la_.lemma(p.modal != kNone ? p.modal : p.lemma).key)) || sp.habitual ||
-                     cl.pred.lemma == latin("sum", Verb);
+  // C34: the Spanish pretérito says the event (perfect) even of a state verb ("Se sentó" -> sēdit, not sedēbat); the
+  // imperfecto is the habitual reading of the frame
+  const bool esPreterite = c.st.lang == frame::SrcLang::Es && !sp.habitual && sp.token >= 0 &&
+                           (size_t)sp.token < c.s.tokens.size() && sp.auxTokens.empty() &&
+                           nlp::morph::get(c.s.tokens[(size_t)sp.token].feats, nlp::morph::TenseShift) == nlp::morph::TensePast &&
+                           cl.pred.lemma != latin("sum", Verb) &&
+                           // thinking stays a state ("Pensé que era lunes." -> Putābam ...)
+                           cl.pred.lemma != latin("putō", Verb) && cl.pred.lemma != latin("crēdō", Verb) &&
+                           cl.pred.lemma != latin("sciō", Verb) && cl.pred.lemma != latin("arbitror", Verb) &&
+                           cl.pred.lemma != latin("existimō", Verb);
+  const bool state = ((!lightVerb && tables::stateVerb(la_.lemma(p.modal != kNone ? p.modal : p.lemma).key)) || sp.habitual ||
+                      cl.pred.lemma == latin("sum", Verb)) && !esPreterite;
   // C22: "Every morning he walked to the village": a habit in the past (imperfect)
   bool everyTime = c.st.lang == frame::SrcLang::En && habitualTime(f);
   uint8_t tense = Present;
@@ -3596,7 +3619,8 @@ void Transfer::predicateInto(const SemFrame& f, Ctx& c, LaClause& cl) const {
       if (o.prep == "by") agent = true;
     // "the clock is broken": resultant state; Spanish passive "se" is a process ("Se venden casas") (C13)
     // ("it is said that ..." stays present: dīcitur)
-    if (tense == Present && !agent && sp.particle != "se" && !(sp.lemma == "say" && !f.subordinate.empty()))
+    if (tense == Present && !agent && sp.particle != "se" && !(sp.lemma == "say" && !f.subordinate.empty()) &&
+        !(c.st.lang == frame::SrcLang::Es && sp.impersonal && !f.subordinate.empty()))   // C34: "se dice que" -> dīcitur
       tense = Perfect;
     // C19: a Latin verb without passive forms (intransitive: liquēscō "melt", nāscor is deponent anyway) says the
     // English passive actively: "I shall be all melted" -> tōta liquēscam; never a missing form
@@ -3766,6 +3790,120 @@ bool Transfer::spanishRewrite(const SemFrame& f, Ctx& c, SemFrame& g) const {
       changed = true;
     }
   }
+  // degree words the clause builder joined to their adverb ("muy lejos", "muy temprano"): two adverbs, each from the
+  // adverb table (valdē longē)
+  for (size_t k = 0; k < g.adverbs.size(); ++k) {
+    const std::string a = lowLemma(g.adverbs[k].lemma);
+    for (const char* deg : {"muy ", "tan ", "demasiado ", "más "}) {
+      const size_t dl = std::strlen(deg);
+      if (a.size() > dl && a.compare(0, dl, deg) == 0) {
+        frame::SemAdverb d = g.adverbs[k];
+        d.lemma = std::string(deg, dl - 1);
+        d.token = -1;
+        for (int t = g.adverbs[k].token - 1; t >= 0 && t >= g.adverbs[k].token - 2 && (size_t)t < c.s.tokens.size(); --t)
+          if (c.s.tokens[(size_t)t].lower == d.lemma) { d.token = t; break; }
+        g.adverbs[k].lemma = a.substr(dl);
+        if (g.adverbs[k].lemma == "lejos") g.adverbs[k].lemma = "a long way";   // valdē longē (procul alone)
+        g.adverbs.insert(g.adverbs.begin() + (long)k, d);
+        ++k;
+        changed = true;
+        break;
+      }
+    }
+  }
+  // "estar lejos" -> abesse ("El mar está muy lejos." -> Mare valdē longē abest)
+  if (g.hasPred && g.pred.lemma == "be" && !g.copula && g.hasSubject && g.predAdj.empty() && g.predicative.empty() &&
+      !g.existential)
+    for (const frame::SemAdverb& a : g.adverbs)
+      if (lowLemma(a.lemma) == "lejos" || a.lemma == "a long way") {
+        g.pred.lemma = "estar lejos";
+        changed = true;
+        break;
+      }
+  // "Que duerman bien, mis niños.": a wish "que" + 3rd plural subjunctive to a group addressed is said to them (2nd
+  // plural: bene dormiātis)
+  if (g.hasPred && g.pred.mood == frame::SrcMood::Subjunctive && g.hasSubject && g.implicitSubject && g.subject.isPronoun &&
+      g.subject.pron.person == 3 && g.subject.pron.number == 2 && c.mem.addresseePlural &&
+      std::find(g.connectors.begin(), g.connectors.end(), "that") != g.connectors.end()) {
+    g.subject.pron.person = 2;
+    changed = true;
+  }
+  // "seguir su camino" -> iter (suum) pergere; an adjective of the subject's gender on the road is the subject's
+  // ("La tortuguita siguió su camino sola." -> Testūdō parva sōla iter suum perrēxit)
+  if (g.hasPred && lowLemma(g.pred.lemma) == "seguir" && g.hasObject && lowLemma(g.object.head) == "camino") {
+    g.pred.lemma = "seguir haciendo";
+    g.object.head = "camino recorrido";
+    for (size_t k = 0; k < g.object.adjectives.size(); ++k) {
+      const frame::SemAdj a = g.object.adjectives[k];
+      if (!g.hasSubject || a.token < 0 || (size_t)a.token >= c.s.tokens.size()) continue;
+      const uint8_t ag = esAdjectiveGender(c.s.tokens[(size_t)a.token].lower, c.st);
+      if (ag && g.object.srcGender && ag != g.object.srcGender) {
+        g.subject.adjectives.push_back(a);
+        g.object.adjectives.erase(g.object.adjectives.begin() + (long)k);
+        break;
+      }
+    }
+    changed = true;
+  }
+  // "mandar" a thing is sending it ("Les mandé una carta a mis abuelos." -> mīsī), not ordering
+  if (g.hasPred && lowLemma(g.pred.lemma) == "mandar" && g.hasObject && !g.object.isPronoun && !animate(g.object) &&
+      g.subordinate.empty()) {
+    g.pred.lemma = "enviar";
+    changed = true;
+  }
+  // "se dice que ..." (impersonal se with a verb of saying): dīcitur + accusative and infinitive, not "they say"
+  if (g.hasPred && g.pred.voice == frame::Voice::Active && g.hasSubject && g.implicitSubject && g.subject.isPronoun &&
+      g.subject.pron.person == 3 && (lowLemma(g.pred.lemma) == "decir" || lowLemma(g.pred.lemma) == "contar") &&
+      !g.subordinate.empty() && g.subordinate[0].relation == Relation::Complement && g.pred.token >= 0)
+    for (size_t t = 0; t < c.s.tokens.size(); ++t)
+      if (c.s.tokens[t].deprel == "expl:impers" && c.s.tokens[t].head == g.pred.token + 1) {
+        g.pred.voice = frame::Voice::Passive;
+        g.pred.impersonal = true;
+        g.hasSubject = false;
+        g.subject = SemNP{};
+        changed = true;
+        break;
+      }
+  // "a casa" / "en casa" (no article, no possessor): home (domum after motion, domī at rest), as English "home"
+  for (size_t k = 0; k < g.obliques.size(); ++k) {
+    const frame::SemOblique& ob = g.obliques[k];
+    if ((ob.prep != "to" && ob.prep != "in") || ob.np.isPronoun || lowLemma(ob.np.head) != "casa" || ob.np.number == 2 ||
+        !ob.np.determiner.empty() || ob.np.definite || !ob.np.possessor.empty() || !ob.np.adjectives.empty() ||
+        !ob.np.genitive.empty() || !ob.np.relative.empty())
+      continue;
+    frame::SemAdverb a;
+    a.lemma = "home";
+    a.token = ob.np.token;
+    if (ob.token >= 0) c.cover(ob.token);
+    g.obliques.erase(g.obliques.begin() + (long)k);
+    g.adverbs.push_back(a);
+    changed = true;
+    break;
+  }
+  // "X me da miedo" -> X timeō: the person the thing frightens fears it ("El mar me da miedo." -> Mare timeō)
+  if (g.hasPred && lowLemma(g.pred.lemma) == "dar" && g.hasObject && !g.object.isPronoun &&
+      lowLemma(g.object.head) == "miedo" && g.object.determiner.empty() && g.hasIndirect && g.indirectObject.isPronoun &&
+      g.hasSubject) {
+    c.cover(g.object.token);
+    SemNP fearer = g.indirectObject;
+    fearer.pron.reflexive = false;
+    g.object = g.subject;
+    g.subject = fearer;
+    g.implicitSubject = true;
+    g.hasIndirect = false;
+    g.indirectObject = SemNP{};
+    g.pred.lemma = "temer";
+    changed = true;
+  }
+  // "esperar que" + a clause is hoping (spērō + accusative + future infinitive), not waiting ("Espero que vengas a mi
+  // fiesta." -> Spērō tē ad convīvium meum ventūrum esse)
+  if (g.hasPred && lowLemma(g.pred.lemma) == "esperar" && !g.hasObject)
+    for (const frame::SemSub& sb : g.subordinate)
+      if (sb.relation == Relation::Complement && !sb.frame.empty() && sb.frame[0].type != Kind::Wh) {
+        g.pred.lemma = "esperar que";
+        changed = true;
+        break;
+      }
   // the usted / ustedes order (a 3rd-person verb form) speaks to "you": its "su" is "your" ("Escriban la palabra en su
   // cuaderno." -> in libellō vestrō)
   if (g.type == Kind::Imp && g.hasPred && g.pred.token >= 0 && (size_t)g.pred.token < c.s.tokens.size() &&
@@ -3783,6 +3921,17 @@ bool Transfer::spanishRewrite(const SemFrame& f, Ctx& c, SemFrame& g) const {
     if (g.hasObject) yours(g.object);
     if (g.hasIndirect) yours(g.indirectObject);
     for (frame::SemOblique& ob : g.obliques) yours(ob.np);
+  }
+  // "pedir algo a alguien" -> ab aliquō aliquid petere ("pedirle perdón" -> veniam ab eō petere)
+  if (g.hasPred && lowLemma(g.pred.lemma) == "pedir" && g.hasObject && g.hasIndirect) {
+    frame::SemOblique ob;
+    ob.prep = "from";
+    ob.np = g.indirectObject;
+    ob.token = -1;
+    g.obliques.insert(g.obliques.begin(), ob);
+    g.hasIndirect = false;
+    g.indirectObject = SemNP{};
+    changed = true;
   }
   // the doubled indirect object: "le / les ... a X" is one dative, X ("Le di agua al perro." -> Canī aquam dedī;
   // "Sofía le dio su lápiz a Mateo." -> Matthaeō stilum suum dedit); the clitic only doubles it
@@ -4172,6 +4321,35 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
     npInto(f.subject, c, cl.subject);
     if (f.subject.pron.emphatic) cl.subject.emphasis = true;
     // Spanish (C13): a 3rd-person plural question answered with "we" was put to ustedes: 2nd plural (a guess)
+    // C34: after a question put to "you", a 1st / 3rd singular form without a subject ("estaba", "jugaba") is the
+    // speaker's "I" ("¿Por qué tienes las manos sucias?" - "Estaba jugando en el jardín." -> lūdēbam); a guess, Check
+    if (c.st.lang == frame::SrcLang::Es && f.implicitSubject && cl.subject.isPronoun && cl.subject.pron.person == 3 &&
+        cl.subject.pron.number != Pl && c.mem.askedYou && !c.question && c.st.srcLex && f.type == Kind::Decl) {
+      int vt = -1;
+      for (int t : f.tokens)
+        if (t >= 0 && (size_t)t < c.s.tokens.size() && (c.s.tokens[(size_t)t].upos == "VERB" || c.s.tokens[(size_t)t].upos == "AUX") &&
+            nlp::morph::get(c.s.tokens[(size_t)t].feats, nlp::morph::PersonShift)) { vt = t; break; }
+      bool p1 = false, p3 = false;
+      if (vt >= 0) {
+        std::vector<lex::Analysis> an;
+        c.st.srcLex->lookup(text::es_key(c.s.tokens[(size_t)vt].lower), an);
+        for (const lex::Analysis& a : an) {
+          const feat::Features ff = feat::unpack(c.st.srcLex->feature(a.feat));
+          if (ff.number == Pl) continue;
+          p1 = p1 || ff.person == 1;
+          p3 = p3 || ff.person == 3;
+        }
+      }
+      if (p1 && p3) {
+        cl.subject.pron.person = 1;
+        char sg = c.st.speakerGender;
+        if (c.st.flipSpeakerGender) sg = sg == 'f' ? 'm' : 'f';
+        cl.subject.pron.gender = sg == 'f' ? F : M;
+        cl.subject.gender = cl.subject.pron.gender;
+        c.subjPerson = 1;
+        c.out.flags.push_back("speaker-reply");
+      }
+    }
     // C34: also the reply to a question put to "you" that lays an obligation on a 3rd-person plural ("Abuelita, ¿me
     // cuentas un cuento?" - "Primero tienen que lavarse las manos." -> dēbētis)
     if (c.st.lang == frame::SrcLang::Es && f.implicitSubject && cl.subject.isPronoun && cl.subject.pron.person == 3 &&
@@ -4802,6 +4980,16 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
       c.out.flags.push_back("fragment");
     }
   }
+  // C34: a Spanish exclamation of an adjective alone ("¡Qué flojos!") is said of persons: the adjective's own gender
+  // and number (quam pigrī), not the neuter of a situation
+  if (c.st.lang == frame::SrcLang::Es && f.type == Kind::Excl && !f.hasSubject && !cl.predAdj.empty() && f.predAdj.size() == 1 &&
+      f.predAdj[0].token >= 0 && (size_t)f.predAdj[0].token < c.s.tokens.size()) {
+    const std::string& w = c.s.tokens[(size_t)f.predAdj[0].token].lower;
+    if (const uint8_t g = esAdjectiveGender(w, c.st)) {
+      cl.predGender = g;
+      cl.predNumber = w.size() > 2 && w.back() == 's' ? (uint8_t)Pl : (uint8_t)Sg;
+    }
+  }
   // C22: "Mr. Rabbit." / "Miss Lucy!" on its own: the person called (vocative), not a nominative fragment
   if (c.st.lang == frame::SrcLang::En && cl.type == realise::ClauseType::Frag && f.hasSubject && cl.hasSubject &&
       !f.hasPred && f.predAdj.empty() && f.obliques.empty() && f.subject.token > 0 && !f.subject.isPronoun) {
@@ -4974,7 +5162,7 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
       continue;
     }
     // C17: "go home" -> domum īre, "stay home" -> domī manēre (domus: accusative of goal, locative)
-    if (a.lemma == "home" && c.st.lang == frame::SrcLang::En) {
+    if (a.lemma == "home" && (c.st.lang == frame::SrcLang::En || c.st.lang == frame::SrcLang::Es)) {   // C34: es "a casa"
       const uint32_t domus = latin("domus", Noun);
       if (domus != kNone) {
         LaOblique o;
@@ -5508,6 +5696,86 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
       case Relation::Concession: ls.rel = realise::SubRel::Concession; break;
       case Relation::Complement:
         ls.rel = sb.frame[0].type == Kind::Wh || whatLike(sb.frame[0]) >= 0 ? realise::SubRel::IndirectQ : realise::SubRel::AccInf;
+        // C34: Spanish "que" + subjunctive by the governing verb: an order or a request (decir / pedir / mandar que
+        // venga) -> ut / nē + subjunctive; a fear (temer que, tener miedo de que) -> nē + subjunctive (ut for a
+        // negative); a hope (esperar que: spērō) -> accusative + future infinitive; a wish (querer que) keeps the
+        // accusative + infinitive
+        if (c.st.lang == frame::SrcLang::Es && ls.rel == realise::SubRel::AccInf && sf.type != Kind::Wh &&
+            (sb.marker.empty() || sb.marker == "that")) {
+          const std::string mv = text::lower(f.pred.lemma);
+          const bool subjMood = sf.pred.mood == frame::SrcMood::Subjunctive;
+          const bool mainPast = cl.pred.tense == Perfect || cl.pred.tense == Imperfect || cl.pred.tense == Pluperfect ||
+                                f.pred.tense == frame::Tense::Past;
+          const bool fear = cl.pred.lemma != kNone && (cl.pred.lemma == latin("timeō", Verb) || cl.pred.lemma == latin("vereor", Verb) ||
+                                                       cl.pred.lemma == latin("metuō", Verb));
+          if (subjMood && (mv == "decir" || mv == "pedir" || mv == "rogar" || mv == "mandar" || mv == "ordenar" ||
+                           mv == "suplicar" || mv == "aconsejar" || mv == "exigir")) {
+            ls.rel = realise::SubRel::Purpose;
+            sc.pred.mood = Subjunctive;
+            sc.pred.tense = mainPast ? (uint8_t)Imperfect : (uint8_t)Present;
+            if (mv == "decir" && latin("imperō", Verb) != kNone) {   // "le dijo que se callara" = ordered: imperāvit ut
+              cl.pred.lemma = latin("imperō", Verb);
+              for (Choice& x : c.out.choices)
+                if (x.token == f.pred.token) { x.lemma = cl.pred.lemma; x.kind = "table"; x.note = "decir que + subjunctive: an order (imperō ut)"; }
+            }
+            // the person told is the subject of the order: no pronoun of its own ("Paulō imperāvit ut tacēret")
+            if (sc.hasSubject && sc.subject.isPronoun && sc.subject.pron.person == 3 && !sc.subject.emphasis) {
+              sc.pred.person = 3;
+              sc.pred.number = sc.subject.pron.number ? sc.subject.pron.number : sc.subject.number;
+              sc.hasSubject = false;
+              sc.subject = LaNP{};
+            }
+            break;
+          }
+          if (subjMood && fear) {
+            ls.rel = sc.polarity == realise::Polarity::Neg ? realise::SubRel::Result : realise::SubRel::Purpose;
+            ls.conj = sc.polarity == realise::Polarity::Neg ? latin("ut", Conj) : latin("nē", Conj);
+            if (ls.conj == kNone) ls.conj = latin(sc.polarity == realise::Polarity::Neg ? "ut" : "nē");
+            sc.pred.mood = Subjunctive;
+            sc.pred.tense = mainPast ? (uint8_t)Imperfect : (uint8_t)Present;
+            break;
+          }
+          // "¿Quieres que te ayude?": a 1st / 3rd singular subjunctive with no subject, asked of "you" and doing
+          // something to "you", is the speaker's offer (mē tē adiuvāre); a guess, Check
+          if (subjMood && (c.question || f.type == Kind::Yn) && f.hasSubject && f.subject.isPronoun && f.subject.pron.person == 2 && sf.implicitSubject &&
+              sc.hasSubject && sc.subject.isPronoun && sc.subject.pron.person == 3 && sc.subject.pron.number != Pl &&
+              ((sf.hasObject && sf.object.isPronoun && sf.object.pron.person == 2) ||
+               (sf.hasIndirect && sf.indirectObject.isPronoun && sf.indirectObject.pron.person == 2))) {
+            sc.subject.pron.person = 1;
+            sc.subject.pron.reflexive = false;
+            char sg = c.st.speakerGender;
+            if (c.st.flipSpeakerGender) sg = sg == 'f' ? 'm' : 'f';
+            sc.subject.pron.gender = sg == 'f' ? F : M;
+            sc.subject.gender = sc.subject.pron.gender;
+            sc.pred.person = 1;
+            c.out.flags.push_back("speaker-reply");
+          }
+          // "Le dijo a su mamá que quería ver el mar.": the same 3rd person who says it is the subject of what is said
+          // (the reflexive sē), as C17 for English pronouns
+          if (!subjMood && f.hasSubject && f.subject.isPronoun && f.implicitSubject && f.subject.pron.person == 3 &&
+              sf.implicitSubject && sc.hasSubject && sc.subject.isPronoun && sc.subject.pron.person == 3 &&
+              (sc.subject.pron.number == Pl) == (f.subject.pron.number == 2) &&
+              (mv == "decir" || mv == "pensar" || mv == "creer" || mv == "contestar" || mv == "responder" ||
+               mv == "escribir" || mv == "gritar" || mv == "explicar" || mv == "prometer"))
+            sc.subject.pron.reflexive = true;
+          // a weather verb has no subject of its own in the accusative and infinitive ("Creo que va a llover." ->
+          // Crēdō pluitūrum esse, not "eum pluere"); a Spanish future is the future infinitive
+          const std::string wv = text::lower(sf.pred.lemma);
+          if ((wv == "llover" || wv == "nevar" || wv == "granizar" || wv == "tronar" || wv == "hacer frío" ||
+               wv == "hacer calor") && sc.hasSubject && sc.subject.isPronoun && sf.implicitSubject) {
+            sc.hasSubject = false;
+            sc.subject = LaNP{};
+          }
+          if (!subjMood && sf.pred.tense == frame::Tense::Future && sc.pred.modal == kNone) {
+            sc.pred.tense = Future;
+            sc.pred.mood = Indicative;
+          }
+          if (cl.pred.lemma != kNone && cl.pred.lemma == latin("spērō", Verb) && sc.pred.modal == kNone &&
+              sf.pred.tense != frame::Tense::Past) {
+            sc.pred.tense = Future;
+            sc.pred.mood = Indicative;
+          }
+        }
         // C22: "I wish (that) it was always summer", "I keep wishing it could be so": a wish is optō ut + subjunctive
         // (imperfect for an unreal wish), never an accusative + infinitive ("Volō semper aestātem fuisse" was OK)
         if (c.st.lang == frame::SrcLang::En && f.hasPred && f.pred.lemma == "wish" && sf.type == Kind::Decl && sf.hasSubject &&
@@ -5776,7 +6044,8 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
     }
   // C32 (after the blind check): angry with / at a person is the dative ("Are you angry with me?" -> Esne mihi īrātus?,
   // was mēcum)
-  if (c.st.lang == frame::SrcLang::En && f.copula && !cl.predAdj.empty() && cl.predAdj[0].lemma != kNone &&
+  if ((c.st.lang == frame::SrcLang::En || c.st.lang == frame::SrcLang::Es) && f.copula && !cl.predAdj.empty() &&   // C34: es
+      cl.predAdj[0].lemma != kNone &&
       (la_.lemma(cl.predAdj[0].lemma).key == "iratus" || la_.lemma(cl.predAdj[0].lemma).key == "infensus")) {
     const uint32_t cum = latin("cum", Prep), ad = latin("ad", Prep), in = latin("in", Prep);
     for (realise::LaOblique& o : cl.obliques)
@@ -5786,6 +6055,25 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
         o.case_ = Dat;
         o.np.case_ = Dat;
       }
+  }
+  // C34: nōscō / cognōscō "get to know": its present "I know (a person)" is the perfect nōvī, the imperfect the
+  // pluperfect ("¿Conoces a mi abuela?" -> Nōvistīne aviam meam?)
+  if (c.st.lang == frame::SrcLang::Es && text::lower(f.pred.lemma) == "conocer" && cl.pred.modal == kNone &&
+      (cl.pred.lemma == latin("nōscō", Verb) || cl.pred.lemma == latin("cognōscō", Verb)) && cl.pred.mood == Indicative) {
+    if (cl.pred.tense == Present) cl.pred.tense = Perfect;
+    else if (cl.pred.tense == Imperfect) cl.pred.tense = Pluperfect;
+  }
+  // C34: "mucho" with a verb of feeling is valdē ("se enojó mucho" -> valdē īrāta est), not multum
+  if (c.st.lang == frame::SrcLang::Es && cl.pred.lemma != kNone &&
+      (cl.pred.lemma == latin("īrāscor", Verb) || cl.pred.lemma == latin("timeō", Verb) || cl.pred.lemma == latin("gaudeō", Verb)))
+    for (realise::LaAdverb& a : cl.adverbs)
+      if (a.lemma == latin("multum", Adv) && latin("valdē", Adv) != kNone) a.lemma = latin("valdē", Adv);
+  // C34: Spanish llevar / traer a person or an animal: dūcō (as C30's "bring" below; ferō is for things)
+  if (c.st.lang == frame::SrcLang::Es && (text::lower(f.pred.lemma) == "llevar" || text::lower(f.pred.lemma) == "traer") &&
+      f.hasObject && !f.object.isPronoun && animate(f.object) && cl.hasObject && latin("dūcō", Verb) != kNone) {
+    cl.pred.lemma = latin("dūcō", Verb);
+    for (Choice& x : c.out.choices)
+      if (x.token == f.pred.token) { x.lemma = cl.pred.lemma; x.kind = "table"; x.note = "llevar a person or an animal: dūcō"; }
   }
   // C30: "bring the goat home" -> dūcam: one brings an animal by leading it (ferō is for things; people keep ferō, the
   // tuning sample's choice);
