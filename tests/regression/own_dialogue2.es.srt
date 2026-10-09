@@ -1,0 +1,479 @@
+1
+00:00:01,000 --> 00:00:03,320
+¡Buenos días, abuelita!
+
+2
+00:00:03,620 --> 00:00:06,500
+Buenos días, mi niña. ¿Dormiste bien?
+
+3
+00:00:06,800 --> 00:00:09,480
+Sí, pero hace frío en mi cuarto.
+
+4
+00:00:09,780 --> 00:00:12,020
+Ponte el abrigo azul.
+
+5
+00:00:12,320 --> 00:00:14,440
+¿Dónde está Pablo?
+
+6
+00:00:14,740 --> 00:00:16,980
+Todavía está dormido.
+
+7
+00:00:17,280 --> 00:00:19,600
+Despiértalo, por favor.
+
+8
+00:00:19,900 --> 00:00:22,020
+¡Pablo, levántate!
+
+9
+00:00:22,320 --> 00:00:24,200
+Ya es tarde.
+
+10
+00:00:24,500 --> 00:00:26,940
+No quiero ir a la escuela.
+
+11
+00:00:27,240 --> 00:00:29,560
+¿Por qué no quieres ir?
+
+12
+00:00:29,860 --> 00:00:32,820
+Porque la maestra está enojada conmigo.
+
+13
+00:00:33,120 --> 00:00:35,040
+¿Qué hiciste?
+
+14
+00:00:35,340 --> 00:00:37,780
+Le rompí el lápiz a Mateo.
+
+15
+00:00:38,080 --> 00:00:40,080
+Fue sin querer.
+
+16
+00:00:40,380 --> 00:00:43,180
+Entonces tienes que pedirle perdón.
+
+17
+00:00:43,480 --> 00:00:46,160
+Sí, abuelita. Se lo voy a decir.
+
+18
+00:00:46,460 --> 00:00:49,100
+Ven a la mesa. Hay pan y leche.
+
+19
+00:00:49,400 --> 00:00:51,280
+¿Hay huevos?
+
+20
+00:00:51,580 --> 00:00:53,700
+No, no hay huevos.
+
+21
+00:00:54,000 --> 00:00:56,720
+Mamá, ¿puedo llevar a mi perrito?
+
+22
+00:00:57,020 --> 00:01:00,180
+No, mi vida. Los perros no van a la escuela.
+
+23
+00:01:00,480 --> 00:01:03,560
+Hace tres días el perro se comió mi tarea.
+
+24
+00:01:03,860 --> 00:01:06,140
+¿De veras? No te creo.
+
+25
+00:01:06,440 --> 00:01:08,520
+Te lo juro, mamá.
+
+26
+00:01:08,820 --> 00:01:11,300
+Camina rápido, ya es tarde.
+
+27
+00:01:11,600 --> 00:01:14,200
+Mira, ahí está nuestra vecina.
+
+28
+00:01:14,500 --> 00:01:17,420
+Buenos días, señora. ¿Cómo está usted?
+
+29
+00:01:17,720 --> 00:01:20,320
+Muy bien, gracias. ¿Y ustedes?
+
+30
+00:01:20,620 --> 00:01:22,780
+Vamos a la escuela.
+
+31
+00:01:23,080 --> 00:01:25,560
+¿Usted tiene perro, señora?
+
+32
+00:01:25,860 --> 00:01:28,700
+Sí, tengo dos perritos muy pequeños.
+
+33
+00:01:29,000 --> 00:01:31,200
+Duermen todo el día.
+
+34
+00:01:31,500 --> 00:01:33,380
+¡Qué flojos!
+
+35
+00:01:33,680 --> 00:01:36,360
+Adiós, señora. Que le vaya bien.
+
+36
+00:01:36,660 --> 00:01:39,180
+¿Conoces a mi abuela, Mateo?
+
+37
+00:01:39,480 --> 00:01:42,040
+Sí, la vi ayer en el mercado.
+
+38
+00:01:42,340 --> 00:01:44,860
+Niños, siéntense, por favor.
+
+39
+00:01:45,160 --> 00:01:47,640
+Hoy vamos a leer un cuento.
+
+40
+00:01:47,940 --> 00:01:50,420
+¿Quién quiere leer primero?
+
+41
+00:01:50,720 --> 00:01:52,640
+¡Yo, maestra!
+
+42
+00:01:52,940 --> 00:01:55,660
+Muy bien, Sofía. Lee en voz alta.
+
+43
+00:01:55,960 --> 00:01:58,520
+Mateo, ¿por qué estás triste?
+
+44
+00:01:58,820 --> 00:02:01,260
+Alguien me quitó mi lápiz.
+
+45
+00:02:01,560 --> 00:02:03,440
+Toma el mío.
+
+46
+00:02:03,740 --> 00:02:06,100
+Gracias, eres muy buena.
+
+47
+00:02:06,400 --> 00:02:09,000
+Sofía le dio su lápiz a Mateo.
+
+48
+00:02:09,300 --> 00:02:12,380
+La maestra le dijo a Pablo que se callara.
+
+49
+00:02:12,680 --> 00:02:15,160
+Pero Pablo seguía hablando.
+
+50
+00:02:15,460 --> 00:02:18,260
+Entonces la maestra se enojó mucho.
+
+51
+00:02:18,560 --> 00:02:20,720
+¡Pablo, cállate ya!
+
+52
+00:02:21,020 --> 00:02:23,940
+Perdón, maestra. No lo vuelvo a hacer.
+
+53
+00:02:24,240 --> 00:02:26,800
+En el salón hace mucho calor.
+
+54
+00:02:27,100 --> 00:02:29,820
+¿Puedo abrir la ventana, maestra?
+
+55
+00:02:30,120 --> 00:02:31,960
+Sí, ábrela.
+
+56
+00:02:32,260 --> 00:02:35,460
+Se dice que el maestro nuevo es muy estricto.
+
+57
+00:02:35,760 --> 00:02:38,280
+¿Cómo se dice esto en latín?
+
+58
+00:02:38,580 --> 00:02:41,380
+Escriban la palabra en su cuaderno.
+
+59
+00:02:41,680 --> 00:02:44,360
+Quiero que todos estudien mucho.
+
+60
+00:02:44,660 --> 00:02:47,100
+Temo que mi papá se enoje.
+
+61
+00:02:47,400 --> 00:02:50,000
+Espero que vengas a mi fiesta.
+
+62
+00:02:50,300 --> 00:02:52,260
+¡Claro que sí!
+
+63
+00:02:52,560 --> 00:02:55,240
+Abuelita, ¿me cuentas un cuento?
+
+64
+00:02:55,540 --> 00:02:58,420
+Primero tienen que lavarse las manos.
+
+65
+00:02:58,720 --> 00:03:01,120
+Ya nos lavamos las manos.
+
+66
+00:03:01,420 --> 00:03:04,140
+Bueno, siéntense aquí junto a mí.
+
+67
+00:03:04,440 --> 00:03:07,480
+Había una vez una tortuguita muy curiosa.
+
+68
+00:03:07,780 --> 00:03:10,540
+Vivía con su mamá junto a un lago.
+
+69
+00:03:10,840 --> 00:03:14,120
+Un día le dijo a su mamá que quería ver el mar.
+
+70
+00:03:14,420 --> 00:03:16,940
+El mar está muy lejos, hija.
+
+71
+00:03:17,240 --> 00:03:20,000
+Pero la tortuguita no tenía miedo.
+
+72
+00:03:20,300 --> 00:03:23,340
+A la mañana siguiente salió muy temprano.
+
+73
+00:03:23,640 --> 00:03:26,120
+Caminó durante muchos días.
+
+74
+00:03:26,420 --> 00:03:29,380
+Hacía mucho calor y estaba muy cansada.
+
+75
+00:03:29,680 --> 00:03:32,200
+Se sentó debajo de un árbol.
+
+76
+00:03:32,500 --> 00:03:34,980
+Ahí encontró a un conejito.
+
+77
+00:03:35,280 --> 00:03:37,680
+¿A dónde vas, tortuguita?
+
+78
+00:03:37,980 --> 00:03:40,780
+Voy al mar. ¿Quieres venir conmigo?
+
+79
+00:03:41,080 --> 00:03:43,760
+No, gracias. El mar me da miedo.
+
+80
+00:03:44,060 --> 00:03:46,900
+La tortuguita siguió su camino sola.
+
+81
+00:03:47,200 --> 00:03:49,920
+Por fin llegó a una playa blanca.
+
+82
+00:03:50,220 --> 00:03:52,540
+¡Qué grande era el mar!
+
+83
+00:03:52,840 --> 00:03:55,600
+La tortuguita estaba muy contenta.
+
+84
+00:03:55,900 --> 00:03:58,860
+Se metió en el agua y nadó todo el día.
+
+85
+00:03:59,160 --> 00:04:01,640
+En la noche regresó a casa.
+
+86
+00:04:01,940 --> 00:04:04,460
+Su mamá la estaba esperando.
+
+87
+00:04:04,760 --> 00:04:07,920
+¿Dónde estabas, hija? Estaba muy preocupada.
+
+88
+00:04:08,220 --> 00:04:10,540
+Fui a ver el mar, mamá.
+
+89
+00:04:10,840 --> 00:04:14,080
+Y colorín colorado, este cuento se ha acabado.
+
+90
+00:04:14,380 --> 00:04:16,940
+¡Qué bonito cuento, abuelita!
+
+91
+00:04:17,240 --> 00:04:19,400
+¿Te gustó, Pablito?
+
+92
+00:04:19,700 --> 00:04:21,860
+Sí, me gustó mucho.
+
+93
+00:04:22,160 --> 00:04:24,960
+Papá, ¿le puedes dar agua al perro?
+
+94
+00:04:25,260 --> 00:04:27,780
+Ya le di agua hace una hora.
+
+95
+00:04:28,080 --> 00:04:30,600
+Les traje fruta a los niños.
+
+96
+00:04:30,900 --> 00:04:33,340
+¡Qué ricas manzanas, papá!
+
+97
+00:04:33,640 --> 00:04:36,240
+¿Quién dejó la puerta abierta?
+
+98
+00:04:36,540 --> 00:04:39,180
+Pablo. Siempre la deja abierta.
+
+99
+00:04:39,480 --> 00:04:41,440
+¡No es cierto!
+
+100
+00:04:41,740 --> 00:04:44,980
+Cierra la puerta para que no se salga el gato.
+
+101
+00:04:45,280 --> 00:04:48,320
+El gato está escondido debajo de la cama.
+
+102
+00:04:48,620 --> 00:04:51,620
+¿Por qué tienes las manos sucias, Pablo?
+
+103
+00:04:51,920 --> 00:04:54,440
+Estaba jugando en el jardín.
+
+104
+00:04:54,740 --> 00:04:57,300
+Lávate las manos ahora mismo.
+
+105
+00:04:57,600 --> 00:05:00,400
+El niñito de la vecina llora mucho.
+
+106
+00:05:00,700 --> 00:05:03,180
+¿Está usted enfermo, señor?
+
+107
+00:05:03,480 --> 00:05:05,800
+Sí, me duele la cabeza.
+
+108
+00:05:06,100 --> 00:05:08,700
+¿Quiere usted un vaso de agua?
+
+109
+00:05:09,000 --> 00:05:11,800
+Sí, gracias, eres muy amable, niña.
+
+110
+00:05:12,100 --> 00:05:14,660
+Mañana va a hacer mucho frío.
+
+111
+00:05:14,960 --> 00:05:17,680
+Hay que cerrar bien las ventanas.
+
+112
+00:05:17,980 --> 00:05:20,740
+¿Por qué estás tan callada, Sofía?
+
+113
+00:05:21,040 --> 00:05:23,760
+Estoy pensando en mi amiga Lucía.
+
+114
+00:05:24,060 --> 00:05:26,500
+Ahora vive en otra ciudad.
+
+115
+00:05:26,800 --> 00:05:28,880
+La extraño mucho.
+
+116
+00:05:29,180 --> 00:05:31,940
+¿Por qué no le escribes una carta?
+
+117
+00:05:32,240 --> 00:05:34,520
+¡Qué buena idea, papá!
+
+118
+00:05:34,820 --> 00:05:37,340
+Mamá, ¿quieres que te ayude?
+
+119
+00:05:37,640 --> 00:05:40,520
+Pablito, no le jales la cola al gato.
+
+120
+00:05:40,820 --> 00:05:43,340
+Que duerman bien, mis niños.

@@ -81,3 +81,32 @@ fixtures `tests/fixtures/rules_es/frames_es.tsv` (40 own sentences). Formats: `d
 2. gloss_es_la.tsv rows changed: capio "tomar" removed (tomar -> sūmō, as in the gold), charta "carta" -> "naipe"
    (carta -> epistula). C11 reads these glosses Latin -> Spanish; please confirm.
 3. "vamos a + infinitive" at the start of a statement is read as "let us" (es-MX usage); "Vamos a ver" stays future?
+
+# Spanish loop 2 (C34)
+
+Material written first (before any engine change): tests/regression/own_dialogue2.es.srt / .es.txt (120 own cues) and
+tests/regression/expected/own_dialogue2.la.gold.txt.
+
+## Blind check sentences (written at 13:48 UTC 2026-10-09 at the start of C34, before any rule; output not looked at until the end)
+Our own Mexican-Spanish children's sentences, none from the regression files or an earlier blind list. Each is run as a
+batch of its own.
+1. ¿Le diste el libro a tu hermano?
+2. Mi abuela está cansada porque trabajó mucho.
+3. Quiero que me cuentes la verdad.
+4. Hay muchos pájaros en el jardín.
+5. Tenemos que limpiar el cuarto antes de la cena.
+6. Mañana vamos a visitar a la tía Rosa.
+7. Hace mucho calor hoy.
+8. Llegamos al pueblo hace dos semanas.
+9. ¿Por qué lloras, mi amor?
+10. El perrito de Juan es muy juguetón.
+11. Señora, ¿usted vive aquí?
+12. ¡Qué bonita es tu casa!
+13. Mi papá estaba leyendo cuando llegué.
+14. Temo que el lobo regrese esta noche.
+15. Se dice que el río es peligroso.
+16. Vi a la maestra en el mercado.
+17. La puerta está cerrada.
+18. Los niños eran felices en el pueblo.
+19. Espero que no llueva mañana.
+20. ¡Escóndete, niño, ahí viene el gigante!

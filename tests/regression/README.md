@@ -12,3 +12,9 @@ interjections, vocatives, yes / no answers and a few song lines. Gold: `expected
 tense, dialogue in quotation marks, a few long sentences with subordinate clauses, narrative connectors), cut the way
 a subtitle maker would at 35-42 characters: mid-phrase, mid-clause and across sentence ends. Gold:
 `expected/own_story.la.gold.txt` (the Latin of each sentence distributed over its cues by phrase).
+
+`own_dialogue2.es.srt` (C34, from `own_dialogue2.es.txt`): 120 cues of our own Mexican-Spanish children's dialogue and
+a short story of our own told by a grandmother: clitics (se, le, lo, les, the doubled "le ... a X"), the personal "a",
+ser / estar with predicate adjectives, pretérito / imperfecto, the subjunctive after querer / temer / esperar que,
+"hay", "se dice", "tener que", "ir a" + infinitive, "hace frío / hace tres días", diminutives, vocatives inside
+questions, usted / tú, exclamations. Gold: `expected/own_dialogue2.la.gold.txt`.

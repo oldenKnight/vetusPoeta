@@ -1,0 +1,128 @@
+# Gold Latin for tests/regression/own_dialogue2.es.txt (C34, Spanish source), one line per cue, written by the
+# implementer before the engine was run on the file; our own Mexican-Spanish children's dialogue and a short story of
+# our own (no film or book text). Alternatives after " | ". Register: beginner reader (Orberg-like), classical Latin,
+# macrons on long vowels. Speakers: Sofía (girl, the default speaker: speaker gender f), her little brother Pablo,
+# their grandmother (who tells the story of the little tortoise, cues 67-89), mother, father, the teacher (maestra),
+# Mateo (a classmate), a neighbour (señora) and an old man (señor) addressed with usted (rendered with tū).
+# Names: Pablo -> Paulus, Mateo -> Matthaeus, Sofía -> Sophīa, Lucía -> Lūcia. Diminutives: the base noun (+ parvus)
+# or the classical diminutive when common (perrito -> catulus, niñito -> puerulus); abuelita -> avia.
+Salvē, avia!
+Salvē, mea puella. Dormīvistīne bene? | Salvē, puella mea. Dormīvistīne bene? | Salvē, mea puella. Bene dormīvistīne? | Salvē, puella mea. Bene dormīvistīne?
+Ita, sed in cubiculō meō frīget. | Ita, sed frīget in cubiculō meō.
+Indue pallium caeruleum.
+Ubi est Paulus?
+Adhūc dormit. | Etiam nunc dormit.
+Excitā eum, quaesō. | Eum excitā, quaesō.
+Paule, surge!
+Iam sērō est. | Iam sērum est.
+Ad lūdum īre nōlō. | Nōlō ad lūdum īre.
+Cūr īre nōn vīs?
+Quia magistra mihi īrāta est. | Quia magistra mihi īrāscitur.
+Quid fēcistī?
+Matthaeō stilum frēgī. | Stilum Matthaeī frēgī.
+Nōn cōnsultō fēcī. | Imprūdēns fēcī.
+Igitur veniam ab eō petere dēbēs. | Igitur ab eō veniam petere dēbēs.
+Ita, avia. Eī dīcam. | Ita, avia. Id eī dīcam.
+Venī ad mēnsam. Est pānis et lac. | Venī ad mēnsam. Pānis et lac sunt. | Venī ad mēnsam. Sunt pānis et lac.
+Suntne ōva?
+Minimē, nūlla ōva sunt. | Nōn, nūlla ōva sunt. | Minimē, ōva nōn sunt. | Nōn, ōva nōn sunt.
+Māter, licetne mihi catulum meum dūcere? | Māter, possumne catulum meum dūcere? | Māter, possumne catulum meum mēcum dūcere?
+Minimē, mea vīta. Canēs ad lūdum nōn eunt. | Nōn, mea vīta. Canēs ad lūdum nōn eunt. | Minimē, vīta mea. Canēs ad lūdum nōn eunt.
+Abhinc trēs diēs canis pēnsum meum comēdit. | Canis abhinc trēs diēs pēnsum meum comēdit.
+Vērē? Tibi nōn crēdō. | Itane vērō? Tibi nōn crēdō. | Itane? Tibi nōn crēdō.
+Iūrō, māter. | Tibi iūrō, māter. | Iūrō tibi, māter.
+Ambulā celeriter; iam sērō est. | Celeriter ambulā; iam sērō est.
+Ecce vīcīna nostra. | Spectā, ibi est vīcīna nostra. | Ecce, ibi est vīcīna nostra.
+Salvē, domina. Quid agis? | Salvē, domina. Ut valēs? | Salvē, domina. Quōmodo valēs?
+Optimē, grātiās. Et vōs? | Bene valeō, grātiās. Et vōs? | Valdē bene, grātiās. Et vōs? | Optimē valeō, grātiās. Et vōs?
+Ad lūdum īmus.
+Habēsne canem, domina? | Canemne habēs, domina?
+Ita, duōs catulōs valdē parvōs habeō.
+Tōtum diem dormiunt.
+Quam pigrī! | Quam pigrī sunt!
+Valē, domina. Bene tibi sit! | Valē, domina. Bene sit tibi! | Valē, domina. Cūrā ut valeās!
+Nōvistīne aviam meam, Matthaee? | Aviamne meam nōvistī, Matthaee?
+Ita, herī eam in forō vīdī. | Ita, eam herī in forō vīdī.
+Puerī, sedēte, quaesō. | Puerī, cōnsīdite, quaesō.
+Hodiē fābulam legēmus.
+Quis prīmus legere vult? | Quis vult prīmus legere? | Quis prīmum legere vult?
+Ego, magistra!
+Optimē, Sophīa. Lege clārā vōce. | Bene, Sophīa. Lege clārā vōce. | Valdē bene, Sophīa. Lege clārā vōce. | Optimē, Sophīa. Lege magnā vōce.
+Matthaee, cūr trīstis es?
+Aliquis stilum meum mihi abstulit. | Aliquis mihi stilum meum abstulit. | Aliquis stilum mihi abstulit. | Aliquis stilum meum abstulit.
+Sūme meum. | Cape meum.
+Grātiās, valdē bona es. | Grātiās tibi, valdē bona es.
+Sophīa Matthaeō stilum suum dedit. | Sophīa stilum suum Matthaeō dedit.
+Magistra Paulō imperāvit ut tacēret. | Magistra Paulum tacēre iussit. | Magistra Paulō dīxit ut tacēret.
+Sed Paulus loquī pergēbat. | Paulus tamen loquī pergēbat.
+Tum magistra valdē īrāta est. | Tum magistra vehementer īrāta est.
+Paule, tacē iam! | Paule, tacē tandem! | Paule, iam tacē!
+Ignōsce mihi, magistra. Id iterum nōn faciam. | Ignōsce mihi, magistra. Nōn iterum faciam. | Ignōsce mihi, magistra. Id nōn iterum faciam.
+In conclāvī magnus aestus est. | In conclāvī valdē calidum est. | In conclāvī valdē calet.
+Licetne mihi fenestram aperīre, magistra? | Possumne fenestram aperīre, magistra?
+Ita, aperī eam. | Ita, eam aperī.
+Novus magister dīcitur valdē sevērus esse. | Dīcitur novus magister valdē sevērus esse. | Dīcitur novum magistrum valdē sevērum esse. | Dīcunt novum magistrum valdē sevērum esse.
+Quōmodo hoc Latīnē dīcitur? | Quid hoc Latīnē dīcitur? | Quōmodo Latīnē hoc dīcitur?
+Scrībite verbum in libellō vestrō. | Verbum in libellō vestrō scrībite.
+Volō omnēs multum discere. | Volō ut omnēs multum discant. | Volō omnēs dīligenter studēre. | Volō omnēs multum studēre.
+Timeō nē pater meus īrāscātur. | Vereor nē pater meus īrāscātur.
+Spērō tē ad convīvium meum ventūrum esse. | Spērō fore ut ad convīvium meum veniās.
+Certē! | Sānē!
+Avia, nārrābisne mihi fābulam? | Avia, nārrāsne mihi fābulam?
+Prīmum manūs lavāre dēbētis. | Prīmum vōbīs manūs lavandae sunt. | Prīmum manūs lavandae sunt.
+Iam manūs lāvimus. | Manūs iam lāvimus.
+Bene, cōnsīdite hīc iuxtā mē. | Bene, sedēte hīc iuxtā mē. | Bene, sedēte hīc prope mē. | Bene, cōnsīdite hīc prope mē.
+Ōlim erat parva testūdō valdē cūriōsa. | Ōlim erat testūdō parva valdē cūriōsa.
+Cum mātre suā prope lacum habitābat. | Cum mātre suā iuxtā lacum habitābat. | Cum mātre prope lacum habitābat. | Cum mātre iuxtā lacum habitābat.
+Quōdam diē mātrī dīxit sē mare vidēre velle. | Quōdam diē mātrī suae dīxit sē mare vidēre velle.
+Mare longē abest, fīlia. | Mare procul abest, fīlia. | Mare valdē longē abest, fīlia.
+Sed testūdō parva nōn timēbat. | Sed parva testūdō nōn timēbat. | Testūdō parva tamen nōn timēbat.
+Postrīdiē bene māne exiit. | Postrīdiē multō māne exiit. | Postrīdiē prīmā lūce exiit. | Posterō diē bene māne exiit.
+Multōs diēs ambulāvit. | Per multōs diēs ambulāvit. | Multōs diēs iter fēcit.
+Magnus aestus erat et valdē fessa erat. | Magnus erat aestus et valdē fessa erat. | Valdē calēbat et valdē fessa erat.
+Sub arbore cōnsēdit. | Sub arbore sēdit.
+Ibi cunīculum parvum invēnit. | Ibi parvum cunīculum invēnit. | Ibi cunīculum invēnit.
+Quō īs, parva testūdō? | Quō īs, testūdō parva?
+Ad mare eō. Vīsne mēcum venīre? | Ad mare eō. Vīsne venīre mēcum?
+Minimē, grātiās. Mare timeō. | Nōn, grātiās. Mare timeō. | Benignē. Mare timeō. | Minimē, grātiās. Mare mē terret.
+Testūdō parva sōla iter perrēxit. | Testūdō parva sōla iter suum perrēxit. | Testūdō sōla iter suum perrēxit.
+Tandem ad lītus album pervēnit. | Tandem ad lītus album advēnit. | Tandem ad lītus album vēnit.
+Quam magnum erat mare! | Quantum erat mare!
+Testūdō parva valdē laeta erat. | Parva testūdō valdē laeta erat.
+In aquam intrāvit et tōtum diem natāvit. | In aquam ingressa est et tōtum diem natāvit. | In aquam iniit et tōtum diem natāvit.
+Nocte domum rediit. | Noctū domum rediit.
+Māter eam exspectābat. | Māter eius eam exspectābat.
+Ubi erās, fīlia? Valdē sollicita eram. | Ubi erās, fīlia? Valdē anxia eram.
+Mare vīsum iī, māter. | Iī ut mare vidērem, māter. | Iī ad mare videndum, māter.
+Et haec fābula fīnīta est. | Atque haec fābula fīnīta est. | Fābula fīnīta est.
+Quam pulchra fābula, avia! | Quam bella fābula, avia!
+Placuitne tibi, Paule? | Tibine placuit, Paule?
+Ita, valdē mihi placuit. | Ita, mihi valdē placuit. | Ita, multum mihi placuit.
+Pater, potesne canī aquam dare? | Pater, potesne aquam canī dare?
+Iam abhinc hōram eī aquam dedī. | Abhinc hōram iam eī aquam dedī. | Eī iam abhinc hōram aquam dedī.
+Puerīs pōma attulī. | Pōma puerīs attulī. | Līberīs pōma attulī.
+Quam suāvia māla, pater! | Quam dulcia māla, pater!
+Quis iānuam apertam relīquit? | Quis ōstium apertum relīquit?
+Paulus. Semper eam apertam relinquit.
+Nōn est vērum! | Nōn vērum est! | Falsum est!
+Claude iānuam, nē fēlēs exeat. | Claude ōstium, nē fēlēs exeat.
+Fēlēs sub lectō latet. | Fēlēs sub lectō abscondita est. | Fēlēs sub lectō cēlāta est.
+Cūr manūs sordidās habēs, Paule? | Cūr manūs tuae sordidae sunt, Paule?
+In hortō lūdēbam.
+Lavā manūs statim. | Statim lavā manūs.
+Puerulus vīcīnae multum flet. | Vīcīnae puerulus multum flet. | Puerulus vīcīnae valdē flet.
+Aegerne es, domine? | Esne aeger, domine? | Aegrōtāsne, domine?
+Ita, caput mihi dolet. | Ita, mihi caput dolet. | Ita, caput dolet.
+Vīsne pōculum aquae?
+Ita, grātiās; valdē benigna es, puella.
+Crās valdē frīgēbit. | Crās magnum frīgus erit.
+Fenestrae bene claudendae sunt. | Fenestrās bene claudere oportet. | Oportet fenestrās bene claudere.
+Cūr tam tacita es, Sophīa?
+Dē amīcā meā Lūciā cōgitō. | Dē Lūciā amīcā meā cōgitō.
+Nunc in aliā urbe habitat. | Nunc in aliā urbe vīvit.
+Eam valdē dēsīderō. | Eam multum dēsīderō.
+Cūr nōn epistulam eī scrībis? | Cūr eī epistulam nōn scrībis? | Cūr nōn eī epistulam scrībis?
+Quam bonum cōnsilium, pater! | Optimum cōnsilium, pater!
+Māter, vīsne mē tē adiuvāre? | Māter, vīsne tē adiuvem? | Māter, vīsne ut tē adiuvem?
+Paule, nōlī caudam fēlis trahere. | Paule, nōlī fēlī caudam trahere.
+Bene dormiātis, puerī meī! | Bene dormīte, puerī meī! | Bene dormiātis, līberī meī!
