@@ -1332,7 +1332,8 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
         if (in(w, {"everyone", "all"})) np.pron.number = 2;
         np.number = np.pron.number;
         np.negative = in(w, {"nobody", "nothing", "none"});
-        np.interrogative = in(w, {"who", "what", "which"}) && (c.question || fget(ht, nlp::morph::PronTypeShift) ==
+        // (C28: "whom" too: "Whom did you see?")
+        np.interrogative = in(w, {"who", "whom", "what", "which"}) && (c.question || fget(ht, nlp::morph::PronTypeShift) ==
                                                                                  nlp::morph::PtInt);
         // C24: "what" heading its own relative clause is a free relative ("quod vidētur"), not a question word
         if (w == "what" && en)
@@ -2972,7 +2973,8 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
         o.front = k < h && mn == first;
       }
       // "wh" inside an oblique: "on where you want to go"
-      if (o.np.isPronoun && o.np.interrogative && f.type != Kind::Wh && c.question && k == first) {
+      // (C28: also after its preposition: "To whom did she write it?", "With whom did you come?")
+      if (o.np.isPronoun && o.np.interrogative && f.type != Kind::Wh && c.question && (k == first || o.front)) {
         f.type = Kind::Wh;
         f.wh.word = o.np.pronLemma;
         f.wh.role = Role::Oblique;

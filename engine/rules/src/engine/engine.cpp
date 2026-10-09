@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <mutex>
+#include <set>
 #include <sstream>
 
 #include "vp/check.h"
@@ -129,6 +130,9 @@ struct SentOut {
   // sentence asks for an answer (a question, an order, or an address alone): the next cue's speaker is then that person
   uint8_t vocGender = 0;
   bool invites = false;
+  // C28: the role of the wh word when the sentence is a wh question (frame::Role; 0 = none): "quid" is nominative or
+  // accusative by its role
+  uint8_t whRole = 0;
 };
 
 void addFlag(std::vector<std::string>& f, const std::string& x) {
@@ -319,15 +323,45 @@ class RulesEngine final : public Engine {
                     std::vector<std::string>& unknown) {
     std::string latin = m.latin;
     // plural variant from the note ("plural: salvēte") when the addressee is a group
-    if (mem.addresseePlural && latin.find(' ') == std::string::npos) {
+    // (C28: as many words as the Latin has: "good night" -> "plural: bene dormīte")
+    if (mem.addresseePlural && latin.find('{') == std::string::npos && latin.find('(') == std::string::npos) {
       const size_t p = m.note.find("plural");
       if (p != std::string::npos) {
         size_t a = p + 6;
         while (a < m.note.size() && (m.note[a] == ':' || m.note[a] == ' ')) ++a;
         size_t b = a;
-        while (b < m.note.size() && m.note[b] != ' ' && m.note[b] != ',' && m.note[b] != ';') ++b;
+        for (size_t w = (size_t)std::count(latin.begin(), latin.end(), ' ') + 1; w > 0; --w) {
+          if (b > a) ++b;
+          while (b < m.note.size() && m.note[b] != ' ' && m.note[b] != ',' && m.note[b] != ';') ++b;
+        }
         if (b > a) latin = m.note.substr(a, b - a);
       }
+    }
+    // C28: an order of the phrasebook given to a group without a plural in its note ("Boys, sit down." -> sedēte):
+    // each singular imperative of the row in the plural (the lexicon's own cell)
+    if (mem.addresseePlural && m.reg == "imp" && m.note.find("plural") == std::string::npos &&
+        latin.find('{') == std::string::npos && latin.find('/') == std::string::npos) {
+      std::string outL;
+      size_t a = 0;
+      while (a <= latin.size()) {
+        size_t b = latin.find(' ', a);
+        if (b == std::string::npos) b = latin.size();
+        std::string w = latin.substr(a, b - a), tail;
+        while (!w.empty() && (w.back() == ',' || w.back() == '!' || w.back() == '.')) { tail.insert(tail.begin(), w.back()); w.pop_back(); }
+        morph::Token mt;
+        if (!w.empty()) morph::analyseLatin(*la_, w, mt);
+        for (const lex::Analysis& an : mt.analyses) {
+          feat::Features f = feat::unpack(morph::packedOf(*la_, an));
+          if (f.mood != feat::Imperative || f.number != feat::Sg || f.person != 2) continue;
+          f.number = feat::Pl;
+          std::string pl;
+          if (morph::generate(*la_, an.lemma, f, pl, true) && !pl.empty()) { w = pl; break; }
+        }
+        if (!outL.empty()) outL += ' ';
+        outL += w + tail;
+        a = b + 1;
+      }
+      if (!outL.empty()) latin = outL;
     }
     // C19: an alternative of several words on both sides ("mī amīce/mea amīca") is chosen whole by the speaker
     // glossary; a one-word right side ("ō mē miserum/miseram") alternates the word before the slash only
@@ -1045,6 +1079,208 @@ class RulesEngine final : public Engine {
       if (frame::FrameBuilder::troubled(s)) s.repairs.emplace_back("no-verb");
     }
     if (st.lang == frame::SrcLang::En) {
+      // C28: "Children, who wrote this letter?": the parser hangs the question on the person addressed as a relative
+      // clause; the person is a vocative and the question a clause of its own
+      for (size_t ui = 0; ui < s.units.size(); ++ui) {
+        frame::Unit& u = s.units[ui];
+        if (u.type != frame::Unit::Clause || u.vocative || u.frame.type != frame::Kind::Frag || u.frame.hasPred ||
+            !u.frame.hasSubject || u.frame.subject.relative.size() != 1 || u.frame.subject.relative[0].type != frame::Kind::Wh)
+          continue;
+        const frame::SemFrame& rf = u.frame.subject.relative[0];
+        int q0 = -1;
+        for (int t : rf.tokens)
+          if (t >= 0 && (q0 < 0 || t < q0)) q0 = t;
+        const int sh = u.frame.subject.token;
+        if (q0 <= 0 || sh < 0 || sh >= q0 || (size_t)q0 > s.tokens.size() || s.tokens[(size_t)q0 - 1].text != ",") continue;
+        frame::Unit q;
+        q.type = frame::Unit::Clause;
+        q.frame = rf;
+        q.first = q0;
+        q.last = u.last;
+        q.sepAfter = u.sepAfter;
+        u.frame.subject.relative.clear();
+        {   // a capitalised word of address is no name ("Children, ..." -> puerī)
+          frame::SemNP& v = u.frame.subject;
+          const std::string h = text::lower(v.head);
+          static const std::pair<const char*, const char*> kPl[] = {{"children", "child"}, {"boys", "boy"}, {"girls", "girl"},
+                                                                    {"friends", "friend"}, {"ladies", "lady"}};
+          for (const auto& pl : kPl)
+            if (h == pl.first || h == pl.second) { v.isName = false; v.head = pl.second; v.number = h == pl.first ? 2 : v.number; }
+        }
+        u.vocative = true;
+        u.last = q0 - 1;
+        u.sepAfter = ",";
+        s.units.insert(s.units.begin() + (long)ui + 1, std::move(q));
+        ++ui;
+      }
+      // C28: in an answer a noun phrase before a comma is no address ("Where are you going?" - "Home, before dark.")
+      if (mem.answer)
+        for (frame::Unit& u : s.units)
+          if (u.type == frame::Unit::Clause && u.vocative && u.frame.hasSubject && !u.frame.subject.isName &&
+              !u.frame.subject.isPronoun && u.frame.subject.possessor.empty()) {
+            const std::string h = text::lower(u.frame.subject.head);
+            if (h == "home" || h == "house" || h == "school" || h == "market" || h == "garden" || h == "town" ||
+                h == "city" || h == "village" || h == "forest" || h == "river" || h == "sea")
+              u.vocative = false;
+          }
+      // C28: "There!" / "Here!" alone point at a place: ibi / hīc
+      if (s.units.size() == 1 && s.units[0].type == frame::Unit::Clause && s.units[0].frame.type == frame::Kind::Frag &&
+          !s.units[0].frame.hasPred && s.units[0].frame.hasSubject && s.units[0].frame.obliques.empty()) {
+        frame::SemFrame& f = s.units[0].frame;
+        const std::string h = text::lower(f.subject.head);
+        int words = 0;
+        for (const nlp::Token& t : s.tokens) words += t.upos != "PUNCT";
+        if (words == 1 && (h == "there" || h == "here")) {
+          frame::SemAdverb a;
+          a.lemma = h;
+          a.token = f.subject.token;
+          f.adverbs.push_back(a);
+          f.hasSubject = false;
+          f.subject = frame::SemNP{};
+          s.units[0].vocative = false;
+        }
+      }
+      // C28: a name or a word of address alone, called out ("Marcus!", "Father!", "Mother?"), is a vocative; not
+      // the answer to a question ("Who wrote it?" - "Julia.")
+      if (s.units.size() == 1 && s.units[0].type == frame::Unit::Clause && !s.units[0].vocative &&
+          (s.finalPunct == "!" || s.finalPunct == "?") && !mem.answer) {
+        frame::Unit& u = s.units[0];
+        frame::SemFrame& f = u.frame;
+        // "Father!" read as an order (generā): one word, no complements
+        if (f.type == frame::Kind::Imp && f.hasPred && !f.hasObject && !f.hasSubject && f.obliques.empty() &&
+            f.adverbs.empty() && f.pred.token >= 0 && (size_t)f.pred.token < s.tokens.size()) {
+          int words = 0;
+          for (const nlp::Token& t : s.tokens) words += t.upos != "PUNCT";
+          const std::string w = s.tokens[(size_t)f.pred.token].lower;
+          if (words == 1 && (w == "father" || w == "mother" || w == "brother" || w == "sister" || w == "master" ||
+                             w == "doctor" || w == "captain" || w == "teacher" || w == "friend" || w == "son")) {
+            f.type = frame::Kind::Frag;
+            f.hasPred = false;
+            f.pred = frame::SemPredicate{};
+            f.interjections.push_back(w);
+          }
+        }
+        if (f.type == frame::Kind::Frag && !f.hasPred && f.obliques.empty() && f.predAdj.empty() && f.predicative.empty() &&
+            f.connectors.empty() && f.adverbs.empty() && !f.negative) {
+          static const char* const kAddress[] = {"father", "mother", "dad", "daddy", "mum", "mummy", "mom", "mommy",
+                                                 "papa", "mama", "sir", "madam", "brother", "sister", "son", "daughter",
+                                                 "grandmother", "grandfather", "grandma", "grandpa", "granny", "uncle",
+                                                 "aunt", "master", "teacher", "doctor", "captain", "friend", "friends",
+                                                 "children", "child", "boys", "girls", "boy", "girl", "lady", "ladies",
+                                                 "gentlemen", "everyone", "everybody", "king", "queen", "majesty"};
+          auto addressWord = [&](const std::string& w) {
+            const std::string l = text::lower(w);
+            for (const char* a : kAddress)
+              if (l == a) return true;
+            return false;
+          };
+          if (f.hasSubject && f.interjections.empty() && f.subject.adjectives.empty() && f.subject.genitive.empty() &&
+              f.subject.relative.empty() && f.subject.coord.empty() && !f.subject.isPronoun &&
+              (f.subject.isName || addressWord(f.subject.head))) {
+            u.vocative = true;
+          } else if (!f.hasSubject && f.interjections.size() == 1 && addressWord(f.interjections[0])) {
+            int tok = -1;
+            for (size_t k = 0; k < s.tokens.size(); ++k)
+              if (s.tokens[k].lower == text::lower(f.interjections[0])) { tok = (int)k; break; }
+            if (tok >= 0) {
+              frame::SemNP np;
+              np.head = text::lower(f.interjections[0]);
+              np.surface = s.tokens[(size_t)tok].text;
+              np.token = tok;
+              np.tokens.push_back(tok);
+              np.number = np.head.back() == 's' || np.head == "children" || np.head == "gentlemen" ? 2 : 1;
+              f.interjections.clear();
+              f.hasSubject = true;
+              f.subject = np;
+              u.vocative = true;
+            }
+          }
+        }
+      }
+      // C28: "Sleep, my child, sleep": a bare verb set off by commas around a person addressed is an order, not a
+      // second vocative (somne)
+      {
+        bool person = false;
+        for (const frame::Unit& u : s.units)
+          if (u.type == frame::Unit::Clause && u.vocative && u.frame.hasSubject &&
+              (u.frame.subject.isName || !u.frame.subject.possessor.empty() || text::lower(u.frame.subject.head) == "child" ||
+               text::lower(u.frame.subject.head) == "children"))
+            person = true;
+        for (frame::Unit& u : s.units) {
+          if (!person || u.type != frame::Unit::Clause || !u.vocative || !u.frame.hasSubject) continue;
+          const frame::SemNP& v = u.frame.subject;
+          const std::string vh = text::lower(v.head);
+          if (vh == "child" || vh == "children" || vh == "father" || vh == "mother" || vh == "friend" || vh == "boy" ||
+              vh == "girl" || vh == "son" || vh == "daughter" || vh == "sir" || vh == "baby" || vh == "dear" || vh == "darling")
+            continue;
+          if (v.isName || v.isPronoun || !v.determiner.empty() || !v.possessor.empty() || !v.adjectives.empty() ||
+              v.number == 2 || v.token < 0 || (size_t)v.token >= s.tokens.size())
+            continue;
+          int words = 0;
+          for (int t = u.first; t <= u.last && t < (int)s.tokens.size(); ++t) words += t >= 0 && s.tokens[(size_t)t].upos != "PUNCT";
+          if (words != 1 || !en_) continue;
+          std::vector<lex::Analysis> an;
+          en_->lookup(text::en_key(s.tokens[(size_t)v.token].lower), an);
+          bool verb = false;
+          for (const lex::Analysis& a : an) verb = verb || en_->lemma(a.lemma).pos == feat::Verb;
+          if (!verb) continue;
+          frame::SemFrame f;
+          f.type = frame::Kind::Imp;
+          f.hasPred = true;
+          f.pred.lemma = s.tokens[(size_t)v.token].lower;
+          f.pred.token = v.token;
+          f.tokens = u.frame.tokens;
+          u.frame = f;
+          u.vocative = false;
+        }
+      }
+      // C28: "Is he your brother, Julia?", "Are you hungry, Anna?": a question whose person addressed comes last (the
+      // clause before the comma has the inverted verb) is a yes / no question
+      if (s.finalPunct == "?" && s.units.size() >= 2 && s.units.back().type == frame::Unit::Clause && s.units.back().vocative) {
+        frame::Unit& q = s.units[s.units.size() - 2];
+        if (q.type == frame::Unit::Clause && !q.vocative && q.frame.type == frame::Kind::Decl && q.frame.hasPred &&
+            q.first >= 0 && (size_t)q.first < s.tokens.size()) {
+          int k0 = q.first;
+          while ((size_t)k0 < s.tokens.size() && s.tokens[(size_t)k0].upos == "PUNCT") ++k0;
+          if ((size_t)k0 < s.tokens.size()) {
+            const std::string w = s.tokens[(size_t)k0].lower;
+            for (const char* a : {"is", "are", "am", "was", "were", "do", "does", "did", "can", "could", "will", "would",
+                                  "have", "has", "had", "shall", "should", "may", "must"})
+              if (w == a) { q.frame.type = frame::Kind::Yn; break; }
+          }
+        }
+      }
+      // C28: "It's me, your brother.": the noun phrase after "it's me" is an apposition, not a person addressed
+      for (size_t ui = 1; ui < s.units.size(); ++ui) {
+        frame::Unit& u = s.units[ui];
+        const frame::Unit& pv = s.units[ui - 1];
+        if (u.type == frame::Unit::Clause && u.vocative && pv.type == frame::Unit::Clause && !pv.vocative && pv.frame.copula &&
+            pv.frame.hasSubject && pv.frame.subject.isPronoun && pv.frame.subject.pronLemma == "it" &&
+            pv.frame.predicative.size() == 1 && pv.frame.predicative[0].isPronoun && pv.frame.predicative[0].pron.person >= 1 &&
+            pv.frame.predicative[0].pron.person <= 2)
+          u.vocative = false;
+      }
+      // C28: a group addressed in this sentence ("Stay here, children.", "Hello, children!") makes its orders,
+      // greetings and "you" plural (also for the rest of the cue); one person addressed makes them singular
+      {
+        int voc = 0;
+        for (const frame::Unit& u : s.units) {
+          if (u.type != frame::Unit::Clause) continue;
+          if (u.vocative && u.frame.hasSubject) voc = u.frame.subject.number == 2 ? 2 : std::max(voc, 1);
+          for (const frame::SemNP& v : u.frame.vocatives) voc = v.number == 2 ? 2 : std::max(voc, 1);
+        }
+        if (voc == 2) {
+          mem.addresseePlural = true;
+          mem.sawPlural = true;
+          for (frame::Unit& u : s.units)
+            if (u.type == frame::Unit::Clause && u.frame.type == frame::Kind::Imp) u.frame.imperativePlural = true;
+        } else if (voc == 1) {
+          mem.addresseePlural = false;
+        }
+      }
+      for (const frame::Unit& u : s.units)
+        if (u.type == frame::Unit::Clause && !u.vocative && u.frame.type == frame::Kind::Wh && !so.whRole)
+          so.whRole = (uint8_t)u.frame.wh.role;
       addressInfo(s, st, mem, ctx, so);
       // C24: a person addressed by a noun of known gender ("Mother, are you tired?") sets the gender of "you" when no
       // name did (C22 Memory::addresseeGender)
@@ -1055,7 +1291,9 @@ class RulesEngine final : public Engine {
     std::vector<std::string> flags;
     struct UnitText { cue::Latin latin; std::vector<Reason> reasons; std::string sep; bool nameFirst = false;
                       int srcStart = -1; size_t choiceFrom = 0, choiceTo = 0; bool connFront = false;
-                      int first = 0, last = -1; bool clause = false; std::string reg; };
+                      int first = 0, last = -1; bool clause = false; std::string reg;
+                      std::vector<int> pOff;   // C28: per token, the source offset of a phrase word (-1: by choice)
+                    };
     std::vector<UnitText> units;
     for (size_t ui = 0; ui < s.units.size(); ++ui) {
       const frame::Unit& u = s.units[ui];
@@ -1182,8 +1420,12 @@ class RulesEngine final : public Engine {
         const std::string& f = ut.latin.tokens[0].text;
         if (!f.empty() && ((f[0] >= 'A' && f[0] <= 'Z') || (unsigned char)f[0] >= 0xC3)) ut.nameFirst = true;
       }
+      // C28: the words of a phrasebook piece come from its source words (kept when the piece moves into a clause)
+      ut.pOff.assign(ut.latin.tokens.size(), u.type == frame::Unit::Phrase ? ut.srcStart : -1);
       if (!ut.latin.text.empty()) units.push_back(std::move(ut));
     }
+    // C28: an order given by a phrasebook row ("Be quiet,") is the order an ", or ..." after it refers to
+    if (!s.units.empty() && s.units.back().type == frame::Unit::Phrase) mem.lastImp = s.units.back().phrase.reg == "imp";
     // C17: an adverbial phrase that stands inside a clause in the source ("so that in reality I may become ...") goes
     // into that clause: after its opening conjunction (ut, et, sed ...), else first
     for (size_t i = 1; i < units.size(); ++i) {
@@ -1236,6 +1478,14 @@ class RulesEngine final : public Engine {
       cue::append(merged, head);
       cue::append(merged, ph);
       cue::append(merged, tail);
+      {   // C28
+        std::vector<int> po;
+        const size_t at0 = conj ? 1 : 0;
+        for (size_t q = 0; q < at0 && q < units[j].pOff.size(); ++q) po.push_back(units[j].pOff[q]);
+        po.insert(po.end(), units[i].pOff.begin(), units[i].pOff.end());
+        for (size_t q = at0; q < units[j].pOff.size(); ++q) po.push_back(units[j].pOff[q]);
+        units[j].pOff = po;
+      }
       for (Reason& r : units[j].reasons)
         if (r.tokenIndex >= (int)(conj ? 1 : 0)) r.tokenIndex += (int)ph.tokens.size();
       const int at = conj ? 1 : 0;
@@ -1286,6 +1536,12 @@ class RulesEngine final : public Engine {
       cue::append(merged, head);
       cue::append(merged, pl);
       cue::append(merged, tail);
+      {   // C28
+        std::vector<int> po(host.pOff.begin(), host.pOff.begin() + (long)std::min(k, host.pOff.size()));
+        po.insert(po.end(), ph.pOff.begin(), ph.pOff.end());
+        for (size_t q = k; q < host.pOff.size(); ++q) po.push_back(host.pOff[q]);
+        host.pOff = po;
+      }
       for (Reason& r : host.reasons)
         if (r.tokenIndex >= (int)k) r.tokenIndex += (int)pl.tokens.size();
       for (Reason r : ph.reasons) { if (r.tokenIndex >= 0) r.tokenIndex += (int)k; host.reasons.push_back(r); }
@@ -1326,6 +1582,7 @@ class RulesEngine final : public Engine {
       std::vector<char> usedChoice(so.choices.size(), 0);
       const size_t offFrom = so.srcOffset.size();
       std::vector<char> found;
+      std::set<int> usedSrc;   // C28
       for (const rules::TokenView& t : ut.latin.tokens) {
         int off = ut.srcStart;
         bool hit = false;
@@ -1338,6 +1595,76 @@ class RulesEngine final : public Engine {
               hit = true;
               break;
             }
+        // C28: a phrasebook word that moved into a clause keeps its phrase's source offset
+        {
+          const size_t q = (size_t)(&t - &ut.latin.tokens[0]);
+          if (!hit && q < ut.pOff.size() && ut.pOff[q] >= 0) { off = ut.pOff[q]; hit = true; }
+        }
+        // C28: a function word without a choice of its own (a relative or interrogative word, nōn, a conjunction)
+        // is found by its English word in the unit, so a sentence over several cues keeps it with its clause
+        if (!hit && st.lang == frame::SrcLang::En) {
+          const std::string k = text::latin_key(t.text);
+          const char* const* src = nullptr;
+          static const char* const kRel[] = {"who", "whom", "which", "that", "what", "whose", nullptr};
+          static const char* const kUbi[] = {"where", "when", nullptr};
+          static const char* const kQuo[] = {"where", "whither", nullptr};
+          static const char* const kCur[] = {"why", nullptr};
+          static const char* const kQuando[] = {"when", nullptr};
+          static const char* const kHow[] = {"how", nullptr};
+          static const char* const kNon[] = {"not", "n't", "never", nullptr};
+          static const char* const kEt[] = {"and", nullptr};
+          static const char* const kSed[] = {"but", nullptr};
+          static const char* const kAut[] = {"or", nullptr};
+          static const char* const kSi[] = {"if", nullptr};
+          static const char* const kQuia[] = {"because", "since", nullptr};
+          static const char* const kDum[] = {"while", "until", "till", nullptr};
+          if (k == "qui" || k == "quae" || k == "quod" || k == "quem" || k == "quam" || k == "cuius" || k == "cui" ||
+              k == "quo" || k == "qua" || k == "quibus" || k == "quos" || k == "quas" || k == "quis" || k == "quid")
+            src = kRel;
+          if (k == "ubi") src = kUbi;
+          else if (k == "quo" && t.features.pos == "adv") src = kQuo;
+          else if (k == "cur") src = kCur;
+          else if (k == "quando") src = kQuando;
+          else if (k == "quomodo" || k == "quot" || k == "quantus" || k == "qualis") src = kHow;
+          else if (k == "non" || k == "nondum") src = kNon;
+          else if (k == "et" || k == "neque" || k == "nec") src = kEt;
+          else if (k == "sed") src = kSed;
+          else if (k == "aut" || k == "an" || k == "vel") src = kAut;
+          else if (k == "si") src = kSi;
+          else if (k == "quia") src = kQuia;
+          else if (k == "dum" || k == "donec") src = kDum;
+          static const char* const kEgo[] = {"me", "i", "my", "myself", nullptr};
+          static const char* const kTu[] = {"you", "your", "yourself", nullptr};
+          static const char* const kNos[] = {"us", "we", "our", "ourselves", nullptr};
+          static const char* const kIs[] = {"him", "her", "it", "them", "he", "she", "they", "his", "its", "their", nullptr};
+          if (t.features.pos == "pron" && !src) {
+            if (k == "ego" || k == "me" || k == "mihi" || k == "mecum") src = kEgo;
+            else if (k == "tu" || k == "te" || k == "tibi" || k == "tecum" || k == "uos" || k == "uobis" || k == "uobiscum") src = kTu;
+            else if (k == "nos" || k == "nobis" || k == "nobiscum") src = kNos;
+            else if (k == "is" || k == "ea" || k == "id" || k == "eum" || k == "eam" || k == "ei" || k == "eo" || k == "eos" ||
+                     k == "eas" || k == "eis" || k == "iis" || k == "eius" || k == "eorum" || k == "earum")
+              src = kIs;
+          }
+          for (int q = ut.first; src && !hit && q <= ut.last && q < (int)s.tokens.size(); ++q) {
+            if (q < 0 || usedSrc.count(q)) continue;
+            for (const char* const* w = src; *w && !hit; ++w)
+              if (s.tokens[(size_t)q].lower == *w) {
+                off = s.tokens[(size_t)q].start;
+                hit = true;
+                usedSrc.insert(q);
+              }
+          }
+        }
+        // C28: by its first two letters without length marks ("Rōmae" for "Rome")
+        if (!hit && !t.text.empty() && (unsigned char)t.text[0] >= 'A' && (unsigned char)t.text[0] <= 'Z') {
+          const std::string lk = text::latin_key(t.text);
+          for (int k = ut.first; !hit && lk.size() >= 3 && k <= ut.last && k < (int)s.tokens.size(); ++k)
+            if (k >= 0 && s.tokens[(size_t)k].upos == "PROPN" && s.tokens[(size_t)k].lower.size() >= 3 &&
+                s.tokens[(size_t)k].lower.compare(0, 2, lk, 0, 2) == 0) {
+              off = s.tokens[(size_t)k].start;
+              hit = true;
+            }
+        }
         // C24: a name is found by its source spelling
         if (!hit && !t.text.empty() && (unsigned char)t.text[0] >= 'A' && (unsigned char)t.text[0] <= 'Z')
           for (int k = ut.first; k <= ut.last && k < (int)s.tokens.size(); ++k)
@@ -1723,6 +2050,106 @@ class RulesEngine final : public Engine {
     return f ? (uint8_t)feat::F : m ? (uint8_t)feat::M : (uint8_t)0;
   }
 
+  // C28: what a wh question asks for, kept for the sentence after it (transfer::Memory wh*): the case of the wh word
+  // (from the realised form), a preposition before it, a place question (ubi / quō / unde), a third-person subject, the
+  // gender and number of an interrogative noun. A short follow-up question without a wh word ("And then?") keeps it;
+  // any other sentence clears it.
+  void whInfo(const SourceSentence& ss, const SentOut& so, transfer::Memory& mem) {
+    std::string t = ss.text;
+    while (!t.empty() && (t.back() == ' ' || t.back() == '"' || t.back() == '\'')) t.pop_back();
+    const bool question = ss.kind == frame::CueKind::Speech && !t.empty() && t.back() == '?';
+    auto clear = [&]() {
+      mem.whCase = mem.whPlace = mem.whGender = mem.whNumber = 0;
+      mem.whPrep = transfer::kNone;
+      mem.whSubj3 = false;
+    };
+    // the question an answer answered stays at hand for a follow-up ("To the market." - "And then?" - "Home.")
+    auto save = [&]() {
+      whSaved_ = {mem.whCase, mem.whPlace, mem.whGender, mem.whNumber, mem.whPrep, mem.whSubj3};
+    };
+    if (!question) {
+      if (mem.whCase || mem.whPlace) save();
+      else whSaved_ = WhSaved{};
+      clear();
+      return;
+    }
+    auto caseOf = [](const std::string& c) -> uint8_t {
+      return c == "nominative" ? feat::Nom : c == "genitive" ? feat::Gen : c == "dative" ? feat::Dat
+           : c == "accusative" ? feat::Acc : c == "ablative" ? feat::Abl : 0;
+    };
+    const std::vector<rules::TokenView>& tk = so.latin.tokens;
+    long at = -1;
+    uint8_t cs = 0, place = 0;
+    uint32_t prep = transfer::kNone;
+    for (size_t i = 0; i < tk.size() && at < 0; ++i) {
+      const std::string k = text::latin_key(tk[i].text);
+      const bool front = i == 0 || (i == 1 && tk[0].features.pos == "prep");
+      const std::string lowSrc = " " + text::lower(ss.text) + " ";
+      const bool srcWhere = lowSrc.find(" where ") != std::string::npos || lowSrc.find(" where?") != std::string::npos;
+      if (k == "ubi") place = 1;
+      else if (k == "quo" && !(i > 0 && tk[i - 1].features.pos == "prep") &&
+               (srcWhere || tk[i].features.pos == "adv" || i + 1 == tk.size() || tk[i + 1].features.pos == "verb"))
+        place = 2;
+      else if (k == "unde") place = 3;
+      else if (k == "quocum" || k == "quacum" || k == "quibuscum") { cs = feat::Abl; prep = xfer_->latin("cum", feat::Prep); }
+      else if (k == "quis" || k == "quid" || k == "quem" || k == "cui" || k == "cuius" || k == "quibus" || k == "quos" ||
+               k == "quas" || k == "quot" || k == "quantus" || k == "quanta" || k == "quantum" || k == "qualis" ||
+               (front && (k == "qui" || k == "quae" || k == "quod" || k == "quam" || k == "quo" || k == "qua")))
+        cs = caseOf(tk[i].features.case_);
+      else continue;
+      // quid / quod / quae (neuter) are nominative or accusative by the role of the wh word
+      if ((k == "quid" || k == "quod" || k == "quae") && (cs == feat::Nom || cs == feat::Acc) && so.whRole) {
+        const frame::Role r = (frame::Role)so.whRole;
+        if (r == frame::Role::Object) cs = feat::Acc;
+        else if (r == frame::Role::Subject || r == frame::Role::Predicate) cs = feat::Nom;
+      }
+      at = (long)i;
+      if (i > 0 && tk[i - 1].features.pos == "prep" && tk[i - 1].hasLemma) prep = tk[i - 1].lemmaId;
+      // an interrogative word before its noun ("Quot pānēs?", "Quae via?"): the noun's case, gender and number
+      if (i + 1 < tk.size() && tk[i + 1].features.pos == "noun") {
+        const rules::Features& nf = tk[i + 1].features;
+        if (!cs) cs = caseOf(nf.case_);
+        uint8_t g = 0;   // a noun form carries no gender: the lemma's
+        if (tk[i + 1].hasLemma) {
+          const uint8_t lg = la_->lemma(tk[i + 1].lemmaId).gender;
+          g = lg == feat::F || lg == feat::FN ? feat::F : lg == feat::N ? feat::N : lg ? feat::M : 0;
+        }
+        if (!g) g = nf.gender == "feminine" ? feat::F : nf.gender == "neuter" ? feat::N : feat::M;
+        mem.whGender = g;
+        mem.whNumber = nf.number == "plural" ? feat::Pl : feat::Sg;
+      } else {
+        mem.whGender = mem.whNumber = 0;
+      }
+    }
+    if (at < 0) {
+      // "And then?", "Really?": a short follow-up keeps the question before it (or the one just answered)
+      if (tk.size() <= 3) {
+        if (!mem.whCase && !mem.whPlace && (whSaved_.cs || whSaved_.place)) {
+          mem.whCase = whSaved_.cs;
+          mem.whPlace = whSaved_.place;
+          mem.whGender = whSaved_.gender;
+          mem.whNumber = whSaved_.number;
+          mem.whPrep = whSaved_.prep;
+          mem.whSubj3 = whSaved_.subj3;
+        }
+        return;
+      }
+      whSaved_ = WhSaved{};
+      clear();
+      return;
+    }
+    whSaved_ = WhSaved{};
+    mem.whCase = cs;
+    mem.whPlace = place;
+    mem.whPrep = place ? transfer::kNone : prep;
+    mem.whSubj3 = false;
+    for (const rules::TokenView& v : tk)
+      if (v.features.pos == "verb" && v.features.person == "third" && cs != feat::Nom && !place) mem.whSubj3 = true;
+  }
+
+  struct WhSaved { uint8_t cs = 0, place = 0, gender = 0, number = 0; uint32_t prep = transfer::kNone; bool subj3 = false; };
+  WhSaved whSaved_;   // C28: per translate call (reset at its start)
+
   static bool firstPersonAgreement(const SentOut& so) {
     for (const auto& t : so.latin.tokens)
       if ((t.features.pos == "adj" || t.features.mood == "participle") && !t.features.gender.empty()) return true;
@@ -1864,6 +2291,7 @@ class RulesEngine final : public Engine {
     };
     std::vector<CueAcc> acc(texts.size());
     transfer::Memory mem;
+    whSaved_ = WhSaved{};   // C28
     transfer::Settings st;
     st.lang = lang;
     st.fidelity = std::max(1, std::min(3, opt.fidelity));
@@ -1950,6 +2378,7 @@ class RulesEngine final : public Engine {
         mem.addresseeGender = ag;
       }
       mem.songLine = ss.kind == frame::CueKind::Song;   // C22
+      mem.answer = ss.kind == frame::CueKind::Speech && (mem.whCase || mem.whPlace);   // C28
       if (ss.kind == frame::CueKind::Nonverbal) mem.prevValid = false;
       memBefore_ = mem;
       if (ss.kind == frame::CueKind::Nonverbal) {
@@ -2051,6 +2480,11 @@ class RulesEngine final : public Engine {
           }
         }
         display(so.latin, opt.macrons);
+        // C28: a speaker dash of the source stays in front of the turn's Latin ("- Veniō! - Festīnā!")
+        if (ss.kind == frame::CueKind::Speech && ss.dash && !so.latin.text.empty()) {
+          so.latin.text.insert(0, "- ");
+          for (auto& t : so.latin.tokens) { t.start += 2; t.end += 2; }
+        }
         if (ss.kind == frame::CueKind::Song) {
           so.song = true;
           addFlag(so.flags, "song");
@@ -2062,7 +2496,53 @@ class RulesEngine final : public Engine {
       // pieces back onto the cues
       if (so.srcOffset.size() != so.latin.tokens.size()) so.srcOffset.assign(so.latin.tokens.size(), -1);
       if (ss.kind == frame::CueKind::Song) so.srcOffset.assign(so.latin.tokens.size(), -1);
-      const std::vector<cue::Latin> pieces = cue::splitSentence(ss, so.latin, &so.srcOffset);
+      std::vector<cue::Latin> pieces = cue::splitSentence(ss, so.latin, &so.srcOffset);
+      // C28: a sentence over several cues is re-split by clause: each cue gets the Latin of its own words, in Latin
+      // order ("Librum legit" | "sub arbore veterī."); the sentence capital moves to the new first word
+      if (ss.kind == frame::CueKind::Speech && ss.parts.size() > 1) {
+        std::vector<cue::Latin> rg;
+        std::vector<std::vector<size_t>> ord;
+        if (cue::regroupSentence(ss, so.latin, so.srcOffset, rg, &ord)) {
+          bool moved = false;
+          for (size_t p = 0; p < ord.size(); ++p)
+            for (size_t q = 0; q < ord[p].size(); ++q)
+              moved = moved || (p > 0 && q == 0 && ord[p][0] < ord[p - 1].back()) || (q > 0 && ord[p][q] < ord[p][q - 1]);
+          for (size_t p = 0; p < rg.size(); ++p)
+            for (size_t q = 1; q < ord[p].size(); ++q) moved = moved || ord[p][q] < ord[p][q - 1];
+          if (moved && !rg[0].tokens.empty() && ord[0][0] != 0) {
+            const auto nameTok = [&](const rules::TokenView& t) {
+              return t.hasLemma && (la_->lemma(t.lemmaId).flags & lex::ProperName);
+            };
+            for (size_t p = 0; p < rg.size(); ++p)
+              for (size_t q = 0; q < ord[p].size(); ++q) {
+                if (ord[p][q] != 0 || nameTok(rg[p].tokens[q])) continue;
+                bool nm = false;
+                for (const Reason& rr : so.reasons) nm = nm || (rr.tokenIndex == 0 && rr.kind == "name");
+                if (nm) continue;
+                std::vector<std::string> tx;
+                for (const auto& t : rg[p].tokens) tx.push_back(t.text);
+                decapitalise(tx[q]);
+                rewriteTokens(rg[p], tx);
+                decapitalise(rg[p].tokens[q].display);
+              }
+            std::vector<std::string> tx;
+            for (const auto& t : rg[0].tokens) tx.push_back(t.text);
+            capitalise(tx[0]);
+            rewriteTokens(rg[0], tx);
+            capitalise(rg[0].tokens[0].display);
+          }
+          if (moved) {
+            // reasons follow their tokens into the new order
+            std::vector<long> newIndex(so.latin.tokens.size(), -1);
+            long k = 0;
+            for (const auto& o2 : ord)
+              for (size_t q : o2) newIndex[q] = k++;
+            for (Reason& rr : so.reasons)
+              if (rr.tokenIndex >= 0 && (size_t)rr.tokenIndex < newIndex.size()) rr.tokenIndex = (int)newIndex[(size_t)rr.tokenIndex];
+          }
+          pieces = std::move(rg);
+        }
+      }
       // C22: no cue may ever be emptied or swallowed by a neighbour. When a sentence spanning cues leaves one of them
       // without Latin words (its words were merged into another cue's piece), each cue's part is translated as a
       // sentence of its own (a fragment, Check).
@@ -2134,6 +2614,7 @@ class RulesEngine final : public Engine {
         if (mem.addresseeGuess) addFlag(a.flags, "addressee-guess");
       }
       prevSongText = ss.kind == frame::CueKind::Song ? ss.text : std::string();   // C24
+      whInfo(ss, so, mem);   // C28
       if (!ss.parts.empty() && ss.kind == frame::CueKind::Speech) {   // C24
         const size_t lc = ss.parts.back().cue;
         if (lc < cueVoc.size()) {
@@ -2302,7 +2783,8 @@ class RulesEngine final : public Engine {
                             "phrase-order", "participle-phrase", "ellipsis", "could-not-parse", "editorial",   // C17
                             "derived-word",   // C19
                             "cue-split", "addressee-gender",   // C22
-                            "speaker-reply", "free-relative", "clause-split", "song-relative"})   // C24
+                            "speaker-reply", "free-relative", "clause-split", "song-relative",   // C24
+                            "antecedent-guess"})   // C28
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       // a tier 3 word chosen while a tier 1/2 word of the same sense existed (fidelity 1, a correction aside)
       for (const transfer::Choice& c : a.choices)
@@ -2315,6 +2797,27 @@ class RulesEngine final : public Engine {
         }
       if (opt.speakerGender == 'u' && std::find(o.flags.begin(), o.flags.end(), "speaker-gender") != o.flags.end())
         chk = true;
+      // C28: a cue of one or two words without a verb ("The queen.", "Fish again?") leans on the cues around it: it is
+      // OK only when every word came from the phrasebook, the names table or a closed-class table ("Yes.", "Marcus!",
+      // "Why not?"); a dictionary choice there is Check (flag short-cue)
+      if (!a.song && !a.nonverbal && !a.copied) {
+        int words = 0;
+        bool inWord = false;
+        for (char ch : cues[i].sourceText) {
+          const bool letter = std::isalpha((unsigned char)ch) || (unsigned char)ch >= 0x80 || ch == '\'';
+          if (letter && !inWord) ++words;
+          inWord = letter;
+        }
+        bool verb = false;
+        for (const auto& t : o.tokens) verb = verb || t.features.pos == "verb";
+        bool dictionary = false;
+        for (const transfer::Choice& c : a.choices) dictionary = dictionary || c.kind == "sense" || c.kind == "periphrasis";
+        if (words >= 1 && words <= 2 && !verb && dictionary) {
+          chk = true;
+          addFlag(o.flags, "short-cue");
+          o.reasons.push_back(Reason{-1, "form", "a cue of one or two words without a verb depends on the cues around it: check it", ""});
+        }
+      }
       // C23 (D18): latinity "classical" and the word chosen is still a Medieval / Late / New Latin sense (no classical
       // candidate won): Check with a hint. With "wide" the register is never a Check reason.
       if (opt.latinity == Latinity::Classical)

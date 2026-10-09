@@ -2527,7 +2527,7 @@ TEST_CASE("rules-h: the person addressed: a feminine name in the cue or the cue 
     CHECK(o[1].text == "Puella cāra mea, fessa es.");   // the name decides, not the speaker setting
   }
   expectEach({
-      {"Are you tired, Lucy?", "Fessa es, Lūcia?"},
+      {"Are you tired, Lucy?", "Esne fessa, Lūcia?"},   // C28: a question with the person addressed last keeps -ne
       {"You are very clever, Mary!", "Valdē callida es, Marīa!"},
   });
   CHECK(run({"You are very clever, Mary!"}, 'm')[0].text == "Valdē callida es, Marīa!");
@@ -2827,11 +2827,12 @@ TEST_CASE("rules-j: the speaker of a reply is the person addressed in the cue be
   }
   {   // the other way round: a masculine project speaker answering for Mary
     const std::vector<Out> o = run({"Are you tired, Mary?", "Yes, I am very tired."}, 'm');
-    CHECK(o[0].text == "Fessa es, Marīa?");
+    CHECK(o[0].text == "Esne fessa, Marīa?");   // C28: -ne (the question was read as a statement)
     CHECK(o[1].text == "Ita, valdē fessa sum.");
   }
   // a dash turn after a turn that addressed someone
-  CHECK(run({"- Peter, are you ready? - Yes, I am ready."}, 'f')[0].text == "Petre, esne parātus? Ita, parātus sum.");
+  // (C28: the speaker dashes are kept)
+  CHECK(run({"- Peter, are you ready? - Yes, I am ready."}, 'f')[0].text == "- Petre, esne parātus? - Ita, parātus sum.");
   // no reply after a goodbye, and nothing to flag when the genders agree
   CHECK(run({"Goodbye, Peter.", "I am tired now."}, 'f')[1].text == "Nunc fessa sum.");
   {
@@ -3193,4 +3194,128 @@ TEST_CASE("rules-k: fixes after the blind check (own sentences, C26)") {
   // a past verb hung on a noun of the subject phrase is the main verb; an adjective with an object is a verb
   CHECK(run({"The song of the little bird pleased everyone."})[0].text.find("placuit") != std::string::npos);
   CHECK(run({"The roar of the angry lion frightened the girls."})[0].text.find("terru") != std::string::npos);
+}
+
+// ================================================================================================================
+// C28 (Latin loop 6): cue context. tests/regression/own_turns.en.srt (our own dialogue: speaker dashes, sentences over
+// two or three cues, lower-case continuations, answer fragments, interjections, vocatives, song lines) vs its gold.
+
+TEST_CASE("rules-l: end to end on own_turns.en.srt vs the gold Latin (report; determinism; cue identity)") {
+  NEED_REAL();
+  std::vector<rules::CueInput> in = regressionCues(1, "own_turns.en.srt");
+  REQUIRE(in.size() == 120);
+  rules::Options o;
+  o.fidelity = 2;
+  o.speakerGender = 'm';
+  rules::Context ctx;
+  auto r1 = engine()->translate(in, o, ctx, nullptr, nullptr);
+  REQUIRE(r1.ok());
+  auto r2 = engine()->translate(in, o, ctx, nullptr, nullptr);   // a fresh engine: byte-identical
+  REQUIRE(r2.ok());
+  REQUIRE(r1->size() == 120);
+  REQUIRE(r2->size() == 120);
+  bool same = true;
+  for (size_t i = 0; i < 120; ++i)
+    same = same && r1.value()[i].target == r2.value()[i].target && r1.value()[i].confidence == r2.value()[i].confidence;
+  CHECK(same);
+  std::ifstream g(repo() / "tests" / "regression" / "expected" / "own_turns.la.gold.txt");
+  std::vector<std::string> gold;
+  std::string line;
+  while (std::getline(g, line))
+    if (!line.empty() && line[0] != '#') gold.push_back(line);
+  REQUIRE(gold.size() == 120);
+  int matches = 0, exact = 0, wrongOk = 0;
+  std::map<std::string, int> conf;
+  std::ostringstream table;
+  table << "| # | source | gold | ours | conf |\n|---|---|---|---|---|\n";
+  for (size_t i = 0; i < 120; ++i) {
+    const rules::CueOutput& c = r1.value()[i];
+    CHECK_MESSAGE(!c.target.empty(), "empty target for cue " << i + 1);   // C22: no cue is ever emptied
+    CHECK(c.index == in[i].index);
+    ++conf[confName(c.confidence)];
+    const std::string ours = flat(c.target);
+    bool match = false, exactMatch = false;
+    for (const std::string& alt : splitAlt(gold[i])) {
+      match = match || norm(alt) == norm(ours);
+      exactMatch = exactMatch || text::nfc(alt) == text::nfc(ours);
+    }
+    matches += match;
+    exact += exactMatch;
+    if (!match && c.confidence == rules::Confidence::Ok) ++wrongOk;
+    if (!match) {
+      std::string chk;
+      for (const auto& k : c.checks)
+        if (!k.ok) chk += k.id + " ";
+      for (const auto& f : c.flags)
+        if (f != "tags") chk += f + " ";
+      std::string g2 = gold[i];
+      for (size_t at; (at = g2.find(" | ")) != std::string::npos;) g2.replace(at, 3, " / ");
+      table << "| " << i + 1 << " | " << in[i].sourceText << " | " << g2 << " | " << ours << " | "
+            << confName(c.confidence) << (chk.empty() ? "" : " " + chk) << "|\n";
+    }
+  }
+  std::ostringstream rep;
+  rep << "Regression own_turns.en.srt -> Latin, fidelity 2, speaker m\n";
+  rep << "match rate (normalised, any gold alternative): " << matches << " / 120\n";
+  rep << "exact (macrons and punctuation too): " << exact << " / 120\n";
+  rep << "confidence: ok " << conf["ok"] << ", check " << conf["check"] << ", fix " << conf["fix"] << "\n";
+  rep << "wrong among OK: " << wrongOk << "\n\nMismatches:\n" << table.str() << "\nAll outputs:\n";
+  for (size_t i = 0; i < 120; ++i) {
+    const rules::CueOutput& c = r1.value()[i];
+    std::string fl;
+    for (const auto& f : c.flags) fl += f + " ";
+    rep << i + 1 << "\t" << in[i].sourceText << "\t" << flat(c.target) << "\t" << confName(c.confidence) << "\t" << fl
+        << "\n";
+  }
+  std::ofstream(buildDir() / "regression_report_turns.txt") << rep.str();
+  MESSAGE("own_turns regression: " << matches << " / 120 match the gold; confidence ok " << conf["ok"] << " / check "
+                                   << conf["check"] << " / fix " << conf["fix"] << "; wrong among OK " << wrongOk);
+  CHECK(wrongOk == 0);
+  CHECK(matches >= 0);   // C28: first run before any rule (docs/rules_en_notes.md "Quality loop 6"); raised at the end
+}
+
+// C28-DEBUG (temporary)
+TEST_CASE("zz-debug: translate VP_DEBUG_FILE") {
+  const char* path = std::getenv("VP_DEBUG_FILE");
+  if (!path || !*path) return;
+  NEED_REAL();
+  std::ifstream f(path);
+  std::vector<std::vector<std::string>> batches(1);
+  std::string line;
+  while (std::getline(f, line)) {
+    if (line.empty()) { if (!batches.back().empty()) batches.emplace_back(); continue; }
+    batches.back().push_back(line);
+  }
+  frame::FrameBuilder fb(frame::SrcLang::En, &real().pen, &real().en, cur());
+  const char* g = std::getenv("VP_DEBUG_GENDER");
+  for (const auto& b : batches) {
+    if (b.empty()) continue;
+    const auto o = run(b, g && *g ? g[0] : 'm');
+    for (size_t i = 0; i < b.size(); ++i) {
+      std::string fl;
+      for (const auto& x : o[i].flags) fl += x + " ";
+      for (const auto& k : o[i].checks) if (!k.ok) fl += k.id + "(" + k.detail + ") ";
+      std::printf("%s\n   -> %s   [%s] %s\n", b[i].c_str(), o[i].text.c_str(), confName(o[i].conf), fl.c_str());
+      if (std::getenv("VP_DEBUG_CAND")) {
+        static std::unique_ptr<rules::Engine> e2 = engine();
+        rules::CueInput c;
+        c.sourceText = b[i];
+        c.startMs = 0;
+        c.endMs = 3000;
+        rules::Options o2;
+        auto r = e2->translate({c}, o2, rules::Context{}, nullptr, nullptr);
+        if (r.ok())
+          for (const auto& rr : r.value()[0].reasons)
+            if (rr.kind == "candidate" || rr.kind == "sense") std::printf("   %s %s %s\n", rr.kind.c_str(), rr.text.c_str(), rr.data.c_str());
+      }
+      if (std::getenv("VP_DEBUG_FRAME")) {
+        frame::SemSentence s;
+        fb.analyse(b[i], s);
+        std::printf("   %s\n", frame::describe(s).c_str());
+        if (std::getenv("VP_DEBUG_TOK"))
+          for (const auto& t : s.tokens) std::printf("      [%s|%s|%s|%s|%d]\n", t.text.c_str(), t.lower.c_str(), t.upos.c_str(), t.deprel.c_str(), t.head);
+      }
+    }
+    std::printf("\n");
+  }
 }

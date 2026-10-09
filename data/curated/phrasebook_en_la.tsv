@@ -6,7 +6,7 @@ good morning	salvē	1	greet
 good day	salvē	1	greet	
 good evening	salvē	1	greet	
 good afternoon	salvē	1	greet	
-good night	bene dormī	1	greet	
+good night	bene dormī	1	greet	plural: bene dormīte (C28)
 goodbye	valē	1	greet	plural valēte
 goodbye	deus tē servet	1	eccl+greet	D18 (C23): ecclesiastical farewell, latinity "wide" only; offered as the alternative of valē, which stays first
 bye	valē	1	greet	
@@ -60,7 +60,7 @@ what time is it	quota hōra est	1	q
 where am i	ubi sum	1	q	
 where are you	ubi es	1	q	
 where are we	ubi sumus	1	q	
-where are you going	quō īs	1	q	
+where are you going	quō īs	1	q	plural: quō ītis (C28)
 where is {NP}	ubi est {1:nom}	1	q	
 why	cūr	1	q	
 why not	cūr nōn	1	q	
@@ -298,3 +298,27 @@ whatever you want	quidquid vīs	1	tail	C26
 whatever you like	quidquid tibi placet	1	tail	C26
 anyone in trouble	eōs quī in perīculō sunt	1	tail	C26: "I like to help anyone in trouble." -> Libenter adiuvō eōs quī in perīculō sunt (object at the end of its clause)
 people in trouble	eōs quī in perīculō sunt	1	tail	C26
+i would like {NP}	{1:acc} velim	1	state	C28: the polite wish (present subjunctive): "I would like some bread." -> Pānem velim.
+so would i	et ego	1	answer	C28: "- So would I." -> Et ego. (the verb understood)
+so do i	et ego	1	answer	C28
+so am i	et ego	1	answer	C28
+so can i	et ego	1	answer	C28
+so did i	et ego	1	answer	C28
+so will i	et ego	1	answer	C28
+me too	et ego	1	answer	C28
+anything else	aliquid aliud	1	q	C28: "Anything else?" (in a shop)
+nothing else	nihil aliud	1	answer	C28
+that way ,	illūc,	1	adv	C28: "That way, past the temple!" -> Illūc, praeter templum!
+this way ,	hūc,	1	adv	C28: "This way, children!" -> Hūc, puerī!
+last night	hesternā nocte	1	adv	C28
+last year	annō superiōre	1	adv	C28: ultimō was "in the last year (of a series)"
+last month	mēnse superiōre	1	adv	C28
+last week	superiōre hebdomade	1	adv	C28
+last summer	aestāte superiōre	1	adv	C28
+last winter	hieme superiōre	1	adv	C28
+got him	eum cēpī	1	excl	C28: "Got him!" (I've got him) -> Eum cēpī!
+got her	eam cēpī	1	excl	C28
+got you	tē cēpī	1	excl	C28
+stop , thief	cōnsiste, fūr	1	excl	C28: the shout at a thief who runs away (dēsine is "stop doing it")
+stop thief	cōnsiste, fūr	1	excl	C28
+here ,	ecce,	1	adv	C28: offering something ("Here, take this bread." -> Ecce, cape hunc pānem.)

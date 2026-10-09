@@ -150,6 +150,139 @@ std::vector<Latin> splitSentence(const frame::SourceSentence& src, const Latin& 
   return out;
 }
 
+namespace {
+bool relativeWord(const std::string& k) {
+  static const char* const kRel[] = {"qui",  "quae",  "quod", "quem",  "quam",   "cuius",  "cui",
+                                     "quo",  "qua",   "quibus", "quos", "quas", "quorum", "quarum"};
+  for (const char* r : kRel)
+    if (k == r) return true;
+  return false;
+}
+bool letters(const std::string& s) {
+  for (char c : s)
+    if ((unsigned char)c >= 0x80 || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) return true;
+  return false;
+}
+// The last word of a source part when nothing (no punctuation) follows it: [start, end) in src.text, else {-1, -1}.
+std::pair<int, int> danglingWord(const std::string& t, int a, int b) {
+  while (b > a && isSpace(t[(size_t)b - 1])) --b;
+  int e = b;
+  while (b > a && ((t[(size_t)b - 1] >= 'a' && t[(size_t)b - 1] <= 'z') || (t[(size_t)b - 1] >= 'A' && t[(size_t)b - 1] <= 'Z') ||
+                   t[(size_t)b - 1] == '\''))
+    --b;
+  if (b == e) return {-1, -1};
+  return {b, e};
+}
+}  // namespace
+
+bool regroupSentence(const frame::SourceSentence& src, const Latin& latin, const std::vector<int>& srcOffset,
+                     std::vector<Latin>& out, std::vector<std::vector<size_t>>* order) {
+  const size_t np = src.parts.size(), nt = latin.tokens.size();
+  if (np < 2 || nt == 0 || srcOffset.size() != nt) return false;
+  size_t mapped = 0;
+  for (int o : srcOffset) mapped += o >= 0;
+  if (mapped * 3 < nt * 2) return false;
+  auto partOf = [&](int off) {
+    size_t p = 0;
+    for (size_t q = 1; q < np; ++q)
+      if (off >= src.parts[q].start) p = q;
+    return p;
+  };
+  std::vector<long> part(nt, -1);
+  for (size_t i = 0; i < nt; ++i)
+    if (srcOffset[i] >= 0) part[i] = (long)partOf(srcOffset[i]);
+  for (size_t i = 0; i < nt; ++i) {
+    if (srcOffset[i] >= 0) continue;
+    for (size_t j = i + 1; j < nt && part[i] < 0; ++j)
+      if (srcOffset[j] >= 0) part[i] = (long)partOf(srcOffset[j]);
+    for (size_t j = i; j > 0 && part[i] < 0; --j)
+      if (srcOffset[j - 1] >= 0) part[i] = (long)partOf(srcOffset[j - 1]);
+    if (part[i] < 0) part[i] = 0;
+  }
+  // the Latin verb of an auxiliary or copula left at the end of a part goes to the next part
+  static const char* const kAux[] = {"is",    "are",    "was",  "were",  "am",    "be",  "been", "will",
+                                     "would", "can",    "could", "shall", "should", "must", "may", "might",
+                                     "has",   "have",   "had",  "do",    "does",  "did",  "'s",  "'re"};
+  for (size_t p = 0; p + 1 < np; ++p) {
+    const std::pair<int, int> w = danglingWord(src.text, src.parts[p].start, src.parts[p].end);
+    if (w.first < 0) continue;
+    const std::string low = text::lower(src.text.substr((size_t)w.first, (size_t)(w.second - w.first)));
+    bool aux = false;
+    for (const char* a : kAux) aux = aux || low == a;
+    if (!aux) continue;
+    for (size_t i = 0; i < nt; ++i)
+      if (srcOffset[i] == w.first && latin.tokens[i].features.pos == "verb") part[i] = (long)p + 1;
+  }
+  // the auxiliary of a perfect participle stays with it ("Cum sōl ortus est," | "avēs ...")
+  for (size_t i = 1; i < nt; ++i) {
+    const std::string k = text::latin_key(latin.tokens[i].text);
+    if ((k == "est" || k == "sunt" || k == "es" || k == "sum" || k == "sumus" || k == "estis" || k == "erat" || k == "erant" ||
+         k == "esset" || k == "essent" || k == "sit" || k == "sint" || k == "erit" || k == "erunt" || k == "esse") &&
+        latin.tokens[i - 1].features.mood == "participle")
+      part[i] = part[i - 1];
+  }
+  // linkers: right to left, so "et nōn" moves together
+  for (size_t i = nt - 1; i-- > 0;) {
+    const rules::TokenView& t = latin.tokens[i];
+    const std::string k = text::latin_key(t.text);
+    if (part[i + 1] <= part[i]) continue;
+    if (t.features.pos == "prep" && preposition(k)) { part[i] = part[i + 1]; continue; }
+    if (conjunction(k) || relativeWord(k) || k == "non" || k == "donec" || k == "antequam") {
+      // with the verb of the clause it opens (the first verb after it), else the nearest later part
+      long best = -1;
+      for (size_t j = i + 1; j < nt && best < 0; ++j)
+        if (latin.tokens[j].features.pos == "verb") best = part[j];
+      if (best < 0) {
+        best = part[i + 1];
+        for (size_t j = i + 1; j < nt; ++j)
+          if (part[j] > part[i] && part[j] < best) best = part[j];
+      }
+      if (best > part[i]) part[i] = best;
+    }
+  }
+  // every part with source letters gets a Latin word
+  for (size_t p = 0; p < np; ++p) {
+    const frame::CuePart& cp = src.parts[p];
+    const std::string s = src.text.substr((size_t)cp.start, (size_t)std::max(0, cp.end - cp.start));
+    bool any = false;
+    for (size_t i = 0; i < nt && !any; ++i) any = part[i] == (long)p && letters(latin.tokens[i].text);
+    if (letters(s) && !any) return false;
+  }
+  // the text: a prefix before the first token ("- "), each token with the marks after it, the final mark at the end
+  const std::string prefix = latin.text.substr(0, (size_t)std::max(0, latin.tokens[0].start));
+  std::vector<std::string> after(nt);
+  for (size_t i = 0; i < nt; ++i) {
+    const size_t a = (size_t)latin.tokens[i].end;
+    const size_t b = i + 1 < nt ? (size_t)latin.tokens[i + 1].start : latin.text.size();
+    std::string g = a < b ? latin.text.substr(a, b - a) : std::string();
+    std::string m;
+    for (char c : g)
+      if (!isSpace(c)) m += c;
+    after[i] = m;
+  }
+  const std::string finalMark = after[nt - 1];
+  after[nt - 1].clear();
+  out.assign(np, Latin{});
+  if (order) order->assign(np, {});
+  for (size_t p = 0; p < np; ++p) {
+    Latin& L = out[p];
+    if (p == 0) L.text = prefix;
+    for (size_t i = 0; i < nt; ++i) {
+      if (part[i] != (long)p) continue;
+      if (!L.text.empty() && !isSpace(L.text.back())) L.text += ' ';
+      rules::TokenView t = latin.tokens[i];
+      t.start = (int)L.text.size();
+      L.text += t.text;
+      t.end = (int)L.text.size();
+      L.text += after[i];
+      L.tokens.push_back(std::move(t));
+      if (order) (*order)[p].push_back(i);
+    }
+    if (p + 1 == np) L.text += finalMark;
+  }
+  return true;
+}
+
 void append(Latin& cue, const Latin& piece) {
   if (piece.text.empty()) return;
   int base = (int)cue.text.size();

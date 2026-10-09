@@ -66,6 +66,7 @@ bool personalPronoun(const std::string& w) {
 }
 
 const char* adverb(const std::string& l, bool motion) {
+  if (l == "not-yet") return "nōndum";   // C28: "not ... yet"
   if (l == "here") return motion ? "hūc" : "hīc";
   if (l == "there") return motion ? "illūc" : "ibi";
   if (l == "there-contrast") return motion ? "illūc" : "illīc";   // C22: "here or there" -> hīc aut illīc

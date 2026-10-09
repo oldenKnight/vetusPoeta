@@ -5,6 +5,7 @@
 #        PRED predicate noun/adjective, INF infinitive complement, WH interrogative word, Q -ne enclitic host.
 RULE order.decl       : clause.type = decl                    => [VOC,] [CONN] S IO O OBL ADV [NEG] V ; verb final, nōn directly before the verb
 RULE order.copula     : predicate.lemma = sum & PRED          => [VOC,] [CONN] S PRED [NEG] V ; "Puer bonus est"; drop S if pronoun and not contrastive
+RULE order.copula.rel : predicate.lemma = sum & PRED with a relative clause => [VOC,] [CONN] S [NEG] V PRED ; "Hic est puer quī canem nostrum invēnit" (the heavy predicate last, the relative clause after its noun; C28)
 RULE order.exist      : predicate.lemma = sum & no PRED       => [CONN] [OBL] V S ; "In hortō est fēlēs" / "Est fēlēs in hortō" (existential, verb before subject)
 RULE order.inf        : modal (possum, volō, nōlō, dēbeō, soleō, incipiō) + INF => [...] O OBL INF V ; "venīre nōn potest": object of the infinitive before the infinitive, modal last
 RULE order.yn         : clause.type = yn                      => Q-ne attached to the verb, which comes first ("Esne fessus?", "Venitne?", "Vīdistīne fēlem meam?"); only an NP the source marks as contrastive focus takes -ne instead ("Rosāsne vīdistī?")

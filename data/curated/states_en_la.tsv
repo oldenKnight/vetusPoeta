@@ -13,7 +13,7 @@ thirsty	sitiō	verb
 wrong	errō	verb	"You were wrong." -> Errābās.
 mistaken	errō	verb	
 tired	fessus	adj	
-ready	parātus	adj	
+ready	parātus	adj	C28: things too ("Dinner is ready." -> Cēna parāta est.)
 happy	laetus	adj	
 glad	laetus	adj	
 sad	trīstis	adj	
@@ -39,3 +39,6 @@ have dream	somniō	verb
 pay attention	animum attendō	verb	"Pay attention to the teacher!" -> Animum ad magistrum attende!
 strike match	facem accendō	verb	C26: "She struck a match." -> Facem accendit.
 light match	facem accendō	verb	C26
+open	apertus	adj	C28: things too ("The door was open." -> Iānua aperta erat.)
+shut	clausus	adj	C28: things too
+closed	clausus	adj	C28: things too

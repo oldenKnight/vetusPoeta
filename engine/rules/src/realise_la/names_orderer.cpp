@@ -127,6 +127,7 @@ Orderer::Orderer(const lex::Lexicon& lx, const curated::CuratedData& cd) {
   const Def defs[] = {
       {"order.decl", {"VOC", "CONN", "S", "IO", "O", "OBL", "ADV", "NEG", "V"}},
       {"order.copula", {"VOC", "CONN", "S", "PRED", "NEG", "V"}},
+      {"order.copula.rel", {"VOC", "CONN", "S", "NEG", "V", "PRED"}},   // C28
       {"order.exist", {"CONN", "OBL", "V", "S"}},
       {"order.inf", {"O", "OBL", "INF", "V"}},
       {"order.imp.long", {"VOC", "O", "OBL", "V"}},

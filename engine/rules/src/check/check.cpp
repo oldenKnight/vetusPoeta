@@ -396,6 +396,16 @@ struct LatinChecker::Impl {
       if (!nominal) continue;
       bool otherUse = false;   // cum + verb (conjunction), post / ante as adverbs before a verb
       for (const Reading& r : rd[i]) otherUse = otherUse || r.lpos == Conj || r.lpos == Adv;
+      // C28: cum before a word that cannot be ablative is the conjunction even when its clause's verb is the only one
+      // in the cue ("Cum domum pervēnimus," | "iānua aperta erat")
+      if (otherUse && rep.tokens[i].analysis.key == "cum" && (boundaryBefore[i] || i == segBegin(i))) {
+        bool abl = false, clauseWord = false;   // the next word opens the clause: its subject or object
+        for (const Reading& r : rd[x]) {
+          abl = abl || (isNominal(r) && r.f.case_ == Abl);
+          clauseWord = clauseWord || (isNominal(r) && (r.f.case_ == Nom || r.f.case_ == Acc));
+        }
+        if (!abl && clauseWord) continue;
+      }
       bool ok = false;
       for (const Reading& r : rd[x])
         if (isNominal(r) && (cases & (1u << r.f.case_))) ok = true;
@@ -878,6 +888,14 @@ struct LatinChecker::Impl {
                                   "superbia", "dolor", "sitis", "amor", "odium", "terror", "metus", "lassitudo"})
               cause = cause || r.key == k;
           if (cause) continue;
+          // C28: an ablative of time ("Manē nōbīscum hāc nocte") is no misplaced object either (also its determiner)
+          bool when = false;
+          for (size_t q = j; q < std::min(e, j + 2) && !when; ++q)
+            for (const Reading& r : rd[q])
+              for (const char* k : {"nox", "dies", "hora", "annus", "mensis", "hiems", "aestas", "uer", "autumnus",
+                                    "tempus", "uesper", "hebdomas", "aetas"})
+                when = when || (r.key == k && r.f.case_ == Abl);
+          if (when) continue;
           if (m == (1u << Abl) && defAbl == n) defAbl = j;
           if (m == (1u << Acc) && defAcc == n) defAcc = j;
           if ((m & ~da) == 0 && defDat == n && defAbl == n) defDat = j;   // dative-or-ablative only (-ō, -īs)

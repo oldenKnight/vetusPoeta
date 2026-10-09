@@ -70,6 +70,15 @@ struct Memory {
   bool songLine = false, prevSong = false, prevValid = false;
   uint8_t prevPerson = 0, prevNumber = 0, prevTense = 0, prevMood = 0;
   uint32_t prevModal = kNone;
+  // C28: cue context for answers. After a wh question the engine keeps the case its wh word had (whCase: Nom, Acc,
+  // Dat, Gen, Abl), the preposition before it (whPrep: "Cum quō?"), the place question (whPlace: 1 ubi, 2 quō, 3
+  // unde), whether its subject was a third person (whSubj3: "her" in the answer is then suus) and the gender / number
+  // of an interrogative noun ("Quot pānēs?" -> duōs). `answer` is set for the sentence right after it (a fragment then
+  // takes that case: "Whom did you see?" - "The queen." -> Rēgīnam.).
+  uint8_t whCase = 0, whPlace = 0, whGender = 0, whNumber = 0;
+  uint32_t whPrep = kNone;
+  bool whSubj3 = false, answer = false;
+  bool lastImp = false;   // C28: the last clause translated was an order ("Don't complain," + "or ..." -> aliter)
 };
 
 struct Settings {

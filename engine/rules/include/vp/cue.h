@@ -27,6 +27,18 @@ struct Latin {
 std::vector<Latin> splitSentence(const frame::SourceSentence& src, const Latin& latin,
                                  const std::vector<int>* srcOffset = nullptr);
 
+// C28: re-split by clause. Every Latin token goes to the cue part of the source word it translates (`srcOffset`, one
+// byte offset in src.text per token; -1 = none: such a word goes with its right neighbour, else its left one), and the
+// parts keep the Latin order inside them: "She is reading a book" | "under the old tree." -> "Librum legit" | "sub
+// arbore veterī." A preposition goes with the noun after it, a conjunction / relative word / nōn with the clause it
+// opens (the nearest later part among the words after it) when the word right after it lies in a later part, and the
+// Latin verb of an auxiliary or copula left dangling at the end of a part ("Your brother is" | "very brave.") goes
+// to the next part. The sentence's final mark closes the last part; other marks stay with their word. Returns false
+// (out untouched) when too few tokens are mapped or a part with source letters would get no Latin word; `order`
+// receives the original token indices of each piece.
+bool regroupSentence(const frame::SourceSentence& src, const Latin& latin, const std::vector<int>& srcOffset,
+                     std::vector<Latin>& out, std::vector<std::vector<size_t>>* order = nullptr);
+
 // Appends `piece` to `cue` (one space between non-empty texts), shifting token offsets.
 void append(Latin& cue, const Latin& piece);
 

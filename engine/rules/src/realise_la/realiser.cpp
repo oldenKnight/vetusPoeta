@@ -681,11 +681,15 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
       addTemplate(order_.slots("order.imp.long"));
     }
   } else {
-    orderRule = exist ? "order.exist" : isCopula ? "order.copula" : c.pred.modal != kNone ? "order.inf" : "order.decl";
+    // C28: a predicate noun with a relative clause goes after the copula ("Hic est puer quī ...")
+    const bool relPred = isCopula && c.type == ClauseType::Decl && c.predicative.size() == 1 &&
+                         !c.predicative[0].relative.empty() && !c.predicative[0].elideHead && c.predAdj.empty() &&
+                         !ctx.accInf && ctx.main;
+    orderRule = exist ? "order.exist" : relPred ? "order.copula.rel" : isCopula ? "order.copula" : c.pred.modal != kNone ? "order.inf" : "order.decl";
     if (ctx.accInf) orderRule = "order.acc.inf";
     seq.push_back(kWH);
     seq.push_back(kFRONT);
-    addTemplate(order_.slots(exist ? "order.exist" : isCopula ? "order.copula" : "order.decl"));
+    addTemplate(order_.slots(exist ? "order.exist" : relPred ? "order.copula.rel" : isCopula ? "order.copula" : "order.decl"));
   }
   if (content.empty()) {
     // slots the template does not name go before the first template slot that follows them canonically

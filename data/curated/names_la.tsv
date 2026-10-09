@@ -51,11 +51,11 @@ Louis	Ludovīcus	Ludovīcī	m	2	decline
 Arthur	Artūrus	Artūrī	m	2	decline	
 Walt	Gualterus	Gualterī	m	2	decline	
 Walter	Gualterus	Gualterī	m	2	decline	
-London	Londinium	Londiniī	n	2	decline	
+London	Londinium	Londiniī	n	2	decline	city
 England	Anglia	Angliae	f	1	decline	
-Rome	Rōma	Rōmae	f	1	decline	
-Athens	Athēnae	Athēnārum	f	1	decline	plural
-Paris	Lutētia	Lutētiae	f	1	decline	
+Rome	Rōma	Rōmae	f	1	decline	city
+Athens	Athēnae	Athēnārum	f	1	decline	plural city
+Paris	Lutētia	Lutētiae	f	1	decline	city
 Mexico	Mexicum	Mexicī	n	2	decline	
 Spain	Hispānia	Hispāniae	f	1	decline	
 France	Gallia	Galliae	f	1	decline	
