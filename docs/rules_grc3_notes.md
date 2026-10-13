@@ -1090,3 +1090,36 @@ está nuestra vecina", "caminó sola", "más alto que su hermano", "Sí, pero ..
 ## Still open (for loop 10)
 #4 κυάνεον, #116 "le" two cues after its antecedent, ES #24 ellos / ustedes; the frame wishes above; blind #6 (lend),
 #9, #12, #18.
+
+# Athenaze prose (C38) — calibration of OK on textbook prose, names, readable rows, predicate adjectives, coordinated verbs, connectors
+
+## Material
+The owner's material (data/acceptance/athen.*, gitignored, copyrighted: never quoted here, units referred to by number)
+and the main agent's first-run fault list (data/work/eval/owner2-first-run/). Our own material, written before any C38
+rule and committed alone ("wip: C38 own material"): tests/regression/own_athen.grc.txt (50 own Attic sentences in the
+register of a beginners' reader, chapters 1-5: a farmer, his family, the farm, oxen, work, a god invoked), the English
+gold tests/regression/expected/own_athen.en.gold.txt, and the reverse direction own_athen.en.txt -> the Greek gold
+expected/own_athen.grc.gold.txt (the Greek original first, correct variants after " | ").
+
+## Blind check sentences (written at 19:33 UTC 2026-10-13 at the start of C38, before any rule; output not looked at until the end)
+Our own sentences, run GRC -> EN (Greek source, English gold) and EN -> GRC (English source, Greek gold).
+1. ὁ γεωργὸς τοὺς βοῦς εἰς τὸν ἀγρὸν ἄγει. = The farmer leads the oxen into the field.
+2. ἡ θυγάτηρ καλή ἐστι καὶ σοφή. = The daughter is beautiful and wise.
+3. ὁ δοῦλος οὐκ ἐν τῷ ἀγρῷ ἐστιν ἀλλὰ ἐν τῇ οἰκίᾳ. = The slave is not in the field but in the house.
+4. ὦ Ζεῦ, πέμπε ἡμῖν ὄμβρον. = O Zeus, send us rain.
+5. ὁ Στέφανος κάμνει· μακρὰ γάρ ἐστιν ἡ ὁδός. = Stephen is tired; for the road is long.
+6. οἱ παῖδες χαίρουσιν· ὁ γὰρ πατὴρ πάρεστιν. = The children are glad; for father is here.
+7. ἡ μὲν μήτηρ πονεῖ, ἡ δὲ θυγάτηρ καθεύδει. = The mother works, but the daughter sleeps.
+8. ὁ κύων μέγας ἐστὶ καὶ ἰσχυρός. = The dog is big and strong.
+9. ὁ Δικαιόπολις τοὺς βοῦς λύει καὶ οἴκαδε ἐλαύνει. = Dicaeopolis unties the oxen and drives them home.
+10. ὁ γέρων οὐ πονεῖ ἀλλὰ ἐν τῇ οἰκίᾳ μένει. = The old man does not work but stays in the house.
+11. ἐλεύθεροι γάρ ἐσμεν, ὦ φίλοι. = For we are free, friends.
+12. ὁ δοῦλος τὸ ἄροτρον φέρει καὶ βραδέως βαδίζει. = The slave carries the plough and walks slowly.
+13. ἡ γυνὴ τοῖς παισὶν ὕδωρ παρέχει. = The woman provides water for the children.
+14. ὁ ἀγρὸς οὐ μέγας ἐστίν, ἱκανὸς δέ. = The field is not large, but it is sufficient.
+15. ὁ οὖν γεωργὸς τὸν θεὸν τιμᾷ. = So the farmer honours the god.
+16. ὁ λύκος τὰ πρόβατα διώκει, ὁ δὲ κύων τὸν λύκον. = The wolf chases the sheep, but the dog chases the wolf.
+17. ὁ Φίλιππος ἰσχυρός ἐστιν· τὸν γὰρ λίθον αἴρει. = Philip is strong; for he lifts the stone.
+18. ὁ πατὴρ τὸν ἑαυτοῦ κλῆρον φιλεῖ. = The father loves his own farm.
+19. χαλεπὸς μέν ἐστιν ὁ πόνος, ἡ δὲ γῆ καλή. = The work is hard, but the land is beautiful.
+20. ὦ Δάφνη, διὰ τί στενάζεις; = Daphne, why are you groaning?
