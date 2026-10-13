@@ -1,0 +1,47 @@
+# Gold Latin for tests/regression/own_prayer.es.txt (C37), one line per unit, written by the implementer before any
+# C37 rule and before the engine was run on the file; our own Spanish devotional lines in the style of a medieval hymn
+# (no quotation of any real prayer or hymn): greetings Ave / Salve, sacred names (María, Jesucristo, Dios, Señor,
+# Señora, Reina del cielo, Virgen), second-person singular imperatives, a clitic doubled by "a mí", "para ... ser"
+# infinitive phrases, an adjective after its noun ("de bondad plena"), te ruego, apestar. Speaker: a man (speaker
+# gender m). Register: ecclesiastical Latin accepted (latinity wide, D18), macrons on long vowels; vocative Iēsū
+# Chrīste, Domine, Deus. Alternatives after " | ".
+Salvē, Māter caelī, | Salvē, Māter caelestis,
+avē, rosa caelī,
+Virgō pūra et sāncta, | Virgō sāncta et pūra,
+audī fīliōs tuōs. | fīliōs tuōs audī.
+Deus bonus et fortis est, | Deus bonus est et fortis,
+et amor eius magnus est. | et magnus est amor eius.
+Domine, respice servum tuum. | Domine, aspice servum tuum. | Domine, servum tuum respice. | Domine, servum tuum aspice.
+Iēsū Chrīste, rēx pācis,
+custōdī animam meam nocte. | animam meam nocte custōdī. | custōdī animam meam in nocte. | animam meam in nocte custōdī.
+Marīa, māter dulcis,
+cōnsōlāre trīstēs, | trīstēs cōnsōlāre,
+et dā pācem pauperibus. | et pauperibus pācem dā.
+Rēgīna caelī, audī vōcem meam. | Rēgīna caelī, vōcem meam audī.
+Tē precor, Domina mea, | Precor tē, Domina mea, | Ōrō tē, Domina mea,
+nē mē sōlum relinquās. | nōlī mē sōlum relinquere.
+Peccātor sum et īnfirmus, | Peccātor et īnfirmus sum, | Peccātor sum et dēbilis, | Peccātor et dēbilis sum,
+sed amor tuus mē servat. | sed amor tuus mē salvat.
+Deus caelī, dēfende nōs | Deus caelī, nōs dēfende
+ā bellō et ā famē.
+Māter bonitāte plēna, | Māter bonitātis plēna, | Māter plēna bonitāte,
+ōrā Fīlium tuum prō mē. | prō mē Fīlium tuum ōrā. | Fīlium tuum prō mē ōrā.
+Cor meum trīste est, | Trīste est cor meum,
+et oculī meī flent. | et oculī meī lacrimant.
+Avē, Domina sāncta, | Avē, sāncta Domina,
+avē, māter pia, | avē, pia māter,
+avē, lūx peccātōrum.
+Dā mihi vīrēs ut bonum faciam, | Dā mihi vīrēs ad bonum faciendum, | Dā mihi vim ut bonum faciam,
+et ut semper fīdus sim. | et semper fīdus esse. | et ut semper fidēlis sim. | et semper fidēlis esse.
+Cōnsōlāre mē, servum tuum, | Mē, servum tuum, cōnsōlāre,
+et dā mihi pācem animae. | et pācem animae mihi dā. | et dā mihi pācem animī.
+Adiuvā mē, miserum peccātōrem. | Iuvā mē, miserum peccātōrem. | Adiuvā mē, pauperem peccātōrem.
+Tē precor, Deus aeterne, | Precor tē, Deus aeterne,
+nē meī oblīvīscāris in morte. | in morte nē meī oblīvīscāris. | nōlī meī oblīvīscī in morte.
+Mundus peccātō foetet, | Mundus foetet peccātō,
+sed grātia tua pūra est.
+Dā nōbīs vēritātem quaerere | Concēde nōbīs vēritātem quaerere | Concēde nōbīs ut vēritātem quaerāmus
+et malum semper fugere. | et semper malum fugere. | et ā malō semper fugere.
+Estō tū māter mea et dux mea, | Estō māter mea et dux mea, | Es tū māter mea et dux mea,
+et dūc mē ad lūcem caelī. | et mē ad lūcem caelī dūc.
+Āmēn.
