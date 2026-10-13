@@ -1,0 +1,34 @@
+# Gold es-MX Spanish for tests/regression/own_prayer.la.txt (C36), one line per unit, written by the implementer before
+# any C36 rule and before the engine was run on the file (see own_prayer.en.gold.txt). Ave stays "Ave" (Salve "Salve";
+# "Dios te salve" accepted), tú forms, the speaker is a man (default speakerGender m). Preferred rendering first,
+# alternatives after " | ".
+Ave, madre de la luz, | Salve, madre de la luz, | Dios te salve, madre de la luz,
+ave, virgen humilde,
+ave, rosa blanca, | ave, rosa cándida, | ave, rosa resplandeciente,
+Salve, señora nuestra. | Salve, nuestra señora. | Dios te salve, señora nuestra.
+Señora mansa y benigna, | Señora dulce y benigna, | Señora apacible y bondadosa, | Señora mansa y bondadosa, | Señora suave y benigna,
+escucha nuestras súplicas. | escucha nuestras oraciones. | oye nuestras súplicas. | oye nuestras oraciones. | escucha nuestros ruegos.
+Consuela a tus hijos,
+protégenos en el camino. | cuídanos en el camino.
+Ten piedad de nosotros, señora, | Ten misericordia de nosotros, señora, | Apiádate de nosotros, señora,
+no nos abandones en la muerte | no nos desampares en la muerte
+y no nos des a los enemigos. | y no nos entregues a los enemigos. | y no nos des a nuestros enemigos.
+Sé nuestra luz en las tinieblas, | Sé nuestra luz en la oscuridad,
+sé la esperanza de los miserables. | sé la esperanza de los desdichados. | sé la esperanza de los infelices.
+Danos paz, | Danos la paz, | Concédenos la paz,
+da también luz. | da también la luz. | danos también la luz.
+Concédenos vivir bien | Danos vivir bien | Haz que vivamos bien
+y ver el cielo.
+Virgen pura, virgen piadosa,
+tú eres nuestra alegría. | tú eres nuestro gozo.
+Fuiste elegida por Dios, | Eres elegida por Dios, | Has sido elegida por Dios,
+bienaventurada y gloriosa. | dichosa y gloriosa. | bendita y gloriosa.
+Madre piadosa de los pobres,
+ruega por tus hijos. | ora por tus hijos.
+Te ruego, señora, | Te suplico, señora,
+defiéndeme del mal.
+Jesucristo, hijo de Dios, | Jesús Cristo, hijo de Dios,
+ten piedad de tu siervo. | ten misericordia de tu siervo. | apiádate de tu siervo.
+Concédenos la gracia | Concédenos gracia | Confiérenos la gracia
+y la vida sin fin. | y vida sin fin. | y una vida sin fin.
+Salve, María, estrella de los pobres. | Dios te salve, María, estrella de los pobres. | Ave, María, estrella de los pobres.

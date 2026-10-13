@@ -1,0 +1,36 @@
+# Gold English for tests/regression/own_prayer.la.txt (C36), one line per unit, written by the implementer before any
+# C36 rule and before the engine was run on the file. Our own devotional Latin lines in the manner of a medieval hymn
+# (not quoted from any real prayer): Ave / Salve + epithets (greetings: "Hail"), vocatives, deponent imperatives
+# (consolare, tuere, miserere), ne + subjunctive as a prohibition, esto, da + infinitive, postpositive et ("also"),
+# confer ("grant"), feminine participles of the addressee, Iesu Christe, Maria. A line is one unit (fragments stay
+# fragments). Preferred rendering first, alternatives after " | ". Compared case- and punctuation-insensitively.
+Hail, mother of light, | Hail, mother of the light,
+hail, humble virgin,
+hail, white rose, | hail, bright rose, | hail, shining rose,
+Hail, our lady.
+Gentle and kind lady, | Mild and kind lady, | Gentle and kindly lady, | Mild and kindly lady,
+hear our prayers.
+Console your children, | Comfort your children, | Console your sons, | Comfort your sons,
+protect us on the way. | protect us on the road. | watch over us on the way. | protect us on the journey.
+Have mercy on us, lady, | Have pity on us, lady,
+do not abandon us in death | do not desert us in death | do not forsake us in death
+and do not give us to the enemies. | and do not give us to our enemies. | and do not hand us over to the enemies.
+Be our light in the darkness, | Be our light in darkness,
+be the hope of the wretched. | be the hope of the unhappy. | be the hope of the miserable.
+Give us peace, | Grant us peace,
+give light also. | give also light. | also give light. | give light too.
+Grant us to live well | Grant that we live well | Let us live well
+and to see heaven. | and see heaven.
+Pure virgin, loving virgin, | Pure virgin, holy virgin, | Pure virgin, pious virgin, | Pure virgin, gentle virgin, | Pure virgin, kind virgin,
+you are our joy.
+You were chosen by God, | You are chosen by God, | You have been chosen by God,
+blessed and glorious.
+Loving mother of the poor, | Holy mother of the poor, | Pious mother of the poor, | Gentle mother of the poor, | Kind mother of the poor,
+pray for your children. | pray for your sons.
+I pray to you, lady, | I beg you, lady, | I pray you, lady, | I entreat you, lady,
+defend me from evil. | protect me from evil.
+Jesus Christ, son of God,
+have mercy on your servant. | have pity on your servant. | have mercy on your slave.
+Grant us grace | Bestow grace on us | Grant us the grace
+and life without end. | and a life without end. | and endless life.
+Hail, Mary, star of the poor.
