@@ -1,5 +1,8 @@
 # Own Latin sentences (beginner style) with the expected readable English and es-MX Spanish (task C11).
 # Columns: latin	english	spanish	construction. Written for this project; plain literal translations.
+# Changed expectations (C36, after review): vīlla is a farmhouse / casa de campo, never just "house" (a teacher marks
+# "house" wrong); "in vīllā" with no earlier mention is indefinite: "in vīllā cantant" (sing in a farmhouse / en una
+# casa de campo) and "ex vīllā ēgressī sunt" (left the farmhouse / salieron de la casa de campo).
 Puella rosam amat.	The girl loves a rose.	La niña ama una rosa.	svo
 Puellae rosās amant.	The girls love roses.	Las niñas aman rosas.	plural
 Puer puellae rosam dat.	The boy gives a rose to the girl.	El niño da una rosa a la niña.	dative
@@ -92,7 +95,7 @@ Sine pecūniā nōn sum laetus.	I am not happy without money.	No estoy contento 
 Servī in agrīs labōrant.	The slaves work in the fields.	Los esclavos trabajan en los campos.	plural PP
 Dominus servōs vocat.	The master calls slaves.	El amo llama a esclavos.	plural object person
 Fīlius patris librum legit.	The son of the father reads a book.	El hijo del padre lee un libro.	genitive
-Puellae in vīllā cantant.	The girls sing in the house.	Las niñas cantan en la casa.	plural subject
+Puellae in vīllā cantant.	The girls sing in a farmhouse.	Las niñas cantan en una casa de campo.	plural subject
 Rēgīna ancillam laudat.	The queen praises a maid.	La reina alaba a una criada.	person object
 Mīlitēs urbem oppugnant.	The soldiers attack a city.	Los soldados atacan una ciudad.	third declension
 Lupus ovem in silvā videt.	The wolf sees a sheep in the forest.	El lobo ve una oveja en el bosque.	animal object
@@ -150,7 +153,7 @@ Mārcus in templum ingressus est.	Marcus entered the temple.	Marco entró al tem
 Puella Mārcum secūta est.	The girl followed Marcus.	La niña siguió a Marco.	periphrasis deponent
 Puerī cum patre locūtī sunt.	The boys spoke with the father.	Los niños hablaron con el padre.	periphrasis deponent plural
 Iūlia cum amīcā locūta est.	Julia spoke with the friend.	Julia habló con la amiga.	periphrasis deponent feminine
-Servī ex vīllā ēgressī sunt.	The slaves left the house.	Los esclavos salieron de la casa.	periphrasis deponent direct-ex
+Servī ex vīllā ēgressī sunt.	The slaves left the farmhouse.	Los esclavos salieron de la casa de campo.	periphrasis deponent direct-ex
 Mārcus ex urbe profectus est.	Marcus set out from the city.	Marco partió de la ciudad.	periphrasis deponent from-ex
 Puellae in hortum ingressae sunt.	The girls entered the garden.	Las niñas entraron al jardín.	periphrasis deponent feminine plural
 Fēminae cum puerīs profectae sunt.	The women set out with the boys.	Las mujeres partieron con los niños.	periphrasis deponent

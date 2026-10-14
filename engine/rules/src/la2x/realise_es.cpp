@@ -877,6 +877,13 @@ class Es {
     if (w == "con" && o.np.isPronoun && o.np.coord.empty() && (o.np.pron.person == 1 || o.np.pron.person == 2) && o.np.pron.number != 2)
       return o.np.pron.person == 1 ? "conmigo" : "contigo";
     std::string out = w;
+    // C36 review: "in vīllā" first mention: "en una casa de campo"
+    if (prep == "in" && cs == "abl" && o.np.token >= 0 && lexOf(o.np.token).ppIndef && o.np.number != 2 &&
+        o.np.determiner.empty() && o.np.possessor.empty() && o.np.genitive.empty() && o.np.relative.empty() &&
+        !in_.disc->seen(ti_[(size_t)o.np.token].lemma)) {
+      appendWord(out, np(o.np, R::Obj, false));
+      return out;
+    }
     if (prep == "sine" && !o.np.isPronoun && !o.np.isName && o.np.coord.empty() && o.np.determiner.empty() &&
         o.np.possessor.empty() && o.np.genitive.empty() && !in_.disc->seen(ti_[(size_t)std::max(0, o.np.token)].lemma)) {
       // C36: "sine dominō": sin amo; "sine fīne": sin fin (no article after sin)

@@ -4,6 +4,7 @@
 # (consolare, tuere, miserere), ne + subjunctive as a prohibition, esto, da + infinitive, postpositive et ("also"),
 # confer ("grant"), feminine participles of the addressee, Iesu Christe, Maria. A line is one unit (fragments stay
 # fragments). Preferred rendering first, alternatives after " | ". Compared case- and punctuation-insensitively.
+# C36 review: alternative added to unit 15 ("give the light also": light was mentioned before), accepted by the main agent.
 Hail, mother of light, | Hail, mother of the light,
 hail, humble virgin,
 hail, white rose, | hail, bright rose, | hail, shining rose,
@@ -18,7 +19,7 @@ and do not give us to the enemies. | and do not give us to our enemies. | and do
 Be our light in the darkness, | Be our light in darkness,
 be the hope of the wretched. | be the hope of the unhappy. | be the hope of the miserable.
 Give us peace, | Grant us peace,
-give light also. | give also light. | also give light. | give light too.
+give light also. | give also light. | also give light. | give light too. | give the light also.
 Grant us to live well | Grant that we live well | Let us live well
 and to see heaven. | and see heaven.
 Pure virgin, loving virgin, | Pure virgin, holy virgin, | Pure virgin, pious virgin, | Pure virgin, gentle virgin, | Pure virgin, kind virgin,

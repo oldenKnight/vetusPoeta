@@ -406,6 +406,7 @@ struct Translator::Impl final : public detail::LexicalSource {
       out.on = out.on || detail::noteHas(r->note, "on");
       out.home = out.home || detail::noteHas(r->note, "home");
       out.meal = out.meal || detail::noteHas(r->note, "meal");
+      out.ppIndef = out.ppIndef || detail::noteHas(r->note, "pp-indef");
     }
     if (lang == Target::Es && !row) {
       // semantics from the English row (person / mass / unique); the time preposition is language specific

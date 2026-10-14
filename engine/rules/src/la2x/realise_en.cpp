@@ -895,10 +895,25 @@ class En {
                                  (prep == "ex" && tab_.tagged("lex", curVerbKey_, "direct-ex"))))
       return np(o.np, R::Prep, true);
     if (w.empty() && prep == "ex" && !curVerbKey_.empty() && tab_.tagged("lex", curVerbKey_, "from-ex")) w = "from";
-    if (w.empty() && prep == "in" && cs == "abl" && lexOf(o.np.token).on) w = "on";   // C36: in viā: on the way
+    if (w.empty() && prep == "in" && cs == "abl" && lexOf(o.np.token).on) w = "on";
+    // C36 review: in viā after a verb of protecting / guiding / keeping, or in a devotional text: "on the way"
+    if (prep == "in" && cs == "abl" && o.np.token >= 0 && ti_[(size_t)o.np.token].key == "uia" && o.np.adjectives.empty() &&
+        o.np.genitive.empty() && o.np.determiner.empty() && o.np.possessor.empty() && o.np.number != 2 &&
+        (in_.disc->devotional || isKey(curVerbKey_, {"tueor", "seruo", "custodio", "protego", "dirigo", "duco", "rego",
+                                                     "defendo", "conseruo"}))) {
+      in_.disc->mention(ti_[(size_t)o.np.token].lemma);
+      return "on the way";
+    }
     if (w.empty()) w = tab_.text("prep", prep, {cs});
     if (w.empty()) w = s_.tokens[(size_t)std::max(0, o.token)].text;
     std::string out = w;
+    // C36 review: "in vīllā" first mention: "in a farmhouse"
+    if (prep == "in" && cs == "abl" && o.np.token >= 0 && lexOf(o.np.token).ppIndef && o.np.number != 2 &&
+        o.np.determiner.empty() && o.np.possessor.empty() && o.np.genitive.empty() && o.np.relative.empty() &&
+        !in_.disc->seen(ti_[(size_t)o.np.token].lemma)) {
+      appendWord(out, np(o.np, R::Obj, false));
+      return out;
+    }
     if (prep == "sine" && !o.np.isPronoun && !o.np.isName && o.np.coord.empty()) {
       // C36: a first mention after sine is indefinite ("without a master"); "without end"
       const Lexical lx = lexOf(o.np.token);

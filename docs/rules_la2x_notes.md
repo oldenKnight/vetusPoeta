@@ -223,7 +223,21 @@ source), `article-guess` ("without the" for a first mention). On the first-run o
   EN 14/20, ES 10/20, wrong among OK 1 in each (blind unit 2: villa -> house, the gold says farmhouse).
 * la2x own set 201/201 EN and ES, tokens unchanged; Orbergise 60/60, 20/20, 20/20, 22/22.
 
-### Proposed gold alternatives (not added; for review)
-prose 2 EN "... but in the house" / ES "... sino en la casa" (villa = house in readable_en.tsv; the C11 set expects "left
-the house"); prose 15 ES "Por lo tanto llama al esclavo a menudo"; prayer 8 EN "Protect us in the road" (in viā stays
-"in the road", as the C11 set expects); prayer 15 EN "Give the light also" (light mentioned two lines before).
+### Proposed gold alternatives and the review
+Accepted by the main agent and added to the gold with a note: prose 15 ES "Por lo tanto llama al esclavo a menudo";
+prayer 15 EN "give the light also". Vetoed, fixed in the engine instead:
+* vīlla = "farmhouse" (EN; a teacher marks "house" wrong) / "casa de campo" (ES), readable note `pp-indef`: "in vīllā"
+  with no earlier mention is indefinite ("in a farmhouse" / "en una casa de campo").
+* in viā after a verb of protecting / guiding / leading / keeping (tueor, servō, custōdiō, prōtegō, dīrigō, dūcō, regō,
+  dēfendō, cōnservō) or in a devotional text = "on the way" ("en el camino"); elsewhere "in the road" as before.
+
+Changed expectations (tests/fixtures/la2x/sentences.tsv, C11 set, reason: vīlla is not "house"): "Puellae in vīllā
+cantant" -> The girls sing in a farmhouse / Las niñas cantan en una casa de campo; "Servī ex vīllā ēgressī sunt" -> The
+slaves left the farmhouse / Los esclavos salieron de la casa de campo. la2x own set stays 201/201.
+
+After the review (vpengine serve): own prose EN 58/60, ES 57/60, prayer EN 30/30, ES 30/30, wrong among OK 0 in all
+four (test_rules_la2x3 asserts it; one-job run 56, 56, 30, 30). Blind, after a reviewer veto, not re-tuned on the blind
+lines: EN 14 -> 15/20, wrong among OK 1 -> 0; ES 10/20 unchanged, wrong among OK 1 (blind 2 "Pues no vive en una casa de
+campo sino en la ciudad": the rendering the review asks for; the blind gold lists "Porque ... la casa de campo" and
+"Pues ... la granja" but not this combination, so it counts as a strict mismatch). Owner material unchanged (OK units
+la->en 3, 10, 11, 13; la->es 6, 11).

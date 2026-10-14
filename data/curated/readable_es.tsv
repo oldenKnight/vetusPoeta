@@ -461,7 +461,7 @@ lex	hora	noun	hora	time:a
 lex	annus	noun	año	time:en
 lex	tempus	noun	tiempo	
 lex	hortus	noun	jardín	
-lex	uilla	noun	casa	
+lex	uilla	noun	casa de campo	pp-indef
 lex	domus	noun	casa	home
 lex	casa	noun	choza	
 lex	uia	noun	camino

@@ -116,7 +116,7 @@ void runCases(World3& W, const std::vector<Case3>& cases) {
     W.tr->sentence(c.la, la2x::Target::En, en);
     W.tr->resetDiscourse();
     W.tr->sentence(c.la, la2x::Target::Es, es);
-    INFO(c.la << " -> " << en.text << " / " << es.text);
+    INFO(std::string(c.la) << " -> " << en.text << " / " << es.text);
     CHECK(en.text == c.en);
     CHECK(es.text == c.es);
   }
@@ -227,6 +227,12 @@ TEST_CASE("rules-la2x3: copula, particles, not ... but, predicate adjectives (C3
       {"Liber magnus est.", "The book is big.", "El libro es grande."},
       // sine: a first mention is indefinite in English, bare in Spanish
       {"Puer sine mātre est.", "The boy is without a mother.", "El niño está sin madre."},
+      // vīlla is a farmhouse; "in vīllā" first mention is indefinite (C36 review)
+      {"Mārcus in vīllā habitat.", "Marcus lives in a farmhouse.", "Marco vive en una casa de campo."},
+      {"Vīlla magna est.", "The farmhouse is big.", "La casa de campo es grande."},
+      // in viā: "on the way" after a verb of protecting / leading, else "in the road" (C36 review)
+      {"Servus puerōs in viā dūcit.", "The slave leads boys on the way.", "El esclavo lleva a niños en el camino."},
+      {"Puella in viā currit.", "The girl runs in the road.", "La niña corre en el camino."},
       {"Fēlīx est puella.", "The girl is happy.", "La niña es feliz."},
   });
 }
@@ -291,11 +297,13 @@ TEST_CASE("rules-la2x3: own prose and own prayer lines against the gold (C36)") 
   NEED_WORLD3();
   struct File { const char* la; const char* gold; la2x::Target t; int floor; };
   // first run (before the C36 rules, through vpengine serve): prose EN 18/60, ES 18/60; prayer EN 4/30, ES 6/30.
-  // Final through vpengine serve: 56, 54, 28, 30 (this one-job run keeps every mention in the discourse: 54, 53).
+  // Final through vpengine serve (after the review: vīlla = farmhouse / casa de campo, in viā = on the way after a
+  // verb of protecting or in a prayer, two accepted gold alternatives): 58, 57, 30, 30, wrong among OK 0; this one-job
+  // run keeps every mention in the discourse: 56, 56, 30, 30.
   const File files[] = {
-      {"own_prose.la.txt", "own_prose.en.gold.txt", la2x::Target::En, 54},
-      {"own_prose.la.txt", "own_prose.es.gold.txt", la2x::Target::Es, 53},
-      {"own_prayer.la.txt", "own_prayer.en.gold.txt", la2x::Target::En, 28},
+      {"own_prose.la.txt", "own_prose.en.gold.txt", la2x::Target::En, 56},
+      {"own_prose.la.txt", "own_prose.es.gold.txt", la2x::Target::Es, 56},
+      {"own_prayer.la.txt", "own_prayer.en.gold.txt", la2x::Target::En, 30},
       {"own_prayer.la.txt", "own_prayer.es.gold.txt", la2x::Target::Es, 30},
   };
   std::ofstream rep(build3() / "la2x3_report.txt");
@@ -321,6 +329,7 @@ TEST_CASE("rules-la2x3: own prose and own prayer lines against the gold (C36)") 
     MESSAGE(std::string(f.gold) << ": " << right << "/" << units.size() << " right, OK " << ok << " (" << okWrong
                    << " of them not matching the gold)");
     CHECK(right >= f.floor);
+    CHECK(okWrong == 0);   // C36 review: OK means right
   }
 }
 

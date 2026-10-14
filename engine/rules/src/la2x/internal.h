@@ -124,7 +124,8 @@ struct Lexical {                // the target-language word for a Latin content 
   // C36 notes of the readable row: manner (bare ablative "in a ... way" / "de modo ..."), sine-bare ("without end"),
   // on (in + ablative is "on"), home (object of a person's verb: "his home" / "su casa")
   bool manner = false, sineBare = false, on = false, home = false;
-  bool meal = false;            // C36: a meal as an object: "wait for dinner" / "esperan la cena"
+  bool meal = false;
+  bool ppIndef = false;         // C36 review: "in vīllā" with no earlier mention is "in a farmhouse"            // C36: a meal as an object: "wait for dinner" / "esperan la cena"
 };
 
 struct Discourse {              // memory across sentences of one text (articles, restored pronouns)
