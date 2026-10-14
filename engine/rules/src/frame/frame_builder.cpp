@@ -364,8 +364,11 @@ bool flatClause(std::vector<Token>& tk, int v) {
     if (tk[(size_t)i].upos == "PART" && (tk[(size_t)i].lower == "'s" || tk[(size_t)i].lower == "'") && i > 0 &&
         in(tk[(size_t)i - 1].upos, {"NOUN", "PROPN"}))
       continue;
-    // C17: prepositions after the verb ("barked at the stranger all night")
+    // C17: prepositions after the verb ("barked at the stranger all night"); C37: a time phrase before the subject ("In
+    // the evening the family eats bread.") and a coordinated object ("bread and cheese")
     if (tk[(size_t)i].upos == "ADP" && i > v) continue;
+    if (tk[(size_t)i].upos == "ADP" && i == 0) continue;
+    if (tk[(size_t)i].upos == "CCONJ" && i > v + 1 && i + 1 < n && in(tk[(size_t)i + 1].upos, {"DET", "ADJ", "NOUN", "PROPN"})) continue;
     if (!in(tk[(size_t)i].upos, {"DET", "ADJ", "NOUN", "PROPN", "PRON", "NUM", "PUNCT", "ADV"})) return false;
   }
   auto possTok = [&](int i) { return i >= 0 && i < n && tk[(size_t)i].upos == "PART"; };
@@ -389,22 +392,33 @@ bool flatClause(std::vector<Token>& tk, int v) {
   {
     int a = v + 1;
     for (int i = v + 1; i <= n; ++i) {
-      const bool cut = i == n || tk[(size_t)i].upos == "PUNCT" ||
+      const bool cut = i == n || tk[(size_t)i].upos == "PUNCT" || (i < n && tk[(size_t)i].upos == "CCONJ") ||
                        (i > a && (tk[(size_t)i].upos == "ADP" || (tk[(size_t)i].upos == "DET" && nominal(i - 1))));
       if (!cut) continue;
       if (i > a) groups.emplace_back(a, i - 1);
-      a = tk[(size_t)std::min(i, n - 1)].upos == "PUNCT" || i == n ? i + 1 : i;
+      a = i == n || tk[(size_t)std::min(i, n - 1)].upos == "PUNCT" || tk[(size_t)std::min(i, n - 1)].upos == "CCONJ" ? i + 1 : i;
     }
   }
-  std::vector<int> role(n, 0);   // 1 subject, 2 object, 3 oblique
+  std::vector<int> role(n, 0);   // 1 subject, 2 object, 3 oblique, 4 conjunct of the group before (C37)
   std::vector<int> headOf(n, -1);
+  std::vector<int> conjOf(n, -1);
   bool objTaken = false;
+  int prevHead = -1;
   for (const auto& g : groups) {
     int h = -1;
     for (int i = g.first; i <= g.second; ++i)
       if (nominal(i)) h = i;
     if (h < 0) continue;
     const bool prep = tk[(size_t)g.first].upos == "ADP";
+    if (g.first > 0 && tk[(size_t)g.first - 1].upos == "CCONJ" && prevHead >= 0 && !prep) {   // C37: "bread and cheese"
+      role[(size_t)h] = 4;
+      conjOf[(size_t)h] = prevHead;
+      tk[(size_t)g.first - 1].head = h + 1;
+      tk[(size_t)g.first - 1].deprel = "cc";
+      for (int i = g.first; i <= g.second; ++i) headOf[(size_t)i] = h;
+      continue;
+    }
+    prevHead = h;
     role[(size_t)h] = !prep && !objTaken ? 2 : 3;
     objTaken = true;   // only the group right after the verb can be its object ("barked at X all night")
     for (int i = g.first; i <= g.second; ++i) headOf[(size_t)i] = h;
@@ -414,11 +428,14 @@ bool flatClause(std::vector<Token>& tk, int v) {
     if (i == v) { t.head = 0; t.deprel = "root"; continue; }
     if (i == subj) { t.head = v + 1; t.deprel = "nsubj"; continue; }
     if (i == preHead) { t.head = v + 1; t.deprel = "obl"; continue; }
+    if (i < subjStart && preHead >= 0 && t.upos == "ADP") { t.head = preHead + 1; t.deprel = "case"; continue; }   // C37
     if (i < subjStart && preHead >= 0 && t.upos != "PUNCT" && t.upos != "ADV") {
       t.head = preHead + 1;
       t.deprel = t.upos == "DET" ? "det" : t.upos == "NUM" ? "nummod" : nominal(i) ? "compound" : "amod";
       continue;
     }
+    if (role[(size_t)i] == 4) { t.head = conjOf[(size_t)i] + 1; t.deprel = "conj"; continue; }
+    if (t.upos == "CCONJ" && t.deprel == "cc" && i > v) continue;   // C37: set above
     if (role[(size_t)i] == 2) { t.head = v + 1; t.deprel = "obj"; continue; }
     if (role[(size_t)i] == 3) { t.head = v + 1; t.deprel = "obl"; continue; }
     if (t.upos == "PUNCT" || t.upos == "ADV") { t.head = v + 1; t.deprel = t.upos == "PUNCT" ? "punct" : "advmod"; continue; }
@@ -3625,6 +3642,8 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     bool inverted = en && nsubj >= 0 && ((cop >= 0 && cop < nsubj) || (!auxes.empty() && auxes.front() < nsubj));
     // C22: "There'd be flowers everywhere." / "There will be cake.": "there" before the auxiliary is no inversion
     if (inverted && expl >= 0 && !auxes.empty() && expl < auxes.front() && !c.question) inverted = false;
+    // C37: "Long is the night." (the predicate first, a statement): no question without a question mark
+    if (inverted && !c.question && cop >= 0 && cop < nsubj && h < cop && c.t(h).upos == "ADJ") inverted = false;
     // C15: "nor do I know ...", "never have I seen ...": inversion after a negative word is not a question
     if (inverted && !c.question)
       for (int i : f.tokens)
@@ -3872,6 +3891,9 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     f.pred.deliberative = true;
   else f.pred.deliberative = false;
 
+  // C37: "provides him food": in English the first of two objects is the indirect one (eī cibum praebet)
+  if (en && f.hasObject && f.hasIndirect && f.object.token >= 0 && f.indirectObject.token > f.object.token)
+    std::swap(f.object, f.indirectObject);
   // C37: "He plows the land of the farm": an "of" phrase right after the object that the parser hung on the verb is the
   // object's genitive (terram praediī), unless the verb takes an "of" phrase of its own (remind / accuse / rob X of Y)
   if (f.hasObject && !f.object.isPronoun && f.object.genitive.empty() && f.object.coord.empty() &&
@@ -4127,6 +4149,9 @@ void FrameBuilder::buildUnits(SemSentence& s) const {
                              (e.reg == "answer" || e.reg == "excl" || e.reg == "polite"));
       // C15: register "tail": an adverbial phrase that closes a clause ("in my day", "as soon as you can")
       if (e.reg == "tail" && rightOk && !leftOk) { leftOk = true; s.doubt("phrase-order"); }
+      // C37: an adverb row on the second member of a coordination ("not in the city but in the country") stays in the
+      // coordination (the transfer renders the member itself: nōn in urbe sed rūrī)
+      if (lang_ == SrcLang::En && e.reg == "adv" && topDep == "conj") leftOk = false;
       if (leftOk && (rightOk || prefixOk)) {
         m.pattern = e.pattern;
         m.latin = e.latin;
@@ -6184,6 +6209,43 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
       tk[(size_t)i].feats = 0;
       reparse = true;
     }
+  // C37: an "adverb" right after a form of "be" that english.vpl knows only as an adjective ("Claudia is wise, ...") is
+  // the predicate adjective
+  if (nlp_ && lex_ && lang_ == SrcLang::En)
+    for (int i = 1; i < n; ++i) {
+      nlp::Token& t = tk[(size_t)i];
+      if (t.upos != "ADV" || !in(tk[(size_t)i - 1].lower, {"is", "are", "was", "were", "am", "be"})) continue;
+      std::vector<lex::Analysis> an;
+      lex_->lookup(text::en_key(t.lower), an);
+      bool adj = false, adv = false;
+      for (const lex::Analysis& a : an) {
+        const uint8_t pos = lex_->lemma(a.lemma).pos;
+        adj = adj || pos == feat::Adj;
+        adv = adv || pos == feat::Adv;
+      }
+      if (!adj || adv) continue;
+      t.upos = "ADJ";
+      t.feats = 0;
+      reparse = true;
+    }
+  // C37: ", so the family is happy" / "and yet the winter is long": "so" / "yet" after a comma or "and" / "but", before
+  // a subject, is the conjunction (itaque / tamen), not a degree word or "still"
+  if (nlp_ && lang_ == SrcLang::En)
+    for (int i = 0; i + 2 < n; ++i) {
+      nlp::Token& t = tk[(size_t)i];
+      if (!in(t.lower, {"so", "yet"}) || t.upos == "CCONJ") continue;
+      const bool after = i > 0 && (tk[(size_t)i - 1].text == "," || tk[(size_t)i - 1].text == ";" ||
+                                   (t.lower == "so" && in(tk[(size_t)i - 1].lower, {"and"})));
+      if (!after) continue;
+      const nlp::Token& nx = tk[(size_t)i + 1];
+      if (!(in(nx.upos, {"DET", "PROPN", "NOUN"}) ||
+            (nx.upos == "PRON" && in(nx.lower, {"i", "you", "he", "she", "it", "we", "they", "my", "his", "her", "our", "their"}))))
+        continue;
+      if (t.lower == "so" && i + 2 < n && tk[(size_t)i + 1].lower == "that") continue;
+      t.upos = "CCONJ";
+      t.feats = 0;
+      reparse = true;
+    }
   // C15: "how am I to get back?" = how shall I get back: the "be" is a future auxiliary, "to" a marker
   if (nlp_ && lang_ == SrcLang::En)
     for (int i = 0; i + 3 < n; ++i)
@@ -6237,7 +6299,8 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
       nlp::Token& v = tk[(size_t)verbAt];
       bool present = false;
       const std::string pastOf = en::verbOfForm(*lex_, v.lower, &present);
-      const bool finite = fget(v, nlp::morph::VerbFormShift) == nlp::morph::VfFin || (!pastOf.empty() && !present);
+      const bool finite = fget(v, nlp::morph::VerbFormShift) == nlp::morph::VfFin || (!pastOf.empty() && !present) ||
+                          (v.lower.size() > 3 && v.lower.back() == 's' && v.lower[v.lower.size() - 2] != 's');   // C37: "eats"
       if (finite && flatClause(tk, verbAt)) {
         if (fget(v, nlp::morph::VerbFormShift) != nlp::morph::VfFin)
           v.feats = nlp::morph::fromString("Tense=Past|VerbForm=Fin|Mood=Ind");
@@ -6248,6 +6311,114 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
   if (nlp_ && (lang_ == SrcLang::En || lang_ == SrcLang::Es)) segmentParse(tk);   // C34: Spanish too
   if (nlp_) punctRoot(tk);
   if (nlp_) repairTree(out);
+  // C37: an inverted copula clause of the reading books ("Hot is the sun, and long is the road.", "... and yet long is the
+  // work."): ADJ + is / are + (the) NOUN at the start of a clause, ending at punctuation or a conjunction. The adjective
+  // is the predicate, the noun its subject; the first such clause of a sentence without another one is the root,
+  // a later one is coordinated with the root ("and" / "yet" its cc).
+  if (nlp_ && lex_ && lang_ == SrcLang::En && n >= 4) {
+    auto adjWord = [&](int i) {
+      const nlp::Token& t = tk[(size_t)i];
+      if (t.upos == "ADJ") return true;
+      if (!in(t.upos, {"ADV", "PROPN", "NOUN"})) return false;
+      std::vector<lex::Analysis> an;
+      lex_->lookup(text::en_key(t.lower), an);
+      for (const lex::Analysis& a : an)
+        if (lex_->lemma(a.lemma).pos == feat::Adj) return true;
+      return false;
+    };
+    struct Inv { int adj, be, det, noun; };
+    std::vector<Inv> invs;
+    for (int i = 0; i + 2 < n; ++i) {
+      bool start = i == 0;
+      for (int q = i - 1; q >= 0 && !start; --q) {
+        const nlp::Token& x = tk[(size_t)q];
+        if (x.text == "," || x.text == ";" || in(x.lower, {"and", "but", "yet", "for", "so"}) || (q == 0 && x.upos == "PUNCT")) {
+          if (x.text == "," || x.text == ";" || q == 0 || in(x.lower, {"and", "but", "yet", "for", "so"})) start = true;
+          if (x.text == "," || x.text == ";") break;
+          continue;
+        }
+        break;
+      }
+      if (!start || !adjWord(i) || !in(tk[(size_t)i + 1].lower, {"is", "are", "was", "were"})) continue;
+      int k = i + 2, det = -1;
+      if (k < n && tk[(size_t)k].upos == "DET") det = k++;
+      if (k >= n || !in(tk[(size_t)k].upos, {"NOUN", "PROPN"})) continue;
+      const bool end = k + 1 >= n || tk[(size_t)k + 1].upos == "PUNCT" || tk[(size_t)k + 1].upos == "CCONJ";
+      if (!end) continue;
+      invs.push_back(Inv{i, i + 1, det, k});
+    }
+    if (!invs.empty()) {
+      int root = -1;
+      for (int i = 0; i < n; ++i)
+        if (tk[(size_t)i].head == 0) { root = i; break; }
+      const bool firstIsRoot = invs[0].adj <= 1 || (invs[0].adj <= 2 && tk[0].upos != "NOUN");
+      int top = firstIsRoot ? invs[0].adj : root;
+      for (size_t vi = 0; vi < invs.size(); ++vi) {
+        const Inv& v = invs[vi];
+        auto inSpan = [&](int x) { return x >= v.adj && x <= v.noun; };
+        nlp::Token& a = tk[(size_t)v.adj];
+        a.upos = "ADJ";
+        a.feats = 0;
+        if (a.text.size() > 1 && a.text[0] >= 'A' && a.text[0] <= 'Z') a.lower = nlp::normalise(a.text);
+        for (int x = 0; x < n; ++x)   // tokens that hung on a word of the span hang on the adjective
+          if (!inSpan(x) && tk[(size_t)x].head > 0 && inSpan(tk[(size_t)x].head - 1)) tk[(size_t)x].head = v.adj + 1;
+        tk[(size_t)v.be].head = v.adj + 1;
+        tk[(size_t)v.be].deprel = "cop";
+        tk[(size_t)v.be].upos = "AUX";
+        tk[(size_t)v.noun].head = v.adj + 1;
+        tk[(size_t)v.noun].deprel = "nsubj";
+        if (v.det >= 0) { tk[(size_t)v.det].head = v.noun + 1; tk[(size_t)v.det].deprel = "det"; }
+        if (vi == 0 && firstIsRoot) {
+          for (int x = 0; x < n; ++x)
+            if (x != v.adj && tk[(size_t)x].head == 0) { tk[(size_t)x].head = v.adj + 1; tk[(size_t)x].deprel = "conj"; }
+          a.head = 0;
+          a.deprel = "root";
+        } else if (top >= 0 && top != v.adj) {
+          a.head = top + 1;
+          a.deprel = "conj";
+        }
+        // the conjunctions and the comma before it are its own
+        for (int q = v.adj - 1; q >= 0; --q) {
+          nlp::Token& x = tk[(size_t)q];
+          if (in(x.lower, {"and", "but"})) { x.head = v.adj + 1; x.deprel = "cc"; x.upos = "CCONJ"; continue; }
+          if (x.lower == "yet") { x.head = v.adj + 1; x.deprel = "advmod"; continue; }
+          if (x.text == "," || x.text == ";") { x.head = v.adj + 1; x.deprel = "punct"; }
+          break;
+        }
+        if (top < 0) top = v.adj;
+      }
+      out.repairs.emplace_back("inverted-copula");
+    }
+  }
+  // C37: the conjunction "for" (nam) that the parser hung on the subject noun hangs on the clause ("..., For work is
+  // endless, ...": the coordinated clause's marker)
+  if (nlp_ && lang_ == SrcLang::En)
+    for (int i = 0; i < n; ++i) {
+      nlp::Token& t = tk[(size_t)i];
+      if (t.lower != "for" || t.upos != "CCONJ" || t.head <= 0) continue;
+      const nlp::Token& h = tk[(size_t)t.head - 1];
+      if (h.deprel == "nsubj" && h.head > 0) t.head = h.head;
+    }
+  // C37: "And yet the winter is long and cold.": a form of "be" left as the root with its subject while the adjective
+  // after it hangs as parataxis / dep / xcomp: the adjective is the predicate (the copula and the subject hang on it)
+  if (nlp_ && lang_ == SrcLang::En)
+    for (int i = 0; i + 1 < n; ++i) {
+      nlp::Token& be = tk[(size_t)i];
+      nlp::Token& adj = tk[(size_t)i + 1];
+      if (be.upos != "AUX" || !in(be.lower, {"is", "are", "was", "were"}) || adj.upos != "ADJ" || adj.head != i + 1 ||
+          in(adj.deprel, {"cop", "amod"}))
+        continue;
+      bool subj = false;
+      for (int k = 0; k < n; ++k)
+        subj = subj || ((tk[(size_t)k].head == i + 1 || tk[(size_t)k].head == i + 2) && tk[(size_t)k].deprel == "nsubj" && k < i);
+      if (!subj || be.deprel != "root") continue;
+      for (int k = 0; k < n; ++k)
+        if (k != i + 1 && tk[(size_t)k].head == i + 1) tk[(size_t)k].head = i + 2;
+      adj.head = be.head;
+      adj.deprel = be.deprel;
+      be.head = i + 2;
+      be.deprel = "cop";
+    }
   // "Bow!": a one-word exclamation tagged as an interjection that the lexicon knows as a verb -> imperative
   if (nlp_ && lex_ && lang_ == SrcLang::En) {
     int words = 0, w0 = -1;
@@ -6299,6 +6470,13 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
     if (t.lower.empty()) t.lower = nlp::normalise(t.text);
     if (!nlp_) { t.upos = "X"; t.head = 0; t.deprel = "root"; }
     t.lemma = lemmaOf(t);
+    // C37: irregular English plurals the lexicon leaves as their own lemma ("oxen" -> ox, plural)
+    if (lang_ == SrcLang::En && t.upos == "NOUN") {
+      static const std::pair<const char*, const char*> kIrr[] = {{"oxen", "ox"}, {"geese", "goose"}, {"mice", "mouse"},
+                                                                 {"lice", "louse"}, {"teeth", "tooth"}, {"feet", "foot"}};
+      for (const auto& p : kIrr)
+        if (t.lower == p.first) { t.lemma = p.second; t.feats = nlp::morph::fromString("Number=Plur"); }
+    }
     // C17: an adjective whose lemma is a verb is that verb's participle (VerbForm=Part, present for -ing)
     if (lex_ && lang_ == SrcLang::En && t.upos == "ADJ" && t.lemma != t.lower && fget(t, nlp::morph::VerbFormShift) == 0) {
       bool present = false;

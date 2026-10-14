@@ -203,6 +203,7 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
     for (const LaAdj& ad : n.adjectives) {
       if (!(order_.adjectiveBefore(ad.lemma) || exclFirst || ad.before) || ad.after) continue;
       for (uint32_t adv : ad.adverbs) { Word w; literal(adv, "?", w, "order.adv"); out.push_back(std::move(w)); }
+      if (!ad.fixedBefore.empty()) { Word w; w.form = ad.fixedBefore; w.rule = "order.adv"; out.push_back(std::move(w)); }   // C37
       out.push_back(modifierWord(ad.lemma, ad.degree, exclFirst ? "order.excl" : "order.adj", ad.participle));
       if (ad.capitalise) Punctuation::capitaliseFirst(out.back().form);
     }
@@ -243,6 +244,7 @@ void LatinRealiser::np(const LaNP& n, uint8_t case_, const LaClause* owner, cons
       if (ad.coord && postAdj) { Word et; literal(k_.et, "et", et, "order.adj"); out.push_back(std::move(et)); }
       postAdj = true;
       for (uint32_t adv : ad.adverbs) { Word w; literal(adv, "?", w, "order.adv"); out.push_back(std::move(w)); }
+      if (!ad.fixedBefore.empty()) { Word w; w.form = ad.fixedBefore; w.rule = "order.adv"; out.push_back(std::move(w)); }   // C37
       out.push_back(modifierWord(ad.lemma, ad.degree, "order.adj", ad.participle, ad.gerundive));
       if (ad.capitalise) Punctuation::capitaliseFirst(out.back().form);
     }
@@ -564,6 +566,7 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
       oa.case_ = oc;
       for (const LaAdj& ad : c.objPredAdj) {
         for (uint32_t adv : ad.adverbs) { Word w; literal(adv, "?", w, "order.adv"); s[kO].push_back(std::move(w)); }
+        if (!ad.fixedBefore.empty()) { Word w; w.form = ad.fixedBefore; w.rule = "order.adv"; s[kO].push_back(std::move(w)); }   // C37
         Word w;
         forms_.select(ad.lemma, ad.participle ? participleFeatures(lx_, ad.lemma, ad.participle, oa)
                                               : agree_.modifier(oa, ad.degree), w);
@@ -637,6 +640,12 @@ void LatinRealiser::clause(const LaClause& c, const RealiseOptions& o, std::vect
     for (size_t i = 0; i < c.predAdj.size(); ++i) {
       if (i) { Word et; literal(c.predConj != kNone ? c.predConj : k_.et, "et", et, "order.copula"); s[kPRED].push_back(std::move(et)); }
       for (uint32_t adv : c.predAdj[i].adverbs) { Word w; literal(adv, "?", w, "order.adv"); s[kPRED].push_back(std::move(w)); }
+      if (!c.predAdj[i].fixedBefore.empty()) {   // C37: "sibi sufficiēns"
+        Word w;
+        w.form = c.predAdj[i].fixedBefore;
+        w.rule = "order.adv";
+        s[kPRED].push_back(std::move(w));
+      }
       Word w;
       forms_.select(c.predAdj[i].lemma,
                     c.predAdj[i].participle ? participleFeatures(lx_, c.predAdj[i].lemma, c.predAdj[i].participle, pa)

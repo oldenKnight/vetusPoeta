@@ -2330,6 +2330,35 @@ class RulesEngine final : public Engine {
       if (t.upos == "ADV" && (t.lower == "not" || t.lower == "n't")) continue;
       so.missing.push_back(t.text);
     }
+    // C37 (calibration): a clause connector of the source ("but", "yet", "so", "for", "however", "therefore") must
+    // have a Latin connector of its sense in the output; "and yet" said as adhūc (still), "for" as prō, "so" as tam
+    // were rated OK. Missing -> Check (connector-guess).
+    if (st.lang == frame::SrcLang::En) {
+      std::vector<std::string> outKeys;
+      for (const auto& lt : L.tokens) outKeys.push_back(text::latin_key(lt.text));
+      auto has = [&](std::initializer_list<const char*> ks) {
+        for (const std::string& k : outKeys)
+          for (const char* w : ks)
+            if (k == w) return true;
+        return false;
+      };
+      bool miss = false;
+      for (size_t i = 0; i < s.tokens.size(); ++i) {
+        const nlp::Token& t = s.tokens[i];
+        const bool clauseStart = i == 0 || s.tokens[i - 1].upos == "PUNCT" || s.tokens[i - 1].upos == "CCONJ";
+        if (t.lower == "yet" && clauseStart && !has({"tamen", "autem", "sed", "at", "uerum"})) miss = true;
+        if (t.lower == "however" && !has({"tamen", "autem", "sed", "at", "uerum"})) miss = true;
+        if (t.lower == "therefore" && !has({"itaque", "igitur", "ergo", "ideo", "proinde"})) miss = true;
+        if (t.lower == "so" && clauseStart && t.upos != "INTJ" && !(i + 1 < s.tokens.size() && s.tokens[i + 1].lower == "that") &&
+            (t.upos == "CCONJ" || (i + 1 < s.tokens.size() && (s.tokens[i + 1].upos == "PRON" || s.tokens[i + 1].upos == "PROPN" ||
+                                                  s.tokens[i + 1].upos == "DET" || s.tokens[i + 1].upos == "NOUN"))) &&
+            !has({"itaque", "igitur", "ergo", "ideo", "proinde", "sic", "ita"}))
+          miss = true;
+        if (t.lower == "for" && t.upos == "CCONJ" && !has({"nam", "enim", "namque", "etenim", "quia", "quod", "quoniam"})) miss = true;
+        if (t.lower == "but" && t.upos == "CCONJ" && !has({"sed", "autem", "tamen", "at", "uerum", "sin"})) miss = true;
+      }
+      if (miss) addFlag(so.flags, "connector-guess");
+    }
     // margins
     for (const transfer::Choice& c : so.choices)
       if (c.kind == "sense" && c.candidates.size() > 1) so.minMargin = std::min(so.minMargin, c.margin);
@@ -3509,7 +3538,8 @@ class RulesEngine final : public Engine {
                             "antecedent-guess",   // C28
                             "split-agreement",   // C30
                             "join-discarded", "join-neighbour",   // C30b
-                            "form-guess", "gender-inferred"})   // C32
+                            "form-guess", "gender-inferred",   // C32
+                            "contrast-guess", "source-word", "vocative-dropped", "connector-guess"})   // C37
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       // a tier 3 word chosen while a tier 1/2 word of the same sense existed (fidelity 1, a correction aside)
       for (const transfer::Choice& c : a.choices)

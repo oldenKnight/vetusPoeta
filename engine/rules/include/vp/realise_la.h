@@ -42,6 +42,7 @@ struct LaAdj {
   bool coord = false;             // C17: joined to the adjective before it by et ("canem magnum et foedum")
   bool after = false;             // C19: after the head whatever order.adj says ("nōs omnēs")
   bool gerundive = false;         // C20: `lemma` is a verb: its gerundive agreeing with the noun ("librum legendum")
+  std::string fixedBefore;        // C37: ready Latin words written right before the adjective ("sibi sufficiēns")
 };
 
 struct LaNP {

@@ -340,7 +340,7 @@ struct Loader {
       splitTabs(line, cols);
       if (!need(no, 3)) return;
       StateEntry e{text::lower(cols[0]), text::nfc(cols[1]), col(cols, 2), col(cols, 3)};
-      if (e.kind != "verb" && e.kind != "adj") { warn(no, "kind must be verb or adj"); return; }
+      if (e.kind != "verb" && e.kind != "adj" && e.kind != "pass") { warn(no, "kind must be verb, pass or adj"); return; }   // C37: pass
       d.states_.push_back(std::move(e));
     });
   }

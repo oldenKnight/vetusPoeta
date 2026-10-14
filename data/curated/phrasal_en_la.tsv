@@ -66,3 +66,40 @@ step	back	recēdō		C30: "She stepped back." -> Recessit.
 jump	out	exsiliō		C30: "The dog jumped out first." -> Canis prīmus exsiluit.
 walk	back	redeō		C30: "They walked back to the river." -> Ad flūmen rediērunt.
 go	back	redeō		C30
+# C37: prefixed English verbs whose whole word the dictionary gives a minor sense of a simple verb ("provide" ->
+# videō "see to it"): the Latin verb of the whole word (test "rules-p: 200 prefixed verbs")
+provide	-	praebeō		C37: "The farm provides food." -> Praedium cibum praebet.
+supply	-	praebeō		C37
+defend	-	dēfendō		C37 (teneō is to hold)
+extend	-	extendō		C37
+intend	-	cōgitō		C37: "I intend to go." -> Īre cōgitō.
+require	-	requīrō		C37
+express	-	exprimō		C37
+derive	-	dēdūcō		C37
+predict	-	praedīcō		C37: foretell
+promote	-	prōmoveō		C37
+proclaim	-	prōnūntiō		C37
+recover	-	recuperō		C37
+repay	-	reddō		C37
+dismiss	-	dīmittō		C37
+release	-	dīmittō		C37
+inspect	-	īnspiciō		C37
+examine	-	īnspiciō		C37
+inquire	-	quaerō		C37
+expect	-	exspectō		C37
+reside	-	habitō		C37
+refresh	-	reficiō		C37
+reflect	-	cōgitō		C37: think (to bend back is reflectō)
+occupy	-	occupō		C37
+obtain	-	obtineō		C37
+contain	-	contineō		C37
+retain	-	retineō		C37
+prolong	-	prōdūcō		C37
+reduce	-	minuō		C37
+procure	-	parō		C37
+comprehend	-	intellegō		C37
+prosecute	-	accūsō		C37
+deter	-	dēterreō		C37
+decline	-	recūsō		C37
+consume	-	cōnsūmō		C37
+end	-	fīniō|dēsinō		C37: with an object fīniō, without one dēsinō ("The work never ends." -> Labor numquam dēsinit)

@@ -725,6 +725,68 @@ uint32_t Transfer::adjectiveInto(const frame::SemAdj& a, Ctx& c, LaAdj& la, Choi
       return adjectiveInto(g, c, la, ch);
     }
   }
+  // C37: "hard" of a thing one can touch (bread, stone, bed, ground ...) is dūrus, of a task or a life difficilis
+  if (c.st.lang == frame::SrcLang::En && a.lemma == "hard" && a.participle == 0) {
+    static const char* const kConcrete[] = {"bread", "stone", "rock", "wood", "bed", "ground", "floor", "ice", "cheese",
+                                            "iron", "nut", "seat", "chair", "wall", "earth", "soil", "shell", "bone",
+                                            "metal", "apple", "meat", "door", "skin", "pillow", "road", "table", "bench"};
+    bool concrete = false;
+    for (const std::string& w : c.context)
+      for (const char* k : kConcrete) concrete = concrete || w == k;
+    const uint32_t durus = latin("dūrus", Adj);
+    if (concrete && durus != kNone) {
+      ch.source = a.lemma;
+      ch.lemma = durus;
+      ch.kind = "table";
+      ch.note = "hard of a thing: dūrus";
+      return durus;
+    }
+  }
+  // C37: "Titus is old." -> senex (vetus is old of things); a woman: anus
+  if (c.st.lang == frame::SrcLang::En && a.lemma == "old" && a.participle == 0 && a.degree == 0 && c.frame &&
+      c.frame->copula && c.frame->hasSubject && a.token >= 0 && (size_t)a.token < c.s.tokens.size() &&
+      c.s.tokens[(size_t)a.token].deprel != "amod") {
+    const SemNP& sj = c.frame->subject;
+    uint8_t g = 0;
+    if (sj.isName) { if (const curated::NameEntry* ne = cd_.nameByEnglish(sj.head)) g = ne->gender; }
+    else if (sj.isPronoun && sj.pron.person == 3 && sj.pron.number == 1) g = sj.pron.gender;
+    else if (!sj.isPronoun && animate(sj)) {
+      const char sx = frame::en::nounSex(text::lower(sj.head));
+      g = sx == 'm' ? M : sx == 'f' ? F : 0;
+    }
+    const uint32_t id = g == M ? latin("senex", Noun) : g == F ? latin("anus", Noun) : kNone;
+    if (id != kNone) {
+      ch.source = a.lemma;
+      ch.lemma = id;
+      ch.kind = "table";
+      ch.note = "old of a person: senex / anus";
+      return id;
+    }
+  }
+  // C37: "self-sufficient" / "self-confident": the present participle of sufficiō / cōnfīdō with the reflexive dative
+  // before it (sibi sufficiēns; "I am self-sufficient" -> mihi sufficiēns sum); never the second part alone
+  if (c.st.lang == frame::SrcLang::En && a.lemma.rfind("self-", 0) == 0) {
+    const std::string rest = a.lemma.substr(5);
+    const char* v = rest == "sufficient" ? "sufficiō" : rest == "confident" || rest == "reliant" ? "cōnfīdō" : nullptr;
+    const uint32_t id = v ? latin(v, Verb) : kNone;
+    if (id != kNone) {
+      la.participle = Present;
+      const char* dat = "sibi";
+      const bool attributive = a.token >= 0 && (size_t)a.token < c.s.tokens.size() && c.s.tokens[(size_t)a.token].deprel == "amod";
+      if (!attributive && c.frame && c.frame->hasSubject && c.frame->subject.isPronoun) {
+        const SemNP& sj = c.frame->subject;
+        const bool pl = sj.pron.number == 2;
+        if (sj.pron.person == 1) dat = pl ? "nōbīs" : "mihi";
+        else if (sj.pron.person == 2) dat = pl ? "vōbīs" : "tibi";
+      }
+      la.fixedBefore = dat;
+      ch.source = a.lemma;
+      ch.lemma = id;
+      ch.kind = "table";
+      ch.note = std::string(dat) + " + the participle of " + v;
+      return id;
+    }
+  }
   // C32 (after the blind check): "best" / "better" / "worst" / "worse" left as their own lemma are the degrees of
   // good / bad ("my best friend" -> amīcus meus optimus, was prīmus)
   if (c.st.lang == frame::SrcLang::En && (a.lemma == "best" || a.lemma == "better" || a.lemma == "worst" || a.lemma == "worse")) {
@@ -2559,6 +2621,18 @@ bool Transfer::obliqueInto(const frame::SemOblique& ob, Ctx& c, LaClause& cl) co
   const std::string head = text::lower(n.head);
   // C30: "behind the rocks and in the tall grass": a conjunct with a preposition of its own is a phrase of its own,
   // joined by et (post saxa et in herbā altā)
+  // C37: "in / to / from the country(side)" = the countryside: rūrī, rūs, rūre (an adverb, no preposition)
+  if (c.st.lang == frame::SrcLang::En && (head == "country" || head == "countryside") && (n.determiner == "the" || n.definite) &&
+      n.adjectives.empty() && n.possessor.empty() && n.genitive.empty() && n.coord.empty() && n.relative.empty() &&
+      (prep == "in" || prep == "to" || prep == "into" || prep == "from")) {
+    LaOblique r;
+    r.np.fixed = prep == "in" ? "rūrī" : prep == "from" ? "rūre" : "rūs";
+    r.front = ob.front;
+    cl.obliques.push_back(r);
+    c.cover(n.tokens);
+    c.cover(n.token);
+    return true;
+  }
   // C37: "not in Athens but in the fields" -> nōn in Athēnīs sed in agrīs (the negation goes with the first phrase, the
   // verb stays positive), Spanish "no en A sino en B" too
   const bool contrast = c.frame && c.frame->negative && n.coord.size() == 1 &&
@@ -3049,7 +3123,10 @@ bool Transfer::obliqueInto(const frame::SemOblique& ob, Ctx& c, LaClause& cl) co
     npInto(n, c, cl.object);
     return true;
   }
-  if (c.frame && vpe && vpe->frame == "dat" && person) return bare(Dat);   // C17: "take X from me" -> mihi auferre
+  // C17: "take X from me" -> mihi auferre (person only); C37: a row without "person only" takes any noun ("provide
+  // food for the family" -> familiae cibum praebēre)
+  if (c.frame && vpe && vpe->frame == "dat" && (person || vpe->note.find("person only") == std::string::npos))
+    return bare(Dat);
   if (prep == "to" || prep == "into") {   // C15: a country of names_la.tsv ("back to Kansas" -> in Kansiam)
     const curated::NameEntry* ne = n.isName ? cd_.nameByEnglish(n.head) : nullptr;
     if (!ne && !n.genitive.empty()) ne = cd_.nameByEnglish(n.head + " of " + n.genitive[0].head);
@@ -4423,19 +4500,26 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
   // state adjectives with a person subject become verbs ("I am afraid" -> timeō, "you were wrong" -> errābās)
   // (data/curated/states_en_la.tsv kind verb); kind adj fixes the Latin adjective ("tired" -> fessus)
   const char* stateVerb = nullptr;
+  bool statePass = false;
   const curated::StateEntry* stateAdj = nullptr;
   if (f.copula && !f.predAdj.empty() && f.predicative.empty()) {
     const bool personSubj = (f.hasSubject && animate(f.subject)) || (!f.hasSubject && f.type == Kind::Imp) ||
-                            (f.hasSubject && f.subject.isPronoun && f.subject.pron.person < 3 && f.subject.pron.person > 0);
+                            (f.hasSubject && f.subject.isPronoun && f.subject.pron.person < 3 && f.subject.pron.person > 0) ||
+                            // C37: "He looks at the stars and is silent.": the subject of the clause before
+                            (!f.hasSubject && !f.inheritedSubject.empty() &&
+                             (animate(f.inheritedSubject[0]) || f.inheritedSubject[0].isName ||
+                              (f.inheritedSubject[0].isPronoun && f.inheritedSubject[0].pronLemma != "it")));
     const curated::StateEntry* se = cd_.state(text::lower(f.predAdj[0].lemma));
     // C34: a Spanish participle used as a state ("está dormido": lemma dormir) is listed by its adjective form
     if (!se && c.st.lang == frame::SrcLang::Es && f.predAdj[0].token >= 0 && (size_t)f.predAdj[0].token < c.s.tokens.size())
       se = cd_.state(esMasculine(c.s.tokens[(size_t)f.predAdj[0].token].lower));
     // C28: an adjective row noted "things too" applies to any subject ("Iānua aperta erat", "Cēna parāta est")
     if (se && !personSubj && !(se->kind == "adj" && se->note.find("things too") != std::string::npos)) se = nullptr;
-    if (se && se->kind == "verb" && f.predAdj.size() == 1 && se->latin.find(' ') == std::string::npos &&
-        latin(se->latin.c_str(), Verb) != kNone)
+    if (se && (se->kind == "verb" || se->kind == "pass") && f.predAdj.size() == 1 &&
+        se->latin.find(' ') == std::string::npos && latin(se->latin.c_str(), Verb) != kNone) {
       stateVerb = se->latin.c_str();
+      statePass = se->kind == "pass";   // C37: "he is delighted" -> dēlectātur (the verb in the passive)
+    }
     else if (se && se->kind == "adj")
       stateAdj = se;
   }
@@ -4462,6 +4546,7 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
       c.forcedVerb = kNone;
       cl.pred.lemma = latin(stateVerb, Verb);
       if (f.pred.tense == frame::Tense::Past && f.pred.aspect == frame::Aspect::Simple) cl.pred.tense = Imperfect;
+      if (statePass) cl.pred.voice = Passive;
       // C20: the adjective's degree words stay with the verb ("so hungry" -> tam ēsuriēbāmus, "very afraid" -> valdē
       // timeō); they were dropped (A7 Check)
       if (c.st.lang == frame::SrcLang::En) {
@@ -6002,6 +6087,18 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
             sc.pred.number = cl.subject.coord.empty() ? cl.subject.number : (uint8_t)Pl;
           }
         }
+        // C37: a coordinated predicate adjective without a subject of its own agrees with the first clause's subject
+        // ("He looks at the stars and is silent / and is tired." -> fessus, not fessum)
+        if (!sc.hasSubject && !sc.predAdj.empty() && !sc.predGender && cl.hasSubject) {
+          if (cl.subject.isPronoun) {
+            sc.predGender = cl.subject.pron.gender ? cl.subject.pron.gender : cl.subject.gender;
+            sc.predNumber = cl.subject.pron.number ? cl.subject.pron.number : cl.subject.number;
+          } else {
+            sc.predGender = cl.subject.gender ? cl.subject.gender
+                            : cl.subject.head != kNone ? simpleGender(la_.lemma(cl.subject.head).gender) : (uint8_t)0;
+            sc.predNumber = cl.subject.coord.empty() ? cl.subject.number : (uint8_t)Pl;
+          }
+        }
         if (sb.marker == "nor") sc.polarity = realise::Polarity::Pos;
         // C32 (after the blind check): "..., but I am better" / "but she is faster": a personal pronoun subject set
         // against a different subject of the clause before is said (pron.drop b: contrast)
@@ -6043,10 +6140,14 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
         if (ls.asyndeton) ls.conj = kNone;   // C26: the elliptical nōlī after a comma
         // C37: "Lucius is tired, for the water is heavy." -> ..., nam aqua ...: the source comma before a for / so / yet
         // / but clause stays
+        int subFirst = -1;   // the first word of the clause (not its punctuation or conjunction)
+        for (int t : sf.tokens)
+          if (t >= 0 && (size_t)t < c.s.tokens.size() && c.s.tokens[(size_t)t].upos != "PUNCT" &&
+              c.s.tokens[(size_t)t].upos != "CCONJ" && (subFirst < 0 || t < subFirst))
+            subFirst = t;
         if (ls.sep.empty() && (sb.marker == "for" || sb.marker == "so" || sb.marker == "yet" || sb.marker == "but") &&
-            !sf.tokens.empty()) {
-          int first = *std::min_element(sf.tokens.begin(), sf.tokens.end());
-          for (int q = first - 1; q >= 0 && (size_t)q < c.s.tokens.size(); --q) {
+            subFirst > 0) {
+          for (int q = subFirst - 1; q >= 0 && (size_t)q < c.s.tokens.size(); --q) {
             const nlp::Token& x = c.s.tokens[(size_t)q];
             if (x.text == "," || x.text == ";") { ls.sep = x.text; break; }
             if (x.upos != "CCONJ" && x.upos != "SCONJ" && !(x.upos == "ADV" && (x.lower == "yet" || x.lower == "so"))) break;
@@ -6086,6 +6187,21 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
   }
   // clause-level negative words from NPs ("no", "nobody", "nothing", "never")
   if (c.negative && !f.negative) cl.polarity = realise::Polarity::Neg;
+  // C37 (calibration): "not A but B" with the negation on a phrase, not on the verb, that no contrast rule took
+  // ("nōn A sed B"): the Latin may say "not ... A and B" (In urbe sed rūrī nōn habitat) -> Check (contrast-guess)
+  if (f.negative && !c.negConsumed && f.hasPred) {
+    bool phraseNeg = false, but = false;
+    for (int t : f.tokens) {
+      if (t < 0 || (size_t)t >= c.s.tokens.size()) continue;
+      const nlp::Token& x = c.s.tokens[(size_t)t];
+      if ((x.lower == "not" || x.lower == "no") && x.head > 0 && x.head - 1 != f.pred.token &&
+          (size_t)(x.head - 1) < c.s.tokens.size() && c.s.tokens[(size_t)x.head - 1].upos != "VERB" &&
+          c.s.tokens[(size_t)x.head - 1].upos != "AUX")
+        phraseNeg = true;
+      if (x.lower == "but" || x.lower == "sino") but = true;
+    }
+    if (phraseNeg && but) c.out.flags.push_back("contrast-guess");
+  }
   if (c.negConsumed) { cl.polarity = realise::Polarity::Pos; c.negConsumed = false; }
   // C15: "not know" -> nesciō ("Nescīs?", "potestāte suā ūtī nescit") unless a negative word carries the negation
   if (cl.polarity == realise::Polarity::Neg && cl.type != realise::ClauseType::Imp) {
