@@ -1972,6 +1972,9 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
             if (poss && latin(poss, Det) != kNone) o.possessive = latin(poss, Det);
           }
           for (const frame::SemAdj& a : n.adjectives) {   // "Señora santa" -> Domina sāncta (never dropped)
+            const std::string al = text::lower(a.lemma);
+            if (o.possessive != kNone && (al == "mío" || al == "mía" || al == "tuyo" || al == "tuya" || al == "nuestro" ||
+                                          al == "nuestra" || al == "mi" || al == "tu")) continue;   // said by the possessive
             Choice ac;
             ac.token = a.token;
             LaAdj la;
@@ -6438,7 +6441,17 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
         }
         // C37: a coordinated predicate adjective without a subject of its own agrees with the first clause's subject
         // ("He looks at the stars and is silent / and is tired." -> fessus, not fessum)
-        if (!sc.hasSubject && !sc.predAdj.empty() && !sc.predGender && cl.hasSubject) {
+        // C37: also "and yet it is warm" ("it" of the first clause's noun subject) and a subjectless clause whose
+        // gender the clause builder left neuter ("She runs and is tired." -> fessa)
+        const bool itSub = sc.hasSubject && sc.subject.isPronoun && sf.hasSubject && sf.subject.isPronoun &&
+                           sf.subject.pronLemma == "it" && cl.hasSubject && !cl.subject.isPronoun && cl.subject.head != kNone;
+        if (itSub && !sc.predAdj.empty()) {
+          const uint8_t g = cl.subject.gender ? cl.subject.gender : simpleGender(la_.lemma(cl.subject.head).gender);
+          if (g) { sc.predGender = g; sc.subject.pron.gender = g; sc.subject.gender = g; }
+        }
+        if (!sc.hasSubject && !sc.predAdj.empty() && (!sc.predGender || sc.predGender == N) && cl.hasSubject &&
+            (cl.subject.isPronoun ? (cl.subject.pron.gender != 0 || cl.subject.gender != 0)
+                                  : (cl.subject.gender != 0 || cl.subject.head != kNone))) {
           if (cl.subject.isPronoun) {
             sc.predGender = cl.subject.pron.gender ? cl.subject.pron.gender : cl.subject.gender;
             sc.predNumber = cl.subject.pron.number ? cl.subject.pron.number : cl.subject.number;

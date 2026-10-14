@@ -1702,3 +1702,88 @@ neuter, OK); "I have been loved and feared." -> Amāta sum et timēbam (the seco
 an animal with a copula and only adjectives stays neuter (Ieiūnum et tenue erat, Check); "You are her brother?" read as
 a question states nothing (Check with gender-inferred); dīvita (dītia); the generator's i-stem default for 3rd-class
 adjectives without a genitive plural cell (iuvenis -> iuvene as a neuter).
+
+## Textbook prose and liturgy (C37, 2026-10-13/14): English -> Latin on reading-book prose
+Material: the owner's English of a reading-book chapter (14 units, data/acceptance/, never quoted here; units by number
+only) with his Latin as a reference, and our own tests/regression/own_prose.en.txt (40 sentences of a farmer's life:
+for / but / so / and yet, vocatives to gods, predicate adjectives, "not in A but in B", genitives) with gold written
+first (wip e60754a). Twenty blind lines (10 English, 10 Spanish) were written 2026-10-13 19:31 UTC before any rule
+(data/work/eval/c37-blind/, gitignored); their output was first produced on 2026-10-14, after all rules and after the
+usage-limit interruptions, and not looked at before. The Spanish side is in docs/rules_es_notes.md.
+
+### Numbers (fidelity 2, speaker m, latinity wide; classical gives the same Latin on the owner material)
+| set | first run | after C37 |
+|---|---|---|
+| owner en -> la (14 units, main agent's review E19) | right 4 / 14; OK 1, wrong 1 (unit 13) | right 13 / 14 (unit 9 left: a "although ... also" clause read as a time clause, Check); OK 2 (units 3, 13), wrong among OK 0 |
+| own_prose.en.txt (40, new) | 7 / 40; OK 10, 8 wrong among them | 33 / 40 as written, 39 / 40 with 6 proposed alternatives; OK 15, wrong among OK 0 |
+| blind (10 English lines) | first run 8 / 10 (wise read as an adverb after "beautiful and"; "old and yet strong" -> adhūc, Check), wrong among OK 0 | 10 / 10 |
+| prefixed verbs (new test, "They <verb> it.") | provide -> videō, defend -> teneō, intend -> audiō, derive -> amō, require -> maneō, present -> [presend] ... | 224 / 224 as reviewed |
+| EN own_dialogue / oz / own_turns / own_story / sample | 114 / 89 / 118 / 119 / 12 | 114 (ok 64 -> 63) / 89 / 118 (117 as written + 1 proposed alternative) / 119 / 12 |
+
+### Step 1: calibration and never-nonsense (engine, transfer)
+* weak-sense (Check): a dictionary word chosen on a weak sense (best candidate below 0.35: "oxen" -> iugum, "Jupiter" ->
+  cōnsul, "pobres" -> paupertās) is never OK.
+* connector-guess (Check): a clause connector of the source (but, yet, so, for, however, therefore) whose sense has no
+  Latin connector in the output (and yet -> adhūc was rated OK).
+* contrast-guess (Check): "not A but B" with the negation on a phrase that no contrast rule took.
+* prep-dropped (Check): a verbless line that opens with a preposition and whose Latin does not.
+* source-word: a capitalised word kept "as a name" that is a common word of the source (Spanish anywhere, English only
+  as the first word: "Hot is the sun") is translated as a title, or kept in brackets (Fix); a guessed name of several
+  words with a common source word in it is a bracket. Never unmarked source words in the Latin.
+* A titled noun from names_la.tsv keeps its adjectives and possessive (a dropped "santa" was silent); a translated name
+  whose Latin fails is a bracket.
+
+### Rules (frame, transfer, realiser, tables)
+* "For" opening a clause before a noun phrase and its finite verb is nam; the conjunction the parser hung on the
+  subject hangs on its clause; the source comma before for / so / yet / but clauses stays.
+* "yet" opening a clause (after and / but) is tamen (transfer; the Greek engine reads the adverb itself); "and yet" before
+  a coordinated adjective is tamen; ", so <clause>" / ", yet <clause>" are conjunctions (frame, opt-in
+  FrameBuilder::setProseConnectors, Latin engine only: the Greek engine renders ", so" as ὥστε); "So he is ..." is
+  itaque, not a degree word.
+* Oh / O + an addressee (also after an opening quotation mark) is a vocative; gods of the reading books in names_la.tsv
+  (the Greek names give the Latin god: Zeus -> Iuppiter), God -> Deus, Lord -> Dominus (vocative Domine); names from
+  the table are singular whatever the tagger's number.
+* not A but B: nōn in A sed in B (two phrases with their prepositions), nōn A sed B (adjectives), the verb positive;
+  "strong but slow" -> sed; "the country" -> rūrī / rūs / rūre.
+* An "of" phrase right after the object that the parser hung on the verb is the object's genitive (unless the verb has
+  an "of" of its own: remind, accuse, rob ...).
+* be + delighted / pleased -> the passive verb (states_en_la.tsv kind pass), be silent -> taceō; "self-sufficient" ->
+  sibi (mihi, tibi ...) sufficiēns (LaAdj::fixedBefore); "hard" of a thing -> dūrus; "old" of a person -> senex / anus.
+* Inverted copula "ADJ is the NOUN" ("Long is the night", "Dark was the night"; never "Today is Friday"): the adjective
+  is the predicate (repair verse-order / inverted-copula: Check).
+* "And yet the winter is long and cold": a root "is" with the adjective hung under it is rebuilt as the copula.
+* every / each + a time noun hung on a noun is a time phrase of the clause; a pronoun first of two objects is the
+  indirect object ("provides him food"; not teach / ask); irregular plurals oxen / geese / mice / teeth / feet; a base
+  form after "the" + a plural noun before a place phrase is the verb; an "adverb" after "be" or "ADJ and" that the
+  lexicon knows only as an adjective is the adjective; flatClause takes a time phrase before the subject and a
+  coordinated object.
+* A coordinated clause without a subject agrees with the first clause's subject ("She runs and is tired." -> fessa);
+  "it" of a noun subject in the next clause takes its gender.
+* "present" is no past of "presend" (a long word that is a verb of its own is never a past form); prefixed verbs:
+  phrasal_en_la.tsv `-` rows for the whole word (provide / supply -> praebeō, defend -> dēfendō, extend, intend ->
+  cōgitō, require, express, derive, predict -> praedīcō, promote, proclaim, recover, repay, dismiss, release, inspect,
+  examine, inquire, expect, reside, refresh, reflect, occupy, obtain, contain, retain, prolong, reduce, procure,
+  comprehend, prosecute, deter, decline, consume, end -> fīniō | dēsinō, present -> offerō | adsum, design, develop,
+  condemn); verbprep: provide for -> dative (rows without "person only" take any noun), pray to -> precor + accusative.
+
+### Proposed gold alternatives (own_prose: the last alternative of units 10 11 28 32 33 38; own_turns cue 21)
+in domō, ignāva, prōtege, in terrā propriā suā, magna nōn est, prūdēns; own_turns 21 "Senex et valdē lēnis est" (the
+senex rule for an old person, lēnis listed elsewhere in the gold). Veto freely.
+
+### Changed expectations
+test_rules_en.cpp: five sentences keep the source comma before sed / nam (C17 / C30 / C32 cases).
+
+### Still open
+"The well supplies water." is mis-tagged (well as an adjective, supplies as a noun, water as the verb) and rated OK: no
+rule; unit 9 of the owner text (although ... also); "self-reliant" (bracket, Fix); "it" of a noun two units back
+(own_prose 40, Check).
+
+### Rows (C37, both languages)
+names_la +44 (gods, Dicaeopolis, sacred names in English and Spanish spellings), phrasal_en_la +39, phrasebook_en_la +8
+(time and place adverbs), verbprep_en_la +2, verbprep_es_la +4, states_en_la +3 (kind pass is new), tiers_la +7 and 1
+note (bōs: ox, oxen ...), gloss_es_la +32 / 2 changed; transfer/tables.cpp interjections avē, salvē, āmēn, hail.
+
+### API changes (additive)
+frame.h FrameBuilder::setProseConnectors (+ member); realise_la.h LaAdj::fixedBefore; names_la.tsv declension 4 and
+two-word names with two genitives (curated loader, Names::decline); states tables kind `pass`. New cue flags (Check):
+weak-sense, connector-guess, contrast-guess, prep-dropped, source-word.

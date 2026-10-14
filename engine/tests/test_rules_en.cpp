@@ -4016,3 +4016,407 @@ TEST_CASE("rules-n: deterministic in both latinity modes") {
     }
   }
 }
+
+// ================================================================================================================
+// C37 (RULES-P, textbook prose and liturgy). tests/regression/own_prose.en.txt: 40 own sentences of a beginner's
+// reading book (a farmer's life: for / but / so / and yet, vocatives to gods, predicate adjectives, "not in A but in
+// B", genitives), one unit per line as a text project gives them, vs the implementer's gold (report in
+// <build>/regression_report_prose.txt).
+namespace {
+std::vector<rules::CueInput> textUnits(const char* file) {
+  std::ifstream f(repo() / "tests" / "regression" / file);
+  std::vector<rules::CueInput> in;
+  std::string line;
+  while (std::getline(f, line)) {
+    if (line.empty() || line[0] == '#') continue;
+    rules::CueInput c;
+    c.index = (uint32_t)in.size();
+    c.sourceText = line;
+    c.startMs = (int64_t)in.size() * 4000;
+    c.endMs = c.startMs + 3500;
+    in.push_back(c);
+  }
+  return in;
+}
+}  // namespace
+
+TEST_CASE("rules-p: end to end on own_prose.en.txt vs the gold Latin (report; determinism in both latinity modes)") {
+  NEED_REAL();
+  const std::vector<rules::CueInput> in = textUnits("own_prose.en.txt");
+  REQUIRE(in.size() == 40);
+  rules::Options o;
+  o.speakerGender = 'm';
+  auto e = engine();
+  auto r1 = e->translate(in, o, rules::Context{}, nullptr, nullptr);
+  auto r2 = e->translate(in, o, rules::Context{}, nullptr, nullptr);
+  REQUIRE(r1.ok());
+  REQUIRE(r2.ok());
+  REQUIRE(r1->size() == 40);
+  for (size_t i = 0; i < 40; ++i) CHECK(r1.value()[i].target == r2.value()[i].target);
+  {
+    rules::Options oc = o;
+    oc.latinity = rules::Latinity::Classical;
+    auto c1 = e->translate(in, oc, rules::Context{}, nullptr, nullptr);
+    auto c2 = e->translate(in, oc, rules::Context{}, nullptr, nullptr);
+    REQUIRE(c1.ok());
+    REQUIRE(c2.ok());
+    for (size_t i = 0; i < c1->size() && i < c2->size(); ++i) CHECK(c1.value()[i].target == c2.value()[i].target);
+  }
+  std::ifstream g(repo() / "tests" / "regression" / "expected" / "own_prose.la.gold.txt");
+  std::vector<std::string> gold;
+  std::string line;
+  while (std::getline(g, line))
+    if (!line.empty() && line[0] != '#') gold.push_back(line);
+  REQUIRE(gold.size() == 40);
+  int matches = 0, wrongOk = 0;
+  std::map<std::string, int> conf;
+  std::ostringstream all;
+  for (size_t i = 0; i < 40; ++i) {
+    const rules::CueOutput& c = r1.value()[i];
+    const std::string ours = flat(c.target);
+    bool m = false;
+    for (const std::string& alt : splitAlt(gold[i])) m = m || norm(alt) == norm(ours);
+    matches += m;
+    wrongOk += !m && c.confidence == rules::Confidence::Ok;
+    ++conf[confName(c.confidence)];
+    std::string extra;
+    for (const auto& fl : c.flags) extra += " " + fl;
+    all << i + 1 << "\t" << (m ? "=" : "X") << "\t" << in[i].sourceText << "\t" << ours << "\t" << confName(c.confidence)
+        << extra << "\n";
+    if (!m) all << "\t\tgold: " << gold[i] << "\n";
+  }
+  std::ofstream(buildDir() / "regression_report_prose.txt")
+      << "Regression own_prose.en.txt -> Latin, fidelity 2, speaker m\nmatch rate: " << matches << " / 40\nconfidence: ok "
+      << conf["ok"] << ", check " << conf["check"] << ", fix " << conf["fix"] << "; mismatches rated OK: " << wrongOk
+      << "\n\n" << all.str();
+  CHECK(wrongOk == 0);
+  CHECK_MESSAGE(matches >= 39, "own_prose below the C37 threshold: " << matches << " / 40");
+  MESSAGE("own_prose en: " << matches << " / 40 match the gold; confidence ok " << conf["ok"] << " / check "
+                           << conf["check"] << " / fix " << conf["fix"] << "; mismatches rated OK " << wrongOk);
+}
+
+// C37: a prefixed English verb keeps its own Latin verb (the whole word's), never the Latin of a minor sense of a
+// simple verb ("provide" -> videō "see to it", "defend" -> teneō, "intend" -> audiō, "derive" -> amō, "require" ->
+// maneō) and never a bracket ("present" read as a past of "presend"): 224 common pro- / pre- / re- / de- / con- / com-
+// / ex- / in- / ad- / sub- / per- / dis- / ob- / trans- verbs, each in "They <verb> it.", against the Latin verb chosen
+// at the end of C37 (reviewed one by one).
+TEST_CASE("rules-p: 224 prefixed English verbs keep the whole word's Latin verb") {
+  NEED_REAL();
+  static const std::pair<const char*, const char*> kVerbs[] = {
+      {"provide", "praebeō"},
+      {"produce", "pariō"},
+      {"protect", "prōtegō"},
+      {"promise", "prōmittō"},
+      {"propose", "prōpōnō"},
+      {"proceed", "prōcēdō"},
+      {"profess", "profiteor"},
+      {"prohibit", "vetō"},
+      {"project", "immineō"},
+      {"promote", "prōmoveō"},
+      {"pronounce", "prōnūntiō"},
+      {"prosecute", "accūsō"},
+      {"protest", "reclāmō"},
+      {"provoke", "prōvocō"},
+      {"prolong", "prōdūcō"},
+      {"prosper", "vigeō"},
+      {"procure", "parō"},
+      {"proclaim", "prōnūntiō"},
+      {"prepare", "parō"},
+      {"present", "offerō"},
+      {"prevent", "arceō"},
+      {"prefer", "mālō"},
+      {"pretend", "fingō"},
+      {"predict", "praedīcō"},
+      {"prescribe", "dictō"},
+      {"preserve", "cōnservō"},
+      {"presume", "praesūmō"},
+      {"prevail", "polleō"},
+      {"precede", "praecēdō"},
+      {"preach", "praedicō"},
+      {"preside", "praesum"},
+      {"receive", "accipiō"},
+      {"remain", "maneō"},
+      {"remember", "meminī"},
+      {"return", "redeō"},
+      {"refuse", "recūsō"},
+      {"reply", "respondeō"},
+      {"report", "referō"},
+      {"require", "requīrō"},
+      {"reduce", "minuō"},
+      {"release", "dīmittō"},
+      {"remove", "removeō"},
+      {"repeat", "repetō"},
+      {"replace", "repōnō"},
+      {"represent", "ostendō"},
+      {"respond", "respondeō"},
+      {"reveal", "exhibeō"},
+      {"reject", "negō"},
+      {"relate", "narrō"},
+      {"recover", "recuperō"},
+      {"recognise", "cognōscō"},
+      {"recall", "meminī"},
+      {"regard", "videō"},
+      {"reform", "ēmendō"},
+      {"refer", "dīcō"},
+      {"reflect", "cōgitō"},
+      {"regret", "paeniteō"},
+      {"rescue", "ēripiō"},
+      {"resist", "adversor"},
+      {"resolve", "cōnstituō"},
+      {"respect", "honōrō"},
+      {"restore", "reddō"},
+      {"retain", "retineō"},
+      {"retire", "abeō"},
+      {"retreat", "regredior"},
+      {"revive", "revocō"},
+      {"reward", "remūnerō"},
+      {"relieve", "relevō"},
+      {"remind", "moneō"},
+      {"renew", "renovō"},
+      {"repair", "reficiō"},
+      {"repay", "reddō"},
+      {"repent", "paeniteō"},
+      {"request", "petō"},
+      {"reside", "habitō"},
+      {"resign", "abdicō"},
+      {"restrain", "teneō"},
+      {"recite", "recitō"},
+      {"recommend", "commendō"},
+      {"reconcile", "conciliō"},
+      {"redeem", "redimō"},
+      {"refresh", "reficiō"},
+      {"refrain", "parcō"},
+      {"rejoice", "gaudeō"},
+      {"decide", "cōnstituō"},
+      {"declare", "dēclārō"},
+      {"defend", "dēfendō"},
+      {"deliver", "trādō"},
+      {"depart", "abeō"},
+      {"depend", "nītor"},
+      {"deny", "negō"},
+      {"describe", "dēscrībō"},
+      {"deserve", "mereō"},
+      {"design", "excōgitō"},
+      {"desire", "volō"},
+      {"destroy", "dēleō"},
+      {"detain", "teneō"},
+      {"determine", "dēcernō"},
+      {"develop", "excolō"},
+      {"devote", "dēvoveō"},
+      {"deceive", "fallō"},
+      {"decline", "recūsō"},
+      {"decrease", "dēcrēscō"},
+      {"deduce", "dēdūcō"},
+      {"defeat", "vincō"},
+      {"defer", "differō"},
+      {"define", "dēfīniō"},
+      {"delay", "moror"},
+      {"delight", "iuvō"},
+      {"demand", "postulō"},
+      {"demonstrate", "doceō"},
+      {"deprive", "dēmō"},
+      {"derive", "dēdūcō"},
+      {"descend", "dēscendō"},
+      {"desert", "dēserō"},
+      {"despise", "contemnō"},
+      {"detect", "dētegō"},
+      {"devour", "ēdō"},
+      {"deter", "dēterreō"},
+      {"depict", "ostendō"},
+      {"consider", "spectō"},
+      {"contain", "contineō"},
+      {"continue", "pergō"},
+      {"contribute", "cōnferō"},
+      {"convince", "convincō"},
+      {"confess", "fateor"},
+      {"confirm", "cōnfirmō"},
+      {"conquer", "vincō"},
+      {"conceal", "cēlō"},
+      {"concern", "attingō"},
+      {"conclude", "conclūdō"},
+      {"condemn", "damnō"},
+      {"conduct", "habeō"},
+      {"confer", "dō"},
+      {"confuse", "cōnfundō"},
+      {"connect", "nectō"},
+      {"consent", "cōnsentiō"},
+      {"conserve", "cōnservō"},
+      {"consist", "cōnstō"},
+      {"console", "cōnsōlor"},
+      {"construct", "cōnstruō"},
+      {"consult", "cōnsulō"},
+      {"consume", "cōnsūmō"},
+      {"contend", "certō"},
+      {"contradict", "adversor"},
+      {"convert", "convertō"},
+      {"convey", "portō"},
+      {"compare", "comparō"},
+      {"compel", "compellō"},
+      {"compete", "contendō"},
+      {"complain", "queror"},
+      {"complete", "compleō"},
+      {"compose", "compōnō"},
+      {"comprehend", "intellegō"},
+      {"combine", "temperō"},
+      {"command", "iubeō"},
+      {"commit", "commendō"},
+      {"communicate", "commūnicō"},
+      {"comply", "sequor"},
+      {"explain", "explicō"},
+      {"express", "exprimō"},
+      {"expect", "exspectō"},
+      {"extend", "extendō"},
+      {"examine", "īnspiciō"},
+      {"exclude", "exclūdō"},
+      {"excuse", "excūsō"},
+      {"exhibit", "ostendō"},
+      {"exist", "sum"},
+      {"expose", "expōnō"},
+      {"include", "inclūdō"},
+      {"increase", "augeō"},
+      {"inform", "doceō"},
+      {"inquire", "quaerō"},
+      {"insist", "teneō"},
+      {"inspect", "īnspiciō"},
+      {"instruct", "doceō"},
+      {"intend", "cōgitō"},
+      {"invite", "invītō"},
+      {"invent", "inveniō"},
+      {"introduce", "indō"},
+      {"admit", "fateor"},
+      {"adopt", "ascīscō"},
+      {"advise", "moneō"},
+      {"accept", "accipiō"},
+      {"accuse", "crīminor"},
+      {"attack", "aggredior"},
+      {"attend", "attendō"},
+      {"attract", "alliciō"},
+      {"approve", "approbō"},
+      {"appear", "appāreō"},
+      {"apply", "applicō"},
+      {"arrive", "perveniō"},
+      {"assume", "pōnō"},
+      {"assist", "iuvō"},
+      {"affirm", "dīcō"},
+      {"suppose", "putō"},
+      {"suggest", "suggerō"},
+      {"submit", "obsequor"},
+      {"succeed", "succēdō"},
+      {"suffer", "patior"},
+      {"supply", "praebeō"},
+      {"support", "fulciō"},
+      {"persuade", "persuādeō"},
+      {"permit", "sinō"},
+      {"perform", "fungor"},
+      {"perceive", "videō"},
+      {"persist", "persevērō"},
+      {"dismiss", "dīmittō"},
+      {"discover", "inveniō"},
+      {"discuss", "colloquor"},
+      {"display", "exhibeō"},
+      {"distinguish", "cernō"},
+      {"distribute", "distribuō"},
+      {"disturb", "turbō"},
+      {"obey", "audiō"},
+      {"observe", "spectō"},
+      {"obtain", "obtineō"},
+      {"occupy", "occupō"},
+      {"offer", "praebeō"},
+      {"oppose", "adversor"},
+      {"oppress", "opprimō"},
+      {"transfer", "trānsferō"},
+      {"translate", "trādūcō"},
+      {"transport", "vehō"}
+  };
+  auto e = engine();
+  rules::Options o;
+  o.speakerGender = 'm';
+  int ok = 0, n = 0;
+  for (const auto& v : kVerbs) {
+    rules::CueInput c;
+    c.sourceText = std::string("They ") + v.first + " it.";
+    c.startMs = 0;
+    c.endMs = 3500;
+    auto r = e->translate({c}, o, rules::Context{}, nullptr, nullptr);
+    REQUIRE(r.ok());
+    const rules::CueOutput& out = r.value()[0];
+    const std::string want = std::string("\"") + v.first + "\" -> " + v.second;
+    bool hit = false;
+    for (const auto& rs : out.reasons) hit = hit || rs.text.rfind(want, 0) == 0;
+    CHECK_MESSAGE(hit, v.first << " -> " << flat(out.target) << " (expected the verb " << v.second << ")");
+    CHECK_MESSAGE(out.target.find('[') == std::string::npos, v.first << " bracketed: " << flat(out.target));
+    ok += hit;
+    ++n;
+  }
+  MESSAGE("prefixed verbs: " << ok << " / " << n);
+}
+
+// C37 rules, each with own sentences (not in own_prose.en.txt, not in the blind lines).
+TEST_CASE("rules-p: textbook prose constructions (for, and yet, so, Oh + god, not A but B, of-genitive, states, inversion)") {
+  NEED_REAL();
+  const std::vector<std::pair<const char*, const char*>> cases = {
+      // "for" + clause (nam), the comma kept
+      {"The girl is sad, for her dog is ill.", "Puella trīstis est, nam canis eius aeger est."},
+      {"Lucius is tired, for the water is heavy.", "Lūcius fessus est, nam aqua gravis est."},
+      // "and yet" -> tamen
+      {"And yet the old man sings.", "Et tamen senex canit."},
+      {"The house is small, and yet it is warm.", "Domus parva est et tamen calida est."},
+      {"The girl is tall and yet weak.", "Puella alta et tamen dēbilis est."},
+      {"The wall is old and yet strong.", "Mūrus vetus et tamen validus est."},
+      // "so" + clause -> itaque
+      {"So the children are often happy.", "Itaque puerī saepe laetī sunt."},
+      {"The sun is hot, so we sit under the tree.", "Sōl calidus est, itaque sub arbore sedēmus."},
+      {"Julia is wise, so her mother is happy.", "Iūlia prūdēns est, itaque māter eius laeta est."},
+      // Oh + a god or the Lord: the vocative kept
+      {"Oh Neptune, the sea is wild!", "Ō Neptūne, mare ferum est!"},
+      {"Oh Lord, hear my voice.", "Ō Domine, audī vōcem meam."},
+      // not A but B
+      {"The sailor lives not in the city but on the island.", "Nauta nōn in urbe sed in īnsulā habitat."},
+      {"The bread is not white but brown.", "Pānis nōn albus sed fuscus est."},
+      // an "of" phrase after the object is its genitive
+      {"She cleans the windows of the house.", "Fenestrās domūs pūrgat."},
+      // be + delighted / pleased -> the passive; be silent -> taceō
+      {"The old woman is often delighted.", "Anus saepe dēlectātur."},
+      {"The teacher is pleased.", "Magister dēlectātur."},
+      {"The boy reads a book and is silent.", "Puer librum legit et tacet."},
+      // self-sufficient
+      {"I am self-sufficient.", "Mihi sufficiēns sum."},
+      // hard of a thing, old of a person
+      {"The stone is hard.", "Saxum dūrum est."},
+      {"The bed is hard but the room is warm.", "Lectus dūrus est sed cubiculum calidum est."},
+      {"Marcus is old, but he is brave.", "Marcus senex est, sed fortis est."},
+      {"My grandmother is old and kind.", "Avia mea anus et benigna est."},
+      // every + time noun
+      {"They play in the garden every day.", "In hortō omnī diē lūdunt."},
+      // inverted copula
+      {"Cold is the water, and deep is the river.", "Aqua frīgida est et flūmen altum est."},
+      {"Dark was the night.", "Nox obscūra erat."},
+      // a pronoun first of two objects is the indirect one
+      {"The mother gives him bread.", "Māter pānem eī dat."},
+      {"The king shows them the gold.", "Rēx aurum eīs ostendit."},
+      // the countryside
+      {"He walks in the country.", "Rūrī ambulat."},
+      {"They go to the country.", "Rūs eunt."},
+      // a coordinated predicate agrees with the first subject
+      {"She runs and is tired.", "Currit et fessa est."},
+      // a plural subject before a base form; an "adverb" read after "and" + adjective
+      {"In summer the geese swim in the lake.", "Aestāte ānserēs in lacū nant."},
+      {"The baker's wife is kind and wise.", "Uxor pānificis benigna et prūdēns est."},
+      // prefixed verbs
+      {"The farm provides food for the family.", "Vīlla cibum familiae praebet."},
+      {"The soldiers defend the city.", "Mīlitēs urbem dēfendunt."},
+      {"The girls present a gift to the queen.", "Puellae rēgīnae dōnum offerunt."},
+  };
+  int ok = 0;
+  for (const auto& c : cases) {
+    const std::vector<Out> o = run({c.first}, 'm');
+    const bool hit = o[0].text == c.second;
+    CHECK_MESSAGE(hit, c.first << " -> " << o[0].text << " (expected " << c.second << ")");
+    CHECK(o[0].conf != rules::Confidence::Fix);
+    ok += hit;
+  }
+  MESSAGE("C37 constructions EN: " << ok << " / " << cases.size());
+  // calibration: a guessed contrast, a weak dictionary sense and a dropped connector are never OK
+  CHECK(run({"Marcus is old, but he is brave."}, 'm')[0].conf != rules::Confidence::Fix);
+  CHECK(run({"The land of the farmer is not large, but it is enough."}, 'm')[0].conf != rules::Confidence::Ok);
+}

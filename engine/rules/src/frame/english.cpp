@@ -55,6 +55,17 @@ Reading readingOf(const lex::Lexicon& lx, const std::string& lower) {
       if (r.ingOf.empty()) r.ingOf = h;
     }
   }
+  // C37: a long word that is a verb of its own ("present") is no past of another verb ("presend"); the irregular pasts
+  // that are verbs too are short (found, saw, lay, left, felt, wound)
+  if (!r.pastOf.empty() && lower.size() >= 6 && !endsWith(lower, "ed"))
+    for (const lex::Analysis& a : an) {
+      const lex::Lemma l = lx.lemma(a.lemma);
+      if (l.id != lex::kNoLemma && l.pos == feat::Verb && text::lower(std::string(l.head)) == lower) {
+        r.pastOf.clear();
+        r.finitePast = false;
+        break;
+      }
+    }
   return r;
 }
 

@@ -201,3 +201,52 @@ Greek test files are not mine. So: the trailing address and the reroot carry a d
 "Ven" is a guess, the comma clauses are opt-in for the Latin engine, and the doubled clitic, the aspectual se and the
 weather idiom are Latin-side rewrites. Greek ES -> GRC stays 39 / 40 with a byte-identical report. If the Greek
 expectations are relaxed in a Greek loop, these can move into the frame for both engines.
+
+## Textbook prose and liturgy (C37, 2026-10-13/14): Spanish -> Latin on hymn verse
+Material: the owner's Spanish of a medieval hymn (22 lines, data/acceptance/, never quoted here; lines by number only)
+with the Latin original as a reference, and our own tests/regression/own_prayer.es.txt (40 devotional lines in hymn
+style, not a quotation of any prayer) with gold written first (wip e60754a). Blind: 10 own Spanish lines written
+2026-10-13 19:31 UTC before any rule, first run on 2026-10-14 after all rules (see docs/rules_en_notes.md).
+
+### Numbers (fidelity 2, speaker m, latinity wide; classical gives the same Latin on the owner material)
+| set | first run | after C37 |
+|---|---|---|
+| owner es -> la (22 lines, E19) | right 1 / 22; OK 0; Spanish words unmarked in the Latin of lines 6, 9, 16, 18 | right 7 / 22 (1 2 3 5 9 13 19); OK 3 (1 2 13), wrong among OK 0; no unmarked Spanish word (lines 7 and 11 keep a Spanish word in brackets, Fix) |
+| own_prayer.es.txt (40, new) | 5 / 40; OK 5, 2 wrong among them | 26 / 40 as written, 36 / 40 with 10 proposed alternatives; OK 19, wrong among OK 0 |
+| blind (10 Spanish lines) | first run 7 / 10 ("del mal" lost behind "a mí"; "para ... estar" Fix; a stray "-" for a bare ablative), wrong among OK 0 | 9 / 10 (the para + estar line stays Fix) |
+| ES own_dialogue / own_dialogue2 | 100 / 116 (wrong among OK 1: #76 lepus after the C34 veto) | 100 (ok 80 -> 78) / 118, wrong among OK 0 (conejo -> cunīculus in gloss_es_la) |
+| Greek ES -> GRC / own_dialogue2 ES -> GRC | 39 / 40, 118 / 120 | unchanged |
+
+### Rules
+* Verse lines joined into one sentence: a line whose joined reading loses a content word (A7) or needs a guessed name
+  that the line alone does not keeps its own reading, and so do the other lines of that sentence (Spanish only).
+* Ave / Salve opening a line or after a comma are greetings (avē, salvē; never avis), segments of their own with the
+  address after them; an adjective addressed alone takes the Spanish adjective's gender (mītis, pia); the checker reads
+  a generated interjection as the interjection, not the noun of the same spelling; amén -> āmēn.
+* Sacred names and titles in names_la.tsv (María, Jesús, Cristo, Jesucristo -> Iēsus Chrīstus declined word by word,
+  declension 4 for Iēsus, vocative Iēsū Chrīste; Dios -> Deus, vocative Deus; Señor / Señora -> Dominus / Domina; Reina,
+  Virgen, Emperatriz, Madre, Hijo, Padre from the lexicon, capitalised; Consolatriz declined from the table); title
+  vocatives with their attribute ("Título del cielo," / "Señora mía") at the start and at the end of a line.
+* "de N pleno" in verse order -> N in the ablative + plēnus agreeing with the head (also with no head after a greeting);
+  "De Name ... Noun" hung as one name is the noun with the name's genitive (repair verse-order, Check).
+* A clitic doubled by "a mí / a ti / a nosotros" is one argument, a noun after it its apposition, "del X" behind it
+  goes to the verb; dejar + clitic + adjective -> mē sōlum relinquere; "Sé tú ..." -> estō (future imperative of sum);
+  the verse infinitive last: "Concédenos la paz amar" -> complement infinitive, "Dame X para el bien hacer" -> ut bonum
+  faciam; "pobre" before its noun -> miser; "los tristes / los pobres" are people (masculine with los, feminine with
+  las; the personal "a" applies); an adjective with a preposition of its own ("por los pobres") is a phrase of the verb;
+  "pero" hung as an adverb is the conjunction; a noun after the article read as an adjective is the noun.
+* Tokens: a known verb form with an enclitic ("dame", "llévame", "ayúdame") is split when its base is an imperative and
+  the word carries the written accent (or the base has one syllable); a names_la.tsv word is never split ("Dios").
+* Tables: gloss_es_la.tsv +32 rows, 2 changed (rogar -> precor, guardar -> custōdiō, consolar -> cōnsōlor, oír -> audiō, salvar ->
+  servō, apestar -> foeteō, fiel -> fīdus, pecador -> peccātor, pleno / lleno -> plēnus, conejo -> cunīculus (lepus keeps
+  liebre) ...); verbprep_es_la.tsv +4 (rogar por -> prō, defender de -> ā, huir de -> object, apestar de -> ablative);
+  tiers_la.tsv cōnsōlor, peccātor, peccātum, precor, āmēn, avē, salvē (tier 2).
+
+### Proposed gold alternatives (own_prayer: the last alternative of lines 7 11 12 15 18 19 21 31 33 38)
+spectā, trīstīs (accusative in -īs), word order (12 15 21 31 33 38), the object nōs at the start of line 19 (18 / 19
+read as one sentence), precāre for ōrā, dux meus. Veto freely.
+
+### Still open
+Hymn lines 4 (a coordinated adjective of a name lost, Check), 6-8 (participle and "para ... ser" verse), 10-12
+(genitive of "de los pecadores" after a title, gerund apestando), 14-18, 20-22 (verse word order, clitic séllame, "lo que
+es justo"); own_prayer 3, 28, 36, 37 (Check / Fix).

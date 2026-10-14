@@ -804,3 +804,127 @@ TEST_CASE("rules-o: constructions of the Spanish source (C34)") {
   const auto t = runEs({"Te lo prometo, papá."});
   CHECK(t[0].conf != rules::Confidence::Ok);
 }
+
+// ================================================================================================================
+// C37 (RULES-P). tests/regression/own_prayer.es.txt: 40 own Spanish devotional lines in hymn style (greetings Ave /
+// Salve, sacred names, imperatives, "a mí" doubling, "para ... ser", "de bondad plena", apestar), one unit per line
+// as a text project gives them (the lines of a sentence are joined and re-split; a line that a joined reading would
+// lose keeps its own), vs the implementer's gold (report in <build>/regression_report_prayer.txt).
+TEST_CASE("rules-p: end to end on own_prayer.es.txt vs the gold Latin (report; determinism in both latinity modes)") {
+  NEED_REAL();
+  std::ifstream f(repo() / "tests" / "regression" / "own_prayer.es.txt");
+  std::vector<rules::CueInput> in;
+  std::string line;
+  while (std::getline(f, line)) {
+    if (line.empty()) continue;
+    rules::CueInput c;
+    c.index = (uint32_t)in.size();
+    c.sourceText = line;
+    c.startMs = (int64_t)in.size() * 4000;
+    c.endMs = c.startMs + 3500;
+    in.push_back(c);
+  }
+  REQUIRE(in.size() == 40);
+  const rules::Options o = esOptions(2, 'm');
+  auto e = engine();
+  auto r1 = e->translate(in, o, rules::Context{}, nullptr, nullptr);
+  auto r2 = e->translate(in, o, rules::Context{}, nullptr, nullptr);
+  REQUIRE(r1.ok());
+  REQUIRE(r2.ok());
+  for (size_t i = 0; i < 40; ++i) CHECK(r1.value()[i].target == r2.value()[i].target);
+  {
+    rules::Options oc = o;
+    oc.latinity = rules::Latinity::Classical;
+    auto c1 = e->translate(in, oc, rules::Context{}, nullptr, nullptr);
+    auto c2 = e->translate(in, oc, rules::Context{}, nullptr, nullptr);
+    REQUIRE(c1.ok());
+    REQUIRE(c2.ok());
+    for (size_t i = 0; i < c1->size() && i < c2->size(); ++i) CHECK(c1.value()[i].target == c2.value()[i].target);
+  }
+  std::ifstream g(repo() / "tests" / "regression" / "expected" / "own_prayer.la.gold.txt");
+  std::vector<std::string> gold;
+  while (std::getline(g, line))
+    if (!line.empty() && line[0] != '#') gold.push_back(line);
+  REQUIRE(gold.size() == 40);
+  int matches = 0, wrongOk = 0;
+  std::map<std::string, int> conf;
+  std::ostringstream all;
+  for (size_t i = 0; i < 40; ++i) {
+    const rules::CueOutput& c = r1.value()[i];
+    const std::string ours = flat(c.target);
+    bool m = false;
+    for (const std::string& alt : splitAlt(gold[i])) m = m || norm(alt) == norm(ours);
+    matches += m;
+    wrongOk += !m && c.confidence == rules::Confidence::Ok;
+    ++conf[confName(c.confidence)];
+    std::string extra;
+    for (const auto& fl : c.flags) extra += " " + fl;
+    all << i + 1 << "\t" << (m ? "=" : "X") << "\t" << in[i].sourceText << "\t" << ours << "\t" << confName(c.confidence)
+        << extra << "\n";
+    if (!m) all << "\t\tgold: " << gold[i] << "\n";
+  }
+  std::ofstream(buildDir() / "regression_report_prayer.txt")
+      << "Regression own_prayer.es.txt -> Latin, fidelity 2, speaker m\nmatch rate: " << matches << " / 40\nconfidence: ok "
+      << conf["ok"] << ", check " << conf["check"] << ", fix " << conf["fix"] << "; mismatches rated OK: " << wrongOk
+      << "\n\n" << all.str();
+  CHECK(wrongOk == 0);
+  CHECK_MESSAGE(matches >= 36, "own_prayer below the C37 threshold: " << matches << " / 40");
+  MESSAGE("own_prayer es: " << matches << " / 40 match the gold; confidence ok " << conf["ok"] << " / check "
+                            << conf["check"] << " / fix " << conf["fix"] << "; mismatches rated OK " << wrongOk);
+}
+
+// C37 rules for prayers and hymns, each with own lines (not in own_prayer.es.txt, not in the blind lines).
+TEST_CASE("rules-p: prayer and hymn constructions (Ave / Salve, sacred names, a mí, rogar, plena, ser, verse infinitives)") {
+  NEED_REAL();
+  const std::vector<std::pair<const char*, const char*>> cases = {
+      // Ave / Salve are greetings, never avis; an adjective addressed keeps the Spanish gender
+      {"Ave, hija del rey.", "Ave, fīlia rēgis."},
+      {"Salve, luz del mundo.", "Salvē, lūx mundī."},
+      {"Ave pura, ave santa.", "Ave pūra, ave sāncta."},
+      // sacred names and titles (names_la.tsv): declined, vocatives
+      {"Dios nos guarda.", "Deus nōs custōdit."},
+      {"María es buena.", "Marīa bona est."},
+      {"Jesucristo, oye nuestra voz.", "Iēsū Chrīste, audī vōcem nostram."},
+      {"Reina de la paz, ruega por nosotros.", "Rēgīna pācis, precāre prō nōbīs."},
+      {"Señor, escúchame.", "Domine, audī mē."},
+      {"Te ruego, Señor mío.", "Tē precor, Domine mī."},
+      {"Te ruego, María, oye mi voz.", "Tē precor, Marīa, audī vōcem meam."},
+      // de N pleno -> plēnus + ablative
+      {"Madre de gracia plena,", "Māter grātiā plēna,"},
+      // clitic doubled by "a mí", the noun after it in apposition
+      {"Ayúdame a mí, tu hijo.", "Adiuvā mē, fīlium tuum."},
+      // dejar + clitic + adjective
+      {"No me dejes triste.", "Mē trīstem nōlī relinquere."},
+      // sé tú -> estō
+      {"Sé tú nuestra guía.", "Estō dux noster."},
+      // verse infinitive last
+      {"Concédenos la paz amar.", "Dā nōbīs pācem amāre."},
+      // rogar por, llevar a person, defender de
+      {"Ruega a Dios por los pobres.", "Precāre Deum prō pauperibus."},
+      {"Llévame a casa.", "Dūc mē domum."},
+      {"Defiéndenos de la noche.", "Dēfende nōs ā nocte."},
+      // los tristes: people
+      {"Consuela a los tristes.", "Cōnsōlāre trīstīs."},
+      // apestar -> foeteō + ablative of cause
+      {"El agua apesta de veneno.", "Aqua venēnō foetet."},
+      {"El alma apesta de culpa.", "Anima culpā foetet."},
+      {"Amén.", "Āmēn."},
+  };
+  int ok = 0;
+  for (const auto& c : cases) {
+    const std::vector<EsOut> o = runEs({c.first}, 'm');
+    const bool hit = o[0].text == c.second;
+    CHECK_MESSAGE(hit, c.first << " -> " << o[0].text << " (expected " << c.second << ")");
+    CHECK(o[0].conf != rules::Confidence::Fix);
+    ok += hit;
+  }
+  MESSAGE("C37 constructions ES: " << ok << " / " << cases.size());
+  // never-nonsense: a Spanish word kept inside the Latin is a bracket (Fix), never an unmarked "name"
+  for (const char* s : {"De los ángeles Emperatriz,", "De Jesucristo santa madre,"}) {
+    const std::vector<EsOut> o = runEs({s}, 'm');
+    for (const char* w : {"ángel", "madre", "Jesucristo"}) {
+      const bool clean = o[0].text.find(w) == std::string::npos || o[0].text.find(std::string("[") + w) != std::string::npos;
+      CHECK_MESSAGE(clean, s << " -> " << o[0].text);
+    }
+  }
+}

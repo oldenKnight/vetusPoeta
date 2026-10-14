@@ -268,9 +268,9 @@ bool esLeadWord(const std::string& w) {
   return in(w, {"sí", "no", "bueno", "pues", "oye", "oiga", "mira", "mire", "ay", "oh", "ah", "entonces", "claro",
                 "perdón", "gracias", "adiós", "hola", "vaya", "órale", "ándale", "ojalá", "bien", "ya", "ok", "sale"});
 }
-bool esVocativeSpan(const std::vector<Token>& tk, int a, int b) {
-  // C37: a sacred name or title of a prayer with its attribute ("Dios eterno", "Señora mía", "Reina del cielo", "Dios
-  // del cielo", "Madre de bondad plena")
+// C37: a sacred name or title of a prayer with its attribute ("Dios eterno", "Señora mía", "Reina del cielo", "Dios
+// del cielo", "Madre de bondad plena")
+bool esTitleSpan(const std::vector<Token>& tk, int a, int b) {
   if (b >= a && b - a <= 6 && upper(tk[(size_t)a].text) &&
       in(nlp::normalise(tk[(size_t)a].text), {"dios", "señor", "señora", "reina", "rey", "madre", "virgen", "jesucristo",
                                               "jesús", "cristo", "maría", "padre", "hijo", "emperatriz", "consolatriz"})) {
@@ -282,6 +282,11 @@ bool esVocativeSpan(const std::vector<Token>& tk, int a, int b) {
     }
     if (ok) return true;
   }
+  return false;
+}
+
+bool esVocativeSpan(const std::vector<Token>& tk, int a, int b) {
+  if (esTitleSpan(tk, a, b)) return true;   // C37
   if (b < a || b - a > 2) return false;
   for (int i = a; i <= b; ++i) {
     const Token& t = tk[(size_t)i];
@@ -5936,7 +5941,8 @@ bool FrameBuilder::segmentParse(std::vector<Token>& tk) const {
           break;
         }
     }
-    if (!cut && (sepIsBreak || a > 0) && !(a == 0 && atEnd) && (esl ? !atEnd && esVocativeSpan(tk, a0, b) : vocativeSpan(tk, a, b))) {
+    if (!cut && (sepIsBreak || a > 0) && !(a == 0 && atEnd) &&
+        (esl ? (!atEnd || (a > 0 && esTitleSpan(tk, a0, b))) && esVocativeSpan(tk, a0, b) : vocativeSpan(tk, a, b))) {   // C37: "Te ruego, Señor mío."
       // a vocative needs something else in the sentence and no article; time nouns are adverbs, not addressees
       bool time = false;
       for (int i = a; i <= b; ++i) time = time || timeNoun(tk[(size_t)i].lower);
@@ -6644,6 +6650,21 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
       // a lower-case word read as a name ("ángeles") is the common noun
       if (!tk2[(size_t)x].text.empty() && !upper(tk2[(size_t)x].text)) { tk2[(size_t)x].upos = "NOUN"; tk2[(size_t)x].lemma = lemmaOf(tk2[(size_t)x]); }
       out.repairs.emplace_back("verse-order");
+    }
+  }
+  // C37: "Ruega a Dios por los pobres": an adjective with a preposition of its own is no attribute of the noun before
+  // it but a phrase of the verb (prō pauperibus)
+  if (lang_ == SrcLang::Es && nlp_) {
+    std::vector<nlp::Token>& tk3 = out.tokens;
+    for (int x = 0; x < (int)tk3.size(); ++x) {
+      nlp::Token& t = tk3[(size_t)x];
+      if (t.upos != "ADJ" || t.deprel != "amod" || t.head <= 0) continue;
+      bool cs = false;
+      for (const nlp::Token& k : tk3) cs = cs || (k.head == x + 1 && k.deprel == "case" && k.upos == "ADP");
+      const nlp::Token& h = tk3[(size_t)t.head - 1];
+      if (!cs || h.head <= 0 || x < t.head) continue;
+      t.head = h.head;
+      t.deprel = "obl";
     }
   }
   // C37: "pero" opening a clause that the parser hung as an adverb is its conjunction (sed)
