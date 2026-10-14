@@ -1123,3 +1123,117 @@ Our own sentences, run GRC -> EN (Greek source, English gold) and EN -> GRC (Eng
 18. ὁ πατὴρ τὸν ἑαυτοῦ κλῆρον φιλεῖ. = The father loves his own farm.
 19. χαλεπὸς μέν ἐστιν ὁ πόνος, ἡ δὲ γῆ καλή. = The work is hard, but the land is beautiful.
 20. ὦ Δάφνη, διὰ τί στενάζεις; = Daphne, why are you groaning?
+
+## Blind check result (C38)
+Honest timing: the 20 sentences above were written at 19:33 UTC 2026-10-13, before any rule. The work was interrupted
+twice by usage limits (main-agent checkpoints 55ee262 and 98bf553); the blind first run happened only after the first
+interruption, at 00:39 UTC 2026-10-14, after the rules of Steps 1-2 below and before any fix for these sentences.
+First run: **GRC -> EN 16 / 20** acceptable, wrong among OK **2** (#9 "and home drives them": a clause-opening adverb of a
+coordinated clause printed before its verb; #14 "not big, and enough": a bare adjective with δέ after a copula clause);
+**EN -> GRC 12 / 20**, wrong among OK 0 (not acceptable, all Check / Fix: #1 "oxen" left as a lemma -> μάνδρα, #2 "wise"
+tagged as an adverb, #5 "for" after "tired", #7 #9 #10 #15 English verbs tagged as nouns (frame), #14 ἱκανόν neuter for
+"it" = the field). After the fixes (own sentences first, "C38 after the blind check"): GRC -> EN 20 / 20, EN -> GRC
+14 / 20, wrong among OK 0 in both.
+
+## Numbers (fidelity 2, speaker m, real data; HEAD e7dcaf0 + exactly the C38 files, isolated copy, LLM off)
+| set | first run (before C38) | after C38 |
+|---|---|---|
+| owner material GRC -> EN (14 units) | right 5 / 14, OK 2 (1 wrong) | right 10 / 14, OK 10 (0 wrong); units 3, 4, 9, 12 need lemmas greek.vpl lacks (Fix / Check). With a candidate greek.vpl that has the 3 supplement rows below: right 14 / 14, OK 14, 0 wrong |
+| owner material EN -> GRC (14 units) | right 3 / 14, OK 3 (2 wrong) | right 11 / 14, OK 7 (0 wrong); left Check: 6 (the inverted "long is the work" lost by the frame), 9 ("although" -> ὅτε), 14 ("not much, but enough" a fragment) |
+| own_athen GRC -> EN (50) | 8 / 50, OK 21 (17 mismatches among OK) | **48 / 50** (42 with the gold as written; 6 proposed alternatives), OK 39, mismatches among OK 0 |
+| own_athen EN -> GRC (50) | 9 / 50, OK 16 (10 mismatches among OK) | **34 / 50** (30 as written; 4 proposed alternatives), OK 26, mismatches among OK 0; 7 Fix / most Check from English parses (verbs tagged as nouns: unties, lifts, shines, groans, honours) |
+| Step 1 calibration on the first-run outputs (no quality rule yet) | OK 2 (1 wrong) / OK 3 (2 wrong) | GRC -> EN OK 1 (unit 10, right); EN -> GRC OK 1 (unit 5, right): zero wrong among OK |
+| EN -> GRC own_dialogue (114) | 114 / 114 | 114 / 114 (ok 81 / check 33) |
+| ES -> GRC own_dialogue 40 / own_dialogue2 120 | 39 / 40, 118 / 120 | 39 / 40, 118 / 120 (ok 37 -> 40, wrong among OK 0) |
+| GRC -> EN / ES (40) | 40 / 40, 40 / 40 | 40 / 40, 40 / 40 |
+| C38 constructions | - | GRC -> EN 33 / 33, GRC -> ES 16 / 16, EN -> GRC 21 / 21; after blind 6 / 6, 4 / 4, 4 / 4 |
+
+## Step 1: calibration (meaning coverage)
+* grc2x (readable.cpp `coverage`, translator.cpp): every content word of the Greek must reach the frames the realisers
+  print (a name or pronoun prints alone, so its attributes count as lost) or be spoken outside them (a connector's gloss,
+  a negation of a clause with a verb, a subordinator); function words (article, ὦ, μέν, γε, δή, τοι, τε, καί, ἤ, ἆρα,
+  ἄν) need not. A lost word -> flag `meaning-coverage`; Greek letters left in the English / Spanish -> `greek-left`; a
+  nominative group printed as the predicate of a verb other than "be", a mid-clause ἀλλά no rule resolves, a guessed
+  object -> `role-doubt`. Each makes the cue Check; a new check `coverage` lists the words.
+* EN / ES -> GRC (engine_grc `sourceCoverage`): a sentence-opening "For" (not "for me / for a while ...") needs γάρ,
+  "so" / "therefore" οὖν (τοίνυν, ἄρα, διό), "and yet" / "yet" / "nevertheless" δέ / ὅμως / ἀλλά / καίτοι / μέντοι,
+  "but" ἀλλά / δέ, "O / Oh" + a capitalised word ὦ, a names_grc.tsv name one of its Greek forms, and no Latin letters
+  outside a [bracket]; Spanish pero / pues / así que / entonces / sin embargo / oh likewise. Flag `meaning-coverage`
+  (Check), check `coverage`.
+
+## Step 2: rules (Greek side)
+GRC -> EN / ES (grc2x):
+* analysis: a clause with two finite verbs is split at the last καί / ἀλλά / ἤ / οὐδέ between them (coordinated verbs
+  were lost), and the one-finite-verb penalty does not cross such a word (μένει was read as μένος "mind"); a verbless
+  predication before καί + a verb after it is split too; an adjective after καί / ἀλλά takes the case of the word
+  before; enclitic εἰσιν / ἐστι(ν) / φησι(ν) ... read as their accented forms (greek.vpl has εἰσιν without features);
+  -ως adverbs prefer the adverb lemma; a reading whose pos has the readable row +0.3; a capitalised word inside the
+  sentence with a names_grc.tsv reading is the name; one name reading per case (several English spellings); a
+  names_grc reading replaces the lexicon's proper-name reading of that case; spurious ambiguity removed (an
+  indeclinable under two parts of speech; homograph lemmas one readable row reads alike; a 2nd person middle in -ει
+  beside the 3rd active; a contracted future identical to the present).
+* frames: a name + bare adjective / noun is a predicate (Athenian was lost; "the Stephen farmer"); a second noun
+  after a group's head starts a new group; a negation is never a degree adverb; οὐκ X ἀλλὰ Y for two prepositional
+  phrases ("lives not in Athens but in the fields") and for two adjectives after a noun group ("food, not much but
+  enough", "no mucho sino suficiente"); μέν ... δέ: δέ "but"; ὅμως δέ "and yet"; the copula left out in "μακρὸς δὲ ὁ
+  πόνος" (subject + bare predicate) and after a copula clause "καλὴ δέ" ("but it is beautiful"); a coordinated clause
+  shares the previous subject (not printed: "always works and often groans and says") and, when valency_grc.tsv gives
+  the verb an accusative, its object ("lifts the stone and brings it"; a verb without a row: role-doubt); a neuter group
+  before its verb in such a clause is the object (a guess); NP coordination ("Chloe and the mother walk"); the article
+  alone before δέ / μέν is a pronoun ("ὁ δὲ οὐκ ἀκούει"); the reflexive possessor ("his own house", "su propio");
+  αὐτόν of a thing is "it"; ὦ + a god "O Zeus" (names note `god`); "always / often" before the verb, a -ly adverb after
+  it; "cannot"; readable tag `generic` ("life is hard"); glosses "be tired" / "be here" print the copula; the closing »
+  and ” stay with their sentence.
+EN / ES -> GRC (transfer_grc, engine_grc, realise_grc, check_grc):
+* names_grc +4 rows, 3 changed: Dikaeopolis / Dikeopolis / Dikaiopolis -> Δικαιόπολις (vocative Δικαιόπολι on every row), Zeus (Διός,
+  Διί, Δία, Ζεῦ), note `god` on Zeus, Athena, Hermes.
+* "O / Oh" before an address and an opening quote before an address are left out before the frame (the tagger read "O"
+  as a preposition; an opening quote made the frame lose the address: "“Timothy, hurry." became a statement).
+* repairs of English readings on the Greek side: "For" read as a preposition -> γάρ; "and yet" -> δέ + ὅμως (ἔτι
+  was produced), no καί beside it; "and so, ..." / "So the ..." ("so" read as a degree word) -> οὖν; "provides him food"
+  (objects swapped); "wise" tagged as an adverb after "beautiful and" -> a second predicate adjective (clause-repair,
+  Check); irregular plurals the tagger kept as lemmas (oxen, mice, geese, teeth, feet, lice); bare "father / mother"
+  take the article; "not in A but in B" (coordinated inside one phrase) -> οὐκ ἐν ... ἀλλὰ ἐν ... after the verb, the
+  verb not negated (GrcOblique::contrast); "the land of the farm" -> the genitive attribute (περί was produced); a
+  coordinated clause agrees with a plural subject; "his / her / their" of the clause's own 3rd person subject -> the
+  article, "his own" -> ἑαυτοῦ between article and noun (GrcNP::possReflexive; never αὐτοῦ); "but he ..." after a
+  person subject and a person object: subject-guess (Check).
+* rows: lexical_en_grc +5 (provide παρέχω, delighted / pleased χαίρω, groan στενάζω, adj lazy ἀργός); readable_grc +29
+  / 1 changed (σῖτος food / alimento; κλῆρος farm, γεωργέω till, στενάζω groan, ἄοκνος tireless, αὐτουργός
+  self-sufficient, παρέχω provide, ἱκανός enough, πόνος / πονέω work, βίος life (generic), Ἀθηναῖος Athenian,
+  ἀπέραντος endless, ἀργός lazy, κάμνω be tired, πάρειμι be here, σῴζω save / salvar, οὐκέτι no longer, ...; most
+  reverse-only so the forward path is unchanged); tiers_grc +16 (beginners' reader core words at tier 2);
+  valency_grc +3 (γεωργέω acc, πονέω / στενάζω intr); lexicon_supplement_grc +3 (αὐτουργός, ἀπέραντος, γεωργέω, full
+  Attic paradigms: greek.vpl lacks them; **for LIB / main agent**: a candidate greek.vpl built with
+  `build.py --next --lang grc --stage pack --out-vpl <dir>` read them (82,428,056 B) and made owner GRC -> EN 14 / 14;
+  promote it with a LIB task; the tests do not depend on it).
+
+## Expectations changed
+test_rules_grc4 "The boy lost his ball.", "Where did the boy put his book?", "The king put his seal on the letter.";
+grc5 "He lied to his mother.", "The girl smiled when she saw her mother.", "The boy washed his feet in the river.";
+grc6 "Mary wept for her brother.", "The boy spent his money.", "The girl stood beside her mother.": αὐτοῦ / αὐτῆς ->
+the article (the subject's own; the task rule "never αὐτοῦ for the subject's own"). Gold proposals after the run (veto
+freely): own_athen.en.gold lines 14 17 21 26 42 43 (waits / listen / brings / fountain / into / "and he"), own_athen.grc.gold
+lines 3 7 22 30 (μέγας οὐκ ἔστιν, πρὸς τὸν πατέρα, ἆραι, ἀλλά for "but").
+
+## API changes (additive)
+vp/grc2x.h: `SentenceOut::dropped`, `Reading::god`; vp/realise_grc.h: `GrcOblique::contrast`, `GrcNP::possReflexive`,
+`GreekRealiser::Closed::alla / heautou`. Internal: grc2x (internal.h Lexical::silent / generic, TokInfo::god,
+LexicalSource::takesAccusative, Built::spoken / dropped, coverage()), engine_grc, transfer_grc, realiser_grc,
+check_grc (a reflexive possessor between article and noun). No edit in frame/, transfer/, realise_la/, engine/, curated/
+or a Latin table.
+**Wish for frame/ (C37)**: a clause-opening "For" tagged ADP and dropped; "O Zeus," read as a prepositional phrase; an
+opening quote loses the address after it; "and yet" (adverb yet); "So the X" / "and so," read as degree "so"; English
+3rd singular verbs tagged as nouns after a name or in "X verbs the Y and ..." (unties, lifts, shines, groans, honours);
+"oxen" left as its own lemma (singular); "provides him food" (objects swapped); "wise" tagged ADV after "beautiful
+and"; "not in A but in B" inside one phrase (a "but" conjunct); "of the farm" an oblique of the verb; "and yet long is
+the work" (inverted predicate) lost.
+**Caused by C37 wip on HEAD 98bf553** (not repaired here): with C37's checkpoint files the Greek tests fail at
+test_rules_grc2.cpp:734 ("Today is Friday."), grc4.cpp:129 / :331 (two "so ... cannot" result clauses read with καί),
+grc8.cpp:147 / :382 ("taught the boys a song"), grc10.cpp:162 / :248 / :367 ("and yet" no longer reaches the Greek side
+as an adverb; own_athen EN -> GRC below threshold); with e7dcaf0's versions of C37's frame / transfer / engine / curated /
+realise_la files and Latin tables (HEAD otherwise) every Greek test passes (65 / 65).
+
+## Still open (for loop 11 / LIB)
+The candidate greek.vpl (supplement rows); the frame wishes above; owner EN -> GRC units 6, 9, 14; blind EN -> GRC
+#1-#2 fixed, #5 #7 #9 #10 #14 #15 (frame); "although" -> καίπερ; "no longer" on the forward path.

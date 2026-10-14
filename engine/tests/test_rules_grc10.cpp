@@ -240,12 +240,14 @@ TEST_CASE("rules-grc10: GRC -> EN regression on own_athen.grc.txt (50 own senten
   NEED_REAL10();
   const RegResult r = regression10(Dir::GrcEn, "own_athen.grc.txt", "own_athen.en.gold.txt", "regression_report_athen_grc_en.txt");
   CHECK(r.okMiss == 0);
+  CHECK(r.match >= 48);   // C38: first run 8 / 50 (17 mismatches rated OK); 48 / 50 (42 with the gold as written)
 }
 
 TEST_CASE("rules-grc10: EN -> GRC regression on own_athen.en.txt (50 own sentences) vs the Greek gold") {
   NEED_REAL10();
   const RegResult r = regression10(Dir::EnGrc, "own_athen.en.txt", "own_athen.grc.gold.txt", "regression_report_athen_en_grc.txt");
   CHECK(r.okMiss == 0);
+  CHECK(r.match >= 34);   // C38: first run 9 / 50 (10 mismatches rated OK); 34 / 50 (30 with the gold as written)
 }
 
 // C38: the Greek -> English / Spanish rules of the loop, each on two or more own sentences (none is a regression line).
