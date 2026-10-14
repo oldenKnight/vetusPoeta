@@ -241,3 +241,25 @@ lines: EN 14 -> 15/20, wrong among OK 1 -> 0; ES 10/20 unchanged, wrong among OK
 campo sino en la ciudad": the rendering the review asks for; the blind gold lists "Porque ... la casa de campo" and
 "Pues ... la granja" but not this combination, so it counts as a strict mismatch). Owner material unchanged (OK units
 la->en 3, 10, 11, 13; la->es 6, 11).
+
+## Frame follow-ups (C39)
+Item (f) of C39 (own sentences tests/regression/own_frame.la.txt, gold expected/own_frame.en.gold.txt; tests in
+engine/tests/test_rules_q.cpp):
+* Abstract nouns said in general take no article in English: readable_en.tsv rows labor (work), somnus (sleep),
+  amīcitia, fāma, glōria, sapientia, lībertās, iūstitia, īra, timor, amor, senectūs, ōtium (note mass; all but labor
+  also note abstract); uita gets note abstract. Note abstract (new, translator.cpp / realise_en.cpp): no article as a
+  subject even after an earlier mention ("O Jupiter, life is difficult." after "life" was named: owner unit 8); a
+  genitive, a relative clause or an adjective brings it back ("The life of the farmer"). labor stays without abstract
+  (narrative "the work is long" after a mention). Spanish keeps its article (la vida, la amistad).
+* "Lūcius līber est et dominus suus": an adjective after a name subject and before the copula is the predicate
+  (Lucius is free), and the et before a predicate noun is "and" (no dangling "and"); dominus / domina as the
+  predicate of a 3rd-singular person with suus or joined to the predicate līber is "his / her own master (mistress)",
+  Spanish "dueño / dueña de sí mismo / misma" ("Līber enim est et dominus": owner unit 12; "Mārcus dominus est" stays
+  "a master").
+* nōn multum sed satis: when Y of nōn X sed Y is an adverb (satis), "but" / "sino" goes before it: "He has not much
+  money but enough", "His daughter works not much but enough", ", nōn multum sed satis" after the object ("provides not
+  much food but enough": owner unit 14).
+Owner material (by unit number, never quoted): la->en right 9 -> 12/14 (8, 12, 14 now right; 6 keeps its meaning with
+"work is long" for "the work is long"), OK units 3 10 11 13 unchanged, wrong among OK 0; la->es unchanged. la2x own
+201/201, own_prose / own_prayer reports byte-identical. Still open: blind LA -> EN 3 (a common-noun subject before
+"līber est et dominus suus": "The free farmer is his own master and."), owner unit 9 (dangling et, nōn multum).

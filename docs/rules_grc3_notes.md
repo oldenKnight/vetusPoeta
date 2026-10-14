@@ -1237,3 +1237,29 @@ realise_la files and Latin tables (HEAD otherwise) every Greek test passes (65 /
 ## Still open (for loop 11 / LIB)
 The candidate greek.vpl (supplement rows); the frame wishes above; owner EN -> GRC units 6, 9, 14; blind EN -> GRC
 #1-#2 fixed, #5 #7 #9 #10 #14 #15 (frame); "although" -> καίπερ; "no longer" on the forward path.
+
+## Frame follow-ups (C39)
+Greek files touched: data/curated/readable_grc.tsv (+1 row: ἔργον noun work / trabajo, reverse-only), data/curated/
+lexical_en_grc.tsv (+4 rows: adj enough / sufficient / bastante / suficiente -> ἱκανός), engine/rules/src/engine_grc/
+engine_grc.cpp (item d: Options::textProject, no wrapping, no overflow in the re-check, line structure; and the source
+coverage now asks a concessive word for although / though / aunque, because the length Check of a wrapped text unit had
+hidden owner EN -> GRC unit 9, "although" -> ὅτε, which would have been OK and wrong), tests/regression/expected/
+own_athen.grc.gold.txt (proposals below). No other Greek source file.
+* (g) "enough" -> ἱκανός (the English frame read "enough water" as a noun compound and the Greek noun lookup took
+  βουπόρος "ox-piercing", whose gloss mentions enough); ", not much, but enough" is Check (ellipsis): the realiser drops
+  the negation of the fragment (πολὺ ἀλλὰ ἱκανόν, owner unit 14 still wrong, Check) - a Greek transfer change, not done.
+* (h) ἔργον: a readable row of its own gives the noun the readable-row prior, so ἔργω (εἴργω) never wins when nothing
+  else decides ("ἔργον ἔχει" was "I was closing off"); after an article or adjective it was already the noun.
+  **BLOCKED (scope): αὐτουργός as a noun.** The lexicon has only an adjective lemma; grc2x reads the substantive
+  ("ὁ αὐτουργός") with the adjective's row, and a row cannot tell the two uses apart: "farmer" would give "The father is
+  farmer" in the predicate, "self-sufficient farmer" the same. Proposal (grc2x/translator.cpp + readable.cpp, ~15
+  lines): a readable_grc tag noun:<english>|<spanish> used when an adjective heads an articled noun group ("the farmer
+  who works his own land" / "el campesino que trabaja su tierra"), the predicate keeping "self-sufficient"; or a noun
+  lemma in the supplement (LIB). Own GRC -> EN units 1-2 stay OK and wrong until then.
+* The English frame fixes of C39 (3rd-singular verbs, "out of") improved own_athen EN -> GRC 34 -> 39/50 (fix 7 -> 4,
+  wrong among OK 0) with three proposed gold alternatives (correct Attic the gold did not list; veto freely):
+  own_athen.grc.gold.txt unit 4 (file line 11) "ὁ Στέφανος τοὺς βοῦς λύει καὶ αὐτοὺς εἰς τὸν ἀγρὸν ἐλαύνει." (καί + αὐτούς before the
+  phrase, εἰς), unit 15 (file line 22) "ὁ πατὴρ ἐν τῷ ἀγρῷ ἐργάζεται ἀλλὰ ὁ παῖς παίζει." (ἀλλά for but), unit 21 (file line 28) "ὁ γεωργὸς τὸν λίθον
+  αἴρει καὶ αὐτὸν ἐκ τοῦ ἀγροῦ φέρει." (αὐτόν before the phrase); own_frame_grc.grc.gold.txt unit 4, file line 7 (υἱέος, ἐκ τοῦ
+  μικροῦ ἀγροῦ, ἑκάστης ἡμέρας). The doubt / flag verb-doubt of the English frame appears on Greek cues but the Greek
+  confidence list was not changed.

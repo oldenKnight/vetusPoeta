@@ -1787,3 +1787,69 @@ note (bōs: ox, oxen ...), gloss_es_la +32 / 2 changed; transfer/tables.cpp inte
 frame.h FrameBuilder::setProseConnectors (+ member); realise_la.h LaAdj::fixedBefore; names_la.tsv declension 4 and
 two-word names with two genitives (curated loader, Names::decline); states tables kind `pass`. New cue flags (Check):
 weak-sense, connector-guess, contrast-guess, prep-dropped, source-word.
+
+## Frame follow-ups (C39)
+Own material first (cf861fb, before any rule): tests/regression/own_frame.en.txt (18 EN -> LA), own_frame.es.txt (4 ES
+-> LA), own_frame.la.txt (7 LA -> EN), own_frame_grc.en.txt (4 EN -> GRC), own_frame_grc.grc.txt (6 GRC -> EN), gold
+in tests/regression/expected/own_frame*.gold.txt; 10 blind lines in data/work/eval/c39-blind/ (gitignored, WRITTEN.txt
+2026-10-14 16:15 UTC). Tests: engine/tests/test_rules_q.cpp (report <build>/regression_report_q.txt), test_server.py
+(TXT export of text projects).
+
+### (a) "The well supplies water." (english.cpp retagForms, frame_builder.cpp)
+* A clause with no verb of its own (from its start to the next coordinator, subordinator or comma): an -s word that
+  english.vpl knows as a 3rd-singular present (or the regular -s of a verb it knows: "unties"), right after its
+  subject, is the verb. The subject is a name opening the clause or [det | possessive] adj* noun+ opening it; the word
+  after it is an object start (det, pronoun, possessive, number), a preposition, an adverb, the end of the clause, or
+  (the C37 sentence) the only verb the tagger found when that word is far more often a noun (en::nounMostly: water,
+  house, book ...): then the -s word is the verb and that word its object, the word before it a noun. An earlier -s
+  word of the clause wins ("My grandmother tells stories": tells). A clause that ends with the -s word needs a subject
+  that is a person, an animal, a name or a thing that acts by itself (sun, river, bell ...): "The house plants." stays a
+  noun phrase.
+* Parse repair: a noun right after the opening determiner and right before the root verb, hung on it as parataxis /
+  dep, is its subject ("Puteus, aquam praebet" -> "Puteus aquam praebet").
+* Calibration: a sentence whose only verb is a noun-mostly word (not an order: "Water the flowers!") is never OK (doubt
+  and flag verb-doubt, Check). The Greek engine shows the flag but its confidence list was not touched (scope).
+### (b) 3rd-singular verbs read as nouns
+Same rule (unties, lifts, groans, smiles after a name or a noun phrase); "X verbs the Y and works hard": an -s word right
+after "and / but / then" whose clause has no subject and no verb, after a clause whose verb is a 3rd-singular present,
+before an adverb, an object or a possessive, is that subject's second verb (a word after it with an adverb reading
+becomes the adverb). Phrasebook: "work hard" -> multum labōrāre (hard was "propter", "hard by").
+### (c) connectors and addresses (what C37 already fixed, what is new)
+Already right after C37 (kept, tested): clause-opening For -> nam, "So the X" -> itaque, ", and so" -> et itaque, "Oh
+Zeus," -> Ō Iuppiter. New: a capital "O" opening the sentence (after an opening quote) before a name or noun that a
+comma or "!" closes within three words is the interjection, not a preposition (phrasebook row o -> ō: "Ō Iuppiter,
+adiuvā nautās!"); a word of address that english.vpl also lists as a name ("Father", "Mother") opening a sentence or a
+quotation is the noun (transfer.cpp: "\"Pater, ager ūmidus est.\"" was "Father"). "out of" + noun phrase keeps "out" as
+the first word of the compound preposition after a re-parse (Greek "carries it out of the field" was περὶ τοῦ ἀγροῦ).
+"has not much money": has before not + a noun phrase without a verb is the main verb ("Multam pecūniam nōn habet").
+### (e) adjectives of proper names
+engine.cpp capitaliseProperAdjectives: a Latin adjective whose first English gloss sense holds a capitalised word that
+english.vpl lists as a capitalised adjective (Athenian, Roman, Greek, Latin; never a capital that only opens a gloss:
+"Of", "Empty") is written with a capital, EN and ES sources (Athēniēnsis, Graecus); capped cache (4,096 lemmas). Tagging:
+"The Greek slave reads a book.": after a determiner, a capitalised adjective of a proper name before a word with a noun
+reading is that adjective and its noun ("Servus Graecus librum legit"; was "Graecum servit ut librum legat").
+### (d) text projects (product defect, E20)
+rules::Options::textProject (set by the CLI for kind "text"): the Latin, Greek and Orbergise engines never wrap a text
+unit at 42 characters and report no overflow (A8, the re-check too); a sentence that begins a new line of the unit's
+source (the source spans keep the line breaks) begins a new line of the translation (cue::beginsSourceLine,
+cue::textLayout). Subtitle projects: unchanged (all 17 regression reports byte-identical for the item).
+Calibration side effect found on the owner material: the overflow Check had hidden a wrong EN -> GRC unit (9,
+"although" -> ὅτε); the Greek source coverage now requires a concessive word for although / though / aunque.
+### (g) "enough"
+"enough" before a noun or ending a clause after "but" / a comma is the quantity adjective (the frame read it as a noun
+compound, the Greek noun lookup gave βουπόρος "ox-piercing"; the lexicon veto keeps its det reading); lexical_en_grc.tsv
+adj enough / sufficient / bastante / suficiente -> ἱκανός. ", not much, but enough" between commas without a verb is an
+ellipsis (doubt, Check): the Greek fragment loses its negation (πολὺ ἀλλὰ ἱκανόν), which is a Greek realiser matter.
+### Numbers
+Own material, first run -> final (text project, fidelity 2, speaker m): EN -> LA 7 -> 15/18 (14 as written + 1
+proposal), ES -> LA 2 -> 2/4, LA -> EN 1 -> 7/7, EN -> GRC 0 -> 2/4 (1 + 1 proposal), GRC -> EN 3 -> 3/6; total 13 ->
+29/39; wrong among OK 1 + 3 + 2 -> 0 except GRC -> EN 2 (αὐτουργός, item h blocked). Blind (first run after all rules):
+4/10, wrong among OK 1 (EN -> LA "in Rōmā" for the locative Rōmae).
+### Proposed gold alternatives (added after the run; veto freely)
+Only appended (no alternative removed): own_frame.la.gold.txt unit 2 = file line 6, "Aquā herbae opus est." (opus est
++ ablative + dative, correct Latin, OK); own_frame_grc.grc.gold.txt unit 4 = file line 7 (υἱέος, ἐκ τοῦ ἀγροῦ, ἑκάστης
+ἡμέρας); own_athen.grc.gold.txt units 4 15 21 = file lines 11 22 28 (+ comment line 7; see rules_grc3_notes.md).
+### Still open
+"The well gives water." (gives tagged as an adjective modifier: Fix, honest); "The river provides water, not much but
+enough." (parse); "los soldados" -> virī (ES); "The Greeks are brave." -> Graeca (pre-existing); the C39 blind lines
+EN -> LA 1 (bell rings -> pulsat), 4 (in Rōmā), LA -> EN 3 (a common-noun subject before līber est et dominus suus).
