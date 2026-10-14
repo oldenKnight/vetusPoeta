@@ -58,6 +58,108 @@ void addFlag(std::vector<std::string>& f, const std::string& x) {
   if (std::find(f.begin(), f.end(), x) == f.end()) f.push_back(x);
 }
 
+// C38: meaning coverage of an English / Spanish cue in its Greek (the calibration of OK on textbook prose: a name left
+// in Latin letters, "Oh Zeus" dropped, "For ..." without γάρ, "and yet" rendered ἔτι were rated OK). Text level, on
+// the source cue and the Greek: every sentence-opening connector of the source needs one of its Greek particles (a
+// count per class), an address with "O / Oh" or a trailing ", Name" needs ὦ, and the Greek has no Latin letters
+// outside a [bracket]. `lost` gets one line per fault.
+void sourceCoverage(const std::string& source, const std::string& greek, bool es, std::vector<std::string>& lost) {
+  // the Greek: particle keys (acute for grave) and Latin letters
+  std::vector<std::string> gk;
+  bool latin = false;
+  {
+    std::string w;
+    int sq = 0;
+    for (size_t i = 0; i <= greek.size();) {
+      size_t j = i;
+      const char32_t c = i < greek.size() ? text::decodeUtf8(greek, j) : U' ';
+      if (j == i) j = i + 1;
+      if (c == '[') ++sq;
+      if (c == ']' && sq > 0) --sq;
+      if (sq == 0 && ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))) latin = true;
+      const bool letter = (c >= 0x370 && c <= 0x3FF) || (c >= 0x1F00 && c <= 0x1FFF) || (c >= 0x300 && c <= 0x36F);
+      if (letter) w += greek.substr(i, j - i);
+      else if (!w.empty()) { gk.push_back(text::greek_key(grc::ultimaToAcute(text::lower(w)))); w.clear(); }
+      i = j;
+    }
+  }
+  auto count = [&](std::initializer_list<const char*> ks) {
+    size_t n = 0;
+    for (const std::string& k : gk)
+      for (const char* x : ks)
+        if (k == text::greek_key(x)) ++n;
+    return n;
+  };
+  if (latin) lost.push_back("a word left in Latin letters");
+  // the source: words with their sentence-start / capital / punctuation context
+  struct W { std::string w; bool start = false, cap = false; char after = 0; };
+  std::vector<W> ws;
+  {
+    bool start = true;
+    std::string cur;
+    bool cap = false;
+    auto flush = [&](char after) {
+      if (cur.empty()) return;
+      ws.push_back(W{text::lower(cur), start, cap, after});
+      start = false;
+      cur.clear();
+    };
+    for (size_t i = 0; i < source.size();) {
+      size_t j = i;
+      const char32_t c = text::decodeUtf8(source, j);
+      if (j == i) j = i + 1;
+      const bool letter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '\'' || c >= 0xC0;
+      const bool quote = c == '"' || c == 0x201C || c == 0x201D || c == 0xAB || c == 0xBB || c == 0xBF || c == 0xA1;
+      if (letter && !quote) {
+        if (cur.empty()) cap = (c >= 'A' && c <= 'Z') || (c >= 0xC0 && c <= 0xDE);
+        cur += source.substr(i, j - i);
+      } else {
+        const char p = c < 0x80 ? (char)c : ' ';
+        flush(p == ' ' ? 0 : p);
+        if (p == '.' || p == '!' || p == '?' || p == ';' || p == ':') start = true;
+        if (!ws.empty() && !ws.back().after && p != ' ' && !quote && c < 0x80) ws.back().after = p;
+      }
+      i = j;
+    }
+    flush(0);
+  }
+  size_t needGar = 0, needOun = 0, needBut = 0, needYet = 0, needO = 0;
+  static const char* const kSubj[] = {"i", "you", "he", "she", "it", "we", "they", "the", "a", "an", "this", "that",
+                                      "his", "her", "my", "our", "their", "your", "there", "these", "those", nullptr};
+  auto subjectWord = [&](size_t k) {
+    if (k >= ws.size()) return false;
+    if (ws[k].cap) return true;
+    for (const char* const* x = kSubj; *x; ++x) if (ws[k].w == *x) return true;
+    return false;
+  };
+  for (size_t k = 0; k < ws.size(); ++k) {
+    const std::string& w = ws[k].w;
+    const bool st = ws[k].start || (k > 0 && ws[k - 1].start && (ws[k - 1].w == "and" || ws[k - 1].w == "y"));
+    if (!es) {
+      if (st && w == "for" && subjectWord(k + 1)) ++needGar;
+      else if (st && w == "so" && (ws[k].after == ',' || subjectWord(k + 1))) ++needOun;
+      else if (w == "therefore") ++needOun;
+      else if (st && w == "and" && k + 1 < ws.size() && ws[k + 1].w == "yet") { ++needYet; ++k; }
+      else if (st && (w == "yet" || w == "nevertheless" || w == "however")) ++needYet;
+      else if (st && w == "but" && ws[k].start) ++needBut;
+      if ((w == "o" || w == "oh") && k + 1 < ws.size() && ws[k + 1].cap) ++needO;
+    } else {
+      if (st && (w == "pero" || w == "mas") && ws[k].start) ++needBut;
+      else if (st && w == "pues" && subjectWord(k + 1)) ++needGar;
+      else if (st && (w == "entonces" || (w == "así" && k + 1 < ws.size() && ws[k + 1].w == "que"))) ++needOun;
+      else if (st && w == "sin" && k + 1 < ws.size() && ws[k + 1].w == "embargo") ++needYet;
+      if (w == "oh" && k + 1 < ws.size() && ws[k + 1].cap) ++needO;
+    }
+  }
+  const size_t gar = count({"γάρ"}), oun = count({"οὖν", "τοίνυν", "ἄρα", "διό"});
+  const size_t yet = count({"ὅμως", "καίτοι", "μέντοι"}), de = count({"δέ"}), alla = count({"ἀλλά", "ἀλλ’", "ἀτάρ"});
+  if (gar < needGar) lost.push_back(es ? "\"pues\" without γάρ" : "\"for\" without γάρ");
+  if (oun < needOun) lost.push_back(es ? "\"así que / entonces\" without οὖν" : "\"so / therefore\" without οὖν");
+  if (yet + de + alla < needYet) lost.push_back(es ? "\"sin embargo\" without δέ / ὅμως" : "\"and yet\" without δέ / ὅμως");
+  if (yet + de + alla < needYet + needBut) lost.push_back(es ? "\"pero\" without ἀλλά / δέ" : "\"but\" without ἀλλά / δέ");
+  if (count({"ὦ"}) < needO) lost.push_back("the address (ὦ ...) left out");
+}
+
 // Rebuilds `text` with new token strings (same order); gaps between tokens are kept.
 void rewriteTokens(cue::Latin& l, const std::vector<std::string>& texts) {
   std::string out;
@@ -2892,6 +2994,15 @@ struct GreekPath::Impl {
           for (const std::string& w : miss) a7.detail += " " + w;
         }
         o.checks.push_back(a7);
+        // C38: meaning coverage (connectors, the address, Latin letters)
+        if (a.greekText && !a.copied) {
+          std::vector<std::string> lost;
+          sourceCoverage(cues[i].sourceText, o.target, lang == frame::SrcLang::Es, lost);
+          Check cov{"coverage", lost.empty(), ""};
+          for (size_t k = 0; k < lost.size(); ++k) cov.detail += (k ? "; " : "") + lost[k];
+          o.checks.push_back(cov);
+          if (!lost.empty()) addFlag(o.flags, "meaning-coverage");
+        }
         std::stable_sort(o.checks.begin(), o.checks.end(), [](const Check& x, const Check& y) { return x.id < y.id; });
       }
       bool unknown = !a.unknown.empty();
@@ -2906,7 +3017,7 @@ struct GreekPath::Impl {
                             "realia", "name-kept", "contact-relative", "noun-infinitive", "purpose-guess", "light-verb",
                             "phrase-order", "participle-phrase", "ellipsis", "clause-repair", "wh-statement", "det-adverb",
                             "past-form", "subject-guess", "fragment", "free-relative", "speech-inversion", "idiom",
-                            "lexicon-gap"})   // C33: a form the lexicon lacks, the nearest attested one written
+                            "lexicon-gap", "meaning-coverage"})   // C38: a connector / address / name lost   // C33: a form the lexicon lacks, the nearest attested one written
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       for (const transfer::Choice& c : a.choices)
         if (c.lowTier) {

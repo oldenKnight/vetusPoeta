@@ -47,11 +47,14 @@ Analyser::Analyser(const lex::Lexicon& lx, const curated::CuratedData& cd, const
     if (e.policy == curated::NamePolicy::Translate) continue;
     for (uint8_t c : {Nom, Gen, Dat, Acc, Voc}) {
       std::string f;
-      if (grc::declineName(e, c, f))
-        names_.push_back(NameForm{text::greek_key(f), e.english, c, e.gender, e.number, e.spanish, e.place});
+      if (grc::declineName(e, c, f)) {
+        const bool god = (" " + e.note + " ").find(" god ") != std::string::npos;
+        names_.push_back(NameForm{text::greek_key(f), e.english, c, e.gender, e.number, e.spanish, e.place, god});
+      }
     }
   }
-  std::sort(names_.begin(), names_.end(), [](const NameForm& a, const NameForm& b) {
+  // stable: several English spellings of one Greek name keep the file order (the first row's English is read back)
+  std::stable_sort(names_.begin(), names_.end(), [](const NameForm& a, const NameForm& b) {
     return a.key != b.key ? a.key < b.key : a.case_ < b.case_;
   });
 }
@@ -148,6 +151,10 @@ void Analyser::readings(const std::string& word, Token& t, const std::vector<rul
   auto it = std::lower_bound(names_.begin(), names_.end(), key,
                              [](const NameForm& n, const std::string& k) { return n.key < k; });
   for (; it != names_.end() && it->key == key; ++it) {
+    // C38: one reading per case when several English spellings share the Greek name (the first row's English)
+    bool sameCase = false;
+    for (const Reading& x : rs) sameCase = sameCase || (x.name && x.lemma == kNone && unpack(x.packed).case_ == it->case_);
+    if (sameCase) continue;
     Reading r;
     Features f;
     f.pos = Name;
@@ -160,10 +167,23 @@ void Analyser::readings(const std::string& word, Token& t, const std::vector<rul
     r.nameEn = it->english;
     r.nameEs = it->spanish;
     r.place = it->place;
+    r.god = it->god;
     // C33: a lower-case word with a lexicon reading is that word, not the name ("τὴν εἰρήνην ἤγγειλεν" was "announced
     // Irene")
     r.prior = t.capitalised ? 1.5 : -1.0;
     rs.push_back(r);
+  }
+  // C38: a names_grc.tsv reading replaces the lexicon's proper-name reading of the same case (Ζεῦ: two readings of one
+  // name made the cue ambiguous)
+  {
+    std::vector<uint8_t> nameCases;
+    for (const Reading& x : rs)
+      if (x.name && x.lemma == kNone) nameCases.push_back(unpack(x.packed).case_);
+    if (!nameCases.empty())
+      rs.erase(std::remove_if(rs.begin(), rs.end(), [&](const Reading& x) {
+                 if (x.lemma == kNone || x.closed || !(lx_.lemma(x.lemma).flags & lex::ProperName)) return false;
+                 return std::find(nameCases.begin(), nameCases.end(), unpack(x.packed).case_) != nameCases.end();
+               }), rs.end());
   }
   if (glossary && rs.empty())
     for (const rules::GlossaryEntry& g : *glossary)
@@ -296,6 +316,34 @@ void Analyser::analyse(std::string_view sentence, Sentence& out, const std::vect
     t.clause = clause;
   }
   disambiguate(out);
+  // C38: coordinated verbs ("πονεῖ ... καὶ πολλάκις στενάζει καὶ λέγει"): a clause with two finite verbs is split at the
+  // last καί / ἀλλά / ἤ / οὐδέ between them, so each verb gets its own frame (the second and third were lost)
+  auto finiteVerb = [&](const Token& t) {
+    const Reading* r = t.best();
+    if (t.kind != TokKind::Word || !r || r->closed || r->name || r->lemma == kNone) return false;
+    const Features f = unpack(r->packed);
+    return isFinite(f) && lx_.lemma(r->lemma).pos == Verb;
+  };
+  auto coordWord = [&](const Token& t) {
+    if (t.kind != TokKind::Word) return false;
+    const std::string key = text::greek_key(grc::ultimaToAcute(text::lower(t.text)));
+    return key == text::greek_key("καί") || key == text::greek_key("ἀλλά") || key == text::greek_key("ἤ") ||
+           key == text::greek_key("οὐδέ") || key == text::greek_key("μηδέ") || key == text::greek_key("ἀλλ’");
+  };
+  for (size_t k = 0; k < out.tokens.size(); ++k) {
+    if (!finiteVerb(out.tokens[k])) continue;
+    // the next finite verb of the same clause
+    size_t v2 = out.tokens.size();
+    for (size_t m = k + 1; m < out.tokens.size() && out.tokens[m].clause == out.tokens[k].clause; ++m)
+      if (finiteVerb(out.tokens[m])) { v2 = m; break; }
+    if (v2 == out.tokens.size()) continue;
+    size_t cut = out.tokens.size();
+    for (size_t m = k + 1; m < v2; ++m)
+      if (coordWord(out.tokens[m])) cut = m;
+    if (cut == out.tokens.size()) continue;
+    for (size_t m = cut; m < out.tokens.size(); ++m) ++out.tokens[m].clause;
+    k = cut;   // the loop goes on from the new clause
+  }
 }
 
 void Analyser::disambiguate(Sentence& s) const {
@@ -328,6 +376,22 @@ void Analyser::disambiguate(Sentence& s) const {
       if (word(k)) return (long)k;
     }
     return -1;
+  };
+  // C38: a coordinating καί / ἀλλά / ἤ / οὐδέ between tokens a < b of a clause
+  auto coordBetween = [&](size_t a, size_t b) {
+    for (size_t k = a + 1; k < b; ++k) {
+      if (s.tokens[k].kind != TokKind::Word) continue;
+      const std::string key = text::greek_key(grc::ultimaToAcute(text::lower(s.tokens[k].text)));
+      if (key == text::greek_key("καί") || key == text::greek_key("ἀλλά") || key == text::greek_key("ἤ") ||
+          key == text::greek_key("οὐδέ") || key == text::greek_key("μηδέ") || key == text::greek_key("ἀλλ’"))
+        return true;
+    }
+    return false;
+  };
+  auto coordWordAt = [&](size_t k) {
+    if (s.tokens[k].kind != TokKind::Word) return false;
+    const std::string key = text::greek_key(grc::ultimaToAcute(text::lower(s.tokens[k].text)));
+    return key == text::greek_key("καί") || key == text::greek_key("ἀλλά") || key == text::greek_key("ἤ");
   };
   auto isArticle = [&](size_t i, size_t r) { return lpos(i, r) == Article; };
   auto isPrep = [&](size_t i, size_t r) { return lpos(i, r) == Prep; };
@@ -381,6 +445,14 @@ void Analyser::disambiguate(Sentence& s) const {
       }
       // ὦ + vocative
       if (pw >= 0 && text::greek_key(s.tokens[(size_t)pw].text) == "ὦ") sc += f.case_ == Voc ? 3.0 : -1.0;
+      // C38: an adjective right after καί / ἀλλά / ἤ takes the case of the adjective or noun before the conjunction (a
+      // negation skipped): "σῖτον παρέχει οὐ πολὺν ἀλλὰ ἱκανόν" (ἱκανόν was read as a nominative)
+      if (pw >= 0 && (lp == Adj || lp == Participle) && coordWordAt((size_t)pw)) {
+        long q = prevWord((size_t)pw);
+        if (q >= 0 && (chosenPos((size_t)q) == Adj || chosenPos((size_t)q) == Noun) &&
+            isNominal(chosen((size_t)q), chosenPos((size_t)q)))
+          sc += chosen((size_t)q).case_ == f.case_ ? 1.25 : 0.0;
+      }
       // enclitic possessor after a noun
       if (rd.closed && lp == Pron && f.case_ == Gen && pw >= 0 && isNominal(chosen((size_t)pw), chosenPos((size_t)pw)))
         sc += 1.0;
@@ -396,11 +468,14 @@ void Analyser::disambiguate(Sentence& s) const {
     } else if (lp == Prep) {
       if (nw >= 0) sc += 0.5;
     }
-    // finite verb: one per clause; agreement with a nominative
+    // finite verb: one per clause (C38: per part of a clause between coordinating καί / ἀλλά / ἤ: "μένει καὶ τὸ δεῖπνον
+    // παρασκευάζει" has two; μένει was read as the noun μένος "mind"); agreement with a nominative
     if (isFinite(f)) {
       bool other = false;
       for (size_t k = 0; k < n; ++k)
-        if (k != i && word(k) && s.tokens[k].clause == s.tokens[i].clause && isFinite(chosen(k))) other = true;
+        if (k != i && word(k) && s.tokens[k].clause == s.tokens[i].clause && isFinite(chosen(k)) &&
+            !coordBetween(std::min(i, k), std::max(i, k)))
+          other = true;
       sc += other ? -1.0 : 1.0;
       for (size_t k = 0; k < n; ++k) {
         if (k == i || !word(k) || s.tokens[k].clause != s.tokens[i].clause) continue;
@@ -415,6 +490,13 @@ void Analyser::disambiguate(Sentence& s) const {
         }
       }
       if (f.mood == Imperative && s.question) sc -= 0.5;
+      // C38: a 2nd person middle / passive in -ει beside the 3rd person active of the same verb (λέγει, φιλεῖ, χαίρει)
+      // is the rarer reading
+      if (f.person == 2 && (f.voice == Middle || f.voice == Passive))
+        for (size_t r2 = 0; r2 < s.tokens[i].readings.size(); ++r2) {
+          const Features g = feats(i, r2);
+          if (r2 != r && s.tokens[i].readings[r2].lemma == rd.lemma && isFinite(g) && g.voice == Active) { sc -= 0.75; break; }
+        }
     }
     // infinitive after a modal verb of its clause
     if (f.mood == Infinitive)
@@ -456,7 +538,17 @@ void Analyser::disambiguate(Sentence& s) const {
     for (size_t r = 0; r < t.readings.size(); ++r) {
       if (sc[r] < top - 0.5) continue;
       const Features f = unpack(t.readings[r].packed);
-      const std::string sig = std::to_string(t.readings[r].lemma) + ":" + std::to_string(f.case_) + ":" +
+      // C38: an indeclinable word listed under two parts of speech (δέ particle / conjunction) is one reading
+      // C38: so are homograph lemmas that readable_grc.tsv reads alike (λέγω "say" / λέγω "gather": one row)
+      const bool indecl = !f.case_ && !f.person && !f.mood && t.readings[r].lemma != kNone;
+      bool sameGloss = false;
+      if (t.readings[r].lemma != kNone && !indecl) {
+        const lex::Lemma lm = lx_.lemma(t.readings[r].lemma);
+        sameGloss = gt_.readable(lm.key) != nullptr;
+      }
+      const std::string sig = (indecl ? std::string(lx_.lemma(t.readings[r].lemma).key)
+                               : sameGloss ? std::string(lx_.lemma(t.readings[r].lemma).key) + "/" + std::to_string(lx_.lemma(t.readings[r].lemma).pos)
+                                           : std::to_string(t.readings[r].lemma)) + ":" + std::to_string(f.case_) + ":" +
                               std::to_string(f.number) + ":" + std::to_string(f.person) + ":" + std::to_string(f.tense) +
                               ":" + std::to_string(f.mood);
       if (std::find(seen.begin(), seen.end(), sig) == seen.end()) { seen.push_back(sig); ++surv; }
@@ -487,6 +579,7 @@ void tokInfos(const lex::Lexicon& lx, const Sentence& s, std::vector<TokInfo>& o
     x.nameEn = r->nameEn;
     x.nameEs = r->nameEs;
     x.place = r->place;
+    x.god = r->god;
     x.closed = r->closed;
     if (r->lemma != kNone) {
       const lex::Lemma l = lx.lemma(r->lemma);

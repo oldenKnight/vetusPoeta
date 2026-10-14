@@ -25,7 +25,8 @@ class Analyser {
   void analyse(std::string_view sentence, Sentence& out, const std::vector<rules::GlossaryEntry>* glossary) const;
 
  private:
-  struct NameForm { std::string key, english; uint8_t case_, gender, number = 1; std::string spanish; bool place = false; };
+  struct NameForm { std::string key, english; uint8_t case_, gender, number = 1; std::string spanish; bool place = false;
+                    bool god = false; };
   void readings(const std::string& word, Token& t, const std::vector<rules::GlossaryEntry>* glossary) const;
   void disambiguate(Sentence& s) const;
   const lex::Lexicon& lx_;
@@ -47,12 +48,15 @@ struct TokInfo {
   std::string nameEn;         // name reading: the English spelling
   std::string nameEs;         // C29: the Spanish spelling of a place name ("Atenas"), "" = as nameEn
   bool place = false;         // C29: a city / country of names_grc.tsv (not a person)
+  bool god = false;           // C38: a god of names_grc.tsv (note "god": "O Zeus" in English address)
 };
 
 // The target-language word of a Greek lemma, with the facts the realisers need.
 struct Lexical {
   std::string word;           // "girl", "niña", "look for", "tener miedo"
   bool person = false, animal = false, mass = false, motion = false, missing = false, pivot = false;
+  bool silent = false;        // C38: a readable row "-" (the word is deliberately not translated)
+  bool generic = false;       // C38: readable tag "generic": no English article for the Greek generic one (life)
   std::string plural;         // irregular English plural ("men"), "" = rule
   uint8_t gender = 0;         // Spanish noun gender (feat::M / F)
 };
@@ -72,14 +76,20 @@ struct Side {
 struct Built {
   std::vector<frame::SemFrame> frames;      // main clauses in order
   std::vector<std::string> joiners;         // between frames[i-1] and frames[i]: "," or "" (connectors live in the frame)
-  std::vector<std::string> flags;           // "no-verb", ...
+  std::vector<std::string> flags;           // "no-verb", "meaning-coverage", "role-doubt", ...
   std::vector<std::string> roles;           // per token
   bool question = false, exclamation = false;
+  // C38: the meaning coverage of the readable sentence: tokens whose meaning was spoken outside the frames (a connector
+  // gloss, a negation of a clause with a verb) and the written forms of the content words the frames lost
+  std::vector<char> spoken;
+  std::vector<std::string> dropped;
 };
 
 // Fills SemFrames from the analysed Greek sentence (target words already chosen through `src`).
 void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<TokInfo>& ti,
                  const LexicalSource& src, Target t, Side& side, Built& out);
+// C38: fills Built::dropped / the flags "meaning-coverage" and "role-doubt" (called at the end of buildFrames).
+void coverage(const Sentence& s, const std::vector<TokInfo>& ti, const Side& side, Built& out);
 std::string realiseEnglish(const Built& b, const Side& side);
 std::string realiseSpanish(const Built& b, const Side& side);
 

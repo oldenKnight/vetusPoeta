@@ -6,6 +6,7 @@
 # "art" (keeps the article: ἡ Ἑλλάς), "pl" (a plural name: αἱ Ἀθῆναι ... εἰσίν), "forms=nom,gen,dat,acc" (every case
 # spelled out), "es=<Spanish spelling>" (the Spanish source word and the GRC -> ES name), "neologism" (no ancient name:
 # a New-Latin style coinage, the cue is never OK).
+# C38: note word "god" (a god addressed with ὦ reads "O Zeus" in English); several English spellings may share one Greek name (the first row gives the English of the Greek).
 Alice	Ἀλίκη	Ἀλίκης	f	1	decline	
 Mary	Μαρία	Μαρίας	f	1	decline	
 Anna	Ἄννα	Ἄννης	f	1	decline	es=Ana
@@ -28,7 +29,7 @@ Daphne	Δάφνη	Δάφνης	f	1	decline
 Chloe	Χλόη	Χλόης	f	1	decline	
 Phoebe	Φοίβη	Φοίβης	f	1	decline	
 Zoe	Ζωή	Ζωῆς	f	1	decline	
-Athena	Ἀθηνᾶ	Ἀθηνᾶς	f	1	decline	
+Athena	Ἀθηνᾶ	Ἀθηνᾶς	f	1	decline	god
 Mark	Μᾶρκος	Μάρκου	m	2	decline	
 Peter	Πέτρος	Πέτρου	m	2	decline	
 Paul	Παῦλος	Παύλου	m	2	decline	es=Pablo
@@ -53,8 +54,12 @@ Andrew	Ἀνδρέας	Ἀνδρέου	m	1	decline
 Xanthias	Ξανθίας	Ξανθίου	m	1	decline	
 Thomas	Θωμᾶς	Θωμᾶ	m	1	decline	
 Luke	Λουκᾶς	Λουκᾶ	m	1	decline	
-Hermes	Ἑρμῆς	Ἑρμοῦ	m	1	decline	
-Dicaeopolis	Δικαιόπολις	Δικαιοπόλιδος	m	3	decline	
+Hermes	Ἑρμῆς	Ἑρμοῦ	m	1	decline	god
+Dicaeopolis	Δικαιόπολις	Δικαιοπόλιδος	m	3	decline	voc=Δικαιόπολι
+Dikaeopolis	Δικαιόπολις	Δικαιοπόλιδος	m	3	decline	voc=Δικαιόπολι C38: spellings of the beginners' reader's farmer (the first row gives the English of the Greek)
+Dikeopolis	Δικαιόπολις	Δικαιοπόλιδος	m	3	decline	voc=Δικαιόπολι C38
+Dikaiopolis	Δικαιόπολις	Δικαιοπόλιδος	m	3	decline	voc=Δικαιόπολι C38
+Zeus	Ζεύς	Διός	m	3	decline	god forms=Ζεύς,Διός,Διί,Δία,Ζεῦ C38: irregular (Διός, Διί, Δία, vocative Ζεῦ)
 Daniel	Δανιήλ	Δανιήλ	m	0	decline	indeclinable
 David	Δαυίδ	Δαυίδ	m	0	decline	indeclinable
 Michael	Μιχαήλ	Μιχαήλ	m	0	decline	indeclinable

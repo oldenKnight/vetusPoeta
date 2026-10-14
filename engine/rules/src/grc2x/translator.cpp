@@ -149,12 +149,13 @@ struct Translator::Impl : public detail::LexicalSource {
     if (!r) r = gt.readable(l.key);
     if (r) {
       x.word = tg == Target::En ? r->en : r->es;
-      if (x.word == "-") x.word.clear();
+      if (x.word == "-") { x.word.clear(); x.silent = true; }
       const std::string& tags = r->tags;
       x.person = tags.find("person") != std::string::npos;
       x.animal = tags.find("animal") != std::string::npos;
       x.mass = tags.find("mass") != std::string::npos;
       x.motion = tags.find("motion") != std::string::npos;
+      x.generic = tags.find("generic") != std::string::npos;
       const size_t pl = tags.find("plural:");
       if (pl != std::string::npos && tg == Target::En) {
         size_t e = pl + 7;
@@ -194,6 +195,14 @@ struct Translator::Impl : public detail::LexicalSource {
     detail::buildFrames(lx, s, ti, *this, tg, side, b);
     out.text = tg == Target::En ? detail::realiseEnglish(b, side) : detail::realiseSpanish(b, side);
     for (const std::string& f : b.flags) out.flags.push_back(f);
+    out.dropped = b.dropped;
+    // C38: a Greek word left in the English / Spanish sentence (an untranslated vocative "Ζεῦ, ...") is never OK
+    for (size_t i = 0; i < out.text.size();) {
+      size_t j = i;
+      const char32_t c = text::decodeUtf8(out.text, j);
+      if ((c >= 0x370 && c <= 0x3FF) || (c >= 0x1F00 && c <= 0x1FFF)) { out.flags.push_back("greek-left"); break; }
+      i = j > i ? j : i + 1;
+    }
     for (size_t i = 0; i < b.frames.size(); ++i) {
       if (i) out.frame += " | ";
       out.frame += frame::describe(b.frames[i]);
@@ -417,7 +426,7 @@ std::vector<rules::CueOutput> Translator::cues(const std::vector<rules::CueInput
       double conf = 0;
       size_t ns = 0;
       bool unknown = false, ambiguous = false, check = false, accent = false;
-      std::vector<std::string> unknownWords, ambiguousWords, accentWords;
+      std::vector<std::string> unknownWords, ambiguousWords, accentWords, droppedWords;
       std::string wordByWord;
       for (const auto& r : ranges) {
         SentenceOut so;
@@ -426,6 +435,7 @@ std::vector<rules::CueOutput> Translator::cues(const std::vector<rules::CueInput
         o.target += so.text;
         conf += so.confidence;
         ++ns;
+        for (const std::string& w : so.dropped) droppedWords.push_back(w);
         for (const std::string& f : so.flags)
           if (std::find(o.flags.begin(), o.flags.end(), f) == o.flags.end()) o.flags.push_back(f);
         for (const Word& w : so.words) {
@@ -479,8 +489,22 @@ std::vector<rules::CueOutput> Translator::cues(const std::vector<rules::CueInput
       for (const std::string& w : ambiguousWords) amb.detail += " " + w;
       o.checks.push_back(a1);
       o.checks.push_back(amb);
+      // C38: meaning coverage (every content word of the Greek reached the readable sentence; no Greek left in it; no
+      // nominative group printed as the predicate of a verb other than "be")
+      {
+        const bool greekLeft = std::find(o.flags.begin(), o.flags.end(), "greek-left") != o.flags.end();
+        const bool roleDoubt = std::find(o.flags.begin(), o.flags.end(), "role-doubt") != o.flags.end();
+        rules::Check cov{"coverage", droppedWords.empty() && !greekLeft && !roleDoubt, ""};
+        if (!droppedWords.empty()) {
+          cov.detail = t == Target::Es ? "palabras sin traducir:" : "words not translated:";
+          for (const std::string& w : droppedWords) cov.detail += " " + w;
+        }
+        if (greekLeft) cov.detail += std::string(cov.detail.empty() ? "" : "; ") + "Greek left in the text";
+        if (roleDoubt) cov.detail += std::string(cov.detail.empty() ? "" : "; ") + "a noun group's role is a guess";
+        o.checks.push_back(cov);
+      }
       const double mean = ns ? conf / (double)ns : 1.0;
-      for (const char* f : {"name-guessed", "no-verb", "accent-differs"})
+      for (const char* f : {"name-guessed", "no-verb", "accent-differs", "meaning-coverage", "greek-left", "role-doubt"})
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) check = true;
       o.confidence = unknown ? rules::Confidence::Fix
                              : (ambiguous || check || mean < 0.7) ? rules::Confidence::Check : rules::Confidence::Ok;

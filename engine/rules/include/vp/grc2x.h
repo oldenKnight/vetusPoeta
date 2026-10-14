@@ -48,6 +48,7 @@ struct Reading {
   std::string nameEn;               // the English spelling of a name reading ("Alice")
   std::string nameEs;               // C29 (additive): the Spanish spelling of a place name ("Atenas"), "" = nameEn
   bool place = false;               // C29 (additive): a city / country of names_grc.tsv
+  bool god = false;                 // C38 (additive): a god of names_grc.tsv (note "god"): "O Zeus" in English address
   double prior = 0;                 // context-free preference (closed tables, tier, canonical, Attic)
 };
 
@@ -102,6 +103,8 @@ struct SentenceOut {
   std::vector<std::string> flags;   // "unknown", "name-guessed", "accent-differs", "ambiguous", "no-verb", ...
   std::string frame;                // frame::describe() of the clauses (tests, debugging)
   Sentence analysis;
+  // C38 (additive): the Greek content words the readable sentence lost (meaning coverage; flag "meaning-coverage")
+  std::vector<std::string> dropped;
 };
 
 class Translator {

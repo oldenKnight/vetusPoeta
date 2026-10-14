@@ -2,6 +2,7 @@
 // realisers over them. English / Spanish word morphology comes from la2x's helpers (la2x/internal.h: en::verb,
 // en::plural, es::verb, es::adjective ...), so both back-translation paths inflect the same way.
 #include <algorithm>
+#include <functional>
 
 #include "grc2x/internal.h"
 #include "la2x/internal.h"
@@ -60,6 +61,8 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
   side.ti = ti;
   side.lex.assign(n, Lexical{});
   out.roles.assign(n, std::string());
+  out.spoken.assign(n, 0);
+  out.dropped.clear();
   for (size_t i = 0; i < n; ++i) {
     const TokInfo& t = ti[i];
     if (!t.word) continue;
@@ -76,6 +79,11 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
   out.exclamation = s.finalPunct.find('!') != std::string::npos;
   int maxClause = 0;
   for (const Token& t : s.tokens) maxClause = std::max(maxClause, t.clause);
+  // C38: μέν ... δέ: δέ is "but" when the sentence has μέν ("ὁ μὲν πατὴρ πονεῖ, ὁ δὲ παῖς παίζει")
+  bool menSentence = false;
+  for (size_t i = 0; i < n; ++i) menSentence = menSentence || (ti[i].word && keyIs(ti[i], {"μέν"}));
+  bool lastPredSet = false;
+  Tense lastTense = Tense::Present;
   struct Pending { SemFrame f; bool sub = false; Relation rel = Relation::Cause; std::string marker; bool hasContent = false;
                    bool onlyVocative = false; std::string sepAfter; };
   std::vector<Pending> clauses;
@@ -104,6 +112,9 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
     size_t finite = n, infinitive = n;
     bool ara = false, me = false, hos = false, frontSet = false;
     bool sawContent = false;
+    std::vector<size_t> negTokens;   // C38: spoken when the clause has a verb (the realisers print "not" there)
+    size_t allaTok = n;              // C38: a mid-clause ἀλλά ("not X but Y")
+    size_t deConn = std::string::npos;   // C38: the connector of δέ in f.connectors
     size_t k = 0;
     auto lexOf = [&](size_t i) -> const Lexical& { return side.lex[i]; };
     // NP starting at idx[k]
@@ -113,6 +124,7 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
       if (!(nominal(ti[i]) || ti[i].lpos == Article)) return false;
       np = NPInfo{};
       np.first = (int)i;
+      int reflexivePossessor = -1;
       uint8_t cs = ti[i].f.case_;
       uint8_t num = ti[i].f.number;
       std::vector<size_t> members;
@@ -121,20 +133,40 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
       while (kk < idx.size()) {
         const size_t j = idx[kk];
         const TokInfo& t = ti[j];
-        if ((t.lpos == Adv || t.lpos == Particle) && kk + 1 < idx.size() && nominal(ti[idx[kk + 1]]) &&
+        if ((t.lpos == Adv || t.lpos == Particle) && !negWord(t) && kk + 1 < idx.size() && nominal(ti[idx[kk + 1]]) &&
             ti[idx[kk + 1]].f.case_ == cs && !members.empty() && ti[idx[kk + 1]].lpos == Adj) {
           pendingAdv.push_back(j);
           ++kk;
           continue;
         }
         if (!(nominal(t) || t.lpos == Article)) break;
+        // C38: a reflexive possessor between the article and its noun ("τὴν ἑαυτοῦ οἰκίαν" = his own house)
+        if (members.size() == 1 && ti[members[0]].lpos == Article && t.f.case_ == Gen && cs != Gen &&
+            (t.key == "ἑαυτοῦ" || t.key == "ἐμαυτοῦ" || t.key == "σεαυτοῦ" || t.key == "ἑαυτοῦσ" ||
+             keyIs(t, {"ἑαυτοῦ", "ἑαυτῆς", "ἑαυτῶν", "ἐμαυτοῦ", "σεαυτοῦ", "ἐμαυτῆς", "σεαυτῆς"}))) {
+          reflexivePossessor = (int)j;
+          ++kk;
+          continue;
+        }
         if (t.f.case_ != cs) break;
         // predicate position: an adjective after the noun of an articled group without its own article
         // ("ἡ οἰκία μικρά ἐστιν" = the house is small)
         if (!members.empty() && (t.lpos == Adj || t.lpos == Participle) && ti[members.back()].lpos != Article) {
-          bool art = false, headSeen = false;
-          for (size_t m : members) { art = art || ti[m].lpos == Article; headSeen = headSeen || ti[m].lpos == Noun || ti[m].lpos == Name; }
-          if (art && headSeen && t.key != "πᾶσ" && t.key != "οὗτοσ" && t.key != "ἐκεῖνοσ") break;
+          bool art = false, headSeen = false, nameSeen = false;
+          for (size_t m : members) {
+            art = art || ti[m].lpos == Article;
+            headSeen = headSeen || ti[m].lpos == Noun || ti[m].lpos == Name;
+            nameSeen = nameSeen || ti[m].name || ti[m].lpos == Name;
+          }
+          // C38: also after a name ("Δικαιόπολις Ἀθηναῖός ἐστιν": Athenian was an attribute of the name and lost)
+          if (((art && headSeen) || nameSeen) && t.key != "πᾶσ" && t.key != "οὗτοσ" && t.key != "ἐκεῖνοσ") break;
+        }
+        // C38: a second noun or name without its own article after the group's head is another group (a predicate
+        // noun: "ὁ Στέφανος γεωργός ἐστιν" was read "the Stephen farmer")
+        if (!members.empty() && (t.lpos == Noun || t.lpos == Name || t.name)) {
+          bool headSeen = false;
+          for (size_t m : members) headSeen = headSeen || ti[m].lpos == Noun || ti[m].lpos == Name || ti[m].name;
+          if (headSeen) break;
         }
         if (num && t.f.number && t.f.number != num && t.lpos != Article) break;
         // a second article starts a new NP unless the group's head is not reached yet ("ὁ παῖς ὁ καλός")
@@ -161,6 +193,21 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
       if (members.empty()) return false;
       np.case_ = cs;
       np.last = (int)members.back();
+      // C38: the article alone before δέ / μέν is a pronoun ("ὁ δὲ οὐκ ἀκούει" = but he does not hear; it was "the one")
+      if (members.size() == 1 && ti[members[0]].lpos == Article) {
+        const size_t a0 = members[0];
+        if (a0 + 1 < n && keyIs(ti[a0 + 1], {"δέ", "μέν"})) {
+          SemNP& x = np.np;
+          x.isPronoun = true;
+          x.pron.person = 3;
+          x.pron.number = ti[a0].f.number == Pl ? 2 : 1;
+          x.pron.gender = ti[a0].f.gender;
+          x.number = x.pron.number;
+          x.token = (int)a0;
+          x.tokens.push_back((int)a0);
+          return true;
+        }
+      }
       size_t head = n;
       for (size_t m : members)
         if (ti[m].lpos == Noun || ti[m].lpos == Name || ti[m].name) head = m;
@@ -241,6 +288,21 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
           }
         }
       }
+      if (reflexivePossessor >= 0) {   // C38: "his own" / "her own" / "their own" (Spanish "su propio")
+        const TokInfo& r = ti[(size_t)reflexivePossessor];
+        SemNP po;
+        po.isPronoun = true;
+        const std::string rk = bareKey(r.text);
+        po.pron.person = rk.rfind(text::greek_key("ἐμαυτ"), 0) == 0 ? 1 : rk.rfind(text::greek_key("σεαυτ"), 0) == 0 ? 2 : 3;
+        po.pron.number = r.f.number == Pl ? 2 : 1;
+        po.pron.gender = r.f.gender;
+        po.pronLemma = "own";
+        po.token = reflexivePossessor;
+        po.tokens.push_back(reflexivePossessor);
+        x.possessor.push_back(po);
+        x.tokens.push_back(reflexivePossessor);
+        x.definite = false;
+      }
       // enclitic / pronoun possessor right after ("ὁ πατήρ μου", "τὴν κεφαλὴν αὐτοῦ")
       // C31: also after a genitive NP when the pronoun is the enclitic μου / σου ("ἐκ τῆς ῥινός μου": "of me" was read)
       if (kk < idx.size() && (cs != Gen || ((ti[idx[kk]].key == "ἐγώ" || ti[idx[kk]].key == "σύ") &&
@@ -271,8 +333,17 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
       // particles and connectors
       if (keyIs(t, {"ἆρα"})) { ara = true; ++k; continue; }
       if (keyIs(t, {"δέ", "γάρ", "οὖν", "ἀλλά", "δήπου"}) || (keyIs(t, {"καί"}) && !sawContent && k == 0)) {
-        if (!lw.word.empty() && lw.word != "-") f.connectors.push_back(lw.word);
         out.roles[i] = "connector";
+        // C38: ἀλλά inside a clause after its first words is the "but" of "not X but Y" (οὐκ ἐν Ἀθήναις ἀλλὰ ἐν τοῖς
+        // ἀγροῖς; σῖτον οὐ πολὺν ἀλλὰ ἱκανόν), resolved after the walk; it was read "and but ... in the fields"
+        if (sawContent && keyIs(t, {"ἀλλά"}) && allaTok == n) { allaTok = i; ++k; continue; }
+        std::string cw = lw.word;
+        if (keyIs(t, {"δέ"}) && menSentence) cw = esT ? "pero" : "but";
+        if (!cw.empty() && cw != "-") {
+          if (keyIs(t, {"δέ"})) deConn = f.connectors.size();
+          f.connectors.push_back(cw);
+          out.spoken[i] = 1;
+        }
         ++k;
         continue;
       }
@@ -281,6 +352,7 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
         f.negative = true;
         if (keyIs(t, {"μή"})) me = true;
         out.roles[i] = "negation";
+        negTokens.push_back(i);
         ++k;
         continue;
       }
@@ -288,6 +360,7 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
       if (t.lpos == Conj && keyIs(t, {"ὅτι", "ἐπεί", "ὅτε", "εἰ", "ἐάν", "ἵνα", "ὥστε", "ἐπειδή"}) && !sawContent) {
         p.sub = true;
         p.marker = lw.word;
+        if (!lw.word.empty()) out.spoken[i] = 1;
         p.rel = keyIs(t, {"ὅτι"}) ? Relation::Cause : keyIs(t, {"εἰ", "ἐάν"}) ? Relation::Condition
               : keyIs(t, {"ἵνα"}) ? Relation::Purpose : keyIs(t, {"ὥστε"}) ? Relation::Result : Relation::Time;
         out.roles[i] = "subordinator";
@@ -422,10 +495,104 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
       }
       ++k;   // anything else is skipped (it stays in the interlinear view)
     }
+    // C38: "not X but Y" (οὐ / οὐκ right before X, ἀλλά right before Y): two prepositional phrases ("lives not in Athens
+    // but in the fields") or two adjectives without a noun after a noun group of their case ("provides food, not much
+    // but enough"); the negation then belongs to X, not to the verb. Anything else stays a guess (role-doubt).
+    if (allaTok < n) {
+      auto posOf = [&](size_t tok) -> long {
+        for (size_t q = 0; q < idx.size(); ++q) if (idx[q] == tok) return (long)q;
+        return -1;
+      };
+      auto negBefore = [&](size_t tok) -> long {   // the negation token right before `tok`, else -1
+        const long q = posOf(tok);
+        if (q <= 0) return -1;
+        const size_t pt = idx[(size_t)q - 1];
+        return std::find(negTokens.begin(), negTokens.end(), pt) != negTokens.end() ? (long)pt : -1;
+      };
+      const long qa = posOf(allaTok);
+      bool done = false;
+      // prepositional phrases
+      for (size_t a = 0; a < f.obliques.size() && !done; ++a) {
+        frame::SemOblique& o1 = f.obliques[a];
+        if (o1.token < 0 || (size_t)o1.token > allaTok) continue;
+        const long ng = negBefore((size_t)o1.token);
+        if (ng < 0) continue;
+        for (size_t b = 0; b < f.obliques.size(); ++b) {
+          frame::SemOblique& o2 = f.obliques[b];
+          if (o2.token < 0 || posOf((size_t)o2.token) != qa + 1) continue;
+          o1.prep = (esT ? "no " : "not ") + o1.prep;
+          o2.prep = (esT ? "sino " : "but ") + o2.prep;
+          o1.front = o2.front = false;
+          f.negative = false;
+          negTokens.erase(std::find(negTokens.begin(), negTokens.end(), (size_t)ng));
+          out.spoken[(size_t)ng] = out.spoken[allaTok] = 1;
+          done = true;
+          break;
+        }
+      }
+      // two adjectives without a noun after a noun group of their case
+      for (size_t a = 0; a + 1 < nps.size() && !done; ++a) {
+        NPInfo& x1 = nps[a];
+        NPInfo& x2 = nps[a + 1];
+        if (!x1.adjOnly || x1.article || !x2.adjOnly || x2.article || x1.case_ != x2.case_) continue;
+        if (posOf((size_t)x2.first) != qa + 1 || x1.first > (int)allaTok) continue;
+        const long ng = negBefore((size_t)x1.first);
+        if (ng < 0 || x1.np.adjectives.empty() || x2.np.adjectives.empty()) continue;
+        const NPInfo* noun = nullptr;
+        for (size_t b = 0; b < a; ++b)
+          if (nps[b].case_ == x1.case_ && !nps[b].adjOnly) noun = &nps[b];
+        if (!noun) continue;
+        auto adjWord = [&](const NPInfo& x) {
+          const std::string& w = x.np.adjectives[0].lemma;
+          if (!esT) return w;
+          const uint8_t g = noun->np.token >= 0 && side.lex[(size_t)noun->np.token].gender ? side.lex[(size_t)noun->np.token].gender : (uint8_t)M;
+          return es::adjective(w, g == F ? F : M, noun->np.number == 2 ? 2 : 1);
+        };
+        f.discourse.push_back(std::string("tail:") + (esT ? "no " : "not ") + adjWord(x1) + (esT ? " sino " : " but ") +
+                              adjWord(x2));
+        for (int tk : x1.np.tokens) out.spoken[(size_t)tk] = 1;
+        for (int tk : x2.np.tokens) out.spoken[(size_t)tk] = 1;
+        for (const SemAdj& ad : x1.np.adjectives) if (ad.token >= 0) out.spoken[(size_t)ad.token] = 1;
+        for (const SemAdj& ad : x2.np.adjectives) if (ad.token >= 0) out.spoken[(size_t)ad.token] = 1;
+        negTokens.erase(std::find(negTokens.begin(), negTokens.end(), (size_t)ng));
+        out.spoken[(size_t)ng] = out.spoken[allaTok] = 1;
+        f.negative = !negTokens.empty();
+        nps.erase(nps.begin() + (long)a, nps.begin() + (long)a + 2);
+        done = true;
+      }
+      if (!done) {   // unresolved: the old reading (a clause connector), never OK
+        const Lexical& lw = side.lex[allaTok];
+        if (!lw.word.empty()) { f.connectors.insert(f.connectors.begin(), lw.word); out.spoken[allaTok] = 1; }
+        out.flags.push_back("role-doubt");
+      }
+    }
+    // C38: δέ with ὅμως is "and yet" ("ὅμως δὲ ὁ γεωργὸς χαίρει"; "and nevertheless" was printed)
+    if (deConn != std::string::npos && deConn < f.connectors.size())
+      for (size_t a = 0; a < f.adverbs.size(); ++a)
+        if (f.adverbs[a].token >= 0 && keyIs(ti[(size_t)f.adverbs[a].token], {"ὅμως"})) {
+          f.connectors[deConn] = esT ? "y sin embargo" : "and yet";
+          out.spoken[(size_t)f.adverbs[a].token] = 1;
+          f.adverbs.erase(f.adverbs.begin() + (long)a);
+          break;
+        }
     // ---- roles from the cases ----
     const TokInfo* vt = finite < n ? &ti[finite] : nullptr;
     const std::string vkey = vt ? vt->key : std::string();
-    const bool eimi = vkey == "εἰμί";
+    bool eimi = vkey == "εἰμί";
+    // C38: a clause without a verb whose nominative groups are a subject (article, name or pronoun) and a bare
+    // adjective or noun is a copula clause with ἐστί left out ("μακρὸς δὲ ὁ πόνος" = and the work is long; "ὁ δὲ
+    // Ξανθίας δοῦλος" = and Xanthias is a slave); it was printed without a verb
+    bool elliptic = false;
+    if (!vt && infinitive == n) {
+      int subj = 0, bare = 0, other = 0;
+      for (const NPInfo& x : nps) {
+        if (x.case_ != Nom) { ++other; continue; }
+        if (x.article || x.np.isName || x.np.isPronoun) ++subj;
+        else if (x.adjOnly || !x.np.head.empty()) ++bare;
+      }
+      elliptic = subj == 1 && bare >= 1 && other == 0 && f.type != Kind::Wh && !out.exclamation;
+      if (elliptic) eimi = true;
+    }
     // genitive NP right after another NP: an attribute ("ὁ οἶκος τοῦ γεωργοῦ"), unless the verb takes a genitive
     bool genVerb = false;
     for (const char* g : {"ἀκούω", "ἄρχω", "ἅπτω", "ἐπιθυμέω", "μέμνημαι", "δέομαι"})
@@ -754,10 +921,16 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
       if (eimi && f.hasSubject && !f.implicitSubject && f.predicative.empty() && f.predAdj.empty() && f.subject.token > (int)vi &&
           !f.subject.definite && !f.subject.isName && !f.subject.isPronoun && f.type != Kind::Wh)
         f.existential = true;
+    } else if (elliptic) {   // C38: the copula left out; the tense of the sentence's previous clause
+      f.hasPred = true;
+      f.pred.lemma = "be";
+      f.copula = true;
+      f.pred.tense = lastPredSet ? lastTense : Tense::Present;
     } else {
       f.type = f.type == Kind::Wh ? Kind::Wh : Kind::Frag;
       if (hos) f.type = Kind::Excl;
     }
+    if (f.hasPred) { lastPredSet = true; lastTense = f.pred.tense; }
     (void)main;
     if (hos) { f.type = Kind::Excl; f.exclQuam = true; }
     if (ara) {
@@ -768,6 +941,8 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
     }
     if (f.type == Kind::Imp) f.hasSubject = false;
     if (f.hasPred && !p.sub && f.type == Kind::Decl && out.question && cl != maxClause) {}
+    if (f.hasPred)
+      for (size_t ng : negTokens) out.spoken[ng] = 1;
     clauses.push_back(std::move(p));
   }
   // vocative-only clauses join the next clause (or the previous one)
@@ -819,14 +994,109 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
       const std::string& o = side.lex[(size_t)c.f.object.token].word;
       if (o == "story" || o == "cuento") c.f.pred.lemma = esT ? "contar" : "tell";
     }
+  // C38: a clause split at καί / ἀλλά whose subject is only the verb's ending and agrees with the previous clause's
+  // subject shares it ("Dicaeopolis always works and often groans and says"): the English realiser leaves it out
+  for (size_t a = 1; a < clauses.size(); ++a) {
+    SemFrame& f = clauses[a].f;
+    const SemFrame& g = clauses[a - 1].f;
+    if (!clauses[a - 1].sepAfter.empty() || !f.hasPred || !f.implicitSubject || f.type != Kind::Decl ||
+        g.type != Kind::Decl || !g.hasSubject || !g.hasPred)
+      continue;
+    const int gp = g.subject.isPronoun ? (g.subject.pron.person ? g.subject.pron.person : 3) : 3;
+    const int gn = g.subject.isPronoun ? (g.subject.pron.number == 2 ? 2 : 1) : (g.subject.number == 2 ? 2 : 1);
+    const int fp = f.subject.pron.person ? f.subject.pron.person : 3;
+    const int fn = f.subject.pron.number == 2 ? 2 : 1;
+    if (gp == fp && gn == fn) {
+      f.discourse.push_back("same-subject");
+      f.inheritedSubject.assign(1, g.subject);
+    }
+  }
   for (size_t a = 0; a < clauses.size(); ++a) {
     out.frames.push_back(clauses[a].f);
-    out.joiners.push_back(a == 0 ? std::string() : (clauses[a - 1].sepAfter == "," ? "," : ";"));
+    // C38: no punctuation between two clauses: a clause split at a coordinating καί / ἀλλά (the connector is in the frame)
+    out.joiners.push_back(a == 0 ? std::string() : clauses[a - 1].sepAfter == "," ? "," : clauses[a - 1].sepAfter.empty() ? " " : ";");
   }
   bool anyVerb = false;
   for (const SemFrame& f : out.frames) anyVerb = anyVerb || f.hasPred;
   if (!anyVerb) out.flags.push_back("no-verb");
   (void)lowerFirst;
+  coverage(s, ti, side, out);
+}
+
+// C38: the meaning coverage of the readable sentence (calibration of OK on textbook prose: a dropped predicate
+// adjective, a dropped coordinated verb, a lost negation, a dropped connector were rated OK). Every content word of the
+// Greek must reach the frames that the realisers print, or be spoken outside them (a connector gloss, a negation of a
+// clause with a verb, a subordinator); the function words (article, ὦ, μέν, γε, δή, τοι, τε, καί, ἤ, ἆρα) need not.
+// A content word that is lost goes to `dropped` (flag "meaning-coverage"); a nominative group printed as a predicate of
+// a verb other than "be" (a second subject or an apposition read wrongly: "Chloe goes the mother") is "role-doubt".
+void coverage(const Sentence& s, const std::vector<TokInfo>& ti, const Side& side, Built& out) {
+  const size_t n = ti.size();
+  std::vector<char> in(n, 0);
+  auto mark = [&](int tk) { if (tk >= 0 && (size_t)tk < n) in[(size_t)tk] = 1; };
+  auto lexWord = [&](int tk) -> bool {
+    return tk >= 0 && (size_t)tk < n && (!side.lex[(size_t)tk].word.empty() || side.lex[(size_t)tk].silent);
+  };
+  std::function<void(const SemNP&)> np = [&](const SemNP& x) {
+    if (x.token >= 0 && (x.isName || x.isPronoun || !x.head.empty() || lexWord(x.token))) mark(x.token);
+    if (x.isName || x.isPronoun) {   // the realisers print a name or a pronoun alone (its attributes are lost)
+      for (const SemNP& y : x.coord) np(y);
+      return;
+    }
+    for (const SemAdj& a : x.adjectives) {
+      if (!a.lemma.empty()) mark(a.token);
+      for (int t : a.advTokens) mark(t);
+    }
+    for (int t : x.tokens) {
+      if (t < 0 || (size_t)t >= n) continue;
+      const TokInfo& m = ti[(size_t)t];
+      if (m.lpos == Article || m.lpos == Num || m.lpos == Det) mark(t);
+      for (const char* k : {"οὗτοσ", "ἐκεῖνοσ", "πᾶσ", "οὐδείσ", "μηδείσ", "πόσοσ", "δύο", "τρεῖσ", "εἷσ", "τέτταρεσ"})
+        if (m.key == k) mark(t);
+    }
+    for (const SemNP& y : x.possessor) np(y);
+    for (const SemNP& y : x.genitive) np(y);
+    for (const SemNP& y : x.coord) np(y);
+    for (const SemNP& y : x.apposition) np(y);
+  };
+  bool roleDoubt = false;
+  std::function<void(const SemFrame&)> fr = [&](const SemFrame& f) {
+    if (f.hasPred) {
+      mark(f.pred.token);
+      mark(f.pred.complementToken);
+      for (int t : f.pred.auxTokens) mark(t);
+    }
+    if (f.hasSubject && !f.implicitSubject) np(f.subject);
+    if (f.hasObject) np(f.object);
+    if (f.hasIndirect) np(f.indirectObject);
+    for (const SemNP& x : f.predicative) np(x);
+    for (const SemNP& x : f.vocatives) np(x);
+    for (const SemAdj& a : f.predAdj) {
+      if (!a.lemma.empty()) mark(a.token);
+      for (int t : a.advTokens) mark(t);
+    }
+    for (const frame::SemOblique& o : f.obliques) { mark(o.token); np(o.np); }
+    for (const frame::SemAdverb& a : f.adverbs) mark(a.token);
+    mark(f.wh.token);
+    for (const frame::SemSub& sb : f.subordinate)
+      for (const SemFrame& g : sb.frame) fr(g);
+    for (const SemFrame& g : f.secondary) fr(g);
+    if (f.hasPred && !f.copula && !f.predicative.empty()) roleDoubt = true;
+  };
+  for (const SemFrame& f : out.frames) fr(f);
+  for (size_t i = 0; i < n && i < s.tokens.size(); ++i) {
+    const TokInfo& t = ti[i];
+    if (!t.word || s.tokens[i].unknown || s.tokens[i].readings.empty()) continue;
+    if (t.lpos == Article || t.lpos == Intj) continue;
+    if (keyIs(t, {"ὦ", "μέν", "γε", "δή", "τοι", "τε", "καί", "ἤ", "ἆρα", "ἄν"})) continue;
+    const std::string& role = out.roles[i];
+    if (role == "particle" || role == "conjunction" || role == "wh" || role == "preposition") continue;
+    bool ok = in[i] != 0 || out.spoken[i] != 0;
+    if (role == "connector" || role == "negation" || role == "subordinator") ok = out.spoken[i] != 0;
+    else if (role == "adverb") ok = lexWord((int)i);
+    if (!ok) out.dropped.push_back(t.text);
+  }
+  if (!out.dropped.empty()) out.flags.push_back("meaning-coverage");
+  if (roleDoubt) out.flags.push_back("role-doubt");
 }
 
 // ---- English ----------------------------------------------------------------------------------------------------------
@@ -849,6 +1119,11 @@ const Lexical* lexAt(const Side& side, int tok) {
 std::string enPronoun(const SemNP& n, bool object, bool possessive) {
   const int p = n.pron.person ? n.pron.person : 3;
   const bool pl = n.pron.number == 2;
+  if (n.pronLemma == "own" && possessive) {   // C38: a reflexive possessor ("τὴν ἑαυτοῦ οἰκίαν" = his own house)
+    SemNP x = n;
+    x.pronLemma.clear();
+    return enPronoun(x, false, true) + " own";
+  }
   if (!n.pronLemma.empty() && n.pronLemma.find_first_of("abcdefghijklmnopqrstuvwxyz") == 0) return n.pronLemma;
   if (p == 1) return possessive ? (pl ? "our" : "my") : object ? (pl ? "us" : "me") : (pl ? "we" : "I");
   if (p == 2) return possessive ? (pl ? "your" : "your") : "you";
@@ -872,6 +1147,8 @@ std::string enNP(const SemNP& n, const Side& side, bool object) {
   else if (n.determiner == "no") w.push_back("no");
   else if (!n.determiner.empty()) w.push_back(n.determiner);
   else if (n.interrogative && n.wh == "how many") w.push_back("how many");
+  // C38: a generic noun with the Greek article is bare in English ("ὁ βίος χαλεπός ἐστιν" = life is hard)
+  else if (n.definite && lx && lx->generic && n.adjectives.empty() && n.genitive.empty() && !pl) {}
   else if (n.definite) w.push_back("the");
   else if (!pl && n.numeral.empty() && !(lx && lx->mass) && !noun.empty()) {
     std::string next = !n.adjectives.empty() ? n.adjectives[0].lemma : noun;
@@ -980,12 +1257,22 @@ std::vector<std::string> enVerb(const SemFrame& f, const Agr& a, bool question, 
   return v;
 }
 
+bool frequencyAdverb(const std::string& a) {
+  return a == "always" || a == "often" || a == "never" || a == "sometimes" || a == "usually" || a == "seldom";
+}
+bool hasDiscourse(const SemFrame& f, const char* d) {
+  return std::find(f.discourse.begin(), f.discourse.end(), d) != f.discourse.end();
+}
+
 std::string enClause(const SemFrame& f, const Side& side) {
   std::vector<std::string> w;
   for (const std::string& c : f.connectors) w.push_back(c);
   for (const std::string& ij : f.interjections) w.push_back(ij + ",");
-  std::vector<std::string> front, end;
-  for (const frame::SemAdverb& a : f.adverbs) (a.front ? front : end).push_back(a.lemma);
+  std::vector<std::string> front, end, mid;
+  // C38: "always", "often", "never" go before the verb in a statement ("So Dicaeopolis always works"; "So always
+  // Dicaeopolis toils often" was printed)
+  const bool midOk = f.type == Kind::Decl && f.hasPred && !f.existential;
+  for (const frame::SemAdverb& a : f.adverbs) (midOk && frequencyAdverb(a.lemma) ? mid : a.front ? front : end).push_back(a.lemma);
   for (const std::string& x : front) w.push_back(x);
   const bool vocAfter = std::find(f.discourse.begin(), f.discourse.end(), "vocative-after") != f.discourse.end();
   auto voc = [&](const SemNP& v) {
@@ -994,6 +1281,8 @@ std::string enClause(const SemFrame& f, const Side& side) {
     std::string np = enNP(x, side, false);
     for (const char* a : {"a ", "an "})
       if (np.compare(0, std::char_traits<char>::length(a), a) == 0) np = np.substr(std::char_traits<char>::length(a));
+    // C38: a god addressed with ὦ is "O Zeus" (names_grc.tsv note "god")
+    if (x.isName && x.token >= 0 && (size_t)x.token < side.ti.size() && side.ti[(size_t)x.token].god) np = "O " + np;
     return np;
   };
   if (!vocAfter)
@@ -1010,7 +1299,8 @@ std::string enClause(const SemFrame& f, const Side& side) {
       a.pl = false;
     }
   }
-  const std::string subj = f.hasSubject ? enNP(f.subject, side, false) : std::string();
+  // C38: a coordinated clause sharing the previous clause's subject leaves it out ("... works and often groans")
+  const std::string subj = f.hasSubject && !hasDiscourse(f, "same-subject") ? enNP(f.subject, side, false) : std::string();
   // objects
   std::string obj = f.hasObject ? enNP(f.object, side, true) : std::string();
   std::string io = f.hasIndirect ? enNP(f.indirectObject, side, true) : std::string();
@@ -1048,6 +1338,8 @@ std::string enClause(const SemFrame& f, const Side& side) {
   }
   for (const frame::SemOblique& o : f.obliques) rest.push_back((o.prep.empty() ? "" : o.prep + " ") + enNP(o.np, side, true));
   for (const std::string& x : end) rest.push_back(x);
+  for (const std::string& d : f.discourse)   // C38: "provides food, not much but enough"
+    if (d.compare(0, 5, "tail:") == 0) { rest.push_back(","); rest.push_back(d.substr(5)); }
   if (vocAfter)
     for (const SemNP& v : f.vocatives) rest.push_back(", " + voc(v));
   std::string sentence;
@@ -1124,7 +1416,19 @@ std::string enClause(const SemFrame& f, const Side& side) {
     for (size_t i = 1; i < vg.size(); ++i) w.push_back(vg[i]);
   } else {
     w.push_back(subj);
-    for (const std::string& x : vg) w.push_back(x);
+    // C38: a frequency adverb after "be" / an auxiliary (and "not"), else before the verb
+    static const char* const kAux[] = {"is", "are", "am", "was", "were", "will", "can", "could", "must", "may", "does",
+                                       "do", "did", "has", "have", "had", nullptr};
+    bool aux = false;
+    if (!vg.empty() && (vg.size() > 1 || f.pred.lemma == "be"))
+      for (const char* const* x = kAux; *x; ++x) aux = aux || vg[0] == *x;
+    size_t at = 0;
+    if (aux) at = (vg.size() > 1 && vg[1] == "not") ? 2 : 1;
+    for (size_t i = 0; i < vg.size(); ++i) {
+      if (i == at) for (const std::string& m : mid) w.push_back(m);
+      w.push_back(vg[i]);
+    }
+    if (at >= vg.size()) for (const std::string& m : mid) w.push_back(m);
   }
   for (const std::string& r : rest) w.push_back(r);
   return join(w);
@@ -1150,7 +1454,7 @@ std::string realiseEnglish(const Built& b, const Side& side) {
       else c += " " + marker + " " + sc;
     }
     if (c.empty()) continue;
-    if (!out.empty()) out += (b.joiners[i] == "," ? ", " : "; ");
+    if (!out.empty()) out += (b.joiners[i] == "," ? ", " : b.joiners[i] == " " ? " " : "; ");
     out += c;
   }
   // tidy: "a" / "an", spaces before commas
@@ -1235,7 +1539,10 @@ std::string esNP(const SemNP& n, const Side& side) {
   const bool pl = n.number == 2;
   std::string noun = n.head;
   if (pl && !noun.empty()) noun = es::plural(noun);
-  if (!n.possessor.empty()) w.push_back(esPossessive(n.possessor[0], pl));
+  if (!n.possessor.empty()) {
+    w.push_back(esPossessive(n.possessor[0], pl));
+    if (n.possessor[0].pronLemma == "own") w.push_back(es::adjective("propio", g == F ? F : M, pl ? 2 : 1));   // C38
+  }
   else if (n.determiner == "all") { w.push_back(g == F ? "todas" : "todos"); w.push_back(esArticle(g, true, true, noun)); }
   else if (n.determiner == "every") w.push_back(g == F ? "cada" : "cada");
   else if (n.determiner == "no") w.push_back(g == F ? "ninguna" : "ningún");
@@ -1423,6 +1730,8 @@ std::string esClause(const SemFrame& f, const Side& side) {
     else rest.push_back(prep + " " + x);
   }
   for (const std::string& x : end) rest.push_back(x);
+  for (const std::string& d : f.discourse)   // C38: "da comida, no mucha sino suficiente"
+    if (d.compare(0, 5, "tail:") == 0) { rest.push_back(","); rest.push_back(d.substr(5)); }
   if (vocAfter)
     for (const SemNP& v : f.vocatives) rest.push_back(", " + voc(v));
   if (f.type == Kind::Excl && f.exclQuam) {
@@ -1507,7 +1816,7 @@ std::string realiseSpanish(const Built& b, const Side& side) {
       else c += " " + marker + " " + sc;
     }
     if (c.empty()) continue;
-    if (!out.empty()) out += (b.joiners[i] == "," ? ", " : "; ");
+    if (!out.empty()) out += (b.joiners[i] == "," ? ", " : b.joiners[i] == " " ? " " : "; ");
     out += c;
   }
   std::string t;

@@ -6,6 +6,7 @@
 # singular with the gender column; tags: person, animal (Spanish personal "a" for objects), mass (no "a"), motion
 # (present progressive in English: "is coming"), plural:<form> (an irregular English plural), reverse-only (C33: the row
 # reads Greek back but is not a taught gloss of the EN / ES -> Greek path).
+# C38: tag "generic" (the Greek generic article is no English article: ὁ βίος "life"). Rows for the core words of a beginners' reader, chapters 1-5.
 δοῦλος	noun	slave	esclavo	m	person
 λίθος	noun	stone	piedra	f	
 κόρη	noun	girl	muchacha	f	person
@@ -261,7 +262,7 @@
 κεῖμαι	verb	lie	yacer		C33 ("lie asleep")
 πλοῖον	noun	boat	barco	m	reverse-only	C33 ("a floating vessel"; reverse-only: "boat" stays ναῦς)
 ἐπιστολή	noun	letter	carta	f		C33 ("message")
-σῖτος	noun	grain	trigo	m	mass	C33 (Spanish "grano, callo")
+σῖτος	noun	food	comida	f	mass	C33 (Spanish "grano, callo"); C38: food (the beginners' reader's sense; "grain" before)
 πρόβατον	noun	sheep	oveja	f	animal plural:sheep	C33 ("cattle")
 τρέφω	verb	raise	criar		C33 ("rear and keep")
 εἰσπλέω	verb	sail	navegar		C33 ("sail into": εἰσέπλευσεν εἰς τὸν λιμένα "sailed into the harbour")
@@ -285,3 +286,28 @@
 φαίνω	mid	appear	aparecer		C33 (φαίνεται, ἐφάνθη "appears, appeared")
 ἀστήρ	noun	star	estrella	f	reverse-only	C33 ("celestial body", Spanish "celeste"; reverse-only: "star" stays ἄστρον)
 ἄγω	verb	lead	llevar		reverse-only	C33 (Spanish "liderar"; reverse-only: "llevar" a thing is φέρω)
+κλῆρος	noun	farm	finca	f	reverse-only	C38 ("lot"; reverse-only: "farm" stays ἀγρός on the forward path)
+γεωργέω	verb	till	cultivar		reverse-only	C38 (greek.vpl lacks the lemma: lexicon_supplement_grc.tsv)
+στενάζω	verb	groan	gemir			C38 ("sigh, moan")
+ἄοκνος	adj	tireless	incansable			C38 ("resolute")
+αὐτουργός	adj	self-sufficient	autosuficiente		reverse-only	C38 (greek.vpl lacks the lemma: lexicon_supplement_grc.tsv)
+παρέχω	verb	provide	proporcionar			C38 ("hold beside")
+ἱκανός	adj	enough	suficiente		reverse-only	C38 ("competent")
+πόνος	noun	work	trabajo	m	mass reverse-only	C38 ("labor")
+πονέω	verb	work	trabajar		reverse-only	C38 ("toil"; reverse-only: "work" stays ἐργάζομαι)
+βίος	noun	life	vida	f	generic reverse-only	C38 (no English article: "life is hard")
+Ἀθηναῖος	adj	Athenian	ateniense			C38 ("of or relating to Athens")
+ἀπέραντος	adj	endless	interminable		reverse-only	C38 (greek.vpl lacks the lemma: lexicon_supplement_grc.tsv)
+ἀργός	adj	lazy	perezoso		reverse-only	C38 ("shining", the other ἀργός)
+παρασκευάζω	verb	prepare	preparar		reverse-only	C38
+ὑδρία	noun	water jar	cántaro	m	reverse-only	C38 ("hydria")
+βαδίζω	verb	walk	caminar		reverse-only	C38 ("go")
+καθίζω	verb	sit	sentarse		reverse-only	C38
+σκιά	noun	shade	sombra	f	reverse-only	C38 ("shadow")
+θερμός	adj	hot	caliente		reverse-only	C38 ("warm")
+πάππος	noun	grandfather	abuelo	m	person reverse-only	C38
+ἐγείρω	verb	wake	despertar		reverse-only	C38
+ὀργίζω	mid	get angry	enojarse		reverse-only	C38 (ὀργίζεται; "anger" was printed)
+ἄροτρον	noun	plough	arado	m	reverse-only	C38
+βαρύς	adj	heavy	pesado		reverse-only	C38
+γέρων	noun	old man	anciano	m	person reverse-only	C38
