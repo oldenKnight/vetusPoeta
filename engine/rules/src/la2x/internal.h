@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <initializer_list>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -108,8 +109,9 @@ struct Built {
   double fill = 1.0;                       // share of word tokens the frame accounts for
   std::vector<Periphrasis> periphrases;
 };
+// `devotional` (C36): a devotional text; a verbless line of person nouns is an address (vocatives).
 void buildFrames(const lex::Lexicon& la, const Tables& tab, const Sentence& s, const std::vector<TokInfo>& ti,
-                 Built& out);
+                 Built& out, bool devotional = false);
 
 // ---- realisers -------------------------------------------------------------------------------------------------------
 struct Lexical {                // the target-language word for a Latin content lemma
@@ -126,7 +128,16 @@ struct Discourse {              // memory across sentences of one text (articles
   uint8_t lastSubjGender = 0;   // vp::feat::Gender of the last 3rd-person subject (M/F/N)
   bool lastSubjPerson = true;
   uint8_t lastSubjNumber = 1;
-  void clear() { mentioned.clear(); lastSubjGender = 0; lastSubjPerson = true; lastSubjNumber = 1; }
+  // C36: sentences since a clause had a person subject (an object-first clause then has a person subject, "Colit
+  // praedium"); a devotional text (avē, a sacred name or title was read: salvē = hail, servus = servant, caelum =
+  // heaven); the gender of the person addressed (vocative), for adjectives and participles that describe "you"
+  int sincePerson = 99;
+  bool devotional = false;
+  uint8_t addresseeGender = 0;
+  void clear() {
+    mentioned.clear(); lastSubjGender = 0; lastSubjPerson = true; lastSubjNumber = 1;
+    sincePerson = 99; devotional = false; addresseeGender = 0;
+  }
   bool seen(uint32_t l) const;
   void mention(uint32_t l);
 };
@@ -147,6 +158,35 @@ struct RealiseIn {
 };
 std::string realiseEnglish(const Built& b, const RealiseIn& in, std::vector<std::string>& flags);
 std::string realiseSpanish(const Built& b, const RealiseIn& in, std::vector<std::string>& flags);
+
+// ---- meaning coverage (coverage.cpp, C36) ------------------------------------------------------------------------------
+// Compares the realised sentence with the Latin analysis; adds flags (meaning-dropped, meaning-added,
+// existential-copula, dangling-conjunction, gender-mismatch, vocative-lost, pronoun-guess, article-guess) and one note
+// per finding ("meaning-dropped: sola"). The flags make a cue Check.
+struct CoverageIn {
+  const Sentence* s = nullptr;
+  const std::vector<TokInfo>* ti = nullptr;
+  const Built* b = nullptr;
+  const Tables* tab = nullptr;
+  const LexicalSource* lex = nullptr;
+  Target lang = Target::En;
+  const std::vector<uint32_t>* mentionedBefore = nullptr;   // discourse memory before this sentence
+};
+class Coverage {
+ public:
+  Coverage();
+  ~Coverage();
+  Coverage(const Coverage&) = delete;
+  Coverage& operator=(const Coverage&) = delete;
+  void init(const Tables& en, const Tables& es);   // stop lists from the closed-class rows of the readable tables
+  void check(const CoverageIn& in, const std::string& text, std::vector<std::string>& flags,
+             std::vector<std::string>& notes) const;
+  static bool isCoverageFlag(std::string_view f);
+
+ private:
+  struct Impl;
+  std::unique_ptr<Impl> impl_;
+};
 
 // Small string helpers shared by the realisers.
 void appendWord(std::string& out, std::string_view w);

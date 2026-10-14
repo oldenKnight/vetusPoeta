@@ -102,6 +102,10 @@ class Analyser {
                     const std::vector<rules::GlossaryEntry>* glossary = nullptr) const;
   // Latin keys of nouns that denote persons (readable_en.tsv "person" rows): a bare ablative of a person is unlikely.
   void setPersonNouns(std::vector<std::string> keys);
+  // C36 (additive): the sentences before this one are about a person (a person subject in the last sentences). An
+  // object-first clause without a subject then reads its neuter noun as the object ("Colit praedium": he farms the
+  // land). Off by default (Orbergise and single sentences); the Translator sets it from its discourse memory.
+  void setPersonContext(bool person);
 
  private:
   struct Impl;
@@ -135,6 +139,10 @@ struct SentenceOut {
   std::vector<Word> words;          // interlinear, one per word token (punctuation excluded)
   double confidence = 0;            // 0..1 from the token confidences and the frame fill
   std::vector<std::string> flags;   // "unknown", "name-guessed", "ambiguous", "abl-abs", "no-verb", "gloss-missing", ...
+                                    // C36 meaning coverage: "meaning-dropped", "meaning-added", "existential-copula",
+                                    // "dangling-conjunction", "gender-mismatch", "vocative-lost", "pronoun-guess",
+                                    // "article-guess" (each makes the cue Check)
+  std::vector<std::string> coverage;   // one note per coverage finding ("meaning-dropped: sola"); C36, additive
   std::string frame;                // frame::describe() of the main clause (tests, debugging)
   Sentence analysis;
 };

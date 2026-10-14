@@ -138,6 +138,7 @@ struct RI {
   bool perfPart = false;    // perfect participle (amātus, secūtus, ingressus <- ingredior): + sum = one verb
   bool adjToo = false;      // the same token also reads as an adjective lemma (laetus, īrātus): a predicate, not a verb
   bool placeAcc = false;    // domum / rūs: accusative of place to, an adverb in effect
+  bool name = false;        // a proper name reading (C36)
 };
 
 struct Hyp {
@@ -156,6 +157,7 @@ struct Analyser::Impl {
   mutable std::vector<lex::Sense> senseBuf;
   mutable std::vector<lex::Analysis> anaBuf;
   std::vector<std::string> personNouns;   // sorted latin keys
+  bool personCtx = false;                 // C36: the discourse is about a person (setPersonContext)
 
   Impl(const lex::Lexicon& l, const curated::CuratedData& c) : lx(l), cd(c) {
     for (const curated::NameEntry& n : cd.names())
@@ -439,6 +441,32 @@ struct Analyser::Impl {
       if (r.lemma != lex::kNoLemma && ((l.flags & lex::ProperName) || unpack(r.packed).pos == Name)) r.name = true;
     }
     if (v.empty()) {
+      // C36: medieval spellings of a known word (charitas = caritas, michi = mihi, nichil = nihil)
+      const std::string low = text::lower(text::nfc(t.text));
+      std::string alt;
+      if (low == "michi") alt = "mihi";
+      else if (low == "nichil") alt = "nihil";
+      else if (low.find("ch") != std::string::npos && !t.capitalised) {
+        alt = low;
+        for (size_t at = alt.find("ch"); at != std::string::npos; at = alt.find("ch", at)) alt.erase(at + 1, 1);
+      } else if (low.find("ch") != std::string::npos && low.compare(0, 2, "ch") == 0) {
+        alt = low;
+        for (size_t at = alt.find("ch"); at != std::string::npos; at = alt.find("ch", at)) alt.erase(at + 1, 1);
+      }
+      if (!alt.empty()) {
+        morph::Token at;
+        morph::analyseLatin(lx, alt, at);
+        for (const lex::Analysis& a : at.analyses) {
+          Reading r;
+          r.lemma = a.lemma;
+          r.packed = lx.feature(a.feat);
+          r.display = std::string(a.display);
+          r.aflags = a.flags;
+          v.push_back(std::move(r));
+        }
+      }
+    }
+    if (v.empty()) {
       if (t.capitalised && (!t.initial || idx + 1 < s.tokens.size())) {
         // capitalised unknown word: a name (case open), Check
         Reading r;
@@ -559,6 +587,8 @@ struct Analyser::Impl {
       if (l.key != "sum") {
         const std::string k = text::latin_key(t.text);
         if (k == "est" || k == "estis" || k == "es" || k == "sunt" || k == "erat" || k == "erant") p -= 2.0;
+        // C36: esse / estō / estōte are sum, never edō "eat"
+        if (k == "esse" || k == "esto" || k == "estote") p -= 2.0;
       }
     } else if (r.name) {
       p += 0.6;
@@ -581,6 +611,20 @@ struct Analyser::Impl {
         }
       p -= wholeCore ? 1.5 : 0.2;
     }
+    // C36: a personal name is singular ("Maria" is Marīa, not a plural of Marius)
+    if (r.name && f.number == Pl) p -= 2.0;
+    if (r.lemma != lex::kNoLemma && f.pos == Verb && !hasLengthMark(t.text)) {
+      const std::string k = text::latin_key(t.text);
+      const bool re = k.size() > 3 && k.compare(k.size() - 2, 2, "re") == 0;
+      // a deponent 2nd singular in -re (cōnsōlāre, miserēre, tuēre) is the imperative, not the rare indicative ending
+      if (re && f.person == 2 && f.number == Sg && (f.mood == Indicative || f.mood == Subjunctive))
+        for (const Reading& o : all)
+          if (o.lemma == r.lemma && unpack(o.packed).mood == Imperative) { p -= 1.0; break; }
+      // vidēre: the infinitive, not the poetic perfect 3rd plural in -ēre
+      if (re && f.tense == Perfect && f.number == Pl)
+        for (const Reading& o : all)
+          if (o.lemma == r.lemma && unpack(o.packed).mood == Infinitive) { p -= 1.0; break; }
+    }
     if (f.case_ == Voc) p -= 0.8;
     if (f.case_ == Loc) p -= 0.3;
     if (f.mood == Subjunctive) p -= 0.4;
@@ -595,6 +639,7 @@ struct Analyser::Impl {
   void info(const Reading& r, RI& o) const {
     o = RI();
     o.encl = r.encl;
+    o.name = r.name;
     o.f = unpack(r.packed);
     if (r.lemma != lex::kNoLemma) {
       const lex::Lemma l = lx.lemma(r.lemma);
@@ -1104,6 +1149,68 @@ struct Analyser::Impl {
       if (!hortative) d -= 0.6;
     }
     if (inf && finite == 0 && words >= 2) d += 0.2;
+    d += predicateTerms(c, ch, cl);
+    return d;
+  }
+
+  // C36: two clause-level readings of real prose.
+  // (1) An adjective / noun homograph in predicate position (līber "free" / liber "book", līberī "children"): in a
+  //     clause with a form of sum (finite or esse) and no preposition, the noun reading loses when another nominative
+  //     noun of the clause denotes a person ("Līber est servus", "Līberī sunt cīvēs"), or when there is no other
+  //     nominative noun and no other nominative adjective that could be the predicate ("Līber esse cupit").
+  // (2) An object-first clause with the subject left out: a transitive active verb (3rd person, not of motion), no
+  //     accusative, and one nominative candidate that is a neuter non-person noun, while the discourse is about a
+  //     person (setPersonContext): the neuter is the object ("Colit praedium": he farms the land).
+  double predicateTerms(const Ctx& c, const std::vector<uint8_t>& ch, int cl) const {
+    const Sentence& s = *c.s;
+    const auto& ri = *c.ri;
+    const auto& co = *c.clauseOf;
+    const Clause& C = s.clauses[(size_t)cl];
+    double d = 0;
+    bool sumHere = false, prep = false, accSeen = false;
+    const RI* verb = nullptr;
+    int nomTok = -1, nomCount = 0;
+    std::vector<int> nomNouns, nomAdjs;
+    for (int i = C.first; i <= C.last; ++i) {
+      if (co[(size_t)i] != cl || s.tokens[(size_t)i].kind != TokKind::Word || ri[(size_t)i].empty()) continue;
+      const RI& r = ri[(size_t)i][ch[(size_t)i]];
+      if (r.key == "sum" && (r.finite || r.inf)) sumHere = true;
+      if (r.prep) prep = true;
+      if (r.finite && !verb) verb = &r;
+      if (r.nominal && r.f.case_ == Acc && !r.placeAcc) accSeen = true;
+      if (r.f.case_ == Nom && r.head && !r.rel && !c.coordBefore[(size_t)i]) { ++nomCount; nomTok = i; }
+      if (r.f.case_ == Nom && (r.lpos == Noun || r.name)) nomNouns.push_back(i);
+      if (r.f.case_ == Nom && r.lpos == Adj && r.modifier) nomAdjs.push_back(i);
+    }
+    if (sumHere && !prep) {
+      for (int i : nomNouns) {
+        const RI& r = ri[(size_t)i][ch[(size_t)i]];
+        if (r.name || r.lpos != Noun) continue;
+        bool adjReading = false;
+        for (const RI& x : ri[(size_t)i])
+          if (x.lpos == Adj && x.f.case_ == Nom && (x.f.number == r.f.number || !x.f.number || !r.f.number)) adjReading = true;
+        if (!adjReading) continue;
+        bool personOther = false, otherNoun = false;
+        for (int j : nomNouns) {
+          if (j == i) continue;
+          const RI& o = ri[(size_t)j][ch[(size_t)j]];
+          otherNoun = true;
+          if (o.personNoun || o.name) personOther = true;
+        }
+        bool otherAdj = false;
+        for (int j : nomAdjs)
+          if (j != i) otherAdj = true;
+        if (personOther || (!otherNoun && !otherAdj)) d -= 1.2;
+      }
+    }
+    if (personCtx && verb && !verb->copula && verb->accOK && !verb->intrOnly && !verb->motion && verb->f.person == 3 &&
+        (verb->f.voice != Passive || (verb->lflags & lex::Deponent)) && !accSeen && nomCount == 1 && nomTok >= 0) {
+      const RI& n0 = ri[(size_t)nomTok][ch[(size_t)nomTok]];
+      const uint8_t g = n0.f.gender ? n0.f.gender : n0.lgender;
+      bool accReading = false;
+      for (const RI& x : ri[(size_t)nomTok]) accReading = accReading || (x.f.case_ == Acc && x.lpos == n0.lpos);
+      if (g == N && n0.lpos == Noun && !n0.personNoun && !n0.name && accReading) d -= 1.5;
+    }
     return d;
   }
 
@@ -1204,7 +1311,14 @@ struct Analyser::Impl {
       if (e < n && s.tokens[e].kind == TokKind::Word && !ri[e].empty() &&
           std::any_of(ri[e].begin(), ri[e].end(), [](const RI& x) { return x.modifier && x.voc; }))
         ++e;
-      const bool endEdge = e >= n || (s.tokens[e].kind == TokKind::Punct && s.tokens[e].text != "-");
+      // C36: a genitive attribute stays inside the address ("Maria, stella pauperum.", "Rēgīna caelī")
+      size_t eg = e;
+      while (eg < n && s.tokens[eg].kind == TokKind::Word && !ri[eg].empty() &&
+             std::any_of(ri[eg].begin(), ri[eg].end(), [](const RI& x) { return x.nominal && x.f.case_ == Gen; }) &&
+             std::any_of(ri[i].begin(), ri[i].end(), [](const RI& x) { return x.voc && x.head; }))
+        ++eg;
+      const bool endEdge = e >= n || (s.tokens[e].kind == TokKind::Punct && s.tokens[e].text != "-") ||
+                           (eg > e && (eg >= n || (s.tokens[eg].kind == TokKind::Punct && s.tokens[eg].text != "-")));
       bool afterO = i > 0 && !ri[i - 1].empty() && std::any_of(ri[i - 1].begin(), ri[i - 1].end(), [](const RI& x) { return x.intjO; });
       bool finalSetOff = false;
       if (i > 0 && s.tokens[i - 1].kind == TokKind::Punct && s.tokens[i - 1].text == "," && endEdge) {
@@ -1216,7 +1330,12 @@ struct Analyser::Impl {
           finalSetOff = c.question || s.tokens[i].capitalised ||
                         std::any_of(ri[i].begin(), ri[i].end(), [](const RI& x) { return x.personNoun; });
       }
-      if ((startEdge && endEdge && (c.anyImper || c.anySecond || afterO)) || afterO || finalSetOff) {
+      // C36: a capitalised common noun inside the sentence with a vocative reading, in a sentence that speaks to
+      // someone ("precor tē Rēgīna caelī"): an address, not an ablative
+      const bool capVoc = s.tokens[i].capitalised && !s.tokens[i].initial && (c.anyImper || c.anySecond) &&
+                          std::any_of(ri[i].begin(), ri[i].end(), [](const RI& x) { return x.voc && x.head && x.lpos == Noun; }) &&
+                          !(i > 0 && !ri[i - 1].empty() && std::all_of(ri[i - 1].begin(), ri[i - 1].end(), [](const RI& x) { return x.prep; }));
+      if ((startEdge && endEdge && (c.anyImper || c.anySecond || afterO)) || afterO || finalSetOff || capVoc) {
         for (size_t k = i; k < e; ++k) c.address[k] = 1;
       }
     }
@@ -1338,6 +1457,23 @@ struct Analyser::Impl {
       if (k == "domi" || k == "ruri" || k == "humi") {
         for (const Reading& r : t.readings)
           if (unpack(r.packed).case_ == Loc || lx.lemma(r.lemma).pos == Adv) keep.push_back(r);
+      }
+      if (!keep.empty()) t.readings = keep;
+    }
+    // C36: avē / avēte as a greeting (not aveō "be eager", not avis "bird", not avus "grandfather"); sōlum after nōn is
+    // the adverb (nōn sōlum ... sed etiam: not only ... but also)
+    for (size_t i = 0; i < n; ++i) {
+      Token& t = s.tokens[i];
+      if (t.readings.empty() || t.kind != TokKind::Word) continue;
+      const std::string k = text::latin_key(t.text);
+      std::vector<Reading> keep;
+      if (k == "aue" || k == "auete") {
+        for (const Reading& r : t.readings)
+          if (lx.lemma(r.lemma).pos == Intj || unpack(r.packed).pos == Intj) keep.push_back(r);
+      }
+      if (k == "solum" && i > 0 && text::latin_key(s.tokens[i - 1].text) == "non") {
+        for (const Reading& r : t.readings)
+          if (lx.lemma(r.lemma).pos == Adv) keep.push_back(r);
       }
       if (!keep.empty()) t.readings = keep;
     }
@@ -1471,6 +1607,8 @@ struct Analyser::Impl {
 
 Analyser::Analyser(const lex::Lexicon& la, const curated::CuratedData& cd) : impl_(std::make_unique<Impl>(la, cd)) {}
 Analyser::~Analyser() = default;
+
+void Analyser::setPersonContext(bool person) { impl_->personCtx = person; }
 
 void Analyser::setPersonNouns(std::vector<std::string> keys) {
   std::sort(keys.begin(), keys.end());

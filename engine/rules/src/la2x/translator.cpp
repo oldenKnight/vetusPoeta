@@ -2,6 +2,7 @@
 // lexicon's glosses cleaned to one plain word), names, the interlinear view, the cue-level output for the engine pairs
 // la-en / la-es and the A9 round-trip overlap for the EN/ES -> LA engine.
 #include <algorithm>
+#include <functional>
 #include <cctype>
 #include <cmath>
 #include <exception>
@@ -132,6 +133,7 @@ struct Translator::Impl final : public detail::LexicalSource {
   mutable std::vector<lex::Analysis> anaBuf;
   mutable std::vector<lex::Sense> senseBuf;
   std::vector<std::string> personWordsEn;   // English words of "person" rows (gloss fallback)
+  detail::Coverage coverage;                // meaning coverage of the readable sentence (C36)
 
   Impl(const lex::Lexicon& l, const curated::CuratedData& c) : lx(l), cd(c), analyser(l, c) {}
 
@@ -620,14 +622,56 @@ struct Translator::Impl final : public detail::LexicalSource {
     return words + " = " + form + " (un solo verbo: " + what + ")";
   }
 
+  // C36: a devotional text: avē, or a sacred name / title (Marīa, Iēsus, Chrīstus, Deus, Dominus as a name, virgō,
+  // rēgīna, sānctus). Sticks for the rest of the text (discourse memory).
+  void devotionalScan(const Sentence& s, const std::vector<TokInfo>& ti) {
+    for (size_t i = 0; i < s.tokens.size() && i < ti.size(); ++i) {
+      const std::string k = text::latin_key(s.tokens[i].text);
+      const std::string& lk = ti[i].key;
+      if (k == "aue" || k == "auete" || lk == "iesus" || lk == "christus" ||
+          (ti[i].name && (lk == "maria" || k == "maria" || k == "iesu" || k == "christe" || k == "christi")) ||
+          lk == "uirgo" || lk == "deus" || lk == "sanctus" || lk == "angelus" || lk == "peccator" || lk == "regina")
+        disc.devotional = true;
+      // the person addressed: a vocative name or noun gives "you" its gender
+      if (ti[i].word && ti[i].f.case_ == Voc && (ti[i].f.gender == F || ti[i].f.gender == M)) disc.addresseeGender = ti[i].f.gender;
+      if (ti[i].name && (k == "maria" || lk == "maria")) disc.addresseeGender = F;
+    }
+  }
+  // C36: did a clause of this sentence have a person subject (a person noun, a name, I / you, or a restored "he / she"
+  // while the discourse is about a person)?
+  void personScan(const detail::Built& b, const std::vector<TokInfo>& ti) {
+    bool person = false;
+    std::function<void(const frame::SemFrame&)> walk = [&](const frame::SemFrame& f) {
+      if (f.hasSubject) {
+        if (f.implicitSubject || f.subject.isPronoun) {
+          const int p = f.subject.pron.person ? f.subject.pron.person : 3;
+          if (p != 3 || (disc.sincePerson <= 2 && f.subject.pron.gender != N)) person = true;
+        } else if (f.subject.isName) {
+          person = true;
+        } else if (f.subject.token >= 0 && (size_t)f.subject.token < ti.size()) {
+          if (lexical(ti[(size_t)f.subject.token], Target::En).person) person = true;
+        }
+      } else if (f.type == frame::Kind::Imp) {
+        person = true;
+      }
+      for (const frame::SemSub& ss : f.subordinate)
+        for (const frame::SemFrame& g : ss.frame) walk(g);
+    };
+    for (const frame::SemFrame& f : b.frames) walk(f);
+    if (person) disc.sincePerson = 0;
+    else if (disc.sincePerson < 99) ++disc.sincePerson;
+  }
+
   void sentence(std::string_view latin, Target t, SentenceOut& out, const std::vector<rules::GlossaryEntry>* glossary) {
     out = SentenceOut();
     out.latin = std::string(latin);
+    analyser.setPersonContext(disc.sincePerson <= 2);
     analyser.analyse(latin, out.analysis, glossary);
     std::vector<TokInfo> ti;
     detail::tokInfos(lx, out.analysis, ti);
+    devotionalScan(out.analysis, ti);
     detail::Built b;
-    detail::buildFrames(lx, t == Target::En ? en : es, out.analysis, ti, b);
+    detail::buildFrames(lx, t == Target::En ? en : es, out.analysis, ti, b, disc.devotional);
     detail::RealiseIn in;
     in.s = &out.analysis;
     in.ti = &ti;
@@ -635,7 +679,21 @@ struct Translator::Impl final : public detail::LexicalSource {
     in.lex = this;
     in.disc = &disc;
     out.flags = b.flags;
+    const std::vector<uint32_t> mentionedBefore = disc.mentioned;
     out.text = t == Target::En ? detail::realiseEnglish(b, in, out.flags) : detail::realiseSpanish(b, in, out.flags);
+    personScan(b, ti);
+    {
+      // C36: OK must mean right: what the reader would call a wrong translation makes the sentence Check
+      detail::CoverageIn ci;
+      ci.s = &out.analysis;
+      ci.ti = &ti;
+      ci.b = &b;
+      ci.tab = in.tab;
+      ci.lex = this;
+      ci.lang = t;
+      ci.mentionedBefore = &mentionedBefore;
+      coverage.check(ci, out.text, out.flags, out.coverage);
+    }
     out.frame = b.frames.empty() ? std::string() : frame::describe(b.frames[0]);
     words(out.analysis, ti, b, t, out.words);
     for (const Word& w : out.words)   // the periphrasis note also explains the reading ("Why this reading?")
@@ -802,6 +860,7 @@ Result<std::unique_ptr<Translator>> Translator::create(const lex::Lexicon& la, c
       for (const detail::Row& r : t->impl_->en.rows())
         if (r.kind == "lex" && detail::noteHas(r.note, "person")) keys.push_back(r.latin);
       t->impl_->analyser.setPersonNouns(std::move(keys));
+      t->impl_->coverage.init(t->impl_->en, t->impl_->es);
       return Result<std::unique_ptr<Translator>>(std::move(t));
     }
     return Result<std::unique_ptr<Translator>>(ErrorCode::NotFound, "readable_en.tsv not found",
@@ -938,6 +997,17 @@ std::vector<rules::CueOutput> Translator::cues(const std::vector<rules::CueInput
       const double mean = sents.empty() ? 1.0 : conf / (double)sents.size();
       for (const char* f : {"abl-abs", "gloss-missing", "name-guessed", "no-verb"})
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) check = true;
+      // C36: meaning coverage (a dropped / added content word, an existential for a copula, a dangling conjunction,
+      // a wrong-gender participle, a lost vocative, a guessed "it", "without the" for a first mention)
+      {
+        std::string detailText;
+        for (const SentenceOut& so : sents)
+          for (const std::string& n : so.coverage) detailText += (detailText.empty() ? "" : "; ") + n;
+        bool lost = false;
+        for (const std::string& f : o.flags) lost = lost || detail::Coverage::isCoverageFlag(f);
+        o.checks.push_back(rules::Check{"meaning", !lost, lost ? "check the meaning: " + detailText : ""});
+        if (lost) check = true;
+      }
       o.confidence = unknown ? rules::Confidence::Fix
                              : (ambiguous || check || mean < 0.7) ? rules::Confidence::Check : rules::Confidence::Ok;
       o.score = std::round(mean * 1000) / 1000;

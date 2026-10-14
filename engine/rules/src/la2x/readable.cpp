@@ -6,6 +6,7 @@
 // relative clauses to their antecedent. Lemma strings in the frame are Latin keys; token indices point into the
 // Sentence. The realisers (realise_en.cpp, realise_es.cpp) turn it into text.
 #include <algorithm>
+#include <cstdlib>
 #include <functional>
 
 #include "internal.h"
@@ -106,8 +107,9 @@ struct NPx {                 // a noun phrase under construction
 
 class Builder {
  public:
-  Builder(const lex::Lexicon& la, const Tables& tab, const Sentence& s, const std::vector<TokInfo>& ti, Built& out)
-      : la_(la), tab_(tab), s_(s), ti_(ti), out_(out) {}
+  Builder(const lex::Lexicon& la, const Tables& tab, const Sentence& s, const std::vector<TokInfo>& ti, Built& out,
+          bool devotional)
+      : la_(la), tab_(tab), s_(s), ti_(ti), out_(out), devotional_(devotional) {}
 
   void run() {
     const size_t n = s_.tokens.size();
@@ -165,6 +167,13 @@ class Builder {
   Built& out_;
   std::vector<char> used_;
   int relMarker_ = -1;
+  int genObjVerb_ = -1;        // C36: a verb whose genitive is its object (misereor: have mercy on)
+  bool devotional_ = false;    // C36: the text is devotional (vocative lines without a verb)
+  static bool motionVerb(const std::string& k) {
+    return isKey(k, {"eo", "uenio", "redeo", "curro", "ambulo", "nauigo", "festino", "propero", "fugio", "abeo", "adeo",
+                     "peruenio", "mitto", "duco", "proficiscor", "porto", "fero", "reuertor", "reuenio", "uolo",
+                     "transeo", "exeo", "ineo", "migro", "uado", "fugo"});
+  }
   struct Chunk { int first = 0, last = 0; std::string text; bool wh = false; };
   std::vector<Chunk> chunks_;
 
@@ -243,6 +252,13 @@ class Builder {
     return t.f.pos == Verb && (t.f.mood == Indicative || t.f.mood == Subjunctive || t.f.mood == Imperative) && t.f.person;
   }
   bool isInf(const TokInfo& t) const { return t.f.pos == Verb && t.f.mood == Infinitive; }
+  // a finite form of sum strictly between tokens a and b (C36)
+  bool copulaBetween(size_t a, size_t b) const {
+    const size_t lo = std::min(a, b), hi = std::max(a, b);
+    for (size_t k = lo + 1; k < hi; ++k)
+      if (ti_[k].key == "sum" && isFinite(ti_[k]) && s_.tokens[k].clause == s_.tokens[a].clause) return true;
+    return false;
+  }
 
   // ---- one clause --------------------------------------------------------------------------------------------------
   void clause(int ci, SemFrame& f) {
@@ -283,6 +299,7 @@ class Builder {
     std::vector<int> intensOf(n, -1);
     bool firstWord = true;
     int quamComparative = -1;
+    int nonTok = -1;
     for (size_t idx = 0; idx < toks.size(); ++idx) {
       const size_t i = toks[idx];
       const TokInfo& t = ti_[i];
@@ -291,6 +308,7 @@ class Builder {
       firstWord = false;
       if ((int)i == verb || !t.word) continue;
       if (isKey(tk, {"domi", "domum", "rus", "ruri", "rure", "humi"}) && tab_.has("adv", tk) &&
+          !(t.f.case_ == Acc && verb >= 0 && !motionVerb(ti_[(size_t)verb].key)) &&
           (t.f.case_ == Loc || t.f.case_ == Acc || t.f.case_ == Abl || t.lpos == Adv) &&
           !(idx > 0 && ti_[toks[idx - 1]].lpos == Prep)) {
         SemAdverbPush(f, tk, (int)i, clauseFirst);
@@ -321,6 +339,21 @@ class Builder {
         out_.roles[i] = "comparison";
         continue;
       }
+      // C36: et right after a clause-initial verb, before a noun phrase, is "also" ("dā et lūcem": give also light)
+      if (t.lpos == Conj && t.key == "et" && idx == 1 && verb >= 0 && (int)toks[0] == verb && idx + 1 < toks.size() &&
+          (isNominal(ti_[toks[idx + 1]]) || ti_[toks[idx + 1]].lpos == Pron)) {
+        SemAdverbPush(f, "quoque", (int)i, false);
+        used_[i] = 1;
+        out_.roles[i] = "adverb";
+        continue;
+      }
+      // C36: vērō (and a second-position particle read as an adverb) is a connector like autem
+      if ((t.lpos == Adv || t.lpos == Particle) && !clauseFirst && tab_.tagged("conj", tk, "second")) {
+        f.connectors.push_back(tk);
+        used_[i] = 1;
+        out_.roles[i] = "connector";
+        continue;
+      }
       if (t.lpos == Conj) {
         if (tab_.has("conj", t.key) && (clauseFirst || tab_.tagged("conj", t.key, "second"))) {
           f.connectors.push_back(t.key);
@@ -331,7 +364,21 @@ class Builder {
       }
       if (t.lpos == Adv || t.lpos == Particle) {
         const std::string k = tab_.has("adv", tk) || tab_.has("wh", tk) ? tk : t.key;
-        if (isKey(k, {"non", "haud"})) { f.negative = true; used_[i] = 1; out_.roles[i] = "negation"; continue; }
+        if (isKey(k, {"non", "haud"})) {
+          used_[i] = 1;
+          out_.roles[i] = "negation";
+          // C36: nōn sōlum ... sed etiam: "not only ... but also" (the verb stays positive)
+          if (idx + 1 < toks.size() && text::latin_key(s_.tokens[toks[idx + 1]].text) == "solum") {
+            f.discourse.push_back("notonly");
+            used_[toks[idx + 1]] = 1;
+            out_.roles[toks[idx + 1]] = "negation";
+            ++idx;
+            continue;
+          }
+          f.negative = true;
+          if (nonTok < 0) nonTok = (int)i;
+          continue;
+        }
         if (k == "nonne") { f.expectYes = true; f.type = Kind::Yn; used_[i] = 1; out_.roles[i] = "question"; continue; }
         if (k == "num" && question) { f.discourse.push_back("num"); f.type = Kind::Yn; used_[i] = 1; out_.roles[i] = "question"; continue; }
         if (question && tab_.has("wh", k) && !isKey(k, {"qui"})) {
@@ -374,6 +421,23 @@ class Builder {
         used_[i] = 1;
         out_.roles[i] = "adverb";
         continue;
+      }
+    }
+    // C36: nōn X sed Y inside one clause: "not X but Y" (sed joins two phrases, not two verbs)
+    if (nonTok >= 0) {
+      int sedTok = -1, xTok = -1, yTok = -1;
+      for (size_t i : toks)
+        if ((int)i > nonTok && !used_[i] && ti_[i].lpos == Conj && ti_[i].key == "sed") { sedTok = (int)i; break; }
+      if (sedTok >= 0) {
+        for (size_t i : toks)
+          if ((int)i > nonTok && (int)i < sedTok && (ti_[i].word || ti_[i].number)) { xTok = (int)i; break; }
+        for (size_t i : toks)
+          if ((int)i > sedTok && (ti_[i].word || ti_[i].number)) { yTok = (int)i; break; }
+      }
+      if (sedTok >= 0 && xTok >= 0 && yTok >= 0 && xTok != verb) {
+        used_[(size_t)sedTok] = 1;
+        out_.roles[(size_t)sedTok] = "connector";
+        f.discourse.push_back("nonsed:" + std::to_string(xTok) + ":" + std::to_string(yTok));
       }
     }
     // -ne on any word: a yes/no question
@@ -455,13 +519,40 @@ class Builder {
       f.pred.token = (int)inf;
       f.pred.mood = frame::SrcMood::Indicative;
       f.discourse.push_back("infinitive");
+      f.copula = ti_[inf].key == "sum";   // C36: "esse māter": to be a mother
       used_[inf] = 1;
       out_.roles[inf] = "verb";
       infs.erase(infs.begin());
     }
 
     // noun phrases
+    genObjVerb_ = verb >= 0 && isKey(ti_[(size_t)verb].key, {"misereor", "miseresco"}) ? verb : -1;
     groupNPs(ci, toks, intensOf, nps);
+
+    // C36: dā + accusative + infinitive: "grant (me) to ..." (dā nōs bene vīvere, dā peccāta mē vītāre); the
+    // accusative person is the one granted, another accusative is the infinitive's object
+    if (verb >= 0 && !infs.empty() && ti_[(size_t)verb].key == "do") {
+      const size_t inf = infs[0];
+      f.pred.complementVerb = ti_[inf].key;
+      f.pred.complementToken = (int)inf;
+      f.discourse.push_back("grant");
+      used_[inf] = 1;
+      out_.roles[inf] = "infinitive";
+      infs.erase(infs.begin());
+      int who = -1;
+      for (size_t k = 0; k < nps.size(); ++k)
+        if (!nps[k].used && !nps[k].governed && nps[k].case_ == Acc && nps[k].np.isPronoun) { who = (int)k; break; }
+      if (who < 0)
+        for (size_t k = 0; k < nps.size(); ++k)
+          if (!nps[k].used && !nps[k].governed && nps[k].case_ == Acc && nps[k].np.token >= 0 &&
+              tab_.tagged("lex", ti_[(size_t)nps[k].np.token].key, "person")) { who = (int)k; break; }
+      if (who >= 0) {
+        f.hasIndirect = true;
+        f.indirectObject = nps[(size_t)who].np;
+        nps[(size_t)who].used = true;
+        markRole(nps[(size_t)who], "indirect object");
+      }
+    }
 
     // acc + inf / modal + inf / verb + inf
     if (f.hasPred && !infs.empty() && verb >= 0 && f.type != Kind::Imp) {
@@ -672,6 +763,25 @@ class Builder {
     for (size_t c = 0; c < s_.clauses.size(); ++c) {
       const Clause& K = s_.clauses[c];
       if (K.parent != ci || K.last < 0) continue;
+      // C36: nē + 2nd person subjunctive with no main verb is a prohibition ("et nē tuum dēs honōrem": and do not
+      // give your honour; "nē nōs dēserās": do not abandon us), not a purpose clause
+      if (K.kind == Clause::Sub && K.marker >= 0 && ti_[(size_t)K.marker].key == "ne" && !f.hasPred && verb < 0 &&
+          K.verb >= 0 && ti_[(size_t)K.verb].f.mood == Subjunctive && ti_[(size_t)K.verb].f.person == 2) {
+        SemFrame sf;
+        clause((int)c, sf);
+        sf.type = Kind::Imp;
+        sf.negative = true;
+        sf.imperativePlural = ti_[(size_t)K.verb].f.number == Pl;
+        sf.connectors.insert(sf.connectors.begin(), f.connectors.begin(), f.connectors.end());
+        sf.interjections.insert(sf.interjections.begin(), f.interjections.begin(), f.interjections.end());
+        sf.vocatives.insert(sf.vocatives.begin(), f.vocatives.begin(), f.vocatives.end());
+        sf.adverbs.insert(sf.adverbs.begin(), f.adverbs.begin(), f.adverbs.end());
+        sf.discourse.insert(sf.discourse.begin(), f.discourse.begin(), f.discourse.end());
+        sf.punct = f.punct;
+        out_.roles[(size_t)K.marker] = "prohibition";
+        f = std::move(sf);
+        continue;
+      }
       SemFrame sf;
       clause((int)c, sf);
       if (K.kind == Clause::Relative) {
@@ -924,6 +1034,11 @@ class Builder {
         int d = (int)h > (int)m ? (int)h - (int)m : (int)m - (int)h;
         // a head takes one determiner ("hic puer meus fīlius": meus goes with fīlius)
         if (detMod && npOfHead[h] >= 0 && !local[(size_t)npOfHead[h]].np.determiner.empty()) d += 10;
+        // C36: an adjective before a form of sum describes the noun after it as its predicate ("Difficilis est vīta":
+        // life is hard; "Magna est nāvis et vēlōx"), never as an attribute across the verb
+        if (!detMod && m < h && ti_[m].f.case_ == Nom && copulaBetween(m, h)) continue;
+        // C36: a name rarely takes the adjective a common noun next to it can take ("Iuppiter magnus deus est")
+        if (ti_[h].name && !detMod) d += 2;
         // a verb between them weakens the link (predicate adjective after the verb)
         if (d < bestDist) { bestDist = d; best = (int)h; }
       }
@@ -980,10 +1095,43 @@ class Builder {
           break;
         }
     }
+    // C36: two names side by side in one case are one name ("Iēsū Chrīstī": of Jesus Christ)
+    for (size_t k = 0; k + 1 < local.size(); ++k) {
+      NPx& x = local[k];
+      if (x.used || !x.np.isName) continue;
+      for (size_t q = 0; q < local.size(); ++q) {
+        NPx& y = local[q];
+        if (q == k || y.used || !y.np.isName || y.first != x.last + 1) continue;
+        if (x.case_ && y.case_ && x.case_ != y.case_) continue;
+        x.np.apposition.push_back(y.np);
+        x.np.tokens.insert(x.np.tokens.end(), y.np.tokens.begin(), y.np.tokens.end());
+        x.last = y.last;
+        y.used = true;
+        break;
+      }
+    }
+    // C36: plēnus / dignus + ablative: "full of charity" (the ablative completes the adjective)
+    for (size_t k = 0; k < local.size(); ++k) {
+      NPx& a = local[k];
+      if (a.used || a.np.adjectives.empty()) continue;
+      int adjTok = -1;
+      for (const frame::SemAdj& ad : a.np.adjectives)
+        if (isKey(ad.lemma, {"plenus", "dignus", "indignus"})) adjTok = ad.token;
+      if (adjTok < 0) continue;
+      for (size_t q = 0; q < local.size(); ++q) {
+        NPx& b = local[q];
+        if (q == k || b.used || b.case_ != Abl || std::abs(b.first - adjTok) > 2) continue;
+        a.np.genitive.push_back(b.np);
+        a.np.tokens.insert(a.np.tokens.end(), b.np.tokens.begin(), b.np.tokens.end());
+        b.used = true;
+        break;
+      }
+    }
     // genitives attach to the nearest non-genitive head (the preceding one first)
     for (size_t k = 0; k < local.size(); ++k) {
       NPx& g = local[k];
       if (g.case_ != Gen || g.used) continue;
+      if (genObjVerb_ >= 0 && (g.first == genObjVerb_ + 1 || g.last == genObjVerb_ - 1)) continue;   // its object
       int best = -1, bestD = 1 << 20;
       for (size_t q = 0; q < local.size(); ++q) {
         if (q == k || local[q].used || local[q].case_ == Gen || local[q].adjOnly || local[q].np.isName) continue;
@@ -1064,6 +1212,29 @@ class Builder {
     const uint8_t vnum = v ? v->f.number : 0, vper = v ? v->f.person : 0;
     const bool copula = f.copula;
     // vocatives
+    // C36: a greeting (avē, salvē, ō) without a verb or with an imperative addresses its nominatives ("Avē, mundī
+    // spēs, Marīa"); so does a verbless line of a devotional text whose nouns are persons ("Virgō dulcis et
+    // serēna") or that holds a word that can only be a vocative ("Iēsū Chrīste, fīlī Deī")
+    bool greet = false;
+    for (const std::string& ij : f.interjections) greet = greet || isKey(ij, {"aue", "auete", "salue", "saluete", "o"});
+    const bool verbless = !v && !f.hasPred;
+    bool onlyVoc = false;
+    for (const NPx& x : nps) {
+      if (x.governed || x.np.token < 0) continue;
+      bool all = !s_.tokens[(size_t)x.np.token].readings.empty();
+      for (const Reading& r : s_.tokens[(size_t)x.np.token].readings) all = all && unpack(r.packed).case_ == Voc;
+      onlyVoc = onlyVoc || all;
+    }
+    const bool addressAll = (greet && (verbless || f.type == Kind::Imp)) || (verbless && (onlyVoc || devotional_));
+    for (NPx& x : nps) {
+      if (x.used || x.governed || !addressAll || x.case_ == Voc) continue;
+      if (!(x.case_ == Nom || (x.case_ == 0 && x.np.isName))) continue;
+      const bool person = x.np.isName || (x.np.token >= 0 && tab_.tagged("lex", ti_[(size_t)x.np.token].key, "person"));
+      if (x.adjOnly ? greet : (greet || onlyVoc || person)) {
+        x.case_ = Voc;
+        if (x.np.isName && x.np.token >= 0) out_.roles[(size_t)x.np.token] = "vocative";
+      }
+    }
     for (NPx& x : nps) {
       if (x.used || x.governed) continue;
       if (x.case_ == Voc || (x.np.isName && x.case_ == 0 && f.type == Kind::Imp)) {
@@ -1109,9 +1280,13 @@ class Builder {
       if (!subj && !copula)
         for (NPx* x : noms)
           if (personOf(*x) == vper) { subj = x; break; }
-    } else if (!v) {
-      // fragment: the first nominative is the "subject" of a verbless exclamation / answer
-      for (NPx* x : noms) { subj = x; break; }
+    } else if (!v && !f.copula) {
+      // fragment: the first nominative is the "subject" of a verbless exclamation / answer; C36: a line of adjectives
+      // only ("beāta et glōriōsa") stays a predicate
+      bool allAdj = !noms.empty();
+      for (NPx* x : noms) allAdj = allAdj && x->adjOnly;
+      if (!allAdj)
+        for (NPx* x : noms) { subj = x; break; }
     }
     if (subj) {
       f.hasSubject = true;
@@ -1150,6 +1325,34 @@ class Builder {
         markRole(*x, "predicate");
       }
       x->used = true;
+    }
+    // C36: "Validus est vir et industrius": an adjective joined by et after the subject shares the predicate
+    if (copula && !f.predAdj.empty() && f.hasSubject && !f.implicitSubject && f.subject.token >= 0) {
+      for (size_t k = 0; k < f.subject.adjectives.size();) {
+        const frame::SemAdj a = f.subject.adjectives[k];
+        if (a.token > f.subject.token && a.token >= 1 && ti_[(size_t)a.token - 1].word && ti_[(size_t)a.token - 1].key == "et" &&
+            !tab_.has("det", a.lemma)) {
+          f.predAdj.push_back(a);
+          f.subject.adjectives.erase(f.subject.adjectives.begin() + (long)k);
+          used_[(size_t)a.token - 1] = 1;
+          out_.roles[(size_t)a.token - 1] = "and";
+          out_.roles[(size_t)a.token] = "predicate";
+        } else {
+          ++k;
+        }
+      }
+    }
+    // C36: nōn X sed Y with X an adjective that went to the subject ("Lūcius nōn trīstis est sed laetus")
+    for (const std::string& d : f.discourse) {
+      if (d.compare(0, 7, "nonsed:") != 0 || !copula || !f.hasSubject) continue;
+      const int xt = std::atoi(d.c_str() + 7);
+      for (size_t k = 0; k < f.subject.adjectives.size(); ++k)
+        if (f.subject.adjectives[k].token == xt) {
+          f.predAdj.insert(f.predAdj.begin(), f.subject.adjectives[k]);
+          f.subject.adjectives.erase(f.subject.adjectives.begin() + (long)k);
+          out_.roles[(size_t)xt] = "predicate";
+          break;
+        }
     }
     // floating omnēs / tōtī with a 1st / 2nd person verb ("Omnēs inurbānī estis": you are all rude)
     for (size_t k = 0; k < f.predicative.size(); ++k) {
@@ -1269,8 +1472,8 @@ class Builder {
         o.prep = "#loc";
         markRole(x, "place");
       } else if (x.case_ == Gen) {
-        o.prep = "#gen";
-        markRole(x, "genitive");
+        o.prep = genObjVerb_ >= 0 ? "#genobj" : "#gen";   // C36: miserēre nostrī: have mercy on us
+        markRole(x, genObjVerb_ >= 0 ? "object" : "genitive");
       } else {
         o.prep = "#" + std::to_string((int)x.case_);
         markRole(x, "other");
@@ -1350,12 +1553,12 @@ class Builder {
 }  // namespace
 
 void buildFrames(const lex::Lexicon& la, const Tables& tab, const Sentence& s, const std::vector<TokInfo>& ti,
-                 Built& out) {
+                 Built& out, bool devotional) {
   out.frames.clear();
   out.joiners.clear();
   out.flags.clear();
   out.roles.clear();
-  Builder b(la, tab, s, ti, out);
+  Builder b(la, tab, s, ti, out, devotional);
   b.run();
 }
 
