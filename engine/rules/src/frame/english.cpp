@@ -71,6 +71,68 @@ Reading readingOf(const lex::Lexicon& lx, const std::string& lower) {
 
 bool vowel(char c) { return c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u'; }
 
+// C39: a 3rd-person singular present of a verb: english.vpl lists the form so, or (a form it does not list:
+// "unties") a regular -s / -es / -ies ending of a verb it knows
+bool verb3sg(const lex::Lexicon& lx, const std::string& lower) {
+  if (lower.size() < 4 || lower.back() != 's') return false;
+  const char p = lower[lower.size() - 2];
+  if (p == 's' || p == 'u' || p == 'i' || p == '\'') return false;   // glass, circus, axis, the cat's
+  std::vector<lex::Analysis> an;
+  lx.lookup(text::en_key(lower), an);
+  for (const lex::Analysis& a : an) {
+    const feat::Features f = feat::unpack(lx.feature(a.feat));
+    if (lx.lemma(a.lemma).pos == feat::Verb && f.person == 3 && f.number == feat::Sg && f.tense == feat::Present) return true;
+  }
+  if (!an.empty()) return false;
+  for (const std::string& b : baseCandidates(lower, "VERB")) {
+    if (b.size() < 2 || endsWith(b, "ed") || endsWith(b, "ing")) continue;
+    std::vector<lex::Analysis> bn;
+    lx.lookup(text::en_key(b), bn);
+    for (const lex::Analysis& a : bn) {
+      const lex::Lemma l = lx.lemma(a.lemma);
+      if (l.pos == feat::Verb && text::lower(std::string(l.head)) == b) return true;
+    }
+  }
+  return false;
+}
+
+bool hasNoun(const lex::Lexicon& lx, const std::string& lower) {
+  std::vector<lex::Analysis> an;
+  lx.lookup(text::en_key(lower), an);
+  for (const lex::Analysis& a : an)
+    if (lx.lemma(a.lemma).pos == feat::Noun) return true;
+  return false;
+}
+
+bool hasPos(const lex::Lexicon& lx, const std::string& lower, uint8_t pos) {
+  std::vector<lex::Analysis> an;
+  lx.lookup(text::en_key(lower), an);
+  for (const lex::Analysis& a : an)
+    if (lx.lemma(a.lemma).pos == pos) return true;
+  return false;
+}
+
+// C39: an English noun of a person or an animal (the subject of an intransitive verb in the C39 retag)
+bool animateNoun(const std::string& w) {
+  if (nounSex(w) || addressWord(w)) return true;
+  return isIn(w, {"farmer", "farmers", "sailor", "sailors", "soldier", "soldiers", "slave", "slaves", "child", "children",
+                  "baby", "people", "person", "teacher", "student", "pupil", "servant", "doctor", "poet", "shepherd",
+                  "fisherman", "merchant", "traveller", "traveler", "stranger", "guest", "neighbour", "neighbor",
+                  "horse", "horses", "dog", "dogs", "cat", "cats", "bird", "birds", "ox", "oxen", "cow", "cows", "sheep",
+                  "goat", "goats", "pig", "pigs", "wolf", "lion", "fox", "bear", "mouse", "frog", "donkey", "bull",
+                  "chicken", "duck", "goose", "owl", "rabbit", "deer", "fish", "bee", "snake", "monkey", "everyone",
+                  "nobody", "somebody", "someone", "everybody", "crowd", "family", "worker", "workers",
+                  // things that act by themselves ("the sun shines", "the river flows", "the bell rings")
+                  "sun", "moon", "star", "stars", "wind", "rain", "snow", "river", "sea", "fire", "bell", "ship", "boat",
+                  "clock"});
+}
+
+// a clause boundary for the C39 rules: a coordinator, a subordinator, a comma / semicolon / colon / dash
+bool clauseBreak(const Token& t) {
+  return t.upos == "CCONJ" || t.upos == "SCONJ" || t.text == "," || t.text == ";" || t.text == ":" ||
+         t.text == "\xE2\x80\x94" || t.text == "--" || isIn(t.lower, {"and", "but", "or", "so", "then"});
+}
+
 }  // namespace
 
 std::string verbOfForm(const lex::Lexicon& lx, const std::string& lower, bool* present) {
@@ -191,6 +253,24 @@ bool addressWord(const std::string& w) {
 bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
   bool changed = false;
   const int n = (int)tk.size();
+  // C39: "O Jupiter, help the sailors!", "\"O mother, ...": a capital "O" that opens the sentence (after an opening
+  // quote) before a name or a noun that a comma or "!" closes within three words is the address word, never a
+  // preposition (the tagger read "O Zeus" as a prepositional phrase and the vocative was lost)
+  {
+    int o = 0;
+    while (o < n && tk[(size_t)o].upos == "PUNCT" && tk[(size_t)o].text != ",") ++o;
+    if (o + 2 < n && tk[(size_t)o].text == "O" && tk[(size_t)o].upos != "INTJ" &&
+        isIn(tk[(size_t)o + 1].upos, {"PROPN", "NOUN", "ADJ", "INTJ", "X"}) && tk[(size_t)o + 1].lower != "i") {
+      int close = -1;
+      for (int k = o + 1; k < n && k <= o + 4; ++k)
+        if (tk[(size_t)k].text == "," || tk[(size_t)k].text == "!") { close = k; break; }
+      if (close > o + 1) {
+        tk[(size_t)o].upos = "INTJ";
+        tk[(size_t)o].feats = 0;
+        changed = true;
+      }
+    }
+  }
   // C30b: a cue of one capitalised word of address and nothing else ("Mother") is that noun, not an unknown name
   {
     int words = 0, w0 = -1;
@@ -785,7 +865,164 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
     t.feats = nlp::morph::fromString("VerbForm=Inf");
     changed = true;
   }
+  // C39 (g): "enough" is a quantity word, never a noun: before a noun it modifies it ("enough water"), after "but" or a
+  // comma at the end of a clause it stands for one ("not much, but enough"); the Greek noun lookup gave βουπόρος.
+  // "has not much money": "has" before "not" and a noun phrase (no verb after it) is the main verb, not an auxiliary.
+  for (int i = 0; i < n; ++i) {
+    Token& t = tk[(size_t)i];
+    if (t.lower == "enough" && t.upos == "NOUN") {
+      const bool before = i + 1 < n && isIn(tk[(size_t)i + 1].upos, {"NOUN", "ADJ"});
+      const bool alone = i > 0 && (tk[(size_t)i - 1].lower == "but" || tk[(size_t)i - 1].text == ",") &&
+                         (i + 1 >= n || tk[(size_t)i + 1].upos == "PUNCT");
+      if (before || alone) { t.upos = "ADJ"; t.feats = 0; changed = true; }
+    }
+    if (isIn(t.lower, {"has", "have", "had"}) && t.upos == "AUX" && i + 2 < n && isIn(tk[(size_t)i + 1].lower, {"not", "n't"}) &&
+        isIn(tk[(size_t)i + 2].upos, {"DET", "ADJ", "NOUN", "NUM"})) {
+      bool verbAfter = false;
+      for (int k = i + 2; k < n && tk[(size_t)k].upos != "PUNCT"; ++k) verbAfter = verbAfter || tk[(size_t)k].upos == "VERB";
+      if (!verbAfter) {
+        t.upos = "VERB";
+        t.feats = nlp::morph::fromString(t.lower == "had" ? "Tense=Past|VerbForm=Fin|Mood=Ind"
+                                         : t.lower == "has" ? "Number=Sing|Person=3|Tense=Pres|VerbForm=Fin|Mood=Ind"
+                                                            : "Tense=Pres|VerbForm=Fin|Mood=Ind");
+        changed = true;
+      }
+    }
+  }
+  // C39 (e): "The Greek slave reads a book.": after a determiner, a capitalised adjective of a proper name (english.vpl
+  // lists the adjective with its capital: Greek, Roman, Athenian) before a word with a noun reading is that adjective
+  // and the word its noun (the tagger read "Greek" as the subject and "slave" as the verb)
+  for (int i = 1; i + 1 < n; ++i) {
+    Token& t = tk[(size_t)i];
+    Token& nx = tk[(size_t)i + 1];
+    if (tk[(size_t)i - 1].upos != "DET" || !isIn(t.upos, {"PROPN", "NOUN"}) || t.text.empty() || !(t.text[0] >= 'A' && t.text[0] <= 'Z'))
+      continue;
+    if (!isIn(nx.upos, {"VERB", "NOUN", "ADJ"}) || !hasNoun(lx, nx.lower)) continue;
+    bool properAdj = false;
+    std::vector<lex::Analysis> an;
+    lx.lookup(text::en_key(t.lower), an);
+    for (const lex::Analysis& a : an)
+      properAdj = properAdj || (lx.lemma(a.lemma).pos == feat::Adj && std::string(lx.lemma(a.lemma).head) == t.text);
+    if (!properAdj) continue;
+    t.upos = "ADJ";
+    t.feats = 0;
+    if (nx.upos != "NOUN") {
+      nx.upos = "NOUN";
+      nx.feats = nlp::morph::fromString("Number=Sing");
+    }
+    changed = true;
+  }
+  // C39 (a, b): a 3rd-person singular verb the tagger read as a plural noun. In a clause that has no verb of its own
+  // (from its start to the next coordinator, subordinator or comma), an -s word that english.vpl knows as a 3rd
+  // singular present, right after its subject (a name that opens the clause: "Marcus unties the horse"; or a noun
+  // phrase that opens it: "the farmer groans", "The old woman smiles and ..."), before the end of the clause, an object
+  // or an adverb, is that clause's verb. "The well supplies water.": when the only verb the tagger found is the word
+  // after it and that word is far more often a noun (water), the -s word is the verb and the word after it its object
+  // (the word before it a noun: well).
+  {
+    const auto finite = [&](int k) { return tk[(size_t)k].upos == "VERB" || tk[(size_t)k].upos == "AUX"; };
+    const auto vf3 = "Number=Sing|Person=3|Tense=Pres|VerbForm=Fin|Mood=Ind";
+    for (int i = 1; i < n; ++i) {
+      Token& y = tk[(size_t)i];
+      if (!isIn(y.upos, {"NOUN", "PROPN", "ADJ", "X"}) || y.text.empty() || (y.text[0] >= 'A' && y.text[0] <= 'Z')) continue;
+      if (!verb3sg(lx, y.lower)) continue;
+      // the clause around it
+      int a = i, b = i;
+      while (a > 0 && !clauseBreak(tk[(size_t)a - 1]) && tk[(size_t)a - 1].upos != "PUNCT") --a;
+      while (b + 1 < n && !clauseBreak(tk[(size_t)b + 1]) && tk[(size_t)b + 1].upos != "PUNCT") ++b;
+      // the subject before it: a name opening the clause, or [det|possessive] adj* noun+ opening the clause
+      const int p = i - 1;
+      if (p < a) {
+        // C39 (b): "Sextus honours the gods and works hard.": an -s word right after "and" whose clause has no subject
+        // and no verb, after a clause whose verb is a 3rd singular present, is the second verb of that subject
+        const int c = a - 1;
+        if (c < 1 || !isIn(tk[(size_t)c].lower, {"and", "but", "then"}) || i + 1 >= n) continue;
+        bool prevVerb = false;
+        for (int k = c - 1; k >= 0 && tk[(size_t)k].text != "." && tk[(size_t)k].text != ";"; --k)
+          if (tk[(size_t)k].upos == "VERB" &&
+              (fget(tk[(size_t)k], nlp::morph::PersonShift) == 3 || verb3sg(lx, tk[(size_t)k].lower)) &&
+              fget(tk[(size_t)k], nlp::morph::TenseShift) != nlp::morph::TensePast) prevVerb = true;
+        if (!prevVerb) continue;
+        Token& nx = tk[(size_t)i + 1];
+        const bool lastWord = i + 2 >= n || tk[(size_t)i + 2].upos == "PUNCT";
+        const bool advNext = nx.upos == "ADV" || (lastWord && hasPos(lx, nx.lower, feat::Adv) && nx.upos != "NOUN");
+        if (!(advNext || isIn(nx.upos, {"DET", "PRON"}) || isIn(nx.lower, {"his", "her", "its", "their", "my", "your", "our"})))
+          continue;
+        bool verbAfter = false;
+        for (int k = i + 1; k <= b; ++k) verbAfter = verbAfter || (finite(k) && !(k == i + 1 && advNext));
+        if (verbAfter) continue;
+        y.upos = "VERB";
+        y.feats = nlp::morph::fromString(vf3);
+        if (advNext && nx.upos != "ADV") { nx.upos = "ADV"; nx.feats = 0; }
+        changed = true;
+        continue;
+      }
+      bool subject = false;
+      bool demote = false;   // the "well supplies water" reading: the word before is a noun, the word after a noun
+      const Token& pt = tk[(size_t)p];
+      if (pt.upos == "PROPN" && p == a && !pt.text.empty() && pt.text[0] >= 'A' && pt.text[0] <= 'Z') subject = true;
+      if (!subject && isIn(pt.upos, {"NOUN", "ADJ", "ADV"}) && p > a) {
+        int q = p - 1;
+        while (q > a && isIn(tk[(size_t)q].upos, {"ADJ", "NOUN", "NUM"})) --q;
+        const bool opener = q == a && (tk[(size_t)q].upos == "DET" ||
+                                       isIn(tk[(size_t)q].lower, {"my", "your", "his", "her", "its", "our", "their"}));
+        if (opener && !isIn(tk[(size_t)q].lower, {"this", "that", "these", "those"})) subject = pt.upos == "NOUN" || hasNoun(lx, pt.lower);
+      }
+      if (!subject) continue;
+      // an earlier -s word of the clause is its verb rather ("My grandmother tells stories.": tells, not stories)
+      bool earlier = false;
+      for (int k = a; k < i; ++k) earlier = earlier || (tk[(size_t)k].upos != "VERB" && verb3sg(lx, tk[(size_t)k].lower));
+      if (earlier) continue;
+      const bool last = i + 1 >= n || clauseBreak(tk[(size_t)i + 1]) || tk[(size_t)i + 1].upos == "PUNCT";
+      // a clause that ends with the -s word has no object: only a person, an animal or a name does something without
+      // one ("the farmer groans", "Marcus sleeps"); "The house plants." stays a noun phrase
+      bool ok = last && (pt.upos == "PROPN" || animateNoun(pt.lower));
+      if (!ok) {
+        const Token& nx = tk[(size_t)i + 1];
+        ok = isIn(nx.upos, {"DET", "PRON", "NUM", "ADP", "ADV"}) ||
+             isIn(nx.lower, {"his", "her", "its", "their", "my", "your", "our"});
+        // an object noun right after it, or the only verb the tagger found, far more often a noun
+        if (!ok && isIn(nx.upos, {"VERB", "NOUN", "ADJ"}) && (i + 2 >= n || tk[(size_t)i + 2].upos == "PUNCT" ||
+                                                             tk[(size_t)i + 2].upos == "ADP" || clauseBreak(tk[(size_t)i + 2])) &&
+            nounMostly(nx.lower) && hasNoun(lx, nx.lower)) {
+          ok = true;
+          demote = nx.upos != "NOUN";
+        }
+      }
+      if (!ok) continue;
+      bool verbElse = false;
+      for (int k = a; k <= b; ++k)
+        if (k != i && finite(k) && !(demote && k == i + 1)) verbElse = true;
+      if (verbElse) continue;
+      if (y.upos == "VERB") continue;
+      y.upos = "VERB";
+      y.feats = nlp::morph::fromString(vf3);
+      if (pt.upos != "NOUN" && pt.upos != "PROPN") { tk[(size_t)p].upos = "NOUN"; tk[(size_t)p].feats = nlp::morph::fromString("Number=Sing"); }
+      if (demote) { tk[(size_t)i + 1].upos = "NOUN"; tk[(size_t)i + 1].feats = nlp::morph::fromString("Number=Sing"); }
+      changed = true;
+    }
+  }
   return changed;
+}
+
+bool nounMostly(const std::string& w) {
+  // C39: common nouns of a beginners' reader that english.vpl also lists as verbs, but that are far more often nouns:
+  // a sentence whose only verb is one of them is read with care (Check), and "the well supplies water" reads water
+  // as the object
+  static const char* const kNouns[] = {
+      "water", "waters", "house", "houses", "home", "book", "books", "table", "tables", "field", "fields", "garden",
+      "gardens", "school", "land", "lands", "ship", "ships", "boat", "boats", "bread", "wine", "milk", "oil", "stone",
+      "stones", "tree", "trees", "flower", "flowers", "man", "hand", "hands", "head", "eye", "eyes", "face", "name",
+      "place", "word", "door", "doors", "window", "road", "roads", "wall", "walls", "roof", "gate", "bridge", "mother",
+      "father", "sister", "brother", "horse", "horses", "bird", "birds", "sun", "moon", "star", "stars", "sea", "river",
+      "island", "mountain", "wood", "woods", "forest", "temple", "god", "gods", "room", "bed", "chair", "cup", "box",
+      "bag", "coat", "shoe", "shoes", "money", "gold", "silver", "iron", "salt", "fruit", "apple", "apples", "food",
+      "soldier", "farmer", "sailor", "slave", "slaves", "master", "son", "daughter", "wife", "child", "friend", "friends",
+      "people", "city", "town", "village", "street", "market", "dinner", "supper", "breakfast", "corn", "grain", "wheat",
+      "sheep", "ox", "oxen", "cow", "cows", "goat", "goats", "dog", "dogs", "ground", "earth", "fire", "rock", "rocks"};
+  for (const char* k : kNouns)
+    if (w == k) return true;
+  return false;
 }
 
 bool colourWord(const std::string& w) {

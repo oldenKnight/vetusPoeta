@@ -183,7 +183,7 @@ void sourceCoverage(const std::string& source, const std::string& greek, bool es
     }
     flush(0);
   }
-  size_t needGar = 0, needOun = 0, needBut = 0, needYet = 0, needO = 0;
+  size_t needGar = 0, needOun = 0, needBut = 0, needYet = 0, needO = 0, needConc = 0;
   static const char* const kSubj[] = {"i", "you", "he", "she", "it", "we", "they", "the", "a", "an", "this", "that",
                                       "his", "her", "my", "our", "their", "your", "there", "these", "those", nullptr};
   auto subjectWord = [&](size_t k) {
@@ -210,7 +210,10 @@ void sourceCoverage(const std::string& source, const std::string& greek, bool es
       else if (st && (w == "yet" || w == "nevertheless" || w == "however")) ++needYet;
       else if (st && w == "but" && ws[k].start) ++needBut;
       if ((w == "o" || w == "oh") && k + 1 < ws.size() && ws[k + 1].cap) ++needO;
+      // C39: a text unit is no longer wrapped (and Check for its length): "although" must keep a concessive word
+      if (w == "although" || (w == "though" && subjectWord(k + 1))) ++needConc;
     } else {
+      if (w == "aunque") ++needConc;   // C39
       if (st && (w == "pero" || w == "mas") && ws[k].start) ++needBut;
       else if (st && w == "pues" && subjectWord(k + 1)) ++needGar;
       else if (st && (w == "entonces" || (w == "así" && k + 1 < ws.size() && ws[k + 1].w == "que"))) ++needOun;
@@ -225,6 +228,14 @@ void sourceCoverage(const std::string& source, const std::string& greek, bool es
   if (yet + de + alla < needYet) lost.push_back(es ? "\"sin embargo\" without δέ / ὅμως" : "\"and yet\" without δέ / ὅμως");
   if (yet + de + alla < needYet + needBut) lost.push_back(es ? "\"pero\" without ἀλλά / δέ" : "\"but\" without ἀλλά / δέ");
   if (count({"ὦ"}) < needO) lost.push_back("the address (ὦ ...) left out");
+  {
+    size_t conc = count({"καίπερ", "καίτοι", "ὅμως", "μέντοι"});
+    for (size_t k = 0; k + 1 < gk.size(); ++k)
+      if ((gk[k] == text::greek_key("εἰ") && gk[k + 1] == text::greek_key("καί")) ||
+          (gk[k] == text::greek_key("καί") && gk[k + 1] == text::greek_key("εἰ")))
+        ++conc;
+    if (conc < needConc) lost.push_back(es ? "\"aunque\" without a concessive word" : "\"although\" without a concessive word");
+  }
   // a name of names_grc.tsv in the source needs one of its Greek forms ("“Zeus, life is hard" lost Zeus)
   for (const W& x : ws) {
     if (!x.cap) continue;
@@ -2877,6 +2888,16 @@ struct GreekPath::Impl {
       std::vector<Alternative> alternatives;
     };
     std::vector<CueAcc> acc(texts.size());
+    // C39: a text project keeps the line structure of its source: the unit's text with its own line breaks (the source
+    // spans keep them; sourceText has spaces there)
+    std::vector<size_t> lineCursor(texts.size(), 0);
+    std::vector<std::string> lined(texts.size());
+    if (opt.textProject)
+      for (size_t i = 0; i < cues.size() && off + i < lined.size(); ++i) {
+        for (const rules::SpanIn& x : cues[i].spans)
+          if (!x.tag) lined[off + i] += x.raw;
+        if (lined[off + i].empty()) lined[off + i] = cues[i].sourceText;
+      }
     transfer::Memory mem;
     royalGender = 0;
     transfer::Settings st;
@@ -2930,7 +2951,15 @@ struct GreekPath::Impl {
       for (size_t p = 0; p < pieces.size() && p < ss.parts.size(); ++p) {
         CueAcc& a = acc[ss.parts[p].cue];
         const int cueBase = (int)a.text.tokens.size();
+        const size_t before = a.text.text.size();
         cue::append(a.text, pieces[p]);
+        // C39: in a text project a sentence that begins a new line of the source begins a new line of the Greek
+        if (opt.textProject && p == 0 && ss.parts[p].cue < texts.size()) {
+          const size_t c0 = ss.parts[p].cue;
+          const std::string head = ss.text.substr((size_t)std::max(0, ss.parts[p].start));
+          if (cue::beginsSourceLine(lined[c0], head, lineCursor[c0]) && before > 0 && a.text.text.size() > before)
+            a.text.text[before] = '\n';
+        }
         for (const Reason& rr : so.reasons) {
           if (rr.tokenIndex < 0) { if (p == 0) a.reasons.push_back(rr); continue; }
           if ((size_t)rr.tokenIndex >= tokBase && (size_t)rr.tokenIndex < tokBase + pieces[p].tokens.size()) {
@@ -2982,7 +3011,7 @@ struct GreekPath::Impl {
         CueOutput o = check(cues[i], corr->target, opt, ctx);
         glossary = &ctx.glossary;
         o.index = cues[i].index;
-        o.target = greekLayout(corr->target, cfg.maxLine, cfg.maxLines).joined;
+        o.target = opt.textProject ? corr->target : greekLayout(corr->target, cfg.maxLine, cfg.maxLines).joined;   // C39
         cue::relocate(o.target, o.tokens);
         o.reasons.push_back(Reason{-1, "correction", "your correction (" + corr->scope + ", used " +
                                                          std::to_string(corr->count) + " times)", corr->target});
@@ -2992,7 +3021,8 @@ struct GreekPath::Impl {
       }
       CueOutput o;
       o.index = cues[i].index;
-      const Layout lay = greekLayout(a.text.text, cfg.maxLine, cfg.maxLines);
+      // C39: text units are not wrapped like subtitles
+      const Layout lay = opt.textProject ? Layout{a.text.text, false} : greekLayout(a.text.text, cfg.maxLine, cfg.maxLines);
       o.target = lay.joined;
       o.tokens = a.text.tokens;
       cue::relocate(o.target, o.tokens);
@@ -3160,7 +3190,7 @@ struct GreekPath::Impl {
       o.tokens.push_back(std::move(t));
     }
     bool overflow = false;
-    {
+    if (!opt.textProject) {   // C39: a text unit has no line-length limit
       std::string flat = target;
       std::replace(flat.begin(), flat.end(), '\n', ' ');
       subs::breakLines(flat, greekBreakHints(), cfg.maxLine, cfg.maxLines, &overflow);

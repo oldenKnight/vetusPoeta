@@ -419,6 +419,46 @@ Layout layout(const std::string& text, int maxLine, int maxLines) {
   return l;
 }
 
+Layout textLayout(const std::string& text) {
+  Layout l;
+  l.joined = text;
+  size_t a = 0;
+  while (true) {
+    const size_t b = text.find('\n', a);
+    l.lines.push_back(text.substr(a, b == std::string::npos ? std::string::npos : b - a));
+    if (b == std::string::npos) break;
+    a = b + 1;
+  }
+  return l;
+}
+
+bool beginsSourceLine(const std::string& src, const std::string& piece, size_t& cursor) {
+  const size_t b = piece.find_first_not_of(" \t\r\n");
+  if (b == std::string::npos) return false;
+  const size_t e = piece.find_first_of(" \t\r\n", b);
+  const std::string w = piece.substr(b, e == std::string::npos ? std::string::npos : e - b);
+  const size_t pos = src.find(w, std::min(cursor, src.size()));
+  if (pos == std::string::npos) return false;
+  cursor = pos + w.size();
+  // what stands before the word on its line: blanks, a speaker dash, opening quotes, brackets, inverted marks
+  static const char* const lead[] = {" ", "\t", "\r", "-", "\"", "'", "(", "[", "\u2014", "\u2013", "\u201c", "\u2018",
+                                     "\u00ab", "\u00bf", "\u00a1", "\u266a"};
+  size_t k = pos;
+  bool more = true;
+  while (k > 0 && more) {
+    more = false;
+    for (const char* x : lead) {
+      const size_t n = std::char_traits<char>::length(x);
+      if (k >= n && src.compare(k - n, n, x) == 0) {
+        k -= n;
+        more = true;
+        break;
+      }
+    }
+  }
+  return k > 0 && src[k - 1] == '\n';
+}
+
 void relocate(const std::string& text, std::vector<rules::TokenView>& tokens) {
   size_t at = 0;
   for (rules::TokenView& t : tokens) {

@@ -517,7 +517,8 @@ std::vector<rules::CueOutput> cues(const std::vector<rules::CueInput>& in, const
         out.meaningPercent = 100;
       } else {
         const OrbergResult r = orbergise(flat, c.originalText.empty() ? nullptr : &c.originalText, c.originalLang, o, ctx);
-        const cue::Layout lay = cue::layout(r.text, ctx.maxLine, ctx.maxLines);
+        // C39: a text unit (text project) is never wrapped like a subtitle
+        const cue::Layout lay = opt.textProject ? cue::textLayout(r.text) : cue::layout(r.text, ctx.maxLine, ctx.maxLines);
         // an unchanged cue keeps its own lines byte for byte (C27); a rewritten one is laid out again
         out.target = r.text == flat ? c.sourceText : lay.joined;
         out.tokens = r.tokens;

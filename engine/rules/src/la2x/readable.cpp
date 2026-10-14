@@ -1380,6 +1380,19 @@ class Builder {
         if (x->adjOnly && x->gender && x->gender != MFN) { f.subject.pron.gender = x->gender; break; }
       if (f.pred.complementToken >= 0 && f.pred.particle == "peri") f.subject.pron.gender = genderOf(ti_[(size_t)f.pred.complementToken]);
     }
+    // C39: "Lūcius līber est et dominus suus": an adjective after a name subject and before the copula is the predicate
+    // (Lucius is free), not an attribute of the name ("free Lucius")
+    if (copula && verb >= 0 && f.hasSubject && !f.implicitSubject && f.subject.isName && f.subject.token >= 0)
+      for (size_t k = 0; k < f.subject.adjectives.size();) {
+        const frame::SemAdj a = f.subject.adjectives[k];
+        if (a.token > f.subject.token && a.token < verb && !tab_.has("det", a.lemma) && a.participle == 0) {
+          f.predAdj.push_back(a);
+          f.subject.adjectives.erase(f.subject.adjectives.begin() + (long)k);
+          out_.roles[(size_t)a.token] = "predicate";
+        } else {
+          ++k;
+        }
+      }
     // copula predicate (nominatives left) / extra nominatives
     for (NPx* x : noms) {
       if (x->used) continue;
@@ -1398,6 +1411,16 @@ class Builder {
       }
       x->used = true;
     }
+    // C39: a predicate noun joined by et to a predicate adjective ("līber est et dominus suus"): the et is "and"
+    if (copula && !f.predAdj.empty())
+      for (const SemNP& x : f.predicative) {
+        int first = x.token;
+        for (int t : x.tokens) first = first < 0 ? t : std::min(first, t);
+        if (first >= 1 && ti_[(size_t)first - 1].word && ti_[(size_t)first - 1].key == "et" && !used_[(size_t)first - 1]) {
+          used_[(size_t)first - 1] = 1;
+          out_.roles[(size_t)first - 1] = "and";
+        }
+      }
     // C36: "Validus est vir et industrius": an adjective joined by et after the subject shares the predicate
     if (copula && !f.predAdj.empty() && f.hasSubject && !f.implicitSubject && f.subject.token >= 0) {
       for (size_t k = 0; k < f.subject.adjectives.size();) {

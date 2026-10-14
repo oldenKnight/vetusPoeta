@@ -2072,7 +2072,9 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
           }
         }
       }
-      if (common && !proper) {
+      // C39: a word of address ("Father, the field is wet.") is that noun, although english.vpl also lists it as a
+      // name (Father, Mother as titles)
+      if (common && (!proper || (c.st.lang == frame::SrcLang::En && frame::en::addressWord(sl)))) {
         Choice ch;
         ch.token = n.token;
         std::string base = sl;

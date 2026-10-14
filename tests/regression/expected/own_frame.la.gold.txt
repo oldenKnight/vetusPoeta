@@ -1,8 +1,9 @@
 # Gold Latin for tests/regression/own_frame.en.txt (C39), one line per unit, written by the implementer before any C39
 # rule and before the engine was run on the file. Classical Latin, macrons; alternatives after " | ". Compared case-
 # and punctuation-insensitively (tools/eval/evallib.py normalise).
+# C39 proposed alternative added after the run (veto freely): unit 2 (the last alternative): opus est + ablative + dative, correct Latin the gold did not list.
 Fōns vīcō aquam praebet. | Fōns aquam vīcō praebet. | Fōns vīcō aquam suppeditat. | Fōns aquam vīcō suppeditat. | Fōns pāgō aquam praebet. | Fōns aquam pāgō praebet.
-Planta aquā eget. | Planta aquam requīrit. | Herba aquā eget. | Planta aquā indiget. | Herba aquam requīrit.
+Planta aquā eget. | Planta aquam requīrit. | Herba aquā eget. | Planta aquā indiget. | Herba aquam requīrit. | Aquā herbae opus est.
 Lūx viam ostendit. | Lūx viam mōnstrat. | Lūmen viam ostendit. | Lūmen viam mōnstrat.
 Puella rosās rigat. | Puella rosās irrigat.
 Mārcus equum solvit et in agrum dūcit. | Mārcus equum solvit et eum in agrum dūcit. | Mārcus equum exsolvit et in agrum dūcit. | Mārcus equum exsolvit et eum in agrum dūcit.

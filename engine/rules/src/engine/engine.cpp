@@ -8,6 +8,7 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <set>
@@ -2914,6 +2915,16 @@ class RulesEngine final : public Engine {
       bool agreeWhole = true;   // C30: every sentence with a piece here passes A3 / A4 as a whole sentence
     };
     std::vector<CueAcc> acc(texts.size());
+    // C39: a text project keeps the line structure of its source: the unit's text with its own line breaks (the source
+    // spans keep them; sourceText has spaces there)
+    std::vector<size_t> lineCursor(texts.size(), 0);
+    std::vector<std::string> lined(texts.size());
+    if (opt.textProject)
+      for (size_t i = 0; i < cues.size() && off + i < lined.size(); ++i) {
+        for (const SpanIn& x : cues[i].spans)
+          if (!x.tag) lined[off + i] += x.raw;
+        if (lined[off + i].empty()) lined[off + i] = cues[i].sourceText;
+      }
     transfer::Memory mem;
     whSaved_ = WhSaved{};   // C28
     transfer::Settings st;
@@ -3205,6 +3216,7 @@ class RulesEngine final : public Engine {
           for (auto& t : so.latin.tokens) { t.start += shift; t.end += shift; }
         }
       }
+      capitaliseProperAdjectives(so.latin);   // C39 (e)
       // pieces back onto the cues
       if (so.srcOffset.size() != so.latin.tokens.size()) so.srcOffset.assign(so.latin.tokens.size(), -1);
       if (ss.kind == frame::CueKind::Song) so.srcOffset.assign(so.latin.tokens.size(), -1);
@@ -3312,7 +3324,15 @@ class RulesEngine final : public Engine {
       for (size_t p = 0; p < pieces.size() && p < ss.parts.size(); ++p) {
         CueAcc& a = acc[ss.parts[p].cue];
         const int cueBase = (int)a.latin.tokens.size();
+        const size_t before = a.latin.text.size();
         cue::append(a.latin, pieces[p]);
+        // C39: in a text project a sentence that begins a new line of the source begins a new line of the Latin
+        if (opt.textProject && p == 0 && ss.parts[p].cue < texts.size()) {
+          const size_t c0 = ss.parts[p].cue;
+          const std::string head = ss.text.substr((size_t)std::max(0, ss.parts[p].start));
+          if (cue::beginsSourceLine(lined[c0], head, lineCursor[c0]) && before > 0 && a.latin.text.size() > before)
+            a.latin.text[before] = '\n';
+        }
         for (const Reason& rr : so.reasons) {
           if (rr.tokenIndex < 0) {
             if (p == 0) a.reasons.push_back(rr);
@@ -3410,7 +3430,8 @@ class RulesEngine final : public Engine {
         CueOutput o = checkImpl(cues[i], corr->target, opt, ctx);
         glossary_ = &ctx.glossary;
         o.index = cues[i].index;
-        const cue::Layout lay = cue::layout(corr->target, cfg_.maxLine, cfg_.maxLines);
+        const cue::Layout lay = opt.textProject ? cue::textLayout(corr->target)   // C39
+                                                : cue::layout(corr->target, cfg_.maxLine, cfg_.maxLines);
         o.target = lay.joined;
         cue::relocate(o.target, o.tokens);
         o.reasons.push_back(Reason{-1, "correction", "your correction (" + corr->scope + ", used " +
@@ -3421,7 +3442,8 @@ class RulesEngine final : public Engine {
       }
       CueOutput o;
       o.index = cues[i].index;
-      const cue::Layout lay = cue::layout(a.latin.text, cfg_.maxLine, cfg_.maxLines);
+      const cue::Layout lay = opt.textProject ? cue::textLayout(a.latin.text)   // C39: text units are not wrapped
+                                              : cue::layout(a.latin.text, cfg_.maxLine, cfg_.maxLines);
       o.target = lay.joined;
       o.tokens = a.latin.tokens;
       cue::relocate(o.target, o.tokens);
@@ -3556,7 +3578,8 @@ class RulesEngine final : public Engine {
                             "split-agreement",   // C30
                             "join-discarded", "join-neighbour",   // C30b
                             "form-guess", "gender-inferred",   // C32
-                            "contrast-guess", "source-word", "connector-guess", "prep-dropped"})   // C37
+                            "contrast-guess", "source-word", "connector-guess", "prep-dropped",   // C37
+                            "verb-doubt"})   // C39: the only verb is a word far more often a noun
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       // C37 (calibration): a dictionary word chosen on a weak sense (the best candidate's score below 0.35: a minor
       // sense, a gloss modifier only, "oxen" -> iugum, "pobres" -> paupertās) is never OK (flag weak-sense)
@@ -3729,7 +3752,7 @@ class RulesEngine final : public Engine {
       o.tokens.push_back(std::move(t));
     }
     bool overflow = false;
-    {
+    if (!opt.textProject) {   // C39: a text unit has no line-length limit
       std::string flat = target;
       std::replace(flat.begin(), flat.end(), '\n', ' ');
       subs::breakLines(flat, cue::latinBreakHints(), cfg_.maxLine, cfg_.maxLines, &overflow);
@@ -3849,6 +3872,55 @@ class RulesEngine final : public Engine {
   const std::vector<GlossaryEntry>* glossary_ = nullptr;
   transfer::Memory memBefore_;
   int soloDepth_ = 0;   // C30b: inside the never-worse guard's translation of one cue alone
+  // C39 (e): Latin adjectives of proper names (lemma id -> proper), capped at 4,096 entries, cleared when full
+  std::map<uint32_t, bool> properAdj_;
+
+  // C39 (e): an adjective of a proper name (Athēniēnsis, Rōmānus, Graecus, Latīnus) is written with a capital: the
+  // lemma is an adjective and the first sense of its English gloss holds a capitalised word that english.vpl lists as
+  // a capitalised adjective (Athenian, Roman, Greek, Latin), never a capital that only opens the gloss ("Of", "Empty")
+  bool properAdjective(uint32_t id) {
+    if (!la_ || !en_ || id == lex::kNoLemma) return false;
+    const auto hit = properAdj_.find(id);
+    if (hit != properAdj_.end()) return hit->second;
+    if (properAdj_.size() >= 4096) properAdj_.clear();
+    bool proper = false;
+    const lex::Lemma l = la_->lemma(id);
+    if (l.pos == feat::Adj) {
+      std::string g(l.glossEn);
+      const size_t cut = g.find_first_of(",;(");
+      if (cut != std::string::npos) g.resize(cut);
+      size_t a = 0;
+      while (!proper && a < g.size()) {
+        while (a < g.size() && !std::isalpha((unsigned char)g[a])) ++a;
+        size_t b = a;
+        while (b < g.size() && (std::isalpha((unsigned char)g[b]) || g[b] == '-')) ++b;
+        const std::string w = g.substr(a, b - a);
+        a = b;
+        if (w.size() < 3 || !(w[0] >= 'A' && w[0] <= 'Z')) continue;
+        std::vector<lex::Analysis> an;
+        en_->lookup(text::en_key(text::lower(w)), an);
+        for (const lex::Analysis& x : an) {
+          const lex::Lemma e = en_->lemma(x.lemma);
+          if (e.pos == feat::Adj && std::string(e.head) == w) { proper = true; break; }
+        }
+      }
+    }
+    properAdj_[id] = proper;
+    return proper;
+  }
+
+  void capitaliseProperAdjectives(cue::Latin& L) {
+    for (rules::TokenView& t : L.tokens) {
+      if (!t.hasLemma || t.text.empty() || t.start < 0 || (size_t)t.start + t.text.size() > L.text.size()) continue;
+      if (!properAdjective(t.lemmaId)) continue;
+      std::string up = t.text;
+      capitalise(up);
+      if (up == t.text || up.size() != t.text.size() || L.text.compare((size_t)t.start, t.text.size(), t.text) != 0) continue;
+      L.text.replace((size_t)t.start, up.size(), up);
+      t.text = up;
+      capitalise(t.display);
+    }
+  }
 
   // ==== C12 grc (Greek engine path: en-grc, es-grc, grc-en, grc-es): BEGIN ==========================================
   // Owned by task C12 (engine/rules/src/{transfer_grc,grc2x,engine_grc}). Reached only through the one-line hooks

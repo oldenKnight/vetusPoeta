@@ -781,7 +781,9 @@ class Es {
         isY.push_back(x.token >= 0 && x.token == sedY_);
       }
       for (const SemNP& x : f.predicative) {
-        pp.push_back(np(x, R::Pred));
+        // C39: "Līber est et dominus (suus)": es libre y dueño de sí mismo
+        if (ownMaster(f, x, a)) pp.push_back(a.gender == F ? "dueña de sí misma" : "dueño de sí mismo");
+        else pp.push_back(np(x, R::Pred));
         isY.push_back(sedY_ >= 0 && (x.token == sedY_ || std::find(x.tokens.begin(), x.tokens.end(), sedY_) != x.tokens.end()));
       }
       for (size_t k = 0; k < pp.size(); ++k) {
@@ -916,9 +918,27 @@ class Es {
         end.push_back("que " + w);
         continue;
       }
+      // C39: nōn multum sed satis: "no mucho sino bastante" (Y of nōn X sed Y is an adverb)
+      for (const std::string& d : f.discourse)
+        if (a.token >= 0 && d.compare(0, 7, "nonsed:") == 0 && d.find(':', 7) != std::string::npos &&
+            std::atoi(d.c_str() + d.find(':', 7) + 1) == a.token)
+          w = "sino " + w;
       if (tab_.tagged("adv", a.lemma, "pre")) pre.push_back(w);
       else end.push_back(w);
     }
+  }
+  // C39: dominus / domina as the predicate of a person, with suus or joined to the predicate līber: "dueño de sí mismo"
+  bool ownMaster(const SemFrame& f, const SemNP& x, const Agree& a) const {
+    if (x.token < 0 || x.isName || x.isPronoun || x.number == 2 || !x.genitive.empty() || !x.adjectives.empty() ||
+        !x.possessor.empty() || !x.relative.empty())
+      return false;
+    if (!isKey(ti_[(size_t)x.token].key, {"dominus", "domina"})) return false;
+    if (a.person != 3 || a.number == 2) return false;
+    if (x.determiner == "suus") return true;
+    if (!x.determiner.empty()) return false;
+    for (const frame::SemAdj& j : f.predAdj)
+      if (isKey(j.lemma, {"liber"})) return true;
+    return false;
   }
   bool frontable(const SemFrame& f, const frame::SemAdverb& a) const {
     if (a.lemma == "#tok") return true;

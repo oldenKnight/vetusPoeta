@@ -373,6 +373,7 @@ struct Translator::Impl final : public detail::LexicalSource {
       if (!r) return;
       out.person = out.person || detail::noteHas(r->note, "person");
       out.mass = out.mass || detail::noteHas(r->note, "mass");
+      out.abstract = out.abstract || detail::noteHas(r->note, "abstract");   // C39
       out.unique = out.unique || detail::noteHas(r->note, "unique");
       out.event = out.event || detail::noteHas(r->note, "event");
       size_t at = r->note.find("time:");

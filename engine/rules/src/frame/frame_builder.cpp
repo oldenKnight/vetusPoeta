@@ -311,18 +311,19 @@ bool lexiconVeto(std::vector<Token>& tk, const lex::Lexicon& lx) {
     std::vector<lex::Analysis> an;
     lx.lookup(text::en_key(t.lower), an);
     if (an.empty()) continue;
-    bool verb = false, noun = false, adj = false, plural = false;
+    bool verb = false, noun = false, adj = false, plural = false, det = false;
     for (const lex::Analysis& a : an) {
       const uint8_t pos = lx.lemma(a.lemma).pos;
       verb = verb || pos == feat::Verb;
       adj = adj || pos == feat::Adj || pos == feat::Participle;
+      det = det || (pos == feat::Det && t.lower == "enough");   // C39: "enough water": the quantity word stays an adjective
       if (pos == feat::Noun) { noun = true; plural = plural || feat::unpack(lx.feature(a.feat)).number == feat::Pl; }
     }
     if (t.upos == "VERB" && !verb && (noun || adj)) {
       t.upos = noun ? "NOUN" : "ADJ";
       t.feats = noun ? nlp::morph::fromString(plural ? "Number=Plur" : "Number=Sing") : 0;
       changed = true;
-    } else if (t.upos == "ADJ" && !adj && !verb && noun) {
+    } else if (t.upos == "ADJ" && !adj && !verb && noun && !det) {
       t.upos = "NOUN";
       t.feats = nlp::morph::fromString(plural ? "Number=Plur" : "Number=Sing");
       changed = true;
@@ -1654,13 +1655,14 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
       if (en && adjLike && !participle && kt.upos == "ADJ" && lex_ && k < h) {
         std::vector<lex::Analysis> an;
         lex_->lookup(text::en_key(kl), an);
-        bool adj = false, noun = false;
+        bool adj = false, noun = false, det = false;
         for (const lex::Analysis& a : an) {
           const uint8_t ps = lex_->lemma(a.lemma).pos;
           adj = adj || ps == feat::Adj || ps == feat::Participle;
           noun = noun || ps == feat::Noun;
+          det = det || (ps == feat::Det && kl == "enough");   // C39: "enough water": a quantity word, not a noun compound
         }
-        if (noun && !adj) adjLike = false;
+        if (noun && !adj && !det) adjLike = false;
       }
       if (!adjLike && kt.upos == "NOUN" && lex_) {   // "white roses" tagged NOUN compound: adjective reading?
         std::vector<lex::Analysis> an;
@@ -6110,7 +6112,19 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
       t.feats = nlp::morph::fromString("Number=Sing");
       again = true;
     }
-    if (again) nlp_->parser().parse(tk);
+    if (again) {
+      nlp_->parser().parse(tk);
+      // C39: "carries it out of the field": after a re-parse "out" of "out of" + noun phrase stays the first word of
+      // the compound preposition (case of the noun), not a particle of the verb
+      for (size_t ti = 0; ti + 1 < tk.size(); ++ti)
+        if (tk[ti].lower == "out" && tk[ti + 1].lower == "of" && tk[ti + 1].deprel == "case" && tk[ti + 1].head > 0 &&
+            tk[ti].deprel != "case") {
+          tk[ti].upos = "ADP";
+          tk[ti].feats = 0;
+          tk[ti].deprel = "case";
+          tk[ti].head = tk[ti + 1].head;
+        }
+    }
   }
   // no verb at all in a sentence of three or more words: the tagger probably missed one; retag and re-parse
   // ("Light the candle." -> imperative; "My mother teaches children." -> 3rd person present)
@@ -6699,6 +6713,42 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
     } else if (fr::nounRelative(tk, false)) {
       fr::nounRelative(tk, true);
     }
+  }
+  // C39: "The well supplies water.": a noun right after the opening determiner and right before the finite verb that
+  // heads the sentence is its subject (the parser hung "well" on the verb as parataxis: "Puteus, aquam praebet")
+  if (lang_ == SrcLang::En && nlp_) {
+    for (size_t ti = 1; ti + 1 < tk.size(); ++ti)
+      if (tk[ti - 1].upos == "DET" && (ti == 1 || tk[ti - 2].upos == "PUNCT") && tk[ti].upos == "NOUN" &&
+          tk[ti + 1].upos == "VERB" && tk[ti + 1].deprel == "root" && tk[ti].head == (int)ti + 2 &&
+          in(tk[ti].deprel, {"parataxis", "dep", "vocative", "appos", "discourse"})) {
+        bool subj = false;
+        for (const nlp::Token& x : tk) subj = subj || (x.head == (int)ti + 2 && x.deprel == "nsubj");
+        if (!subj) tk[ti].deprel = "nsubj";
+      }
+  }
+  // C39 (g): "..., not much, but enough.": a verbless "not much / many" between commas is an ellipsis of the clause
+  // before it; read with care (Check): the negation of a fragment may be lost by a realiser
+  if (lang_ == SrcLang::En && nlp_)
+    for (int i = 0; i + 1 < (int)tk.size(); ++i) {
+      if (tk[(size_t)i].lower != "not" || !in(tk[(size_t)i + 1].lower, {"much", "many", "enough", "a"})) continue;
+      int a = i, b = i + 1;
+      while (a > 0 && !in(tk[(size_t)a - 1].text, {",", ":", ";"})) --a;
+      while (b + 1 < (int)tk.size() && !in(tk[(size_t)b + 1].text, {",", ":", ";", ".", "!", "?"})) ++b;
+      bool verb = false;
+      for (int k = a; k <= b; ++k) verb = verb || tk[(size_t)k].upos == "VERB" || tk[(size_t)k].upos == "AUX";
+      if (!verb && a > 0) out.doubt("ellipsis");
+    }
+  // C39 (a): a sentence whose only verb is a word that is far more often a noun ("The well supplies water." read with
+  // water as the verb) is read with care: Check, never OK
+  if (lang_ == SrcLang::En && nlp_ && lex_) {
+    int verbs = 0, v = -1;
+    for (int i = 0; i < (int)tk.size(); ++i)
+      if (tk[(size_t)i].upos == "VERB" || (tk[(size_t)i].upos == "AUX" && tk[(size_t)i].deprel != "aux")) { ++verbs; v = i; }
+    int first = 0;
+    while (first < (int)tk.size() && tk[(size_t)first].upos == "PUNCT") ++first;
+    if (verbs == 1 && tk[(size_t)v].upos == "VERB" && en::nounMostly(tk[(size_t)v].lower) && v != first &&
+        nlp::morph::get(tk[(size_t)v].feats, nlp::morph::MoodShift) != nlp::morph::MoodImp)
+      out.doubt("verb-doubt");
   }
   buildUnits(out);
   // C30: a habit said by a phrase of the phrasebook ("Every morning Anna gave ...", "Sometimes they heard ..."): the

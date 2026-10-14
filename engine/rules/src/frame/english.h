@@ -18,6 +18,9 @@ namespace vp::frame::en {
 bool retagForms(std::vector<nlp::Token>& tk, const lex::Lexicon& lx);
 // C24: kinship words and titles are nouns of address (C30b: also used for a one-word cue)
 bool addressWord(const std::string& w);
+// C39: a common noun of a beginners' reader that english.vpl also lists as a verb but that is far more often a noun
+// ("water", "house", "book"): a sentence whose only verb is one of them is Check (doubt "verb-doubt")
+bool nounMostly(const std::string& lower);
 
 // The verb whose past (or past participle, or -ing form) this form is, when the lexicon lists the form only as such
 // under another lemma ("lighted" -> light, "sang" -> sing). `present` is set for -ing forms. Empty when none.

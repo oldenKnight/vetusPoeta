@@ -35,6 +35,10 @@ struct Options {
   bool orbergSimplify = true;    // structure rewrites (false: vocabulary swaps only)
   // C23 addition: settings key `latinity` ("wide" default | "classical"), set by the CLI for translate / orbergise
   Latinity latinity = Latinity::Wide;
+  // C39 addition: the project is a text project (kind "text": any non-subtitle file), set by the CLI. Its units are
+  // never wrapped at the subtitle line length and keep the line structure of their source (a sentence that begins a
+  // new source line begins a new line); no line-length check. Subtitle projects (false, the default) are unchanged.
+  bool textProject = false;
 };
 
 struct Features { std::string pos, case_, number, gender, person, tense, mood, voice, degree; };

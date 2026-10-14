@@ -315,3 +315,6 @@
 σῴζω	verb	save	salvar		reverse-only	C38 (Spanish "ahorrar")
 κάμνω	verb	be tired	estar cansado		reverse-only	C38 ("exert oneself")
 πάρειμι	verb	be here	estar aquí		reverse-only	C38 ("be by or present")
+# C39: ἔργον has its own row, so the noun wins over the imperfect / participle of ἔργω (εἴργω, "close off") when
+# nothing else decides ("ἔργον ἔχει" was "I was closing off"); after an article or an adjective it was already the noun
+ἔργον	noun	work	trabajo	m	reverse-only	C39 (the EN / ES -> Greek choice for "work" is unchanged)

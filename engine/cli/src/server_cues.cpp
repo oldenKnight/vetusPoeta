@@ -39,6 +39,7 @@ vp::rules::Options Server::engineOptions() const {
   // C23 (D18): "classical" avoids Medieval / ecclesiastical Latin; anything else (missing key, older file) is "wide"
   o.latinity = s.contains("latinity") && s["latinity"] == "classical" ? vp::rules::Latinity::Classical
                                                                      : vp::rules::Latinity::Wide;
+  o.textProject = project_.manifest.kind == "text";   // C39: text units are not wrapped like subtitles
   return o;
 }
 

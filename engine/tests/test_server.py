@@ -697,6 +697,26 @@ def part_real(exe, work, _lex):
     check(e["code"] == "bad_params" and "latinity" in e["message"], "settings: latinity must be wide or classical")
     eng.req("settings.set", {"patch": {"latinity": None}})
 
+    # C39: a text project is never wrapped like a subtitle: a long sentence stays on one line in the cue and in the TXT
+    # export, and a unit keeps the line structure of its source (two one-sentence lines stay two lines)
+    text_src = ("The farmer walks with his son from the small farm to the big city every day.\n\n"
+                "The girl sings.\nThe boy reads a book.\n")
+    eng.req("project.new", {"kind": "text", "pair": "en-la", "text": text_src})
+    j = eng.req("translate.start", {})["jobId"]
+    eng.wait_event("translate.done", lambda e, j=j: e["jobId"] == j, timeout=120)
+    t0 = eng.req("cue.get", {"index": 0})["cue"]
+    t1 = eng.req("cue.get", {"index": 1})["cue"]
+    check("\n" not in t0["target"] and len(t0["target"]) > 42 and "overflow" not in t0["flags"],
+          "text project: a long sentence on one line, no overflow (%r)" % t0["target"])
+    check(t1["target"].count("\n") == 1, "text project: a two-line unit keeps two lines (%r)" % t1["target"])
+    out_t = os.path.join(work, "out.text.txt")
+    eng.req("export.write", {"path": out_t, "format": "txt", "macrons": True, "emoji": False, "overwrite": True})
+    with open(out_t, "rb") as f:
+        blocks = f.read().decode("utf-8").strip("\n").split("\n\n")
+    check(len(blocks) == 2 and blocks[0] == t0["target"] and blocks[1].split("\n") == t1["target"].split("\n"),
+          "TXT export of a text project: one line for the long sentence, two for the two-line unit (%r)" % blocks)
+    eng.req("project.close", {"discard": True})
+
     # Latin -> English (C11): source-side tokens and "analysis" reasons pass through; words.list on the Latin side
     if "la-en" in hello["pairs"]:
         eng.req("project.new", {"kind": "subs", "pair": "la-en", "sourcePath": samples.get("la")})
@@ -892,6 +912,18 @@ def part_orberg_greek(exe, work, _lex):
               "monotonic export: no breathings/circumflexes left (%r)" % text_m)
         check(any(has_polytonic(b"\n".join(x[2:]).decode("utf-8")) for x in poly[:3]), "polytonic export unchanged by default")
         check(mono[3:] == poly[3:], "monotonic touches Greek only (untranslated English cues identical)")
+        eng.req("project.close", {"discard": True})
+        # C39: a Greek text project is not wrapped like a subtitle either (TXT export)
+        eng.req("project.new", {"kind": "text", "pair": "en-grc",
+                                "text": "The farmer walks with his son from the small farm to the big city every day.\n"})
+        r, done = run_job(eng, "translate.start", {})
+        tg = eng.req("cue.get", {"index": 0})["cue"]["target"]
+        out_t = os.path.join(work, "out.grc.txt")
+        eng.req("export.write", {"path": out_t, "format": "txt", "macrons": True, "emoji": False, "overwrite": True})
+        with open(out_t, "rb") as f:
+            exported = f.read().decode("utf-8").strip("\n")
+        check(is_greek(tg) and "\n" not in tg and len(tg) > 42 and exported == tg,
+              "en-grc text project: one line in the cue and in the TXT export (%r)" % exported)
         eng.req("project.close", {"discard": True})
     if greek_data and "grc-en" in hello["pairs"]:
         eng.req("project.new", {"kind": "subs", "pair": "grc-en", "sourcePath": os.path.join(SAMPLES, "sample.grc.srt")})

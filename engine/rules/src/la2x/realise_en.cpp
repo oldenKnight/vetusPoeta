@@ -373,6 +373,8 @@ class En {
         else if (x.number != 2 && !lx.mass) indef = true;
       }
       if (lx.mass && !mentioned && !hasGen && (!definite || role == R::Prep) && !x.relative.size()) { def = false; indef = false; }
+      // C39: an abstract noun subject said in general ("O Jupiter, life is hard" after "life" was named) has no article
+      if (lx.mass && lx.abstract && role == R::Subj && !definite && !hasGen && !hasRel && adjs.empty()) { def = false; indef = false; }
       if (x.number == 2 && !mentioned && !hasGen && !hasRel && (role == R::Obj || role == R::Pred)) def = false;
       if (role == R::Pred && x.number != 2 && !mentioned && !lx.mass && !lx.unique && !hasGen && !hasRel) { def = false; indef = true; }
       if (lx.meal && role == R::Obj && !mentioned && !hasGen && !hasRel && x.adjectives.empty()) { def = false; indef = false; }
@@ -793,7 +795,10 @@ class En {
       std::vector<char> isY;
       for (const frame::SemAdj& x : f.predAdj) { pp.push_back(adjective(x)); isY.push_back(x.token >= 0 && x.token == sedY_); }
       for (const SemNP& x : f.predicative) {
-        pp.push_back(np(x, R::Pred));
+        // C39: "Līber est et dominus (suus)": he is free and his own master
+        if (ownMaster(f, x)) pp.push_back(pron(3, 1, curSubj_.gender == F ? F : M, "poss") + " own " +
+                                          (ti_[(size_t)x.token].key == "domina" ? "mistress" : "master"));
+        else pp.push_back(np(x, R::Pred));
         isY.push_back(sedY_ >= 0 && (x.token == sedY_ || std::find(x.tokens.begin(), x.tokens.end(), sedY_) != x.tokens.end()));
       }
       for (size_t k = 0; k < pp.size(); ++k) {
@@ -840,6 +845,21 @@ class En {
     }
     (void)a;
     return out;
+  }
+
+  // C39: dominus / domina as the predicate of a person, with suus or joined to the predicate līber ("Līber est et
+  // dominus", "Servus nōn est dominus suus"): one's own master, not "the master" / "his master"
+  bool ownMaster(const SemFrame& f, const SemNP& x) const {
+    if (x.token < 0 || x.isName || x.isPronoun || x.number == 2 || !x.genitive.empty() || !x.adjectives.empty() ||
+        !x.possessor.empty() || !x.relative.empty())
+      return false;
+    if (!isKey(ti_[(size_t)x.token].key, {"dominus", "domina"})) return false;
+    if (curSubj_.person != 3 || curSubj_.number == 2) return false;
+    if (x.determiner == "suus") return true;
+    if (!x.determiner.empty()) return false;
+    for (const frame::SemAdj& a : f.predAdj)
+      if (isKey(a.lemma, {"liber"})) return true;
+    return false;
   }
 
   // the object is domus alone and the subject a person (3rd singular)
@@ -951,6 +971,8 @@ class En {
         end.push_back("than " + w);
         continue;
       }
+      // C39: nōn multum sed satis: "not much but enough" (Y of nōn X sed Y is an adverb)
+      if (nonX_ >= 0 && a.token >= 0 && a.token == sedY_) w = "but " + w;
       if (tab_.tagged("adv", a.lemma, "pre")) pre.push_back(w);
       else end.push_back(w);
     }

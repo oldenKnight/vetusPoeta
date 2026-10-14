@@ -49,6 +49,12 @@ const subs::BreakHints& latinBreakHints();
 struct Layout { std::vector<std::string> lines; bool overflow = false; std::string joined; };
 // Lines of one cue (maxLine code points, maxLines lines); `joined` is the lines joined with '\n'.
 Layout layout(const std::string& text, int maxLine = 42, int maxLines = 2);
+// C39 addition: text projects (rules::Options::textProject, kind "text": any non-subtitle file). A text unit is never
+// wrapped at the subtitle line length: `textLayout` keeps the text as it is (its own '\n' kept, no overflow), and
+// `beginsSourceLine` tells whether the sentence `piece` begins a new line of its unit's source text `src` (found from
+// `cursor`, which then moves past it), so the translation keeps the line structure of the source.
+Layout textLayout(const std::string& text);
+bool beginsSourceLine(const std::string& src, const std::string& piece, size_t& cursor);
 // Re-locates every token's offsets inside `text` (after line breaking), in order. Tokens not found keep -1/-1.
 void relocate(const std::string& text, std::vector<rules::TokenView>& tokens);
 

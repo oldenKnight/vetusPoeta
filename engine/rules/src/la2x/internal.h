@@ -125,6 +125,7 @@ struct Lexical {                // the target-language word for a Latin content 
   // on (in + ablative is "on"), home (object of a person's verb: "his home" / "su casa")
   bool manner = false, sineBare = false, on = false, home = false;
   bool meal = false;
+  bool abstract = false;        // C39: an abstract noun said in general: no article as a subject even after a mention
   bool ppIndef = false;         // C36 review: "in vīllā" with no earlier mention is "in a farmhouse"            // C36: a meal as an object: "wait for dinner" / "esperan la cena"
 };
 

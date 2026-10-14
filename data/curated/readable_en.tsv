@@ -434,7 +434,7 @@ lex	caput	noun	head
 lex	nomen	noun	name
 lex	uox	noun	voice
 lex	cor	noun	heart
-lex	uita	noun	life	mass
+lex	uita	noun	life	mass abstract
 lex	bellum	noun	war
 lex	pax	noun	peace	mass
 lex	gladius	noun	sword
@@ -751,3 +751,19 @@ lex	mors	noun	death	mass
 lex	charitas	noun	charity	mass
 lex	caritas	noun	charity	mass
 lex	serenus	adj	serene
+# ---- C39: abstract nouns said in general take no article in English ("Friendship is good", "Work is long, but sleep
+# is sweet"); note abstract: no article as a subject even after an earlier mention ("O Jupiter, life is hard"); a
+# genitive, a relative clause or an adjective still brings the article back ("the life of the farmer")
+lex	labor	noun	work	mass
+lex	somnus	noun	sleep	mass abstract
+lex	amicitia	noun	friendship	mass abstract
+lex	fama	noun	fame	mass abstract
+lex	gloria	noun	glory	mass abstract
+lex	sapientia	noun	wisdom	mass abstract
+lex	libertas	noun	freedom	mass abstract
+lex	iustitia	noun	justice	mass abstract
+lex	ira	noun	anger	mass abstract
+lex	timor	noun	fear	mass abstract
+lex	amor	noun	love	mass abstract
+lex	senectus	noun	old age	mass abstract
+lex	otium	noun	leisure	mass abstract
