@@ -1,0 +1,10 @@
+# Gold Latin for tests/regression/own_last.en.txt (C40), written before any C40 rule and before the engine was run.
+# Alternatives after " | ".
+Nauta Rōmae habitat. | Nauta Rōmae vīvit.
+Mercātor cum frātre suō Corinthī manet. | Mercātor Corinthī cum frātre suō manet. | Mercātor cum frātre Corinthī manet. | Mercātor Corinthī cum frātre manet.
+Philosophī Athēnīs docent.
+Mīles Carthāgine habitat. | Mīles Carthāgine vīvit.
+Puellae hodiē domī manent. | Puellae domī hodiē manent. | Hodiē puellae domī manent.
+Pater meus rūrī labōrat.
+Agricola cum fīliō suō Rōmam it. | Agricola Rōmam cum fīliō suō it. | Agricola cum fīliō Rōmam it. | Agricola Rōmam cum fīliō it.
+Quamquam fessus est, agricola in agrō labōrat. | Agricola, quamquam fessus est, in agrō labōrat. | Quamquam dēfessus est, agricola in agrō labōrat.

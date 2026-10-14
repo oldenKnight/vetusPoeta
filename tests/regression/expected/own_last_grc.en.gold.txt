@@ -1,0 +1,5 @@
+# Gold English for tests/regression/own_last_grc.grc.txt (C40), written before any C40 rule and before the engine was
+# run. Alternatives after " | ".
+The farmer who works his own land carries the food into the house. | The farmer who works his own land brings the food into the house. | The farmer who works his own land carries the grain into the house. | The farmer who works his own land carries the food home.
+The slave sees the farmers who work their own land in the field. | In the field the slave sees the farmers who work their own land.
+The man is self-employed. | The man is self-sufficient. | The man is a farmer who works his own land.

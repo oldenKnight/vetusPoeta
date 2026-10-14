@@ -1,0 +1,5 @@
+# C40: own Spanish sentences, ES -> LA, items (a) and (d). Our own sentences, written before any C40 rule.
+# Gold: expected/own_last.es.la.gold.txt.
+Mi hermano vive en Corinto.
+La carta viene de Atenas.
+Aunque llueve, el niño juega en el jardín.

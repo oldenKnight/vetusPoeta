@@ -1,0 +1,5 @@
+# Gold Spanish for tests/regression/own_last_grc.grc.txt (C40), written before any C40 rule and before the engine was
+# run. Alternatives after " | ".
+El campesino que trabaja su propia tierra lleva la comida a la casa. | El campesino que trabaja su propia tierra lleva el trigo a la casa. | El campesino que trabaja su propia tierra lleva la comida a casa.
+El esclavo ve a los campesinos que trabajan su propia tierra en el campo. | En el campo el esclavo ve a los campesinos que trabajan su propia tierra.
+El hombre es autónomo. | El hombre es autosuficiente. | El hombre trabaja por cuenta propia. | El hombre es un campesino que trabaja su propia tierra.

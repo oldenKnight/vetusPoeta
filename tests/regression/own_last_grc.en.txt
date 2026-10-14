@@ -1,0 +1,7 @@
+# C40: own English sentences, EN -> GRC, items (c) ("not X but Y" after a noun keeps the negation and agrees with the
+# noun) and (d) (although -> καίπερ + participle with a shared subject, else μέν ... ὅμως δέ / καίτοι). Our own
+# sentences, written before any C40 rule. Gold: expected/own_last_grc.grc.gold.txt.
+The farmer has food, not much, but enough.
+The girl has a house, not big but beautiful.
+Although he is tired, the slave carries the stones.
+Although the road is long, the boy walks to the city.

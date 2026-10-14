@@ -1,0 +1,4 @@
+# Gold Attic Greek for tests/regression/own_last_grc.es.txt (C40), written before any C40 rule and before the engine
+# was run. Polytonic, no elision; alternatives after " | ".
+καίπερ κάμνουσα ἡ κόρη ᾄδει. | ἡ κόρη, καίπερ κάμνουσα, ᾄδει. | ἡ κόρη καίπερ κάμνουσα ᾄδει.
+ἄρτον ἔχομεν, οὐ πολὺν ἀλλὰ ἱκανόν. | ἔχομεν ἄρτον, οὐ πολὺν ἀλλὰ ἱκανόν.

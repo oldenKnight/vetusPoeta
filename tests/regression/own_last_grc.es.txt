@@ -1,0 +1,4 @@
+# C40: own Spanish sentences, ES -> GRC, items (c) and (d). Our own sentences, written before any C40 rule.
+# Gold: expected/own_last_grc.es.grc.gold.txt.
+Aunque está cansada, la niña canta.
+Tenemos pan, no mucho, pero suficiente.
