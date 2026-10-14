@@ -628,13 +628,17 @@ struct Analyser::Impl {
     }
     // C36: a personal name is singular ("Maria" is Marīa, not a plural of Marius)
     if (r.name && f.number == Pl) p -= 2.0;
-    if (r.lemma != lex::kNoLemma && f.pos == Verb && !hasLengthMark(t.text)) {
+    if (r.lemma != lex::kNoLemma && f.pos == Verb) {
       const std::string k = text::latin_key(t.text);
       const bool re = k.size() > 3 && k.compare(k.size() - 2, 2, "re") == 0;
       // a deponent 2nd singular in -re (cōnsōlāre, miserēre, tuēre) is the imperative, not the rare indicative ending
       if (re && f.person == 2 && f.number == Sg && (f.mood == Indicative || f.mood == Subjunctive))
         for (const Reading& o : all)
           if (o.lemma == r.lemma && unpack(o.packed).mood == Imperative) { p -= 1.0; break; }
+    }
+    if (r.lemma != lex::kNoLemma && f.pos == Verb && !hasLengthMark(t.text)) {
+      const std::string k = text::latin_key(t.text);
+      const bool re = k.size() > 3 && k.compare(k.size() - 2, 2, "re") == 0;
       // vidēre: the infinitive, not "you are seen" (the -re passive ending of an active verb)
       if (re && f.person == 2 && f.number == Sg && f.voice == Passive && !(lx.lemma(r.lemma).flags & lex::Deponent))
         for (const Reading& o : all)
@@ -1190,7 +1194,7 @@ struct Analyser::Impl {
       if (co[(size_t)i] != cl || s.tokens[(size_t)i].kind != TokKind::Word || ri[(size_t)i].empty()) continue;
       const RI& r = ri[(size_t)i][ch[(size_t)i]];
       if (!r.modifier || r.head || r.rel) continue;
-      if ((copula || infSum) && r.f.case_ == Nom) continue;
+      if ((copula || (infSum && !accSeen)) && r.f.case_ == Nom) continue;   // C36: esse with a nominative predicate
       bool agrees = false;
       for (int j = std::max(C.first, i - 3); j <= std::min(C.last, i + 3); ++j) {
         if (j == i || co[(size_t)j] != cl || ri[(size_t)j].empty() || s.tokens[(size_t)j].kind != TokKind::Word) continue;
@@ -1267,7 +1271,7 @@ struct Analyser::Impl {
       if (r.nominal && r.f.case_ == Acc && !r.placeAcc) accSeen = true;
       if (r.f.case_ == Nom && r.head && !r.rel && !c.coordBefore[(size_t)i]) { ++nomCount; nomTok = i; }
       if (r.f.case_ == Nom && (r.lpos == Noun || r.name)) nomNouns.push_back(i);
-      if (r.f.case_ == Nom && r.lpos == Adj && r.modifier) nomAdjs.push_back(i);
+      if (r.f.case_ == Nom && r.modifier) nomAdjs.push_back(i);   // adjectives, possessives, demonstratives
     }
     if (sumHere && !prep) {
       for (int i : nomNouns) {
@@ -1289,7 +1293,10 @@ struct Analyser::Impl {
         bool otherAdj = false;
         for (int j : nomAdjs)
           if (j != i) otherAdj = true;
-        if (personOther || (!otherNoun && !otherAdj)) d -= 2.0;
+        // the bare case ("Līber esse cupit", "Ōlim līber erit") only for a thing-noun reading, in a statement with
+        // no accusative and nothing else to describe: "Ubi est liber meus?" stays the book, "amīcī sumus" friends
+        const bool bare = !otherNoun && !otherAdj && !r.personNoun && !accSeen && s.finalPunct != "?";
+        if (personOther || bare) d -= 2.0;
       }
     }
     const bool carry = verb && isKeyOf(verb->key, {"porto", "fero", "affero", "mitto", "duco", "traho", "ueho"});

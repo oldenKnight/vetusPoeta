@@ -457,7 +457,7 @@ class Es {
     if (f.predAdj.empty() && f.predicative.empty()) {
       for (const frame::SemOblique& o : f.obliques) {
         const std::string p = o.prep.substr(0, o.prep.find(':'));
-        if (isKey(p, {"in", "apud", "sub", "inter", "prope", "#loc"})) return "estar";
+        if (isKey(p, {"in", "apud", "sub", "inter", "prope", "#loc", "sine"})) return "estar";
       }
       for (const frame::SemAdverb& a : f.adverbs)
         if (isKey(a.lemma, {"hic", "ibi", "domi", "ruri", "foris", "intus", "procul", "bene", "male"})) return "estar";

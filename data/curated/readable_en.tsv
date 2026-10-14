@@ -399,7 +399,7 @@ lex	hortus	noun	garden
 lex	uilla	noun	house
 lex	domus	noun	house	home
 lex	casa	noun	cottage
-lex	uia	noun	road	on
+lex	uia	noun	road
 lex	urbs	noun	city
 lex	oppidum	noun	town
 lex	ager	noun	field
@@ -734,7 +734,7 @@ name	iuppiter	-	Jupiter
 name	dauus	-	Davus
 name	iesus	-	Jesus
 name	christus	-	Christ
-name	maria	-	Mary
+name	maria	eccl	Mary
 intj	aue	-	hail
 intj	auete	-	hail
 intj	salue	eccl	hail

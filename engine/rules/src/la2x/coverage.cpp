@@ -220,6 +220,12 @@ void Coverage::check(const CoverageIn& in, const std::string& text, std::vector<
   };
   std::vector<std::string> out;
   words(text, out);
+  // "Jesucristo" is the two names Iēsus Chrīstus
+  for (size_t k = 0; k < out.size(); ++k)
+    if (out[k] == "jesucristo") {
+      out[k] = "jesus";
+      out.insert(out.begin() + (long)k + 1, "cristo");
+    }
   std::vector<char> accounted(out.size(), 0);
   for (size_t k = 0; k < out.size(); ++k)
     if (impl_->isStop(out[k], t)) accounted[k] = 1;

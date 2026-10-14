@@ -437,6 +437,8 @@ struct Translator::Impl final : public detail::LexicalSource {
       // C36: the readable table's spelling first (Davus, not the lexicon's gloss "Daos")
       const detail::Tables& tb = lang == Target::En ? en : es;
       const std::string lk = t.lemma != lex::kNoLemma ? std::string(lx.lemma(t.lemma).key) : t.key;
+      if (devotionalNow)
+        if (const detail::Row* r = tb.find("name", lk, "eccl")) return r->text;   // Marīa: Mary in a prayer
       if (const detail::Row* r = tb.find("name", lk, "-")) return r->text;
     }
     if (t.lemma != lex::kNoLemma) {
@@ -655,15 +657,15 @@ struct Translator::Impl final : public detail::LexicalSource {
     return words + " = " + form + " (un solo verbo: " + what + ")";
   }
 
-  // C36: a devotional text: avē, or a sacred name / title (Marīa, Iēsus, Chrīstus, Deus, Dominus as a name, virgō,
+  // C36: a devotional text: avē, or a sacred name / title (Iēsus, Chrīstus, Deus, virgō,
   // rēgīna, sānctus). Sticks for the rest of the text (discourse memory).
   void devotionalScan(const Sentence& s, const std::vector<TokInfo>& ti) {
     for (size_t i = 0; i < s.tokens.size() && i < ti.size(); ++i) {
       const std::string k = text::latin_key(s.tokens[i].text);
       const std::string& lk = ti[i].key;
       if (k == "aue" || k == "auete" || lk == "iesus" || lk == "christus" ||
-          (ti[i].name && (lk == "maria" || k == "maria" || k == "iesu" || k == "christe" || k == "christi")) ||
-          lk == "uirgo" || lk == "deus" || lk == "sanctus" || lk == "angelus" || lk == "peccator" || lk == "regina")
+          (ti[i].name && (k == "iesu" || k == "christe" || k == "christi")) ||
+          lk == "uirgo" || (lk == "deus" && s.tokens[i].capitalised && !s.tokens[i].initial) || lk == "sanctus" || lk == "angelus" || lk == "peccator" || lk == "regina")
         disc.devotional = true;
       // the person addressed: a vocative name or noun gives "you" its gender
       if (ti[i].word && ti[i].f.case_ == Voc && (ti[i].f.gender == F || ti[i].f.gender == M)) disc.addresseeGender = ti[i].f.gender;
@@ -711,7 +713,7 @@ struct Translator::Impl final : public detail::LexicalSource {
       for (size_t j : {i - 1, i + 1}) {
         if (j >= ti.size() || !ti[j].word) continue;
         const TokInfo& y = ti[j];
-        if ((y.f.pos == Adj || y.lpos == Adj) && y.f.case_ == x.f.case_ && (y.f.gender == F || y.f.gender == M)) {
+        if ((y.f.pos == Adj || y.lpos == Adj || y.f.pos == Participle || y.lpos == Participle) && y.f.case_ == x.f.case_ && (y.f.gender == F || y.f.gender == M)) {
           x.f.gender = y.f.gender;
           break;
         }

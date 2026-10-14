@@ -150,3 +150,80 @@ pass in both languages; tokens 380/380).
   already."; "Populus Rōmānus" reads Rōmānus as a name; hostis glossed "an enemy of the state" (no readable row).
 * Article policy unchanged: first-mention objects stay indefinite ("The girl followed a mother").
 * Spanish "sēdit" in a coordinated clause gives "estuvo sentado" without agreement.
+
+## Real prose and liturgy (C36)
+Material: the owner's Latin of a textbook chapter (14 units, la->en) and a medieval hymn (22 lines, la->es) in
+data/acceptance/ (gitignored, never quoted; units by number only); own material written before any rule:
+`tests/regression/own_prose.la.txt` (60 textbook-prose sentences) and `own_prayer.la.txt` (30 devotional lines of our
+own), gold in `tests/regression/expected/own_{prose,prayer}.{en,es}.gold.txt`; a blind set of 20 further lines in
+data/work/eval/c36-blind/ (gitignored). Tests: `engine/tests/test_rules_la2x3.cpp` (report `<build>/la2x3_report.txt`).
+
+### Step 1: calibration (coverage.cpp)
+After realisation `detail::Coverage` compares the sentence with the Latin analysis and adds flags that make the cue
+Check (check id `meaning`, `SentenceOut::coverage` holds one note per finding): `meaning-dropped` (a content lemma whose
+target word or an inflected form is missing; Spanish verbs and adjectives through morph_es, clitics allowed),
+`meaning-added` (an output content word no Latin word accounts for; the closed-class rows of the readable tables and the
+forms of be / ser / estar / haber / ir are not content), `existential-copula` (there is / hay for a subject with a
+descriptive adjective and no place), `dangling-conjunction`, `gender-mismatch` (Spanish adjective / participle against
+the Spanish noun it agrees with, else the Latin gender), `vocative-lost` (a capitalised noun with a vocative reading read
+as a bare ablative / dative in a sentence that speaks to someone), `pronoun-guess` (a restored "it" with no neuter
+source), `article-guess` ("without the" for a first mention). On the first-run outputs (engine unchanged): la->en OK
+4 -> 1 (the remaining OK unit is right), la->es OK 1 -> 0: 3 + 1 units went from OK to Check, zero wrong among OK.
+
+### Step 2: rules
+* Copula with a postposed subject: an adjective before a form of sum never attaches to the noun after it (it is the
+  predicate: "the noun is adjective"); "ADJ est NOUN et ADJ2" shares the predicate; a sine phrase makes no existential.
+* Postpositive autem / enim / igitur / vērō (vērō as a connector row), quoque; "et" right after a clause-initial verb
+  before a noun phrase = "also" (placed after an affirmative Spanish imperative: "da también luz").
+* nōn X sed Y in one clause (discourse `nonsed:X:Y`): English copula "is not X but Y", other verbs "lives not in A but
+  in B"; Spanish "no ... sino"; between two verbs "does not sleep but plays" / "no duerme sino que juega"; nōn sōlum ...
+  sed etiam = not only ... but also / no solo ... sino que también; "X est, sed nōn Y" = "X, but not Y".
+* Adjective / noun homographs in predicate position (līber / liber / līberī): in a clause with sum (finite or esse) and
+  no preposition the noun reading loses when another nominative noun is a person, or (statements only, no accusative,
+  no other nominative modifier, thing-noun reading) when nothing else could be the predicate. "Ubi est liber meus?" and
+  "amīcī sumus" keep the nouns. Modal + esse: nominative adjectives are predicates ("he wants to be free").
+* Implicit subject with an object-first clause: while the discourse is about a person (a person subject in the last two
+  sentences; `Analyser::setPersonContext`) a transitive active verb (3rd person, not an intransitive verb of motion)
+  with no accusative and only neuter non-person nominatives reads them as the object; the restored pronoun is the last
+  person's ("he"), not "it" for the last thing, unless a thing was the subject earlier in the same sentence.
+* Names: readable `name` rows win over lexicon glosses (Davus, Iuppiter -> Jupiter / Júpiter, Iēsus, Chrīstus); two
+  names side by side are one ("Jesus Christ", Spanish "Jesucristo"); a personal name is singular (Marīa never Marius);
+  an initial capitalised ordinal is the praenomen (Quīntus); Marīa -> Mary only in a devotional text (else Maria).
+* Avē / avēte are greetings (pre-filter on the interjection reading); salvē in a devotional text is "hail" / "salve"
+  (`intj ... eccl` rows); each greeting after a comma starts its own address; a greeting line, or a verbless line with
+  a vocative-only word, addresses its singular vocative readings; in a devotional text a verbless line of person nouns
+  is an address (no article); adjectives addressing someone take the addressee's gender (ave, mansa).
+* esse / estō / estōte are sum; deponent 2nd singular in -re is the imperative (cōnsōlāre, miserēre, tuēre); a passive
+  imperative / -re passive of an active verb and the poetic perfect in -ēre lose to the infinitive (et caelum vidēre).
+* nē + 2nd person subjunctive with no main verb is a prohibition (do not give / no des), also when it opens the line.
+* Vocatives: a capitalised common noun inside a sentence that speaks to someone, not after a noun it could be the
+  genitive of (Rēgīna caelī); a genitive stays inside the address span; plural vocatives lose in an address line.
+* The addressee's gender: a 1st / 2nd person pronoun takes the gender of its periphrasis participle (tū ... ēlēcta
+  fuistī: elegida); "tū sōla" keeps the adjective; a common-gender noun takes its adjective's gender (sāncta parēns:
+  mother / madre via the `f:` note).
+* cōnferre = grant / conceder; dā + accusative + infinitive = grant (me) to ... / concédeme ...; misereor + genitive =
+  have mercy on / tener piedad de; mē + person noun = "me, a sinner" / "a mí, pecador"; mē + present participle = "me,
+  who mourn" / "a mí, que lloro"; plēnus + ablative = full of / lleno de; modō + adjective = in a ... way / de modo ...
+* Articles: sine + first mention = "without a master" / "sin amo" (estar in Spanish), finis "without end"; domus as the
+  object of a person's verb = "his / her home" / "su casa"; meals as objects (wait for dinner / esperan la cena);
+  devotional words (`devotional:` note: servant / siervo, heaven, evil, lady) without article for heaven / evil.
+* Spelling: medieval ch for c (charitas), michi, nichil; a rare adjective / noun spelled like a core adverb loses
+  (saepe); a thing in the dative with no dative verb loses to the ablative (modō mīrō).
+* Segmentation: a comma after a complete main clause before another finite clause, or before a verbless rest with a
+  second-position particle (ellipsis of est: "the master is good, but the slave is bad"), starts a new main clause.
+
+### Numbers (vpengine serve, text project, la-en / la-es, speaker m, latinity wide, fidelity 2)
+* Owner material (implementer's count, the main agent re-reviews): la->en 2/14 -> about 9/14 right, OK 4 -> 4, wrong
+  among OK 3 -> 0; la->es 2/22 -> about 19/22, OK 1 -> 2, wrong among OK 1 -> 0. Still wrong: la->en 1 (misspelt
+  word, Fix), 6 (second connector lost), 9 and 14 (ellipsis with et / nōn multum sed satis), 12 (predicate noun
+  definite); la->es 10 (unknown -trix noun), 15 (adjective read as a verb), 22 (free relative + infinitive).
+* Own material first run -> final: prose EN 18 -> 56/60, ES 18 -> 54/60; prayer EN 4 -> 28/30, ES 6 -> 30/30. The one-job
+  test run keeps every mention in the discourse: 54, 53, 28, 30.
+* Blind 20 (written before any rule; first run after the rules, the run happened after the usage-limit interruption):
+  EN 14/20, ES 10/20, wrong among OK 1 in each (blind unit 2: villa -> house, the gold says farmhouse).
+* la2x own set 201/201 EN and ES, tokens unchanged; Orbergise 60/60, 20/20, 20/20, 22/22.
+
+### Proposed gold alternatives (not added; for review)
+prose 2 EN "... but in the house" / ES "... sino en la casa" (villa = house in readable_en.tsv; the C11 set expects "left
+the house"); prose 15 ES "Por lo tanto llama al esclavo a menudo"; prayer 8 EN "Protect us in the road" (in viā stays
+"in the road", as the C11 set expects); prayer 15 EN "Give the light also" (light mentioned two lines before).
