@@ -1,0 +1,5 @@
+# Gold Latin for tests/regression/own_frame.es.txt (C39), written before any C39 rule and before the engine was run.
+Magister Graecus est. | Magister est Graecus.
+Mīlitēs Rōmānī fortēs sunt. | Mīlitēs Rōmānī validī sunt.
+Puella Athēniēnsis in hortō cantat.
+Agricola cum fīliō suō omnī māne ā parvō praediō ad magnam urbem ambulat. | Agricola omnī māne cum fīliō suō ā praediō parvō ad urbem magnam ambulat. | Agricola cum fīliō suō cotīdiē māne ā praediō parvō ad urbem magnam ambulat. | Agricola cum fīliō suō omnī māne ā praediō parvō ad urbem magnam ambulat.

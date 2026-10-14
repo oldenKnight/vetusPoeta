@@ -1,0 +1,23 @@
+# C39: own English sentences (beginner reading-book register) for the frame follow-ups, EN -> LA. Our own sentences,
+# not from any textbook. Gold: expected/own_frame.la.gold.txt. Units 1-4 item (a) (determiner + word + -s verb +
+# noun), 5-9 item (b) (3rd singular verbs after a name / in "X verbs the Y and ..."), 10-14 item (c) (clause-opening
+# For, O + god, an opening quote with an address, So the X / and so), 15-17 item (e) (adjectives of proper names),
+# 18 item (d) (a long sentence in a text project: one line, never wrapped).
+The spring supplies water to the village.
+The plant needs water.
+The light shows the way.
+The girl waters the roses.
+Marcus unties the horse and leads it into the field.
+Julia lifts the heavy basket.
+The sun shines and the farmer groans.
+Sextus honours the gods and works hard.
+The old woman smiles and waters the garden.
+For the road is long, and the boy is tired.
+O Jupiter, help the sailors!
+"Father, the field is wet."
+So the farmer goes home.
+The rain is heavy, and so the boys stay at home.
+Marcus is a Roman farmer.
+The Athenian sailor loves the sea.
+The Greek slave reads a book.
+The farmer walks with his son from the small farm to the big city every day.

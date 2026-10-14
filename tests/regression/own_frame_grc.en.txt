@@ -1,0 +1,6 @@
+# C39: own English sentences, EN -> GRC, item (g) (not much, but enough; enough = ἱκανός) and (d) (a long sentence in a
+# text project). Our own sentences. Gold: expected/own_frame_grc.grc.gold.txt.
+The garden gives fruit: not much, but enough.
+We have water, not much, but enough.
+The farmer has enough food.
+The farmer walks with his son from the small farm to the big city every day.

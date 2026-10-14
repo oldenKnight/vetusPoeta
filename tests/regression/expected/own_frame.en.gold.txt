@@ -1,0 +1,8 @@
+# Gold English for tests/regression/own_frame.la.txt (C39), written before any C39 rule and before the engine was run.
+Life is difficult. | Life is hard.
+Work is long, but sleep is sweet. | Toil is long, but sleep is sweet. | Labour is long, but sleep is sweet. | Labor is long, but sleep is sweet.
+Lucius is free and his own master.
+The slave is not his own master. | A slave is not his own master.
+He has not much money but enough. | He has money, not much but enough. | He does not have much money, but enough. | She has not much money but enough. | She does not have much money, but enough.
+His daughter works not much but enough. | His daughter does not work much, but enough. | Her daughter works not much but enough. | Her daughter does not work much, but enough.
+Friendship is good.

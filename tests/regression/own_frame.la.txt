@@ -1,0 +1,9 @@
+# C39: own Latin sentences, LA -> EN, item (f) (abstract noun subjects without the article, dominus suus as a
+# predicate of a person, nōn multum sed satis). Our own sentences. Gold: expected/own_frame.en.gold.txt.
+Vīta difficilis est.
+Labor longus est, sed somnus dulcis est.
+Lūcius līber est et dominus suus.
+Servus nōn est dominus suus.
+Pecūniam nōn multam sed satis habet.
+Fīlia eius nōn multum sed satis labōrat.
+Amīcitia bona est.

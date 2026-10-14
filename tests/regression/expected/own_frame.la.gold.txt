@@ -1,0 +1,21 @@
+# Gold Latin for tests/regression/own_frame.en.txt (C39), one line per unit, written by the implementer before any C39
+# rule and before the engine was run on the file. Classical Latin, macrons; alternatives after " | ". Compared case-
+# and punctuation-insensitively (tools/eval/evallib.py normalise).
+Fōns vīcō aquam praebet. | Fōns aquam vīcō praebet. | Fōns vīcō aquam suppeditat. | Fōns aquam vīcō suppeditat. | Fōns pāgō aquam praebet. | Fōns aquam pāgō praebet.
+Planta aquā eget. | Planta aquam requīrit. | Herba aquā eget. | Planta aquā indiget. | Herba aquam requīrit.
+Lūx viam ostendit. | Lūx viam mōnstrat. | Lūmen viam ostendit. | Lūmen viam mōnstrat.
+Puella rosās rigat. | Puella rosās irrigat.
+Mārcus equum solvit et in agrum dūcit. | Mārcus equum solvit et eum in agrum dūcit. | Mārcus equum exsolvit et in agrum dūcit. | Mārcus equum exsolvit et eum in agrum dūcit.
+Iūlia corbem gravem tollit. | Iūlia cistam gravem tollit. | Iūlia corbem gravem levat. | Iūlia cistam gravem levat. | Iūlia calathum gravem tollit. | Iūlia calathum gravem levat.
+Sōl lūcet et agricola gemit. | Sōl fulget et agricola gemit. | Sōl splendet et agricola gemit. | Sōl lūcet, et agricola gemit.
+Sextus deōs colit et dīligenter labōrat. | Sextus deōs honōrat et dīligenter labōrat. | Sextus deōs colit et multum labōrat. | Sextus deōs honōrat et multum labōrat. | Sextus deōs colit et strēnuē labōrat. | Sextus deōs honōrat et strēnuē labōrat.
+Anus rīdet et hortum rigat. | Anus subrīdet et hortum rigat. | Anus rīdet et hortum irrigat. | Anus subrīdet et hortum irrigat.
+Nam via longa est, et puer fessus est. | Via enim longa est, et puer fessus est. | Nam via longa est, et puer dēfessus est. | Via enim longa est, et puer dēfessus est.
+Ō Iuppiter, nautās adiuvā! | Ō Iuppiter, adiuvā nautās! | Ō Iuppiter, nautās iuvā! | Ō Iuppiter, iuvā nautās!
+"Pater, ager ūmidus est." | "Pater, ager madidus est." | "Pater, ager ūvidus est."
+Itaque agricola domum it. | Agricola igitur domum it. | Igitur agricola domum it. | Itaque agricola domum redit. | Agricola igitur domum redit.
+Imber magnus est, itaque puerī domī manent. | Pluvia magna est, itaque puerī domī manent. | Imber gravis est, itaque puerī domī manent. | Imber magnus est, et itaque puerī domī manent. | Pluvia magna est, et itaque puerī domī manent. | Imber magnus est, et ideō puerī domī manent.
+Mārcus agricola Rōmānus est. | Mārcus est agricola Rōmānus.
+Nauta Athēniēnsis mare amat.
+Servus Graecus librum legit.
+Agricola cum fīliō suō cotīdiē ā parvō praediō ad magnam urbem ambulat. | Agricola cum fīliō suō ā praediō parvō ad urbem magnam cotīdiē ambulat. | Agricola cum fīliō cotīdiē ā praediō parvō ad urbem magnam ambulat. | Agricola cum fīliō suō ex praediō parvō ad urbem magnam cotīdiē ambulat. | Agricola cum fīliō suō omnī diē ā praediō parvō ad urbem magnam ambulat.
