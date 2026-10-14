@@ -344,10 +344,10 @@ lex	puella	noun	girl	person
 lex	femina	noun	woman	person
 lex	uir	noun	man	person
 lex	homo	noun	person	person
-lex	seruus	noun	slave	person
+lex	seruus	noun	slave	person devotional:servant
 lex	serua	noun	slave woman	person
 lex	dominus	noun	master	person
-lex	domina	noun	mistress	person
+lex	domina	noun	mistress	person devotional:lady
 lex	pater	noun	father	person
 lex	mater	noun	mother	person
 lex	filius	noun	son	person
@@ -387,7 +387,7 @@ lex	panis	noun	bread	mass
 lex	lac	noun	milk	mass
 lex	sol	noun	sun	unique
 lex	luna	noun	moon	unique
-lex	caelum	noun	sky	unique
+lex	caelum	noun	sky	unique devotional:heaven
 lex	terra	noun	earth
 lex	mare	noun	sea
 lex	nox	noun	night	time:at
@@ -397,9 +397,9 @@ lex	annus	noun	year	time:in
 lex	tempus	noun	time
 lex	hortus	noun	garden
 lex	uilla	noun	house
-lex	domus	noun	house
+lex	domus	noun	house	home
 lex	casa	noun	cottage
-lex	uia	noun	road
+lex	uia	noun	road	on
 lex	urbs	noun	city
 lex	oppidum	noun	town
 lex	ager	noun	field
@@ -426,7 +426,7 @@ lex	porta	noun	gate
 lex	fabula	noun	story
 lex	carmen	noun	song
 lex	donum	noun	gift
-lex	malum	noun	apple
+lex	malum	noun	apple	devotional:evil
 lex	oculus	noun	eye
 lex	manus	noun	hand
 lex	pes	noun	foot
@@ -434,7 +434,7 @@ lex	caput	noun	head
 lex	nomen	noun	name
 lex	uox	noun	voice
 lex	cor	noun	heart
-lex	uita	noun	life
+lex	uita	noun	life	mass
 lex	bellum	noun	war
 lex	pax	noun	peace	mass
 lex	gladius	noun	sword
@@ -587,8 +587,8 @@ lex	uiridis	adj	green
 lex	caeruleus	adj	blue
 lex	flauus	adj	yellow
 lex	clarus	adj	bright
-lex	miser	adj	poor
-lex	mirus	adj	strange
+lex	miser	adj	wretched
+lex	mirus	adj	wonderful
 lex	fortis	adj	brave
 lex	celer	adj	fast
 lex	facilis	adj	easy
@@ -619,12 +619,12 @@ lex	asper	adj	rough
 lex	dexter	adj	right
 lex	sinister	adj	left
 lex	solus	adj	alone
-lex	beatus	adj	happy
+lex	beatus	adj	blessed
 lex	dives	adj	rich
 lex	pauper	adj	poor
 lex	luceo	verb	shine
 lex	mus	noun	mouse
-lex	cena	noun	dinner	event
+lex	cena	noun	dinner	event meal
 lex	ceno	verb	have dinner
 lex	pluo	verb	rain
 lex	mordeo	verb	bite
@@ -641,7 +641,7 @@ lex	inclino	verb+refl	bow
 lex	facio	verb+wh	do
 lex	lauo	verb+refl	wash
 lex	sextus	adj	sixth
-lex	tenebrae	noun	dark	mass
+lex	tenebrae	noun	darkness	mass
 lex	horologium	noun	clock
 lex	thea	noun	tea	mass
 lex	placenta	noun	cake
@@ -679,3 +679,75 @@ lex	ingredior	verb	enter	direct-in
 lex	egredior	verb	leave	direct-ex
 lex	proficiscor	verb	set out	from-ex
 lex	fons	noun	fountain	
+# ---- C36: textbook prose and devotional verse (notes: devotional:<word> = the word in a devotional text; f:<word> =
+# the word for a feminine reading; manner = bare ablative "in a ... way"; sine-bare = no article after "without";
+# on = in + ablative is "on"; home = as the object of a person's verb: "his / her home") ----
+lex	fluuius	noun	river
+lex	praedium	noun	farm
+lex	colo	verb	cultivate
+lex	oleum	noun	oil	mass
+lex	lectio	noun	lesson
+lex	familia	noun	family
+lex	uirgo	noun	virgin	person
+lex	humilis	adj	humble
+lex	candidus	adj	white
+lex	mitis	adj	gentle
+lex	benignus	adj	kind
+lex	tueor	verb	protect
+lex	misereor	verb	have mercy
+lex	desero	verb	abandon
+lex	hostis	noun	enemy	person
+lex	lux	noun	light	mass
+lex	spes	noun	hope	mass
+lex	purus	adj	pure
+lex	pius	adj	pious
+lex	gloriosus	adj	glorious
+lex	oro	verb	pray
+lex	precor	verb	beg
+lex	defendo	verb	defend
+lex	confero	verb	grant
+lex	gratia	noun	grace	mass
+lex	finis	noun	end	sine-bare
+lex	stella	noun	star
+lex	imperatrix	noun	empress	person
+lex	sanctus	adj	holy
+lex	parens	noun	parent	person f:mother
+lex	angelus	noun	angel	person
+lex	peccatum	noun	sin
+lex	peccator	noun	sinner	person
+lex	foeteo	verb	stink
+lex	lugeo	verb	mourn
+lex	honor	noun	honour
+lex	alienus	adj	strange
+lex	crudelis	adj	cruel
+lex	honestas	noun	honesty	mass
+lex	mos	noun	custom
+lex	lacto	verb	suckle
+lex	modus	noun	way	manner
+lex	ualidus	adj	strong
+lex	industrius	adj	industrious
+lex	praebeo	verb	provide
+lex	uito	verb	avoid
+lex	iustus	adj	just
+lex	do	verb+inf	grant
+name	iuppiter	-	Jupiter
+name	dauus	-	Davus
+name	iesus	-	Jesus
+name	christus	-	Christ
+name	maria	-	Mary
+intj	aue	-	hail
+intj	auete	-	hail
+intj	salue	eccl	hail
+intj	saluete	eccl	hail
+conj	uero	-	but	second
+adv	olim	fut	one day	front time
+lex	rus	noun	countryside	unique
+lex	ciuis	noun	citizen	person
+lexh	liber	noun	child	children
+lex	uelox	adj	fast
+lex	felix	adj	happy
+lex	frumentum	noun	grain	mass
+lex	mors	noun	death	mass
+lex	charitas	noun	charity	mass
+lex	caritas	noun	charity	mass
+lex	serenus	adj	serene

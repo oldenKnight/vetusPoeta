@@ -3,6 +3,7 @@
 // pretérito / pluscuamperfecto / futuro, tú / ustedes (never vosotros), ¿? and ¡!, "no" before the verb, clitic
 // pronouns before the finite verb and attached to affirmative imperatives and infinitives, personal "a", ser/estar.
 #include <algorithm>
+#include <cstdlib>
 
 #include "internal.h"
 #include "vp/text.h"
@@ -60,11 +61,13 @@ class Es {
       std::string c = clause(b.frames[k]);
       if (k > 0) {
         const std::string& j = b.joiners[k - 1];
-        if (j == "," || j == ";" || j == ":") out += j;
+        // C36: "nōn dormit sed lūdit": no duerme sino que juega; "nōn sōlum ... sed etiam": no solo ... sino que también
+        const bool contrast = j == "sed" && (b.frames[k - 1].negative || hasDisc(b.frames[k - 1], "notonly"));
+        if (j == "," || j == ";" || j == ":") { if (out.empty() || out.back() != ',') out += j; }
         else {
-          std::string w = tab_.text("conj", j, {"-"});
+          std::string w = contrast ? std::string("sino que") : tab_.text("conj", j, {"-"});
           if (w.empty()) w = "y";
-          if (!out.empty() && (j == "sed" || j == "at" || j == "autem")) out += ",";
+          if (!out.empty() && (j == "sed" || j == "at" || j == "autem") && !contrast) out += ",";
           appendWord(out, w);
         }
       }
@@ -89,6 +92,8 @@ class Es {
   const Tables& tab_;
   std::vector<std::string>& flags_;
   Agree mainSubj_, curSubj_;
+  int sedY_ = -1;
+  const SemNP* curObj_ = nullptr;   // C36: the clause's object (for an apposition to a clitic pronoun)   // C36: nōn X sed Y: first token of Y ("sino" before it)
   bool mainPast_ = false, curPassive_ = false, inSub_ = false;
 
   bool reflexiveObject(const SemFrame& f, const Agree& a) const {
@@ -259,18 +264,36 @@ class Es {
       if (tab_.has("det", k) && !isKey(k, {"is"})) return standalone(x, role);
       const uint8_t g = x.pron.gender;
       const char* rk = role == R::Subj ? "subj" : "prep";
-      return pron(x.pron.person ? x.pron.person : 3, x.pron.number == 2 ? 2 : 1, g, rk);
+      std::string out = pron(x.pron.person ? x.pron.person : 3, x.pron.number == 2 ? 2 : 1, g, rk);
+      for (const frame::SemAdj& a : x.adjectives) {   // C36: "tū sōla": tú sola
+        const uint8_t ag = a.token >= 0 && ti_[(size_t)a.token].f.gender == F ? F : (g == F ? F : M);
+        appendWord(out, adjective(a, ag, x.pron.number == 2 ? 2 : 1));
+      }
+      return out;
     }
     if (x.head.empty() && !x.determiner.empty()) return standalone(x, role);
     if (x.isName && x.token >= 0) {
       std::string out = in_.lex->nameIn(ti_[(size_t)x.token], Target::Es);
+      for (const SemNP& ap : x.apposition)   // C36: Iēsū Chrīstī: de Jesucristo
+        if (ap.isName && ap.token >= 0) appendWord(out, in_.lex->nameIn(ti_[(size_t)ap.token], Target::Es));
+      if (out == "Jesús Cristo") out = "Jesucristo";
       if (!x.relative.empty()) appendWord(out, relative(x, x.relative[0]));
       return out;
     }
     if (x.token >= 0 && x.adjectives.size() == 1 && x.adjectives[0].token == x.token && x.head == x.adjectives[0].lemma) {
-      const uint8_t g = (ti_[(size_t)x.token].f.gender == F) ? F : M;
-      std::string out = article(true, g, x.number, "");
+      uint8_t lg = ti_[(size_t)x.token].f.gender;
+      // C36: an adjective addressing someone takes the addressee's gender ("avē, mītis": ave, mansa)
+      if (role == R::Voc && lg != F && lg != M && in_.disc->addresseeGender) lg = in_.disc->addresseeGender;
+      const uint8_t g = lg == F ? F : M;
+      const TokInfo& st = ti_[(size_t)x.token];
+      if ((st.f.pos == Participle || st.lpos == Participle) && st.key.size() > 2 && st.key.compare(st.key.size() - 2, 2, "ns") == 0)
+        return adjective(x.adjectives[0], g, x.number);   // C36: ya apestando
+      std::string out = role == R::Voc || !x.genitive.empty() ? std::string() : article(true, g, x.number, "");
       appendWord(out, adjective(x.adjectives[0], g, x.number));
+      for (const SemNP& gn : x.genitive) {   // C36: plēna cāritāte: llena de caridad
+        appendWord(out, "de");
+        appendWord(out, np(gn, R::Prep, false));
+      }
       return out;
     }
     // a quantifier / demonstrative standing alone as the head ("ab omnibus": by everyone)
@@ -366,12 +389,22 @@ class Es {
       if (lx.mass && role == R::Subj) def = true;
       if (num == 2 && !mentioned && !hasGen && !hasRel && (role == R::Obj || role == R::Pred)) def = false;
       if (role == R::Pred && num != 2 && !mentioned && !lx.mass && !lx.unique && !hasGen && !hasRel) { def = false; indef = true; }
+      if (lx.meal && role == R::Obj && num != 2) { def = true; indef = false; }   // C36: esperan la cena
       if (def) pre.push_back(article(true, g, num, word));
       else if (indef) pre.push_back(article(false, g, num, word));
     }
     std::string out = join(pre);
     appendWord(out, word);
-    for (const std::string& a : adjs) appendWord(out, a);
+    std::vector<int> at;
+    for (const frame::SemAdj& a : x.adjectives)
+      if (!(a.token >= 0 && tab_.has("det", a.lemma))) at.push_back(a.token);
+    for (size_t k = 0; k < adjs.size(); ++k) {
+      // C36: "mītis et benigna": mansa y benigna
+      if (k > 0 && k < at.size() && at[k - 1] >= 0 && at[k] >= 0 && std::abs(at[k] - at[k - 1]) == 2 &&
+          ti_[(size_t)std::min(at[k], at[k - 1]) + 1].key == "et")
+        appendWord(out, "y");
+      appendWord(out, adjs[k]);
+    }
     in_.disc->mention(lemma);
     for (const SemNP& gn : x.genitive) {
       appendWord(out, "de");
@@ -443,6 +476,7 @@ class Es {
       base = tab_.find("lex", ti_[(size_t)lexTok].key, "verb+wh")->text;
     if (lexTok >= 0 && reflexiveObject(f, a) && tab_.find("lex", ti_[(size_t)lexTok].key, "verb+refl"))
       base = tab_.find("lex", ti_[(size_t)lexTok].key, "verb+refl")->text;
+    if (hasDisc(f, "grant") && tab_.find("lex", "do", "verb+inf")) base = tab_.find("lex", "do", "verb+inf")->text;
     if (f.existential && f.copula) {
       // hay / había / hubo / habrá
       bool hb = false;
@@ -458,7 +492,7 @@ class Es {
     es::VTense vt = tenseOf(f, haber);
     c.reflexive = es::reflexive(base);
     // modal + infinitive
-    if (!f.pred.complementVerb.empty() && !hasDisc(f, "jussive")) {
+    if (!f.pred.complementVerb.empty() && !hasDisc(f, "jussive") && !hasDisc(f, "grant")) {
       std::string inf = verbWord(f.pred.complementToken);
       bool neg2 = false;
       if (inf.compare(0, 3, "no ") == 0) { inf = inf.substr(3); neg2 = true; }
@@ -597,9 +631,14 @@ class Es {
       cl.clear();
     }
     if (negWord) appendWord(out, "no");
-    for (const std::string& p : preAdv) appendWord(out, p);
+    if (hasDisc(f, "notonly")) appendWord(out, "no solo");   // C36
+    // C36: an affirmative imperative comes first ("da también luz", not "también da luz")
+    if (!c.imperativeAff)
+      for (const std::string& p : preAdv) appendWord(out, p);
     appendWord(out, cl);
     appendWord(out, join(c.w));
+    if (c.imperativeAff)
+      for (const std::string& p : preAdv) appendWord(out, p);
     return out;
   }
 
@@ -693,23 +732,63 @@ class Es {
     return np(f.subject, R::Subj);
   }
 
+  std::string contrastMark(const std::string& piece, const std::vector<int>& toks, int tok) const {
+    if (sedY_ >= 0 && (tok == sedY_ || std::find(toks.begin(), toks.end(), sedY_) != toks.end())) return "sino " + piece;
+    return piece;
+  }
+  bool homeObject(const SemFrame& f) const {
+    if (!f.hasObject || f.object.isPronoun || f.object.token < 0 || f.object.number == 2) return false;
+    if (!f.object.determiner.empty() || !f.object.possessor.empty() || !f.object.adjectives.empty() ||
+        !f.object.genitive.empty() || !f.object.coord.empty())
+      return false;
+    if (!lexOf(f.object.token).home || curSubj_.person != 3 || curSubj_.number == 2) return false;
+    if (f.hasSubject && f.implicitSubject) return in_.disc->sincePerson <= 2;
+    return curSubj_.personNoun;
+  }
+
   std::string complements(const SemFrame& f, const Agree& a, bool usedObj, bool usedIo) {
     std::string out;
+    curObj_ = f.hasObject ? &f.object : nullptr;
+    sedY_ = -1;
+    bool sedNot = false;
+    for (const std::string& d : f.discourse) {
+      if (d.compare(0, 7, "sednon:") == 0) { sedY_ = std::atoi(d.c_str() + 7); sedNot = true; }
+      if (d.compare(0, 7, "nonsed:") == 0) {
+        const size_t colon = d.find(':', 7);
+        sedY_ = colon == std::string::npos ? -1 : std::atoi(d.c_str() + colon + 1);
+      }
+    }
+    if (hasDisc(f, "grant")) {
+      // C36: dā nōs bene vīvere: concédenos vivir bien (the person granted is the clitic)
+      if (f.hasIndirect && !usedIo) appendWord(out, "a " + np(f.indirectObject, R::Prep, true));
+      if (f.pred.complementToken >= 0) appendWord(out, es::unreflexive(verbWord(f.pred.complementToken)));
+      if (f.hasObject && !usedObj) appendWord(out, np(f.object, R::Obj));
+      for (const frame::SemOblique& o : f.obliques) appendWord(out, o.prep == "#acc" ? np(o.np, R::Obj) : oblique(o));
+      return out;
+    }
     for (const std::string& d : f.discourse)
       if (d.compare(0, 12, "phrase-pred:") == 0) appendWord(out, d.substr(12));
     if (f.copula || (!f.hasPred && (!f.predAdj.empty() || !f.predicative.empty()))) {
       std::vector<std::string> pp;
+      std::vector<char> isY;
       for (const frame::SemAdj& x : f.predAdj) {
         uint8_t g = a.gender;
-        if (f.hasSubject && f.implicitSubject && x.token >= 0) {
+        if ((!f.hasSubject || (f.hasSubject && f.implicitSubject)) && x.token >= 0) {
           const uint8_t lg = ti_[(size_t)x.token].f.gender;
           if (lg == F || lg == M) g = lg;
         }
         pp.push_back(adjective(x, g, a.number));
+        isY.push_back(x.token >= 0 && x.token == sedY_);
       }
-      for (const SemNP& x : f.predicative) pp.push_back(np(x, R::Pred));
+      for (const SemNP& x : f.predicative) {
+        pp.push_back(np(x, R::Pred));
+        isY.push_back(sedY_ >= 0 && (x.token == sedY_ || std::find(x.tokens.begin(), x.tokens.end(), sedY_) != x.tokens.end()));
+      }
       for (size_t k = 0; k < pp.size(); ++k) {
-        if (k > 0) appendWord(out, k + 1 == pp.size() ? "y" : ",");
+        if (k > 0) {
+          if (isY[k] && sedNot) out += ",";
+          appendWord(out, isY[k] ? (sedNot ? "pero no" : "sino") : k + 1 == pp.size() ? "y" : ",");
+        }
         appendWord(out, pp[k]);
       }
     } else if (!f.predAdj.empty() || !f.predicative.empty()) {
@@ -717,18 +796,38 @@ class Es {
       for (const SemNP& x : f.predicative) appendWord(out, np(x, R::Pred));
     }
     const bool jussive = hasDisc(f, "jussive");
-    if (f.hasObject && !usedObj) {
+    if (f.hasObject && usedObj && f.object.isPronoun && (f.object.pron.person == 1 || f.object.pron.person == 2)) {
+      // C36: "cōnsōlāre mē lūgentem": consuélame a mí, que lloro
+      for (const frame::SemAdj& ad : f.object.adjectives) {
+        if (ad.token < 0) continue;
+        const TokInfo& at = ti_[(size_t)ad.token];
+        if (!((at.f.pos == Participle || at.lpos == Participle) && at.key.size() > 2 && at.key.compare(at.key.size() - 2, 2, "ns") == 0))
+          continue;
+        const int pn = f.object.pron.number == 2 ? 2 : 1;
+        std::string w = "a " + pron(f.object.pron.person, pn, f.object.pron.gender, "prep") + ", que";
+        appendWord(w, es::verb(lexOf(ad.token).word, es::VTense::Present, f.object.pron.person, pn));
+        appendWord(out, w);
+        break;
+      }
+    }
+    if (f.hasObject && !usedObj && homeObject(f)) {
+      appendWord(out, "su casa");   // C36: "Amat domum": ama su casa
+      in_.disc->mention(ti_[(size_t)f.object.token].lemma);
+    } else if (f.hasObject && !usedObj) {
       std::string o = np(f.object, R::Obj);
-      if (personObject(f.object) && !(f.object.isPronoun && false)) o = "a " + o;
-      appendWord(out, o);
+      // personal "a"; not after tener ("tiene un amo")
+      if (personObject(f.object) && !isKey(f.pred.lemma, {"habeo"})) o = "a " + o;
+      appendWord(out, contrastMark(o, f.object.tokens, f.object.token));
     }
     if (jussive && f.pred.complementToken >= 0) appendWord(out, es::unreflexive(verbWord(f.pred.complementToken)));
     for (const frame::SemOblique& o : f.obliques)
-      if (o.prep == "#acc") appendWord(out, np(o.np, R::Obj));
+      if (o.prep == "#acc") appendWord(out, contrastMark(np(o.np, R::Obj), o.np.tokens, o.np.token));
     if (f.hasIndirect && !usedIo) appendWord(out, "a " + np(f.indirectObject, R::Prep, true));
     for (const frame::SemOblique& o : f.obliques) {
       if (o.prep == "#acc") continue;
-      appendWord(out, oblique(o));
+      std::vector<int> toks = o.np.tokens;
+      toks.push_back(o.token);
+      appendWord(out, contrastMark(oblique(o), toks, o.np.token));
     }
     return out;
   }
@@ -737,7 +836,14 @@ class Es {
     const std::string p = o.prep;
     if (p == "#dat") return "a " + np(o.np, R::Prep, true);
     if (p == "#than") return "que " + np(o.np, R::Subj, true);
-    if (p == "#gen") return "de " + np(o.np, R::Prep, true);
+    if (p == "#appos" && curObj_) {
+      // C36: "Mē dēfende peccātōrem": defiéndeme a mí, pecador
+      const SemNP& pr = *curObj_;
+      std::string out = "a " + pron(pr.pron.person, pr.pron.number == 2 ? 2 : 1, pr.pron.gender, "prep") + ",";
+      appendWord(out, nounWord(o.np));
+      return out;
+    }
+    if (p == "#gen" || p == "#genobj") return "de " + np(o.np, R::Prep, true);
     if (p == "#loc") return "en " + (o.np.isName ? in_.lex->nameIn(ti_[(size_t)std::max(0, o.np.token)], Target::Es) : np(o.np, R::Prep, true));
     if (p == "#abl") {
       const Lexical lx = lexOf(o.np.token);
@@ -745,6 +851,13 @@ class Es {
         std::string out = lx.timePrep;
         if (lx.timePrep == "de" && o.np.adjectives.empty() && o.np.number != 2) { appendWord(out, nounWord(o.np)); return out; }
         appendWord(out, np(o.np, R::Prep, true));
+        return out;
+      }
+      if (lx.manner) {   // C36: modō mīrō: de modo admirable
+        std::string out = "de";
+        appendWord(out, nounWord(o.np));
+        const uint8_t g = nounGender(o.np);
+        for (const frame::SemAdj& a : o.np.adjectives) appendWord(out, adjective(a, g, o.np.number));
         return out;
       }
       return "con " + np(o.np, R::Obj, false);
@@ -764,15 +877,27 @@ class Es {
     if (w == "con" && o.np.isPronoun && o.np.coord.empty() && (o.np.pron.person == 1 || o.np.pron.person == 2) && o.np.pron.number != 2)
       return o.np.pron.person == 1 ? "conmigo" : "contigo";
     std::string out = w;
+    if (prep == "sine" && !o.np.isPronoun && !o.np.isName && o.np.coord.empty() && o.np.determiner.empty() &&
+        o.np.possessor.empty() && o.np.genitive.empty() && !in_.disc->seen(ti_[(size_t)std::max(0, o.np.token)].lemma)) {
+      // C36: "sine dominō": sin amo; "sine fīne": sin fin (no article after sin)
+      appendWord(out, nounWord(o.np));
+      const uint8_t g = nounGender(o.np);
+      for (const frame::SemAdj& a : o.np.adjectives) appendWord(out, adjective(a, g, o.np.number));
+      in_.disc->mention(ti_[(size_t)std::max(0, o.np.token)].lemma);
+      return out;
+    }
     appendWord(out, np(o.np, R::Prep, true));
     return out;
   }
 
+  std::string advText(const SemFrame& f, const std::string& lemma) const {
+    return tab_.text("adv", lemma, {f.pred.tense == frame::Tense::Future ? "fut" : "-", "-"});
+  }
   void adverbs(const SemFrame& f, std::vector<std::string>& pre, std::vector<std::string>& end) {
     for (const frame::SemAdverb& a : f.adverbs) {
       if (a.front && !(tab_.tagged("adv", a.lemma, "pre") && f.hasPred) && frontable(f, a)) continue;
       if (a.lemma == "#tok") { end.push_back(leftover(a.token)); continue; }
-      std::string w = tab_.text("adv", a.lemma, {"-"});
+      std::string w = advText(f, a.lemma);
       if (w.empty()) {
         w = lexOf(a.token).word;
         if (w.empty()) w = "[" + s_.tokens[(size_t)a.token].text + "]";
@@ -809,7 +934,7 @@ class Es {
     for (const frame::SemAdverb& a : f.adverbs) {
       if (!a.front) continue;
       if (a.lemma == "#tok") { appendWord(out, leftover(a.token)); continue; }
-      std::string w = tab_.text("adv", a.lemma, {"-"});
+      std::string w = advText(f, a.lemma);
       if (w.empty()) w = lexOf(a.token).word;
       if (tab_.tagged("adv", a.lemma, "pre") && f.hasPred) continue;   // handled with the verb ("nunca", "ya")
       if (!frontable(f, a)) continue;
@@ -919,7 +1044,7 @@ class Es {
       }
     std::string head;
     for (const std::string& i : f.interjections) {
-      std::string w = tab_.text("intj", i, {"-"});
+      std::string w = tab_.text("intj", i, {in_.disc->devotional ? "eccl" : "-", "-"});
       if (w.empty()) w = i;
       appendWord(head, w);
       if (i != "o" || f.vocatives.empty()) head += ",";
@@ -1002,7 +1127,16 @@ class Es {
     const bool ecce = std::find(f.interjections.begin(), f.interjections.end(), "ecce") != f.interjections.end();
     if (f.hasSubject) appendWord(out, np(f.subject, ecce ? R::Obj : R::Subj));
     const Agree a = f.hasSubject ? agreeOf(f.subject) : Agree();
-    for (const frame::SemAdj& x : f.predAdj) appendWord(out, adjective(x, a.gender, a.number));
+    for (size_t k = 0; k < f.predAdj.size(); ++k) {   // C36: "beāta et glōriōsa": bienaventurada y gloriosa
+      const frame::SemAdj& x = f.predAdj[k];
+      uint8_t g = a.gender;
+      if (!f.hasSubject && x.token >= 0) {
+        const uint8_t lg = ti_[(size_t)x.token].f.gender;
+        g = lg == F ? (uint8_t)F : lg == M ? (uint8_t)M : (in_.disc->addresseeGender ? in_.disc->addresseeGender : (uint8_t)M);
+      }
+      if (k > 0) appendWord(out, k + 1 == f.predAdj.size() ? "y" : ",");
+      appendWord(out, adjective(x, g, f.hasSubject ? a.number : (x.token >= 0 && ti_[(size_t)x.token].f.number == Pl ? 2 : 1)));
+    }
     for (const SemNP& x : f.predicative) appendWord(out, np(x, R::Pred));
     if (f.hasObject) appendWord(out, np(f.object, R::Obj));
     if (f.hasIndirect) appendWord(out, "a " + np(f.indirectObject, R::Prep, true));

@@ -120,12 +120,28 @@ class Builder {
     phrases();
     // top-level clauses in order
     std::vector<int> top;
-    for (size_t c = 0; c < s_.clauses.size(); ++c)
-      if (s_.clauses[c].parent < 0 && s_.clauses[c].last >= 0) top.push_back((int)c);
+    for (size_t c = 0; c < s_.clauses.size(); ++c) {
+      const Clause& K = s_.clauses[c];
+      if (K.last < 0) continue;
+      // C36: a clause whose main clause has no word of its own ("nē nōs dēserās") stands as a main clause
+      const bool orphan = K.parent >= 0 && s_.clauses[(size_t)K.parent].last < 0 && s_.clauses[(size_t)K.parent].parent < 0;
+      if (K.parent < 0 || orphan) top.push_back((int)c);
+    }
     std::sort(top.begin(), top.end(), [&](int a, int b) { return s_.clauses[(size_t)a].first < s_.clauses[(size_t)b].first; });
     for (size_t k = 0; k < top.size(); ++k) {
       SemFrame f;
       clause(top[k], f);
+      {
+        const Clause& K = s_.clauses[(size_t)top[k]];
+        if (K.kind == Clause::Sub && K.marker >= 0 && ti_[(size_t)K.marker].key == "ne" && K.verb >= 0 &&
+            ti_[(size_t)K.verb].f.mood == Subjunctive && ti_[(size_t)K.verb].f.person == 2) {
+          f.type = Kind::Imp;   // C36: a prohibition
+          f.negative = true;
+          f.imperativePlural = ti_[(size_t)K.verb].f.number == Pl;
+          out_.roles[(size_t)K.marker] = "prohibition";
+        }
+      }
+      prevTopVerb_ = f.copula && f.pred.token >= 0 ? f.pred.token : -1;
       if (k > 0) {
         const Clause& c = s_.clauses[(size_t)top[k]];
         std::string j = ",";
@@ -167,7 +183,9 @@ class Builder {
   Built& out_;
   std::vector<char> used_;
   int relMarker_ = -1;
-  int genObjVerb_ = -1;        // C36: a verb whose genitive is its object (misereor: have mercy on)
+  int genObjVerb_ = -1;
+  int prevTopVerb_ = -1;
+  bool elliptic_ = false;       // C36: the copula of the previous main clause (ellipsis)        // C36: a verb whose genitive is its object (misereor: have mercy on)
   bool devotional_ = false;    // C36: the text is devotional (vocative lines without a verb)
   static bool motionVerb(const std::string& k) {
     return isKey(k, {"eo", "uenio", "redeo", "curro", "ambulo", "nauigo", "festino", "propero", "fugio", "abeo", "adeo",
@@ -287,6 +305,14 @@ class Builder {
     // the verb group
     int verb = C.verb;
     if (verb >= 0 && used_[(size_t)verb]) verb = -1;
+    // C36: "Bonus est dominus, malus autem servus": a verbless coordinated main clause after a copula clause shares
+    // its copula (the slave is bad)
+    bool elliptic = false;
+    if (verb < 0 && C.kind == Clause::Coord && C.parent < 0 && prevTopVerb_ >= 0 && ti_[(size_t)prevTopVerb_].key == "sum") {
+      verb = prevTopVerb_;
+      elliptic = true;
+    }
+    elliptic_ = elliptic;
     if (verb >= 0 && isKey(ti_[(size_t)verb].key, {"salueo", "ualeo"}) && ti_[(size_t)verb].f.mood == Imperative &&
         tab_.has("intj", text::latin_key(s_.tokens[(size_t)verb].text)))
       verb = -1;   // salvē / valēte: greetings
@@ -375,6 +401,14 @@ class Builder {
             ++idx;
             continue;
           }
+          // C36: "Cēna bona est, sed nōn magna": the dinner is good, but not big (nōn belongs to the last adjective)
+          if (idx > 0 && idx + 1 < toks.size() && ti_[toks[idx - 1]].lpos == Conj && ti_[toks[idx - 1]].key == "sed" &&
+              !used_[toks[idx - 1]] && verb >= 0 && (int)toks[idx - 1] > verb) {
+            used_[toks[idx - 1]] = 1;
+            out_.roles[toks[idx - 1]] = "connector";
+            f.discourse.push_back("sednon:" + std::to_string(toks[idx + 1]));
+            continue;
+          }
           f.negative = true;
           if (nonTok < 0) nonTok = (int)i;
           continue;
@@ -455,7 +489,7 @@ class Builder {
       f.pred.lemma = v.key;
       f.pred.token = verb;
       used_[(size_t)verb] = 1;
-      out_.roles[(size_t)verb] = "verb";
+      if (!elliptic) out_.roles[(size_t)verb] = "verb";
       setTense(v, f.pred);
       if (v.f.mood == Imperative) {
         f.type = Kind::Imp;
@@ -1076,6 +1110,19 @@ class Builder {
         local.push_back(std::move(x));
       }
     }
+    // C36: "mītis et benigna": et between two adjectives of one noun joins them ("gentle and kind")
+    for (NPx& x : local) {
+      for (size_t a = 0; a + 1 < x.np.adjectives.size(); ++a) {
+        const int t0 = std::min(x.np.adjectives[a].token, x.np.adjectives[a + 1].token);
+        const int t1 = std::max(x.np.adjectives[a].token, x.np.adjectives[a + 1].token);
+        if (t0 < 0 || t1 - t0 != 2) continue;
+        const size_t m = (size_t)t0 + 1;
+        if (ti_[m].word && ti_[m].key == "et" && !used_[m]) {
+          used_[m] = 1;
+          out_.roles[m] = "and";
+        }
+      }
+    }
     // interrogative determiners without case (quot): the next head
     for (size_t i : toks) {
       if (!isFree(i) || !(isKey(ti_[i].key, {"quot", "totidem"}) || ((ti_[i].lpos == Num || ti_[i].f.pos == Num) && tab_.has("det", ti_[i].key))))
@@ -1268,18 +1315,36 @@ class Builder {
     };
     bool otherNom = false;
     for (NPx* x : noms) otherNom = otherNom || (!x->adjOnly && !interrogativeNP(x));
+    // C36: "Līber est et dominus": a noun joined by et to a predicate adjective is a predicate too (he is free and a
+    // master); the subject is the one the verb restores
+    if (copula)
+      for (NPx* x : noms) {
+        if (x->adjOnly || x->np.isName || x->np.isPronoun || x->first < 1) continue;
+        const size_t pt = (size_t)x->first - 1;
+        if (!ti_[pt].word || ti_[pt].key != "et") continue;
+        bool adjBefore = false;
+        for (NPx* y : noms) adjBefore = adjBefore || (y->adjOnly && y->first < x->first);
+        if (!adjBefore) continue;
+        f.predicative.push_back(x->np);
+        markRole(*x, "predicate");
+        x->used = true;
+        used_[pt] = 1;
+        out_.roles[pt] = "and";
+      }
+    const bool copLike = copula || f.pred.complementVerb == "sum";   // C36: "Līber esse cupit": he wants to be free
     if (v && f.type != Kind::Imp) {
       for (NPx* x : noms) {
-        if (x->adjOnly && copula) continue;
+        if (x->used) continue;
+        if (x->adjOnly && copLike) continue;
         if (copula && otherNom && interrogativeNP(x)) continue;   // "Quid est nōmen?": nōmen is the subject
         if (personOf(*x) == vper && (numberOf(*x) == vnum || x->number == 0)) { subj = x; break; }
       }
       if (!subj)
         for (NPx* x : noms)
-          if (!x->adjOnly && personOf(*x) == vper) { subj = x; break; }
-      if (!subj && !copula)
+          if (!x->used && !x->adjOnly && personOf(*x) == vper) { subj = x; break; }
+      if (!subj && !copLike)
         for (NPx* x : noms)
-          if (personOf(*x) == vper) { subj = x; break; }
+          if (!x->used && personOf(*x) == vper) { subj = x; break; }
     } else if (!v && !f.copula) {
       // fragment: the first nominative is the "subject" of a verbless exclamation / answer; C36: a line of adjectives
       // only ("beāta et glōriōsa") stays a predicate
@@ -1293,6 +1358,11 @@ class Builder {
       f.subject = subj->np;
       subj->used = true;
       markRole(*subj, "subject");
+      // C36: "ēlēcta ... tū fuistī": a 1st / 2nd person pronoun takes the gender of its participle (elegida)
+      if (f.subject.isPronoun && !f.subject.pron.gender && f.pred.particle == "peri" && f.pred.complementToken >= 0) {
+        const uint8_t pg = genderOf(ti_[(size_t)f.pred.complementToken]);
+        if (pg == F || pg == M) f.subject.pron.gender = pg;
+      }
     } else if (v && f.type != Kind::Imp) {
       // subject restored from the verb's person and number
       f.hasSubject = true;
@@ -1315,6 +1385,8 @@ class Builder {
       if (x->used) continue;
       if (x->adjOnly) {
         for (const frame::SemAdj& a : x->np.adjectives) f.predAdj.push_back(a);
+        for (const SemNP& c : x->np.coord)   // C36: "beāta et glōriōsa"
+          for (const frame::SemAdj& a : c.adjectives) f.predAdj.push_back(a);
         if (x->np.adjectives.empty()) f.predicative.push_back(x->np);
         if (copula || !v) markRole(*x, "predicate");
         else markRole(*x, "predicate");
@@ -1342,6 +1414,17 @@ class Builder {
         }
       }
     }
+    // C36: "Cēna bona est, sed nōn magna": the adjective before the copula is the first predicate
+    for (const std::string& d : f.discourse) {
+      if (d.compare(0, 7, "sednon:") != 0 || !copula || !f.hasSubject || f.subject.adjectives.empty() || verb < 0) continue;
+      for (size_t k = f.subject.adjectives.size(); k-- > 0;)
+        if (f.subject.adjectives[k].token >= 0 && f.subject.adjectives[k].token < verb) {
+          f.predAdj.insert(f.predAdj.begin(), f.subject.adjectives[k]);
+          out_.roles[(size_t)f.subject.adjectives[k].token] = "predicate";
+          f.subject.adjectives.erase(f.subject.adjectives.begin() + (long)k);
+          break;
+        }
+    }
     // C36: nōn X sed Y with X an adjective that went to the subject ("Lūcius nōn trīstis est sed laetus")
     for (const std::string& d : f.discourse) {
       if (d.compare(0, 7, "nonsed:") != 0 || !copula || !f.hasSubject) continue;
@@ -1366,12 +1449,15 @@ class Builder {
     // existential: the copula before its subject, or a subject without a predicate ("erat puella parva",
     // "nūlla thēa est" -> there was a little girl / there is no tea)
     const bool verbFirst = f.hasSubject && !f.implicitSubject && f.subject.token >= 0 && verb >= 0 &&
-                           verb < f.subject.token && f.type == Kind::Decl;
+                           verb < f.subject.token && f.type == Kind::Decl && !elliptic_;
     if (copula && f.hasSubject && !f.implicitSubject && !f.subject.isPronoun && !f.subject.isName &&
         f.predAdj.empty() && f.predicative.empty() &&
         (verbFirst || isKey(f.subject.determiner, {"nullus", "multus", "paucus", "aliquis", "ullus", "nemo"}))) {
       bool place = false;
       for (const frame::SemAdverb& a : f.adverbs) place = place || isKey(a.lemma, {"hic", "ibi"});
+      // C36: "sine fīne est labor": the work is without end (a sine phrase is the predicate, not a place)
+      for (const NPx& x : nps)
+        if (x.governed && !x.np.tokens.empty() && ti_[(size_t)x.np.tokens.front()].key == "sine") place = true;
       if (!place) f.existential = true;
     }
     if (copula && f.predAdj.empty() && f.predicative.empty() && (!f.hasSubject || f.implicitSubject)) {
@@ -1418,6 +1504,10 @@ class Builder {
         // a second accusative: double object / time / coordination without a conjunction
         frame::SemOblique o;
         o.prep = "#acc";
+        // C36: "Mē dēfende peccātōrem": me, a sinner (a person noun in apposition to I / you)
+        if (f.object.isPronoun && (f.object.pron.person == 1 || f.object.pron.person == 2) && !x.np.isPronoun &&
+            x.np.token >= 0 && tab_.tagged("lex", ti_[(size_t)x.np.token].key, "person"))
+          o.prep = "#appos";
         o.np = x.np;
         o.token = x.np.token;
         f.obliques.push_back(o);

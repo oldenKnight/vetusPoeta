@@ -121,6 +121,10 @@ struct Lexical {                // the target-language word for a Latin content 
   bool adjective = false;       // a participle with its own adjective row (īrātus -> angry)
   std::string timePrep;         // bare ablative of time: "at", "on", "in" (EN) / "en", "por la" (ES)
   uint8_t gender = 0;           // Spanish noun gender (M/F) when known
+  // C36 notes of the readable row: manner (bare ablative "in a ... way" / "de modo ..."), sine-bare ("without end"),
+  // on (in + ablative is "on"), home (object of a person's verb: "his home" / "su casa")
+  bool manner = false, sineBare = false, on = false, home = false;
+  bool meal = false;            // C36: a meal as an object: "wait for dinner" / "esperan la cena"
 };
 
 struct Discourse {              // memory across sentences of one text (articles, restored pronouns)
@@ -132,11 +136,12 @@ struct Discourse {              // memory across sentences of one text (articles
   // praedium"); a devotional text (avē, a sacred name or title was read: salvē = hail, servus = servant, caelum =
   // heaven); the gender of the person addressed (vocative), for adjectives and participles that describe "you"
   int sincePerson = 99;
+  uint8_t lastPersonGender = 0;   // the gender of the last person subject (a restored "he / she")
   bool devotional = false;
   uint8_t addresseeGender = 0;
   void clear() {
     mentioned.clear(); lastSubjGender = 0; lastSubjPerson = true; lastSubjNumber = 1;
-    sincePerson = 99; devotional = false; addresseeGender = 0;
+    sincePerson = 99; devotional = false; addresseeGender = 0; lastPersonGender = 0;
   }
   bool seen(uint32_t l) const;
   void mention(uint32_t l);

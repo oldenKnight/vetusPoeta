@@ -731,11 +731,14 @@ TEST_CASE("rules-la2x: dev dump (VP_LA2X_DUMP=<file or sentence>)") {
   }
   for (const std::string& l : lines) {
     la2x::SentenceOut en, es;
-    W.tr->resetDiscourse();
+    const bool keep = std::getenv("VP_LA2X_KEEP") != nullptr;   // keep the discourse memory across lines (C36)
+    if (!keep) W.tr->resetDiscourse();
     W.tr->sentence(l, la2x::Target::En, en);
-    W.tr->resetDiscourse();
+    if (!keep) W.tr->resetDiscourse();
     W.tr->sentence(l, la2x::Target::Es, es);
     std::cout << "LA " << l << "\nEN " << en.text << "\nES " << es.text << "\nFR " << en.frame << "\n";
+    for (const std::string& c : en.coverage) std::cout << "   EN coverage " << c << "\n";
+    for (const std::string& c : es.coverage) std::cout << "   ES coverage " << c << "\n";
     for (const la2x::Word& w : en.words)
     {
       std::cout << "   " << w.text << " = " << w.head << " [" << w.featureText << "] '" << w.gloss << "' c=" << w.confidence
@@ -744,7 +747,8 @@ TEST_CASE("rules-la2x: dev dump (VP_LA2X_DUMP=<file or sentence>)") {
       if (std::getenv("VP_LA2X_SCORES")) {
         const la2x::Token& tk = en.analysis.tokens[(size_t)w.token];
         for (const la2x::Reading& r : tk.readings)
-          std::cout << "        " << r.display << " L" << r.lemma << " p=" << r.prior << " s=" << r.score << " " << std::hex << r.packed << std::dec << "\n";
+          std::cout << "        " << r.display << " L" << r.lemma << " p=" << r.prior << " s=" << r.score << " " << std::hex << r.packed << std::dec
+                    << " tier=" << (r.lemma != lex::kNoLemma ? (int)W.la.lemma(r.lemma).tier : -1) << "\n";
         for (const std::string& y : tk.why) std::cout << "        why: " << y << "\n";
       }
     }

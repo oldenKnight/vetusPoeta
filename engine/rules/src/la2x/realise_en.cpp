@@ -3,6 +3,7 @@
 // pluperfect -> had, future -> will), pronouns restored from the verb, do-support for questions and negation,
 // imperatives, subordinators from readable_en.tsv.
 #include <algorithm>
+#include <cstdlib>
 
 #include "internal.h"
 #include "vp/text.h"
@@ -41,14 +42,32 @@ class En {
   std::string sentence(const Built& b) {
     std::string out;
     for (size_t k = 0; k < b.frames.size(); ++k) {
+      // C36: a coordinated clause with the same restored subject as the one before does not repeat it ("He grows
+      // grain and works in the field"); after "not (only) X" the sed clause continues the same subject too
+      bool contrast = false;
+      dropSubj_ = false;
+      if (k > 0) {
+        const SemFrame& p = b.frames[k - 1];
+        const SemFrame& q = b.frames[k];
+        const std::string& j = b.joiners[k - 1];
+        contrast = j == "sed" && (p.negative || hasDisc(p, "notonly"));
+        const bool same = q.hasSubject && q.implicitSubject && p.hasSubject &&
+                          (p.implicitSubject ? (p.subject.pron.person == q.subject.pron.person &&
+                                                p.subject.pron.number == q.subject.pron.number)
+                                             : (q.subject.pron.person == 3 || !q.subject.pron.person) &&
+                                                   (q.subject.pron.number == 2) == (p.subject.number == 2));
+        dropSubj_ = same && (p.implicitSubject || contrast) && q.type == Kind::Decl && p.type == Kind::Decl &&
+                    j != "," && j != ";" && j != ":";
+      }
       std::string c = clause(b.frames[k], nullptr, nullptr);
+      dropSubj_ = false;
       if (k > 0) {
         const std::string& j = b.joiners[k - 1];
-        if (j == "," || j == ";" || j == ":") out += j;
+        if (j == "," || j == ";" || j == ":") { if (out.empty() || out.back() != ',') out += j; }
         else {
           std::string w = tab_.text("conj", j, {"-"});
           if (w.empty()) w = "and";
-          if (!out.empty() && (j == "sed" || j == "at" || j == "autem")) out += ",";
+          if (!out.empty() && (j == "sed" || j == "at" || j == "autem") && !contrast) out += ",";
           appendWord(out, w);
         }
       }
@@ -70,6 +89,10 @@ class En {
   const Tables& tab_;
   std::vector<std::string>& flags_;
   Agree mainSubj_;
+  bool dropSubj_ = false;      // C36: the coordinated clause shares the previous restored subject
+  bool thingSubjectHere_ = false;   // C36: a clause of this sentence had a thing as its subject
+  int nonX_ = -1, sedY_ = -1;  // C36: nōn X sed Y (token of X's first word, of Y's first word)
+  bool sedNot_ = false;        // C36: X sed nōn Y ("but not")
 
   void flag(const std::string& f) {
     if (std::find(flags_.begin(), flags_.end(), f) == flags_.end()) flags_.push_back(f);
@@ -212,11 +235,26 @@ class En {
       if (tab_.has("det", k) && !isKey(k, {"is"})) return standalone(x, role);
       uint8_t g = x.pron.gender;
       if (x.pron.person == 3 && x.pron.number != 2 && !g) g = M;
-      return pron(x.pron.person ? x.pron.person : 3, x.pron.number == 2 ? 2 : 1, g, roleName(role));
+      std::string out = pron(x.pron.person ? x.pron.person : 3, x.pron.number == 2 ? 2 : 1, g, roleName(role));
+      for (const frame::SemAdj& a : x.adjectives) {
+        const TokInfo& at = ti_[(size_t)std::max(0, a.token)];
+        if (a.token >= 0 && (at.f.pos == Participle || at.lpos == Participle) && at.key.size() > 2 &&
+            at.key.compare(at.key.size() - 2, 2, "ns") == 0 && (x.pron.person == 1 || x.pron.person == 2)) {
+          // C36: "mē lūgentem": me, who mourn
+          out += ", who";
+          std::string v = lexOf(a.token).word;
+          appendWord(out, x.pron.person == 1 && x.pron.number != 2 ? (v == "be" ? "am" : v) : (v == "be" ? "are" : v));
+          continue;
+        }
+        appendWord(out, adjective(a));   // C36: "tū sōla": you alone
+      }
+      return out;
     }
     if (x.head.empty() && !x.determiner.empty()) return standalone(x, role);
     if (x.isName && x.token >= 0) {
       std::string out = in_.lex->nameIn(ti_[(size_t)x.token], Target::En);
+      for (const SemNP& ap : x.apposition)   // C36: "Iēsū Chrīstī": Jesus Christ
+        if (ap.isName && ap.token >= 0) appendWord(out, in_.lex->nameIn(ti_[(size_t)ap.token], Target::En));
       for (const frame::SemAdj& a : x.adjectives) out = adjective(a) + " " + out;
       for (const SemNP& g : x.genitive) {
         appendWord(out, "of");
@@ -227,9 +265,25 @@ class En {
     }
     if (x.token >= 0 && x.adjectives.size() == 1 && x.adjectives[0].token == x.token && x.head == x.adjectives[0].lemma) {
       // a substantive adjective ("bonī" the good ones; predicate handled elsewhere)
-      std::string out = definite || role == R::Subj ? "the" : "";
+      if (!x.genitive.empty()) {
+        // C36: plēna cāritāte: "full of charity"
+        std::string out = adjective(x.adjectives[0]);
+        for (const SemNP& g : x.genitive) {
+          appendWord(out, "of");
+          appendWord(out, np(g, R::Prep, false));
+        }
+        return out;
+      }
+      const TokInfo& st = ti_[(size_t)x.token];
+      const bool presPart = (st.f.pos == Participle || st.lpos == Participle) && st.key.size() > 2 &&
+                            st.key.compare(st.key.size() - 2, 2, "ns") == 0;
+      if (presPart) return adjective(x.adjectives[0]);   // C36: "iam foetentem": already stinking
+      std::string out = (definite || role == R::Subj) && role != R::Voc ? "the" : "";
       appendWord(out, adjective(x.adjectives[0]));
-      appendWord(out, x.number == 2 ? "ones" : "one");
+      // C36: people in the plural are "the poor", "the wretched" (no "ones")
+      const uint8_t sg = ti_[(size_t)x.token].f.gender;
+      if (!(x.number == 2 && sg != N && !out.empty() && out.compare(0, 4, "the ") == 0))
+        appendWord(out, x.number == 2 ? "ones" : "one");
       return out;
     }
     // a quantifier / demonstrative standing alone as the head ("ab omnibus": by everyone)
@@ -321,6 +375,8 @@ class En {
       if (lx.mass && !mentioned && !hasGen && (!definite || role == R::Prep) && !x.relative.size()) { def = false; indef = false; }
       if (x.number == 2 && !mentioned && !hasGen && !hasRel && (role == R::Obj || role == R::Pred)) def = false;
       if (role == R::Pred && x.number != 2 && !mentioned && !lx.mass && !lx.unique && !hasGen && !hasRel) { def = false; indef = true; }
+      if (lx.meal && role == R::Obj && !mentioned && !hasGen && !hasRel && x.adjectives.empty()) { def = false; indef = false; }
+      if ((lx.word == "heaven" || lx.word == "evil") && !hasGen) def = indef = false;   // C36: devotional "heaven", "evil"
       if (def) pre.push_back(tab_.text("article", "def", {"-"}));
       else if (indef) {
         const std::string next = !adjs.empty() ? adjs[0] : nounWord(x, role);
@@ -328,7 +384,10 @@ class En {
       }
     }
     std::string out = join(pre);
-    for (const std::string& a : adjs) appendWord(out, a);
+    for (size_t k = 0; k < adjs.size(); ++k) {
+      if (k > 0 && etBetween(x, k)) appendWord(out, "and");
+      appendWord(out, adjs[k]);
+    }
     appendWord(out, nounWord(x, role));
     in_.disc->mention(lemma);
     for (const SemNP& g : x.genitive) {
@@ -337,6 +396,16 @@ class En {
     }
     if (!x.relative.empty()) appendWord(out, relative(x, x.relative[0]));
     return out;
+  }
+
+  // C36: et between the (k-1)th and kth adjective of the phrase ("mītis et benigna")
+  bool etBetween(const SemNP& x, size_t k) const {
+    std::vector<int> t;
+    for (const frame::SemAdj& a : x.adjectives)
+      if (a.token >= 0 && !tab_.has("det", a.lemma)) t.push_back(a.token);
+    if (k >= t.size()) return false;
+    const int lo = std::min(t[k - 1], t[k]), hi = std::max(t[k - 1], t[k]);
+    return hi - lo == 2 && ti_[(size_t)lo + 1].key == "et";
   }
 
   // ---- verbs -----------------------------------------------------------------------------------------------------------
@@ -385,6 +454,7 @@ class En {
       const std::string w = tab_.text("lex", ti_[(size_t)lexTok].key, {"verb+obj"});
       if (!w.empty() && tab_.find("lex", ti_[(size_t)lexTok].key, "verb+obj")) base = w;
     }
+    if (hasDisc(f, "grant") && tab_.find("lex", "do", "verb+inf")) base = tab_.find("lex", "do", "verb+inf")->text;
     if (base.empty()) base = "be";
     bool lexNeg = false;
     if (base.compare(0, 4, "not ") == 0) { base = base.substr(4); lexNeg = true; }   // nesciō, nōlō
@@ -395,7 +465,7 @@ class En {
     const bool subj = f.pred.mood == frame::SrcMood::Subjunctive;
     c.base = base;
     // modal verbs with an infinitive
-    if (!f.pred.complementVerb.empty() && !hasDisc(f, "jussive")) {
+    if (!f.pred.complementVerb.empty() && !hasDisc(f, "jussive") && !hasDisc(f, "grant")) {
       const std::string m = f.pred.lemma;
       const std::string inf = lexOf(f.pred.complementToken).word;
       const bool past = t == frame::Tense::Past;
@@ -588,9 +658,22 @@ class En {
       c.w = {f.negative ? "not to" : "to", base};
       subj.clear();
     }
-    const bool neg = (f.negative != c.neg) && !(sameSubjectInf);
+    // C36: nōn X sed Y: the copula keeps "is not X but Y"; another verb stays positive ("lives not in A but in B")
+    nonX_ = sedY_ = -1;
+    sedNot_ = false;
+    for (const std::string& d : f.discourse) {
+      if (d.compare(0, 7, "sednon:") == 0) { sedY_ = std::atoi(d.c_str() + 7); sedNot_ = true; }
+      if (d.compare(0, 7, "nonsed:") == 0) {
+        nonX_ = std::atoi(d.c_str() + 7);
+        const size_t colon = d.find(':', 7);
+        sedY_ = colon == std::string::npos ? -1 : std::atoi(d.c_str() + colon + 1);
+      }
+    }
+    const bool constituentNeg = nonX_ >= 0 && !f.copula;
+    const bool neg = ((f.negative && !constituentNeg) != c.neg) && !(sameSubjectInf);
     std::vector<std::string> preAdv, endAdv;
     adverbs(f, preAdv, endAdv);
+    if (hasDisc(f, "notonly") && !c.w.empty()) c.w.insert(c.w.begin(), "not only");
     if (neg && f.hasPred) {
       doSupport(c, a);
       if (!c.w.empty()) {
@@ -663,30 +746,61 @@ class En {
 
   std::string subjectText(const SemFrame& f) {
     if (!f.hasSubject) return std::string();
+    if (f.implicitSubject && dropSubj_) return std::string();
     if (f.implicitSubject) {
       int person = f.subject.pron.person ? f.subject.pron.person : 3;
       int number = f.subject.pron.number == 2 ? 2 : 1;
       uint8_t g = f.subject.pron.gender;
       if (person == 3 && number == 1) {
         if (!g || g == MFN || g == MF) g = in_.disc->lastSubjGender ? in_.disc->lastSubjGender : (uint8_t)M;
+        // C36: while the text is about a person, a restored subject is that person, not "it" for the last thing
+        if ((!f.subject.pron.gender || f.subject.pron.gender == MFN || f.subject.pron.gender == MF) && g == N &&
+            in_.disc->sincePerson <= 2 && !thingSubjectHere_)
+          g = in_.disc->lastPersonGender ? in_.disc->lastPersonGender : (uint8_t)M;
       }
       return pron(person, number, g, "subj");
     }
     return np(f.subject, R::Subj);
   }
 
+  // C36: "not" before X and "but" before Y of nōn X sed Y
+  std::string contrastMark(const std::string& piece, const std::vector<int>& toks, int tok, bool copula) const {
+    auto has = [&](int t) { return t >= 0 && (t == tok || std::find(toks.begin(), toks.end(), t) != toks.end()); };
+    if (has(sedY_)) return "but " + piece;
+    if (has(nonX_) && !copula) return "not " + piece;
+    return piece;
+  }
+
   std::string complements(const SemFrame& f, const Agree& a) {
     std::string out;
     const bool jussive = hasDisc(f, "jussive");
+    if (hasDisc(f, "grant")) {
+      // C36: dā nōs bene vīvere: grant us to live well
+      if (f.hasIndirect) appendWord(out, np(f.indirectObject, R::Iobj));
+      if (f.pred.complementToken >= 0) {
+        appendWord(out, "to");
+        appendWord(out, lexOf(f.pred.complementToken).word);
+      }
+      if (f.hasObject) appendWord(out, np(f.object, R::Obj));
+      for (const frame::SemOblique& o : f.obliques) appendWord(out, o.prep == "#acc" ? np(o.np, R::Obj) : oblique(o));
+      return out;
+    }
     // copula predicate
     for (const std::string& d : f.discourse)
       if (d.compare(0, 12, "phrase-pred:") == 0) appendWord(out, d.substr(12));
     if (f.copula || (!f.hasPred && (!f.predAdj.empty() || !f.predicative.empty()))) {
       std::vector<std::string> pp;
-      for (const frame::SemAdj& x : f.predAdj) pp.push_back(adjective(x));
-      for (const SemNP& x : f.predicative) pp.push_back(np(x, R::Pred));
+      std::vector<char> isY;
+      for (const frame::SemAdj& x : f.predAdj) { pp.push_back(adjective(x)); isY.push_back(x.token >= 0 && x.token == sedY_); }
+      for (const SemNP& x : f.predicative) {
+        pp.push_back(np(x, R::Pred));
+        isY.push_back(sedY_ >= 0 && (x.token == sedY_ || std::find(x.tokens.begin(), x.tokens.end(), sedY_) != x.tokens.end()));
+      }
       for (size_t k = 0; k < pp.size(); ++k) {
-        if (k > 0) appendWord(out, k + 1 == pp.size() ? "and" : ",");
+        if (k > 0) {
+          if (isY[k] && sedNot_) out += ",";
+          appendWord(out, isY[k] ? (sedNot_ ? "but not" : "but") : k + 1 == pp.size() ? "and" : ",");
+        }
         appendWord(out, pp[k]);
       }
     } else if (!f.predAdj.empty() || !f.predicative.empty()) {
@@ -701,24 +815,43 @@ class En {
     if (f.hasObject) {
       if (reflDropped_) reflDropped_ = false;
       else if (reflexiveObject(f, curSubj_)) appendWord(out, pron(curSubj_.person, curSubj_.number, curSubj_.gender, "refl"));
-      else appendWord(out, np(f.object, R::Obj));
+      else if (homeObject(f)) {
+        // C36: "Amat domum": he loves his home
+        appendWord(out, pron(3, 1, curSubj_.gender == F ? F : M, "poss"));
+        appendWord(out, "home");
+        in_.disc->mention(ti_[(size_t)f.object.token].lemma);
+      } else appendWord(out, contrastMark(np(f.object, R::Obj), f.object.tokens, f.object.token, f.copula));
     }
     if (jussive && f.pred.complementToken >= 0) {
       appendWord(out, "to");
       appendWord(out, lexOf(f.pred.complementToken).word);
     }
     for (const frame::SemOblique& o : f.obliques)
-      if (o.prep == "#acc") appendWord(out, np(o.np, R::Obj));
+      if (o.prep == "#acc") appendWord(out, contrastMark(np(o.np, R::Obj), o.np.tokens, o.np.token, f.copula));
     if (f.hasIndirect && (f.hasObject || giveSay) && !ioPron) {
       appendWord(out, "to");
       appendWord(out, np(f.indirectObject, R::Prep, true));
     }
     for (const frame::SemOblique& o : f.obliques) {
       if (o.prep == "#acc") continue;
-      appendWord(out, oblique(o));
+      std::vector<int> toks = o.np.tokens;
+      toks.push_back(o.token);
+      appendWord(out, contrastMark(oblique(o), toks, o.np.token, f.copula));
     }
     (void)a;
     return out;
+  }
+
+  // the object is domus alone and the subject a person (3rd singular)
+  bool homeObject(const SemFrame& f) const {
+    if (!f.hasObject || f.object.isPronoun || f.object.token < 0 || f.object.number == 2) return false;
+    if (!f.object.determiner.empty() || !f.object.possessor.empty() || !f.object.adjectives.empty() ||
+        !f.object.genitive.empty() || !f.object.coord.empty())
+      return false;
+    if (!lexOf(f.object.token).home) return false;
+    if (curSubj_.person != 3 || curSubj_.number == 2) return false;
+    if (f.hasSubject && f.implicitSubject) return in_.disc->sincePerson <= 2 || curSubj_.gender == M || curSubj_.gender == F;
+    return curSubj_.personNoun;
   }
 
   std::string oblique(const frame::SemOblique& o) {
@@ -726,6 +859,8 @@ class En {
     if (p == "#dat") return "to " + np(o.np, R::Prep, true);
     if (p == "#than") return "than " + np(o.np, R::Subj, true);
     if (p == "#gen") return "of " + np(o.np, R::Prep, true);
+    if (p == "#appos") return ", " + np(o.np, R::Pred);   // C36: me, a sinner
+    if (p == "#genobj") return "on " + np(o.np, R::Prep, true);   // C36: miserēre nostrī: have mercy on us
     if (p == "#loc") {
       std::string w = in_.lex->nameIn(ti_[(size_t)std::max(0, o.np.token)], Target::En);
       return "in " + (o.np.isName ? w : np(o.np, R::Prep, true));
@@ -741,6 +876,7 @@ class En {
         appendWord(out, np(x, R::Prep, true));
         return out;
       }
+      if (lx.manner) return "in " + np(o.np, R::Obj, false);   // C36: modō mīrō: in a wonderful way
       return "with " + np(o.np, R::Obj, false);
     }
     if (p.size() > 1 && p[0] == '#') return np(o.np, R::Obj);
@@ -759,14 +895,27 @@ class En {
                                  (prep == "ex" && tab_.tagged("lex", curVerbKey_, "direct-ex"))))
       return np(o.np, R::Prep, true);
     if (w.empty() && prep == "ex" && !curVerbKey_.empty() && tab_.tagged("lex", curVerbKey_, "from-ex")) w = "from";
+    if (w.empty() && prep == "in" && cs == "abl" && lexOf(o.np.token).on) w = "on";   // C36: in viā: on the way
     if (w.empty()) w = tab_.text("prep", prep, {cs});
     if (w.empty()) w = s_.tokens[(size_t)std::max(0, o.token)].text;
     std::string out = w;
+    if (prep == "sine" && !o.np.isPronoun && !o.np.isName && o.np.coord.empty()) {
+      // C36: a first mention after sine is indefinite ("without a master"); "without end"
+      const Lexical lx = lexOf(o.np.token);
+      if (lx.sineBare && o.np.adjectives.empty() && o.np.genitive.empty()) appendWord(out, nounWord(o.np, R::Obj));
+      else appendWord(out, np(o.np, R::Obj, false));
+      return out;
+    }
     appendWord(out, np(o.np, R::Prep, true));
     return out;
   }
   bool curPassive_ = false;
   std::string curVerbKey_;   // Latin key of the clause's lexical verb (the participle's verb in a periphrasis)
+
+  // C36: an adverb with a future-tense word ("ōlim" + future: one day)
+  std::string advText(const SemFrame& f, const std::string& lemma) const {
+    return tab_.text("adv", lemma, {f.pred.tense == frame::Tense::Future ? "fut" : "-", "-"});
+  }
 
   void adverbs(const SemFrame& f, std::vector<std::string>& pre, std::vector<std::string>& end) {
     for (const frame::SemAdverb& a : f.adverbs) {
@@ -775,7 +924,7 @@ class En {
         end.push_back(leftover(a.token));
         continue;
       }
-      std::string w = tab_.text("adv", a.lemma, {"-"});
+      std::string w = advText(f, a.lemma);
       if (w.empty()) {
         w = lexOf(a.token).word;
         if (w.empty()) w = "[" + s_.tokens[(size_t)a.token].text + "]";
@@ -809,7 +958,7 @@ class En {
       if (a.lemma == "#tok") { appendWord(out, leftover(a.token)); continue; }
       if (tab_.tagged("adv", a.lemma, "pre") && f.hasPred) continue;   // with the verb ("never", "always")
       if (!frontable(f, a)) continue;
-      std::string w = tab_.text("adv", a.lemma, {"-"});
+      std::string w = advText(f, a.lemma);
       if (w.empty()) w = lexOf(a.token).word;
       appendWord(out, w);
     }
@@ -933,7 +1082,7 @@ class En {
     // interjections + vocatives in front
     std::string head;
     for (const std::string& i : f.interjections) {
-      std::string w = tab_.text("intj", i, {"-"});
+      std::string w = tab_.text("intj", i, {in_.disc->devotional ? "eccl" : "-", "-"});
       if (w.empty()) w = i;
       if (i == "o" && !f.vocatives.empty()) w = "O";
       appendWord(head, w);
@@ -1005,6 +1154,8 @@ class En {
       const Agree a = agreeOf(f.subject);
       in_.disc->lastSubjGender = a.gender;
       in_.disc->lastSubjPerson = a.personNoun;
+      if (a.personNoun) in_.disc->lastPersonGender = a.gender;
+      else thingSubjectHere_ = true;
       in_.disc->lastSubjNumber = (uint8_t)a.number;
     }
     return out;
@@ -1028,7 +1179,10 @@ class En {
     }
     const bool ecce = std::find(f.interjections.begin(), f.interjections.end(), "ecce") != f.interjections.end();
     if (f.hasSubject) appendWord(out, np(f.subject, ecce ? R::Obj : R::Subj));
-    for (const frame::SemAdj& a : f.predAdj) appendWord(out, adjective(a));
+    for (size_t k = 0; k < f.predAdj.size(); ++k) {   // C36: "beāta et glōriōsa": blessed and glorious
+      if (k > 0) appendWord(out, k + 1 == f.predAdj.size() ? "and" : ",");
+      appendWord(out, adjective(f.predAdj[k]));
+    }
     for (const SemNP& x : f.predicative) appendWord(out, np(x, R::Pred));
     if (f.hasObject) appendWord(out, np(f.object, R::Obj));
     if (f.hasIndirect) appendWord(out, "to " + np(f.indirectObject, R::Prep, true));

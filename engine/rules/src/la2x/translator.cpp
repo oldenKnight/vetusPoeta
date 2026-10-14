@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <functional>
 #include <cctype>
+#include <cstring>
 #include <cmath>
 #include <exception>
 #include <sstream>
@@ -134,6 +135,7 @@ struct Translator::Impl final : public detail::LexicalSource {
   mutable std::vector<lex::Sense> senseBuf;
   std::vector<std::string> personWordsEn;   // English words of "person" rows (gloss fallback)
   detail::Coverage coverage;                // meaning coverage of the readable sentence (C36)
+  bool devotionalNow = false;               // C36: the current text is devotional (lexical() picks devotional words)
 
   Impl(const lex::Lexicon& l, const curated::CuratedData& c) : lx(l), cd(c), analyser(l, c) {}
 
@@ -380,6 +382,31 @@ struct Translator::Impl final : public detail::LexicalSource {
       }
     };
     tags(row);
+    if (row) {
+      // C36: the devotional word (servus -> servant, caelum -> heaven) and the feminine word (parēns -> mother)
+      const std::string& nt = row->note;
+      auto noteWord = [&](const char* tag) -> std::string {
+        const size_t at = nt.find(tag);
+        if (at == std::string::npos || (at > 0 && nt[at - 1] != ' ')) return std::string();
+        const size_t b = at + std::strlen(tag), e = nt.find(' ', b);
+        std::string w = nt.substr(b, e == std::string::npos ? std::string::npos : e - b);
+        for (char& ch : w)
+          if (ch == '_') ch = ' ';
+        return w;
+      };
+      const std::string dv = noteWord("devotional:");
+      if (devotionalNow && !dv.empty()) out.word = dv;
+      const std::string fw = noteWord("f:");
+      if (!fw.empty() && t.f.gender == F) out.word = fw;
+    }
+    for (const detail::Row* r : {row, enRow}) {
+      if (!r) continue;
+      out.manner = out.manner || detail::noteHas(r->note, "manner");
+      out.sineBare = out.sineBare || detail::noteHas(r->note, "sine-bare");
+      out.on = out.on || detail::noteHas(r->note, "on");
+      out.home = out.home || detail::noteHas(r->note, "home");
+      out.meal = out.meal || detail::noteHas(r->note, "meal");
+    }
     if (lang == Target::Es && !row) {
       // semantics from the English row (person / mass / unique); the time preposition is language specific
       const std::string keep = out.timePrep;
@@ -406,6 +433,12 @@ struct Translator::Impl final : public detail::LexicalSource {
 
   std::string nameIn(const TokInfo& t, Target lang) const override {
     std::string latin;
+    {
+      // C36: the readable table's spelling first (Davus, not the lexicon's gloss "Daos")
+      const detail::Tables& tb = lang == Target::En ? en : es;
+      const std::string lk = t.lemma != lex::kNoLemma ? std::string(lx.lemma(t.lemma).key) : t.key;
+      if (const detail::Row* r = tb.find("name", lk, "-")) return r->text;
+    }
     if (t.lemma != lex::kNoLemma) {
       const lex::Lemma l = lx.lemma(t.lemma);
       const std::string g(lang == Target::En ? l.glossEn : l.glossEs);
@@ -669,7 +702,23 @@ struct Translator::Impl final : public detail::LexicalSource {
     analyser.analyse(latin, out.analysis, glossary);
     std::vector<TokInfo> ti;
     detail::tokInfos(lx, out.analysis, ti);
+    // C36: a noun of common gender (parēns, cīvis) takes the gender of the adjective next to it (sāncta parēns: the
+    // holy mother)
+    for (size_t i = 0; i < ti.size(); ++i) {
+      TokInfo& x = ti[i];
+      if (!x.word || x.lpos != Noun) continue;
+      if (x.lgender != MF && x.lgender != MFN && x.lgender != 0) continue;
+      for (size_t j : {i - 1, i + 1}) {
+        if (j >= ti.size() || !ti[j].word) continue;
+        const TokInfo& y = ti[j];
+        if ((y.f.pos == Adj || y.lpos == Adj) && y.f.case_ == x.f.case_ && (y.f.gender == F || y.f.gender == M)) {
+          x.f.gender = y.f.gender;
+          break;
+        }
+      }
+    }
     devotionalScan(out.analysis, ti);
+    devotionalNow = disc.devotional;
     detail::Built b;
     detail::buildFrames(lx, t == Target::En ? en : es, out.analysis, ti, b, disc.devotional);
     detail::RealiseIn in;

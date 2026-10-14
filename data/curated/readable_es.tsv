@@ -409,7 +409,7 @@ lex	puella	noun	niña	person
 lex	femina	noun	mujer	person
 lex	uir	noun	hombre	person
 lex	homo	noun	persona	person
-lex	seruus	noun	esclavo	person
+lex	seruus	noun	esclavo	person devotional:siervo
 lex	serua	noun	esclava	person
 lex	dominus	noun	amo	person
 lex	domina	noun	señora	person
@@ -462,9 +462,9 @@ lex	annus	noun	año	time:en
 lex	tempus	noun	tiempo	
 lex	hortus	noun	jardín	
 lex	uilla	noun	casa	
-lex	domus	noun	casa	
+lex	domus	noun	casa	home
 lex	casa	noun	choza	
-lex	uia	noun	camino	
+lex	uia	noun	camino
 lex	urbs	noun	ciudad	
 lex	oppidum	noun	pueblo	
 lex	ager	noun	campo	
@@ -491,7 +491,7 @@ lex	porta	noun	puerta
 lex	fabula	noun	cuento	
 lex	carmen	noun	canción	
 lex	donum	noun	regalo	
-lex	malum	noun	manzana	
+lex	malum	noun	manzana	devotional:mal
 lex	oculus	noun	ojo	
 lex	manus	noun	mano	
 lex	pes	noun	pie	
@@ -656,8 +656,8 @@ lex	uiridis	adj	verde
 lex	caeruleus	adj	azul	
 lex	flauus	adj	amarillo	
 lex	clarus	adj	claro	
-lex	miser	adj	pobre	
-lex	mirus	adj	extraño	
+lex	miser	adj	miserable
+lex	mirus	adj	admirable
 lex	fortis	adj	valiente	
 lex	celer	adj	rápido	
 lex	facilis	adj	fácil	
@@ -688,7 +688,7 @@ lex	asper	adj	áspero
 lex	dexter	adj	derecho	
 lex	sinister	adj	izquierdo	
 lex	solus	adj	solo	estar
-lex	beatus	adj	feliz	
+lex	beatus	adj	bienaventurado
 lex	diues	adj	rico	
 lex	pauper	adj	pobre	
 # ---- names (Latin name key -> Spanish); others: -us -> -o, initial I + vowel -> J ----
@@ -704,7 +704,7 @@ name	cornelia	-	Cornelia
 name	alicia	-	Alicia
 lex	luceo	verb	brillar	
 lex	mus	noun	ratón	
-lex	cena	noun	cena	event
+lex	cena	noun	cena	event meal
 lex	pluo	verb	llover	
 lex	mordeo	verb	morder	
 lex	oppugno	verb	atacar	
@@ -721,7 +721,7 @@ lex	inclino	verb+refl	inclinarse
 lex	facio	verb+wh	hacer	
 lex	lauo	verb+refl	lavarse	
 lex	sextus	adj	sexto	
-lex	tenebrae	noun	oscuridad	mass
+lex	tenebrae	noun	tiniebla
 lex	horologium	noun	reloj	
 lex	thea	noun	té	mass
 lex	placenta	noun	pastel	
@@ -759,3 +759,72 @@ lex	ingredior	verb	entrar
 lex	egredior	verb	salir	
 lex	proficiscor	verb	partir	
 lex	fons	noun	fuente	
+# ---- C36: prosa de manual y verso devocional (notas como en readable_en.tsv) ----
+lex	fluuius	noun	río
+lex	praedium	noun	granja
+lex	colo	verb	cultivar
+lex	oleum	noun	aceite	mass
+lex	lectio	noun	lección
+lex	familia	noun	familia
+lex	uirgo	noun	virgen	person
+lex	humilis	adj	humilde
+lex	candidus	adj	blanco
+lex	mitis	adj	manso
+lex	benignus	adj	benigno
+lex	tueor	verb	proteger
+lex	misereor	verb	tener piedad
+lex	desero	verb	abandonar
+lex	hostis	noun	enemigo	person
+lex	lux	noun	luz
+lex	spes	noun	esperanza
+lex	purus	adj	puro
+lex	pius	adj	piadoso
+lex	gloriosus	adj	glorioso
+lex	oro	verb	rogar
+lex	precor	verb	suplicar
+lex	defendo	verb	defender
+lex	confero	verb	conceder
+lex	gratia	noun	gracia	mass
+lex	finis	noun	fin
+lex	stella	noun	estrella
+lex	imperatrix	noun	emperatriz	person
+lex	sanctus	adj	santo
+lex	parens	noun	padre	person f:madre
+lex	angelus	noun	ángel	person
+lex	peccatum	noun	pecado
+lex	peccator	noun	pecador	person
+lex	foeteo	verb	apestar
+lex	lugeo	verb	llorar
+lex	honor	noun	honor
+lex	alienus	adj	ajeno
+lex	crudelis	adj	cruel
+lex	honestas	noun	honestidad	mass
+lex	mos	noun	costumbre
+lex	lacto	verb	amamantar
+lex	modus	noun	modo	manner
+lex	ualidus	adj	fuerte
+lex	industrius	adj	trabajador
+lex	praebeo	verb	dar
+lex	uito	verb	evitar
+lex	iustus	adj	justo
+lex	do	verb+inf	conceder
+name	iuppiter	-	Júpiter
+name	dauus	-	Davo
+name	iesus	-	Jesús
+name	christus	-	Cristo
+intj	aue	-	ave
+intj	auete	-	ave
+intj	salue	eccl	salve
+intj	saluete	eccl	salve
+conj	uero	-	pero	second
+adv	olim	fut	algún día	front time
+lex	rus	noun	campo	unique
+lex	ciuis	noun	ciudadano	person
+lexh	liber	noun	niño	children
+lex	uelox	adj	veloz
+lex	felix	adj	feliz
+lex	frumentum	noun	trigo	mass
+lex	mors	noun	muerte
+lex	charitas	noun	caridad	mass
+lex	caritas	noun	caridad	mass
+lex	serenus	adj	sereno

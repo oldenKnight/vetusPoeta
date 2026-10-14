@@ -259,13 +259,17 @@ void Coverage::check(const CoverageIn& in, const std::string& text, std::vector<
     bool found = false;
     for (size_t k = 0; k < out.size(); ++k)
       for (const std::string& f : forms)
-        if (!impl_->isStop(f, t) && realises(out[k], f, t)) {
-          accounted[k] = 1;
+        if (realises(out[k], f, t)) {
+          if (!impl_->isStop(f, t)) accounted[k] = 1;
           found = true;
         }
-    // a gloss made only of function words ("be eager" -> eager is content; "be" alone counts as found)
+    // a gloss made only of function words ("be eager" -> eager is content; "be" or "solo" alone counts as found)
     bool allStop = true;
-    for (const std::string& f : forms) allStop = allStop && impl_->isStop(f, t);
+    {
+      std::vector<std::string> base;
+      words(word, base);
+      for (const std::string& b0 : base) allStop = allStop && impl_->isStop(b0, t);
+    }
     if (!found && !allStop) flag("meaning-dropped", s.tokens[i].text);
   }
   // ---- added content words ----
