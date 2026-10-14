@@ -284,6 +284,11 @@ struct LatinChecker::Impl {
               if (hp == Noun || hp == Adj || hp == Participle)
                 for (const Reading& r : rd[ti])
                   if (r.lemma == h.lemma && isNominal(r)) nounHint[ti] = 1;
+              // C37: an interjection the generator wrote ("Avē" of a hymn) is not the noun of the same spelling
+              // (avis "bird" in the ablative): only its interjection reading takes part in the checks
+              if (hp == Intj && std::any_of(rd[ti].begin(), rd[ti].end(), [&](const Reading& r) { return r.lemma == h.lemma; }))
+                rd[ti].erase(std::remove_if(rd[ti].begin(), rd[ti].end(), [&](const Reading& r) { return r.lemma != h.lemma; }),
+                             rd[ti].end());
             }
           }
         }

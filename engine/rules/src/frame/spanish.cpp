@@ -258,6 +258,70 @@ bool retagWords(std::vector<Token>& tk, const lex::Lexicon& lex, const curated::
     const bool next = i + 1 < n && (tk[(size_t)i + 1].text == "," || tk[(size_t)i + 1].text == "!" ||
                                     tk[(size_t)i + 1].text == "?" || tk[(size_t)i + 1].text == ".");
     const bool afterComma = i > 0 && tk[(size_t)i - 1].text == ",";
+    // C37: prayers and hymns. "Ave" / "Salve" opening the line or after a comma (not "el ave", the bird) and "amén" are
+    // greetings / interjections (avē, salvē, āmēn); "pero" opening a clause is the conjunction; "Sé tú ..." / "tú sé" is
+    // the imperative of ser (estō), not saber
+    {
+      const bool lineStart = i == firstWord || afterComma || (i > 0 && tk[(size_t)i - 1].text == "\xC2\xA1");
+      if (in(low, {"ave", "salve"}) && lineStart) {
+        if (t.upos != "INTJ") { t.upos = "INTJ"; t.feats = 0; changed = true; }
+        continue;
+      }
+      if (in(low, {"amén", "amen"})) {
+        if (t.upos != "INTJ") { t.upos = "INTJ"; t.feats = 0; changed = true; }
+        continue;
+      }
+      if (low == "pero" && (i == firstWord || afterComma) && t.upos != "CCONJ") {
+        t.upos = "CCONJ";
+        t.feats = 0;
+        changed = true;
+        continue;
+      }
+      if (low == "sé" && ((i + 1 < n && tk[(size_t)i + 1].lower == "tú") || (i > 0 && tk[(size_t)i - 1].lower == "tú"))) {
+        t.upos = "VERB";
+        t.feats = nlp::morph::fromString("Mood=Imp|Number=Sing|Person=2|VerbForm=Fin");
+        changed = true;
+        continue;
+      }
+      // "de los pecadores": a word after the article that the lexicon reads as a noun is that noun (peccātōrum), even
+      // when the tagger read an adjective
+      if (t.upos == "ADJ" && i > 0 && in(tk[(size_t)i - 1].lower, {"los", "las", "el", "la", "un", "una"}) &&
+          (i + 1 >= n || in(tk[(size_t)i + 1].upos, {"PUNCT", "ADP", "CCONJ"}))) {   // not "el viejo marinero"
+        std::vector<lex::Analysis> an;
+        lex.lookup(text::es_key(low), an);
+        bool noun = false;
+        for (const lex::Analysis& a : an) noun = noun || lex.lemma(a.lemma).pos == feat::Noun;
+        if (noun) { setNoun(t, "NOUN", low.size() > 2 && low.back() == 's'); continue; }
+      }
+      // "Ave mansa": a word after the greeting that the lexicon reads only as an adjective is the adjective addressed
+      if (t.upos == "NOUN" && i > 0 && in(tk[(size_t)i - 1].lower, {"ave", "salve"})) {
+        std::vector<lex::Analysis> an;
+        lex.lookup(text::es_key(low), an);
+        bool adj = false, noun = false;
+        for (const lex::Analysis& a : an) {
+          adj = adj || lex.lemma(a.lemma).pos == feat::Adj;
+          noun = noun || lex.lemma(a.lemma).pos == feat::Noun;
+        }
+        if (adj && !noun) { t.upos = "ADJ"; t.feats = 0; changed = true; continue; }
+      }
+      // "los tristes", "a los pobres": an adjective after the article stands for people (trīstēs, pauperēs)
+      if (t.upos == "NOUN" && i > 0 && in(tk[(size_t)i - 1].lower, {"los", "las"}) &&
+          (i + 1 >= n || tk[(size_t)i + 1].upos == "PUNCT" || tk[(size_t)i + 1].upos == "CCONJ" || tk[(size_t)i + 1].upos == "ADP")) {
+        std::vector<lex::Analysis> an;
+        lex.lookup(text::es_key(low), an);
+        bool adj = false, noun = false;
+        for (const lex::Analysis& a : an) {
+          adj = adj || lex.lemma(a.lemma).pos == feat::Adj;
+          noun = noun || lex.lemma(a.lemma).pos == feat::Noun;
+        }
+        if (adj && (!noun || (i >= 2 && tk[(size_t)i - 2].lower == "a" && (i + 1 >= n || tk[(size_t)i + 1].upos == "PUNCT")))) {
+          t.upos = "ADJ";
+          t.feats = nlp::morph::fromString("Number=Plur");
+          changed = true;
+          continue;
+        }
+      }
+    }
     // "¿Cómo ...?": the interrogative adverb (the tagger may read a pronoun)
     if (low == "cómo" && t.upos != "ADV") {
       t.upos = "ADV";
@@ -280,7 +344,7 @@ bool retagWords(std::vector<Token>& tk, const lex::Lexicon& lex, const curated::
     }
     // a name of names_la.tsv, capitalised (not a sentence-initial common word with a reading of its own)
     if (capital(t.text) && cd.nameByEnglish(t.text) && t.upos != "PROPN" &&
-        (i != firstWord || next || !nounReading(lex, low))) {
+        (i != firstWord || next || !nounReading(lex, low) || t.upos == "VERB")) {   // C37: "Virgen pura" read as a verb
       setNoun(t, "PROPN", false);
       continue;
     }
@@ -1259,7 +1323,9 @@ void normalise(SemSentence& s, const lex::Lexicon* lex, const curated::CuratedDa
                         addressNoun(npl) ||
                         (np.upos == "PRON" && in(np.lower, {"él", "ella", "ellos", "ellas", "usted", "ustedes", "mí",
                                                             "ti", "nosotros", "nosotras", "todos", "nadie", "alguien",
-                                                            "quién"}));
+                                                            "quién"})) ||
+                        // C37: "consuela a los tristes": an adjective after the article stands for people
+                        (np.upos == "ADJ" && h > 0 && in(tk[(size_t)h - 1].lower, {"los", "las"}));
     const curated::VerbPrepEntry* vpe = cd.verbPrep(vl, "to");
     // C34: llevar / traer a person or an animal ("¿Puedo llevar a mi perrito?") carry it: the object
     const bool carry = in(vl, {"llevar", "traer"});

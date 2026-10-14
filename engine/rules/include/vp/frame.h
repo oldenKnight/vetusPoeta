@@ -289,6 +289,9 @@ class FrameBuilder {
   // C34: Spanish main clauses joined by a comma ("Camina rápido, ya es tarde.") are parsed apart, one unit each. Off by
   // default; the Latin engine turns it on (the Greek engine reads such sentences with its own repair, which adds γάρ).
   void setCommaClauses(bool on) { commaClauses_ = on; }
+  // C37: ", so <clause>" and ", yet <clause>" read as the conjunctions (itaque / tamen). Off by default; the Latin
+  // engine turns it on (the Greek engine renders ", so" as ὥστε from the adverb reading).
+  void setProseConnectors(bool on) { proseConnectors_ = on; }
 
  private:
   struct Ctx;
@@ -306,6 +309,7 @@ class FrameBuilder {
   const curated::CuratedData& cd_;
   Phrasebook book_;
   bool commaClauses_ = false;   // C34
+  bool proseConnectors_ = false;   // C37
   std::vector<std::pair<std::string, std::vector<std::string>>> contractions_;   // sorted by form
 };
 

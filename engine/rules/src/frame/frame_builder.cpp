@@ -269,6 +269,19 @@ bool esLeadWord(const std::string& w) {
                 "perdón", "gracias", "adiós", "hola", "vaya", "órale", "ándale", "ojalá", "bien", "ya", "ok", "sale"});
 }
 bool esVocativeSpan(const std::vector<Token>& tk, int a, int b) {
+  // C37: a sacred name or title of a prayer with its attribute ("Dios eterno", "Señora mía", "Reina del cielo", "Dios
+  // del cielo", "Madre de bondad plena")
+  if (b >= a && b - a <= 6 && upper(tk[(size_t)a].text) &&
+      in(nlp::normalise(tk[(size_t)a].text), {"dios", "señor", "señora", "reina", "rey", "madre", "virgen", "jesucristo",
+                                              "jesús", "cristo", "maría", "padre", "hijo", "emperatriz", "consolatriz"})) {
+    bool ok = true;
+    for (int i = a + 1; i <= b && ok; ++i) {
+      const Token& t = tk[(size_t)i];
+      ok = in(t.upos, {"ADJ", "NOUN", "PROPN", "DET", "ADP"}) || in(t.lower, {"mía", "mío", "de", "del"});
+      if (t.upos == "ADP" && !in(t.lower, {"de", "del"})) ok = false;
+    }
+    if (ok) return true;
+  }
   if (b < a || b - a > 2) return false;
   for (int i = a; i <= b; ++i) {
     const Token& t = tk[(size_t)i];
@@ -971,7 +984,19 @@ void FrameBuilder::tokenize(std::string_view sentence, std::vector<Token>& out) 
             a = b + 1;
           }
         }
-      if ((an.empty() || tryKnown || firstWord) && !phraseWord) {
+      // C37: a one-word phrase ("ayúdame") doubled by "a mí" is split, so the clitic and "a mí" are one argument
+      {
+        const size_t ri = (size_t)(&t - raw.data());
+        if (phraseWord && ri + 2 < raw.size() && nlp::normalise(raw[ri + 1].text) == "a" &&
+            in(nlp::normalise(raw[ri + 2].text), {"mí", "ti", "nosotros", "nosotras"}))
+          phraseWord = false;
+      }
+      if (low == "dame" || low == "dime") nonVerb = false;   // "dame" is also an English noun in the lexicon
+      // C37: a known verb form inside the sentence ("y dame la paz", "llévame", "ayúdame") is split like an unknown one
+      // when its base is an imperative; a noun is never split ("Dios" is no "di os")
+      const bool verbOnly = !an.empty() && !nonVerb;
+      const bool tableName = cd_.nameByEnglish(t.text) != nullptr;   // "Dios" is no "di os"
+      if ((an.empty() || tryKnown || (firstWord && !tableName) || verbOnly) && !phraseWord && !tableName) {
         std::vector<std::string> kCl;
         for (const curated::CliticEntry& ce : cd_.clitics()) kCl.push_back(ce.form);
         if (kCl.empty()) kCl = {"me", "te", "se", "nos", "os", "lo", "la", "los", "las", "le", "les"};
@@ -1001,6 +1026,20 @@ void FrameBuilder::tokenize(std::string_view sentence, std::vector<Token>& out) 
             if (an.empty() || md == feat::Imperative || md == feat::Infinitive || md == feat::Gerund ||
                 (md == feat::Subjunctive && tryKnown))
               ok = true;
+          }
+          if (ok && verbOnly && !tryKnown) {   // C37: a known verb form: its base must be an imperative
+            ok = false;
+            for (const lex::Analysis& x : a2)
+              if (lex_->lemma(x.lemma).pos == feat::Verb && feat::unpack(lex_->feature(x.feat)).mood == feat::Imperative) ok = true;
+            // the written accent of a longer base ("ayúda|me") or a one-syllable base ("da|me", "di|me")
+            static const char* const kShort1[] = {"da", "di", "haz", "pon", "ten", "ve", "ven", "sal", "sé", "dé"};
+            bool shortBase = false;
+            for (const char* k : kShort1) shortBase = shortBase || b == k;
+            const bool accent = low.find("\xC3\xA1") != std::string::npos || low.find("\xC3\xA9") != std::string::npos ||
+                                low.find("\xC3\xAD") != std::string::npos || low.find("\xC3\xB3") != std::string::npos ||
+                                low.find("\xC3\xBA") != std::string::npos;
+            if (ok && (accent || shortBase)) { split = true; bestBase = b; bestCl = cl; }
+            continue;
           }
           if (ok && !an.empty() && !tryKnown) {   // sentence start: one-syllable imperatives only (da, di, haz ...)
             static const char* const kShort[] = {"da", "di", "haz", "pon", "ten", "ve", "ven", "sal", "sé", "dé"};
@@ -3225,7 +3264,7 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       }
       // "then" / "so" at the start of the clause: connector
       if ((k == first || k == firstContent) && in(kl, {"then", "so", "entonces", "luego", "also", "therefore", "however",
-                                                       "besides", "still", "yet"})) {   // C37: "And yet he ..." -> tamen
+                                                       "besides", "still"})) {
         c.drop(k, Drop::Marker);   // accounted for by the connector table
         f.connectors.push_back(kl == "entonces" || kl == "luego" ? "then" : kl);
         continue;
@@ -3892,7 +3931,8 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
   else f.pred.deliberative = false;
 
   // C37: "provides him food": in English the first of two objects is the indirect one (eī cibum praebet)
-  if (en && f.hasObject && f.hasIndirect && f.object.token >= 0 && f.indirectObject.token > f.object.token)
+  if (en && f.hasObject && f.hasIndirect && f.object.token >= 0 && f.indirectObject.token > f.object.token &&
+      f.object.isPronoun && !f.indirectObject.isPronoun && !in(f.pred.lemma, {"teach", "ask"}))
     std::swap(f.object, f.indirectObject);
   // C37: "He plows the land of the farm": an "of" phrase right after the object that the parser hung on the verb is the
   // object's genitive (terram praediī), unless the verb takes an "of" phrase of its own (remind / accuse / rob X of Y)
@@ -5879,6 +5919,12 @@ bool FrameBuilder::segmentParse(std::vector<Token>& tk) const {
     const int a0 = esl && a < n && (tk[(size_t)a].text == "\xC2\xA1" || tk[(size_t)a].text == "\xC2\xBF") ? a + 1 : a;
     if (esl && a > 0 && a0 > a && b > a) cut = true;   // "Mamá, ¿puedo ...?": a question / exclamation after a comma
     if (esl && !cut && a0 == b && b > a && sepIsBreak && esLeadWord(tk[(size_t)b].lower)) cut = true;   // "¡Ay, ...!"
+    // C37: the greeting of a hymn ("Ave mansa, ave piadosa,", "Salve, Madre del cielo,"): "ave" / "salve" is a segment
+    // of its own and so is the address after it
+    if (esl && a0 < n && tk[(size_t)a0].upos == "INTJ" && in(tk[(size_t)a0].lower, {"ave", "salve"})) {
+      addCut(a0);
+      addCut(a0 + 1 < n && tk[(size_t)a0 + 1].text == "," ? a0 + 2 : a0 + 1);
+    }
     // "But, comrades, ...": a one-word "verb" after a lead word that the lexicon also reads as a noun is the addressee
     if (!esl && a == 2 && b == 2 && sepIsBreak && leadWord(tk[0].lower) && tk[2].upos == "VERB" && lex_) {
       std::vector<lex::Analysis> an;
@@ -6119,12 +6165,19 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
         feats = nlp::morph::fromString("VerbForm=Fin|Mood=Imp");
       } else {
         // C19: a base form after a plural noun subject ("Only kings and queens wear crowns."): the plural verb
+        // C37: also after "the" + a plural noun when a place / time phrase or the end follows ("In winter the oxen stay
+        // in the stable.")
         for (int i = 1; i + 1 < n && fix < 0; ++i) {
           const std::string& w = tk[(size_t)i].lower;
           const std::string& pw = tk[(size_t)i - 1].lower;
-          if (tk[(size_t)i].upos == "NOUN" && w.back() != 's' && tk[(size_t)i - 1].upos == "NOUN" && pw.size() > 3 &&
-              i >= 3 && tk[(size_t)i - 2].upos == "CCONJ" &&   // "kings and queens wear": a coordinated plural subject
-              pw.back() == 's' && verbReading(tk[(size_t)i]) && i + 1 < n &&
+          const bool plPrev = pw.size() > 3 && (pw.back() == 's' || in(pw, {"oxen", "children", "men", "women", "people", "geese", "mice"}));
+          const bool coordSubj = i >= 3 && tk[(size_t)i - 2].upos == "CCONJ";   // "kings and queens wear"
+          const bool theSubj = i >= 2 && in(tk[(size_t)i - 2].lower, {"the", "my", "his", "her", "our", "their", "these", "those"}) &&
+                               in(tk[(size_t)i + 1].upos, {"ADP", "ADV", "PUNCT"});
+          const bool irregular = in(pw, {"oxen", "children", "men", "women", "people", "geese", "mice"});
+          if (irregular && tk[(size_t)i - 1].upos == "ADJ") nounFix.push_back(i - 1);   // "oxen" read as an adjective
+          if (tk[(size_t)i].upos == "NOUN" && w.back() != 's' && (tk[(size_t)i - 1].upos == "NOUN" || irregular) &&
+              (coordSubj || theSubj) && plPrev && verbReading(tk[(size_t)i]) && i + 1 < n &&
               in(tk[(size_t)i + 1].upos, {"NOUN", "DET", "ADJ", "PRON", "ADP", "ADV", "PUNCT"})) {
             fix = i;
             feats = nlp::morph::fromString("Number=Plur|Person=3|Tense=Pres|VerbForm=Fin|Mood=Ind");
@@ -6214,7 +6267,9 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
   if (nlp_ && lex_ && lang_ == SrcLang::En)
     for (int i = 1; i < n; ++i) {
       nlp::Token& t = tk[(size_t)i];
-      if (t.upos != "ADV" || !in(tk[(size_t)i - 1].lower, {"is", "are", "was", "were", "am", "be"})) continue;
+      const bool afterBe = in(tk[(size_t)i - 1].lower, {"is", "are", "was", "were", "am", "be"});
+      const bool afterAdjAnd = i >= 2 && in(tk[(size_t)i - 1].lower, {"and", "but"}) && tk[(size_t)i - 2].upos == "ADJ";
+      if (t.upos != "ADV" || !(afterBe || afterAdjAnd)) continue;
       std::vector<lex::Analysis> an;
       lex_->lookup(text::en_key(t.lower), an);
       bool adj = false, adv = false;
@@ -6230,7 +6285,7 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
     }
   // C37: ", so the family is happy" / "and yet the winter is long": "so" / "yet" after a comma or "and" / "but", before
   // a subject, is the conjunction (itaque / tamen), not a degree word or "still"
-  if (nlp_ && lang_ == SrcLang::En)
+  if (nlp_ && lang_ == SrcLang::En && proseConnectors_)   // opt-in: the Greek engine reads ", so" as ὥστε itself
     for (int i = 0; i + 2 < n; ++i) {
       nlp::Token& t = tk[(size_t)i];
       if (!in(t.lower, {"so", "yet"}) || t.upos == "CCONJ") continue;
@@ -6318,13 +6373,17 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
   if (nlp_ && lex_ && lang_ == SrcLang::En && n >= 4) {
     auto adjWord = [&](int i) {
       const nlp::Token& t = tk[(size_t)i];
-      if (t.upos == "ADJ") return true;
-      if (!in(t.upos, {"ADV", "PROPN", "NOUN"})) return false;
+      if (!in(t.upos, {"ADJ", "ADV", "PROPN", "NOUN"})) return false;
       std::vector<lex::Analysis> an;
-      lex_->lookup(text::en_key(t.lower), an);
-      for (const lex::Analysis& a : an)
-        if (lex_->lemma(a.lemma).pos == feat::Adj) return true;
-      return false;
+      lex_->lookup(text::en_key(nlp::normalise(t.text)), an);
+      bool adj = false, noun = false;
+      for (const lex::Analysis& a : an) {
+        adj = adj || lex_->lemma(a.lemma).pos == feat::Adj;
+        noun = noun || lex_->lemma(a.lemma).pos == feat::Noun;
+      }
+      bool first = true;   // the sentence's first word: its capital says nothing ("Hot is the sun")
+      for (int q = 0; q < i; ++q) first = first && tk[(size_t)q].upos == "PUNCT";
+      return adj && (t.upos == "ADJ" || t.upos == "ADV" || !noun || first);
     };
     struct Inv { int adj, be, det, noun; };
     std::vector<Inv> invs;
@@ -6341,8 +6400,8 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
       }
       if (!start || !adjWord(i) || !in(tk[(size_t)i + 1].lower, {"is", "are", "was", "were"})) continue;
       int k = i + 2, det = -1;
-      if (k < n && tk[(size_t)k].upos == "DET") det = k++;
-      if (k >= n || !in(tk[(size_t)k].upos, {"NOUN", "PROPN"})) continue;
+      if (k < n && (tk[(size_t)k].upos == "DET" || in(tk[(size_t)k].lower, {"my", "his", "her", "our", "their", "your"}))) det = k++;
+      if (det < 0 || k >= n || !in(tk[(size_t)k].upos, {"NOUN", "PROPN"})) continue;   // "Today is Friday" is no inversion
       const bool end = k + 1 >= n || tk[(size_t)k + 1].upos == "PUNCT" || tk[(size_t)k + 1].upos == "CCONJ";
       if (!end) continue;
       invs.push_back(Inv{i, i + 1, det, k});
@@ -6390,6 +6449,26 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
       out.repairs.emplace_back("inverted-copula");
     }
   }
+  // C37: "He works in the fields every day.": a time noun with "every" / "each" hung on another noun is a time phrase
+  // of the clause (omnī diē), not an attribute
+  if (nlp_ && lang_ == SrcLang::En)
+    for (int i = 0; i < n; ++i) {
+      nlp::Token& t = tk[(size_t)i];
+      if (t.upos != "NOUN" || t.deprel != "nmod" || !timeNoun(t.lower) || t.head <= 0) continue;
+      bool every = false, prep = false;
+      for (int k = 0; k < n; ++k) {
+        if (tk[(size_t)k].head != i + 1) continue;
+        every = every || in(tk[(size_t)k].lower, {"every", "each"});
+        prep = prep || tk[(size_t)k].deprel == "case";
+      }
+      if (!every || prep) continue;
+      int h = t.head - 1;
+      while (h >= 0 && !in(tk[(size_t)h].upos, {"VERB", "AUX"}) && tk[(size_t)h].head > 0 &&
+             !(tk[(size_t)h].deprel == "root")) h = tk[(size_t)h].head - 1;
+      if (h < 0 || !in(tk[(size_t)h].upos, {"VERB", "ADJ"})) continue;
+      t.head = h + 1;
+      t.deprel = "obl";
+    }
   // C37: the conjunction "for" (nam) that the parser hung on the subject noun hangs on the clause ("..., For work is
   // endless, ...": the coordinated clause's marker)
   if (nlp_ && lang_ == SrcLang::En)
@@ -6529,6 +6608,48 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
     if (t.lower == "too" && !(hd >= 0 && hd < n && in(tk[(size_t)hd].upos, {"ADJ", "ADV"}) && hd > last)) t.lemma = "also";
   }
   if (lang_ == SrcLang::Es && nlp_) es::normalise(out, lex_, cd_);   // C13: clitics, personal "a", "por qué" ...
+  // C37: "Señora santa", "Señora mía": an adjective or possessive the parser joined to a name as part of it (flat) is
+  // its attribute
+  if (lang_ == SrcLang::Es && nlp_)
+    for (nlp::Token& t : out.tokens)
+      if (t.deprel == "flat" && (t.upos == "ADJ" || (t.upos == "PRON" && in(t.lower, {"mía", "mío", "nuestra", "nuestro"}))) &&
+          t.head > 0 && out.tokens[(size_t)t.head - 1].upos == "PROPN") {
+        t.deprel = t.upos == "ADJ" ? "amod" : "det";
+        if (t.upos == "PRON") t.upos = "DET";
+      }
+  // C37: verse order "De Jesucristo santa madre", "De los ángeles Emperatriz": a name (or a word read as one) with its
+  // "de" and a noun hung on it as part of the name (flat) is that noun's genitive: the noun heads the phrase
+  if (lang_ == SrcLang::Es && nlp_) {
+    std::vector<nlp::Token>& tk2 = out.tokens;
+    const int n2 = (int)tk2.size();
+    for (int x = 0; x < n2; ++x) {
+      if (tk2[(size_t)x].upos != "PROPN") continue;
+      bool de = false;
+      int flat = -1;
+      for (int k = 0; k < n2; ++k) {
+        if (tk2[(size_t)k].head != x + 1) continue;
+        if (tk2[(size_t)k].deprel == "case" && tk2[(size_t)k].lower == "de") de = true;
+        if (tk2[(size_t)k].deprel == "flat" && k > x && in(tk2[(size_t)k].upos, {"NOUN", "PROPN"})) flat = k;
+      }
+      if (!de || flat < 0) continue;
+      nlp::Token& y = tk2[(size_t)flat];
+      y.head = tk2[(size_t)x].head;
+      y.deprel = tk2[(size_t)x].deprel;
+      for (int k = 0; k < n2; ++k)   // the words between (santa) and the punctuation go with the noun
+        if (k != flat && tk2[(size_t)k].head == x + 1 && k > x) tk2[(size_t)k].head = flat + 1;
+      for (int k = 0; k < n2; ++k)
+        if (tk2[(size_t)k].head == x + 1 && tk2[(size_t)k].upos == "ADJ") { tk2[(size_t)k].head = flat + 1; tk2[(size_t)k].deprel = "amod"; }
+      tk2[(size_t)x].head = flat + 1;
+      tk2[(size_t)x].deprel = "nmod";
+      // a lower-case word read as a name ("ángeles") is the common noun
+      if (!tk2[(size_t)x].text.empty() && !upper(tk2[(size_t)x].text)) { tk2[(size_t)x].upos = "NOUN"; tk2[(size_t)x].lemma = lemmaOf(tk2[(size_t)x]); }
+      out.repairs.emplace_back("verse-order");
+    }
+  }
+  // C37: "pero" opening a clause that the parser hung as an adverb is its conjunction (sed)
+  if (lang_ == SrcLang::Es && nlp_)
+    for (nlp::Token& t : out.tokens)
+      if (t.upos == "CCONJ" && t.deprel == "advmod" && in(t.lower, {"pero", "mas", "sino"})) t.deprel = "cc";
   // "six o'clock": the clock word heads the numeral and stands for "hour" (RULE time.hour)
   for (int i = 1; i < n; ++i) {
     if (tk[(size_t)i].lower != "o'clock" || tk[(size_t)i - 1].upos != "NUM") continue;

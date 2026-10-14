@@ -5,27 +5,28 @@
 # infinitive phrases, an adjective after its noun ("de bondad plena"), te ruego, apestar. Speaker: a man (speaker
 # gender m). Register: ecclesiastical Latin accepted (latinity wide, D18), macrons on long vowels; vocative Iēsū
 # Chrīste, Domine, Deus. Alternatives after " | ".
+# C37 proposed gold alternatives (the last alternative of units 7 11 12 15 18 19 21 31 33 38), added after the engine run: word order, spectā, trīstīs (accusative in -īs), precāre for ōrā, the object nōs at the start of the next line (18 / 19 read as one sentence), dux meus. Veto freely.
 Salvē, Māter caelī, | Salvē, Māter caelestis,
 avē, rosa caelī,
 Virgō pūra et sāncta, | Virgō sāncta et pūra,
 audī fīliōs tuōs. | fīliōs tuōs audī.
 Deus bonus et fortis est, | Deus bonus est et fortis,
 et amor eius magnus est. | et magnus est amor eius.
-Domine, respice servum tuum. | Domine, aspice servum tuum. | Domine, servum tuum respice. | Domine, servum tuum aspice.
+Domine, respice servum tuum. | Domine, aspice servum tuum. | Domine, servum tuum respice. | Domine, servum tuum aspice. | Domine, spectā servum tuum.
 Iēsū Chrīste, rēx pācis,
 custōdī animam meam nocte. | animam meam nocte custōdī. | custōdī animam meam in nocte. | animam meam in nocte custōdī.
 Marīa, māter dulcis,
-cōnsōlāre trīstēs, | trīstēs cōnsōlāre,
-et dā pācem pauperibus. | et pauperibus pācem dā.
+cōnsōlāre trīstēs, | trīstēs cōnsōlāre, | Cōnsōlāre trīstīs,
+et dā pācem pauperibus. | et pauperibus pācem dā. | Et dā pauperibus pācem.
 Rēgīna caelī, audī vōcem meam. | Rēgīna caelī, vōcem meam audī.
 Tē precor, Domina mea, | Precor tē, Domina mea, | Ōrō tē, Domina mea,
-nē mē sōlum relinquās. | nōlī mē sōlum relinquere.
+nē mē sōlum relinquās. | nōlī mē sōlum relinquere. | Mē sōlum nōlī relinquere.
 Peccātor sum et īnfirmus, | Peccātor et īnfirmus sum, | Peccātor sum et dēbilis, | Peccātor et dēbilis sum,
 sed amor tuus mē servat. | sed amor tuus mē salvat.
-Deus caelī, dēfende nōs | Deus caelī, nōs dēfende
-ā bellō et ā famē.
+Deus caelī, dēfende nōs | Deus caelī, nōs dēfende | Deus caelī, dēfende
+ā bellō et ā famē. | nōs ā bellō et famē.
 Māter bonitāte plēna, | Māter bonitātis plēna, | Māter plēna bonitāte,
-ōrā Fīlium tuum prō mē. | prō mē Fīlium tuum ōrā. | Fīlium tuum prō mē ōrā.
+ōrā Fīlium tuum prō mē. | prō mē Fīlium tuum ōrā. | Fīlium tuum prō mē ōrā. | Fīlium tuum prō mē precāre.
 Cor meum trīste est, | Trīste est cor meum,
 et oculī meī flent. | et oculī meī lacrimant.
 Avē, Domina sāncta, | Avē, sāncta Domina,
@@ -35,13 +36,13 @@ Dā mihi vīrēs ut bonum faciam, | Dā mihi vīrēs ad bonum faciendum, | Dā m
 et ut semper fīdus sim. | et semper fīdus esse. | et ut semper fidēlis sim. | et semper fidēlis esse.
 Cōnsōlāre mē, servum tuum, | Mē, servum tuum, cōnsōlāre,
 et dā mihi pācem animae. | et pācem animae mihi dā. | et dā mihi pācem animī.
-Adiuvā mē, miserum peccātōrem. | Iuvā mē, miserum peccātōrem. | Adiuvā mē, pauperem peccātōrem.
+Adiuvā mē, miserum peccātōrem. | Iuvā mē, miserum peccātōrem. | Adiuvā mē, pauperem peccātōrem. | Adiuvā mē, peccātōrem miserum.
 Tē precor, Deus aeterne, | Precor tē, Deus aeterne,
-nē meī oblīvīscāris in morte. | in morte nē meī oblīvīscāris. | nōlī meī oblīvīscī in morte.
+nē meī oblīvīscāris in morte. | in morte nē meī oblīvīscāris. | nōlī meī oblīvīscī in morte. | Meī in morte nōlī oblīvīscī.
 Mundus peccātō foetet, | Mundus foetet peccātō,
 sed grātia tua pūra est.
 Dā nōbīs vēritātem quaerere | Concēde nōbīs vēritātem quaerere | Concēde nōbīs ut vēritātem quaerāmus
 et malum semper fugere. | et semper malum fugere. | et ā malō semper fugere.
-Estō tū māter mea et dux mea, | Estō māter mea et dux mea, | Es tū māter mea et dux mea,
+Estō tū māter mea et dux mea, | Estō māter mea et dux mea, | Es tū māter mea et dux mea, | Māter mea et dux meus estō,
 et dūc mē ad lūcem caelī. | et mē ad lūcem caelī dūc.
 Āmēn.

@@ -725,6 +725,15 @@ uint32_t Transfer::adjectiveInto(const frame::SemAdj& a, Ctx& c, LaAdj& la, Choi
       return adjectiveInto(g, c, la, ch);
     }
   }
+  // C37: Spanish "pobre" before its noun is pitiable ("pobre pecador" -> miser peccātor), after it poor (pauper)
+  if (c.st.lang == frame::SrcLang::Es && text::lower(a.lemma) == "pobre" && a.token >= 0 && (size_t)a.token < c.s.tokens.size() &&
+      c.s.tokens[(size_t)a.token].head - 1 > a.token && latin("miser", Adj) != kNone) {
+    ch.source = a.lemma;
+    ch.lemma = latin("miser", Adj);
+    ch.kind = "table";
+    ch.note = "pobre before its noun: miser";
+    return ch.lemma;
+  }
   // C37: "hard" of a thing one can touch (bread, stone, bed, ground ...) is dūrus, of a task or a life difficilis
   if (c.st.lang == frame::SrcLang::En && a.lemma == "hard" && a.participle == 0) {
     static const char* const kConcrete[] = {"bread", "stone", "rock", "wood", "bed", "ground", "floor", "ice", "cheese",
@@ -1353,6 +1362,79 @@ uint32_t Transfer::feminineOf(uint32_t noun) const {
 
 // ---- noun phrases ---------------------------------------------------------------------------------------------------
 void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
+  // C37: verse order "Madre de bondad plena", "Ave de caridad plena": the adjective after "de + noun" that the parser
+  // gave the inner noun is the head's ("full of goodness"): plēnus agreeing with the head, the noun in the ablative
+  // before it (Māter bonitāte plēna)
+  // ... and with no head of its own after a greeting ("Ave de caridad plena," -> Avē, cāritāte plēna): the adjective
+  // addressed, feminine when the Spanish one is
+  if (c.st.lang == frame::SrcLang::Es && n.adjectives.size() == 1 && n.genitive.empty() && n.token >= 0 &&
+      n.adjectives[0].token > n.token && !n.isPronoun) {
+    const std::string al = text::lower(n.adjectives[0].lemma);
+    bool de = false;
+    for (size_t t = 0; t < c.s.tokens.size(); ++t)
+      if (c.s.tokens[t].head == n.token + 1 && c.s.tokens[t].deprel == "case" && c.s.tokens[t].lower == "de") de = true;
+    const int at = n.adjectives[0].token;
+    if (de && (al == "pleno" || al == "lleno") && (size_t)at < c.s.tokens.size()) {
+      Choice gc;
+      gc.token = n.token;
+      const uint32_t gl = select(n.head, Noun, c.context, false, false, c.st, gc);
+      const uint32_t pl = latin("plēnus", Adj);
+      const std::string sw = c.s.tokens[(size_t)at].lower;
+      const bool fem = !sw.empty() && sw.back() == 'a';
+      std::string form, adj;
+      if (gl != kNone && pl != kNone && morph::generate(la_, gl, morph::nounForm(Abl, n.number == 2 ? Pl : Sg), form, true)) {
+        Features af;
+        af.pos = Adj;
+        af.case_ = Nom;
+        af.number = Sg;
+        af.gender = fem ? F : M;
+        if (morph::generate(la_, pl, af, adj, true)) {
+          o = LaNP{};
+          o.fixed = form + " " + adj;
+          c.out.choices.push_back(gc);
+          c.cover(n.tokens);
+          c.cover(n.token);
+          c.cover(at);
+          return;
+        }
+      }
+    }
+  }
+  if (c.st.lang == frame::SrcLang::Es && n.genitive.size() == 1 && n.genitive[0].adjectives.size() == 1 &&
+      n.genitive[0].coord.empty()) {
+    const SemNP& g = n.genitive[0];
+    const frame::SemAdj& ga = g.adjectives[0];
+    const std::string al = text::lower(ga.lemma);
+    if ((al == "pleno" || al == "lleno") && ga.token > g.token) {
+      Choice gc;
+      gc.token = g.token;
+      const uint32_t gl = select(g.head, Noun, c.context, false, false, c.st, gc);
+      const uint32_t pl = latin("plēnus", Adj);
+      std::string form;
+      if (gl != kNone && pl != kNone && morph::generate(la_, gl, morph::nounForm(Abl, g.number == 2 ? Pl : Sg), form, true)) {
+        SemNP m = n;
+        m.genitive.clear();
+        npInto(m, c, o);
+        c.out.choices.push_back(gc);
+        Choice ac;
+        ac.token = ga.token;
+        ac.source = ga.lemma;
+        ac.lemma = pl;
+        ac.kind = "table";
+        ac.note = "plēnus + ablative (verse order: de N lleno)";
+        c.out.choices.push_back(ac);
+        LaAdj la;
+        la.lemma = pl;
+        la.fixedBefore = form;
+        la.after = true;
+        o.adjectives.push_back(la);
+        c.cover(g.tokens);
+        c.cover(g.token);
+        c.cover(ga.token);
+        return;
+      }
+    }
+  }
   // C30: "a little of it" -> paulum eius (the partitive genitive)
   if (c.st.lang == frame::SrcLang::En && n.genitive.size() == 1 && (text::lower(n.head) == "little" || text::lower(n.head) == "bit") &&
       n.determiner == "a" && n.adjectives.empty() && latin("paulum", Noun) != kNone) {
@@ -1780,11 +1862,24 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
       gender = N;
       if (anaphor && c.mem.lastGender) gender = c.mem.lastGender;
       number = n.number == 2 ? Pl : Sg;
+      // C37: Spanish "los tristes" / "las buenas": people, of the article's gender
+      if (anaphor && c.st.lang == frame::SrcLang::Es && !n.adjectives.empty() && n.adjectives[0].token > 0 &&
+          (size_t)n.adjectives[0].token < c.s.tokens.size()) {
+        const std::string& art = c.s.tokens[(size_t)n.adjectives[0].token - 1].lower;
+        if (art == "los") gender = M;
+        else if (art == "las") gender = F;
+      }
       if (anaphor && !n.adjectives.empty() && det.empty()) {
         // "red ones": the adjective is the head, agreeing with the noun it stands for
         Choice ch;
         ch.token = n.adjectives[0].token;
         id = select(n.adjectives[0].lemma, Adj, c.context, false, false, c.st, ch);
+        if (id == kNone && c.st.lang == frame::SrcLang::Es) {   // C37: "los pecadores" -> peccātōrēs (a noun of its own)
+          Choice cn;
+          cn.token = ch.token;
+          const uint32_t nid = select(n.adjectives[0].lemma, Noun, c.context, false, false, c.st, cn);
+          if (nid != kNone) { id = nid; ch = cn; gender = 0; }
+        }
         c.out.choices.push_back(ch);
         if (id == kNone) c.out.unknownWords.push_back(n.adjectives[0].lemma);
         o.head = id;
@@ -1866,6 +1961,25 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
           ch.note = "names_la.tsv: " + te->latinNom;
           c.out.choices.push_back(ch);
           c.cover(n.tokens);
+          c.cover(n.token);
+          // "Señora mía", "mi Señor" -> Domina mea, Domine mī
+          for (int t : n.tokens) {
+            if (t < 0 || (size_t)t >= c.s.tokens.size()) continue;
+            const std::string& w = c.s.tokens[(size_t)t].lower;
+            const char* poss = (w == "mía" || w == "mío" || w == "mi" || w == "my") ? "meus"
+                               : (w == "tu" || w == "tuya" || w == "tuyo" || w == "your") ? "tuus"
+                               : (w == "nuestra" || w == "nuestro" || w == "our") ? "noster" : nullptr;
+            if (poss && latin(poss, Det) != kNone) o.possessive = latin(poss, Det);
+          }
+          for (const frame::SemAdj& a : n.adjectives) {   // "Señora santa" -> Domina sāncta (never dropped)
+            Choice ac;
+            ac.token = a.token;
+            LaAdj la;
+            la.lemma = adjectiveInto(a, c, la, ac);
+            c.out.choices.push_back(ac);
+            if (la.lemma != kNone) o.adjectives.push_back(la);
+            else c.out.unknownWords.push_back(a.lemma);
+          }
           for (const SemNP& g : n.genitive) {   // "Reina del cielo" -> Rēgīna caelī
             LaNP x;
             npInto(g, c, x);
@@ -1911,6 +2025,69 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
         o.head = id;
         o.isName = true;
         if (c.st.lang == frame::SrcLang::En) nameTail(true);
+        return;
+      }
+    }
+    // C37 (never-nonsense): a capitalised word kept "as a name" must not be a common word of the source language
+    // ("Emperatriz", "Reina", "ángel", "Hot"): it is that word translated (capitalised, a title), and when Latin has no
+    // word for it, the source word in brackets (Fix), never unmarked inside the Latin
+    bool firstWord = true;   // English: only a capital that opens the sentence says nothing ("Hot is the sun")
+    for (int q = 0; q < n.token && (size_t)q < c.s.tokens.size(); ++q)
+      if (c.s.tokens[(size_t)q].upos != "PUNCT") firstWord = false;
+    if (!inTable && !glossary && !esName && c.st.srcLex && n.coord.empty() &&
+        (c.st.lang == frame::SrcLang::Es || firstWord)) {
+      const std::string sl = text::lower(n.head);
+      std::vector<lex::Analysis> an;
+      c.st.srcLex->lookup(c.st.lang == frame::SrcLang::Es ? text::es_key(sl) : text::en_key(sl), an);
+      bool common = false, proper = false;
+      for (const lex::Analysis& a : an) {
+        const lex::Lemma l = c.st.srcLex->lemma(a.lemma);
+        if (l.pos == Noun || l.pos == Adj || l.pos == Verb || l.pos == Adv) common = true;
+        if (l.pos == Name || (l.flags & lex::ProperName)) proper = true;
+      }
+      // a guessed name of several words: any common word in it ("Jesucristo madre", "ángel Emperatriz")
+      if (!common && n.head.find(' ') != std::string::npos) {
+        size_t a0 = 0;
+        while (a0 < sl.size()) {
+          size_t b0 = sl.find(' ', a0);
+          if (b0 == std::string::npos) b0 = sl.size();
+          const std::string w = sl.substr(a0, b0 - a0);
+          a0 = b0 + 1;
+          std::vector<lex::Analysis> aw;
+          c.st.srcLex->lookup(c.st.lang == frame::SrcLang::Es ? text::es_key(w) : text::en_key(w), aw);
+          bool cw = false, pw = false;
+          for (const lex::Analysis& a : aw) {
+            const lex::Lemma l = c.st.srcLex->lemma(a.lemma);
+            cw = cw || l.pos == Noun || l.pos == Adj || l.pos == Verb;
+            pw = pw || l.pos == Name || (l.flags & lex::ProperName);
+          }
+          if (cw && !pw && !cd_.nameByEnglish(w)) {
+            o.literal = n.surface.empty() ? n.head : n.surface;
+            c.out.unknownWords.push_back(o.literal);
+            c.out.flags.push_back("source-word");
+            return;
+          }
+        }
+      }
+      if (common && !proper) {
+        Choice ch;
+        ch.token = n.token;
+        std::string base = sl;
+        std::vector<lex::Analysis> nb;
+        for (const lex::Analysis& a : an)
+          if (c.st.srcLex->lemma(a.lemma).pos == Noun) { base = text::lower(std::string(c.st.srcLex->lemma(a.lemma).head)); break; }
+        const uint32_t id = select(base, Noun, c.context, false, false, c.st, ch);
+        c.out.choices.push_back(ch);
+        if (id != kNone && !ch.candidates.empty() && ch.candidates[0].score >= 0.3) {
+          o.head = id;
+          o.capitalise = true;
+          o.number = n.number == 2 ? Pl : Sg;
+          c.out.flags.push_back("source-word");
+          return;
+        }
+        o.literal = n.surface.empty() ? n.head : n.surface;
+        c.out.unknownWords.push_back(o.literal);
+        c.out.flags.push_back("source-word");
         return;
       }
     }
@@ -3111,7 +3288,8 @@ bool Transfer::obliqueInto(const frame::SemOblique& ob, Ctx& c, LaClause& cl) co
   const bool person = animate(n);
   const std::string verb = c.frame ? c.frame->pred.lemma : std::string();
   if (!c.prepOverride.empty() && prep == c.prepOverride && !c.prepOverrideLatin.empty())
-    return withPrep(c.prepOverrideLatin.c_str(), c.prepOverrideCase ? c.prepOverrideCase : (uint8_t)Abl);
+    return c.prepOverrideLatin == "-" ? bare(c.prepOverrideCase ? c.prepOverrideCase : (uint8_t)Abl)   // C37: a bare case
+                                      : withPrep(c.prepOverrideLatin.c_str(), c.prepOverrideCase ? c.prepOverrideCase : (uint8_t)Abl);
   // prepositional verbs (verbprep_en_la.tsv frame obj): the PP object is the verb's direct object ("wait for me",
   // "look at the sky")
   const curated::VerbPrepEntry* vpe = c.frame ? cd_.verbPrep(verb, prep) : nullptr;
@@ -4080,10 +4258,171 @@ bool Transfer::spanishRewrite(const SemFrame& f, Ctx& c, SemFrame& g) const {
         break;
       }
   }
+  // C37: verse order with the infinitive last. "Concédenos la verdad buscar" -> Dā nōbīs vēritātem quaerere (the
+  // infinitive is the verb's complement, the noun before it its object); "Dame fuerza para el bien hacer" -> ... ut
+  // bonum faciam (the noun after "para" is the infinitive's object, the person given to is its subject)
+  if (g.hasPred && g.subordinate.size() == 1 && g.subordinate[0].frame.size() == 1 && g.pred.complementVerb.empty()) {
+    frame::SemSub& sb = g.subordinate[0];
+    frame::SemFrame& sf = sb.frame[0];
+    const bool bareInf = sf.hasPred && !sf.hasSubject && !sf.hasObject && sf.obliques.empty() && sf.subordinate.empty() &&
+                         sf.pred.token > g.pred.token && sf.pred.token >= 0 && (size_t)sf.pred.token < c.s.tokens.size() &&
+                         nlp::morph::get(c.s.tokens[(size_t)sf.pred.token].feats, nlp::morph::VerbFormShift) == nlp::morph::VfInf;
+    int paraObl = -1;
+    for (size_t k = 0; bareInf && k < g.obliques.size(); ++k)
+      if (g.obliques[k].prep == "for" && g.obliques[k].np.token < sf.pred.token && !g.obliques[k].np.isPronoun) paraObl = (int)k;
+    if (bareInf && paraObl >= 0) {
+      sf.object = g.obliques[(size_t)paraObl].np;
+      sf.hasObject = true;
+      if (g.obliques[(size_t)paraObl].token >= 0) c.cover(g.obliques[(size_t)paraObl].token);
+      g.obliques.erase(g.obliques.begin() + paraObl);
+      sb.relation = Relation::Purpose;
+      if (g.hasIndirect && g.indirectObject.isPronoun) {   // "Dame ... para ..." -> ut (ego) faciam
+        sf.subject = g.indirectObject;
+        sf.subject.pron.emphatic = false;
+        sf.hasSubject = true;
+        sf.implicitSubject = true;
+      }
+      changed = true;
+    } else if (bareInf && sb.relation != Relation::Purpose && g.hasObject && g.object.token < sf.pred.token &&
+               !sf.negative && sf.pred.modality == Modality::None) {
+      g.pred.complementVerb = sf.pred.lemma;
+      g.pred.complementToken = sf.pred.token;
+      for (const frame::SemAdverb& a : sf.adverbs) g.adverbs.push_back(a);
+      g.subordinate.clear();
+      changed = true;
+    }
+  }
+  // C37: "Sé tú mi madre y mi guía": the imperative of ser with a noun is the copula (Estō tū māter mea et dux mea)
+  if (g.hasPred && lowLemma(g.pred.lemma) == "ser" && !g.copula && g.hasObject && !g.object.isPronoun) {
+    g.copula = true;
+    g.pred.lemma = "be";
+    g.predicative.push_back(g.object);
+    g.hasObject = false;
+    g.object = frame::SemNP{};
+    for (size_t k = 0; k < g.obliques.size(); ++k)
+      if (g.obliques[k].np.isPronoun && g.obliques[k].np.pron.person == 2) {   // "tú"
+        g.subject = g.obliques[k].np;
+        g.subject.pron.emphatic = true;
+        g.hasSubject = true;
+        c.cover(g.obliques[k].np.token);
+        g.obliques.erase(g.obliques.begin() + (long)k);
+        break;
+      }
+    changed = true;
+  }
+  // C37: "no me dejes solo": dejar + a clitic + an adjective is "leave me alone" (mē sōlum relinquere): the clitic is
+  // the object, the adjective its complement
+  if (g.hasPred && lowLemma(g.pred.lemma) == "dejar" && !g.hasObject && g.hasIndirect && g.indirectObject.isPronoun &&
+      g.subordinate.size() == 1 && g.subordinate[0].frame.size() == 1) {
+    const frame::SemFrame& sf = g.subordinate[0].frame[0];
+    if (!sf.hasPred && !sf.hasSubject && sf.predAdj.size() == 1) {
+      g.object = g.indirectObject;
+      g.hasObject = true;
+      g.hasIndirect = false;
+      g.indirectObject = frame::SemNP{};
+      g.objComplementAdj.push_back(sf.predAdj[0]);
+      g.subordinate.clear();
+      changed = true;
+    }
+  }
+  // C37: a first / second person clitic doubled by "a mí / a ti / a nosotros" is one argument ("Consuélame a mí, tu
+  // siervo" -> Cōnsōlāre mē, servum tuum): the strong pronoun is dropped, a noun right after it is the clitic's
+  // apposition, and a clitic read as the indirect object is the object when nothing else is
+  if (g.hasPred) {
+    auto strongOf = [](const std::string& w) {
+      return w == "mí" ? 1 : w == "ti" ? 2 : w == "nosotros" || w == "nosotras" ? 4 : w == "vosotros" || w == "vosotras" ? 5 : 0;
+    };
+    auto cliticOf = [](const std::string& w) { return w == "me" ? 1 : w == "te" ? 2 : w == "nos" ? 4 : w == "os" ? 5 : 0; };
+    const bool objCl = g.hasObject && g.object.isPronoun && cliticOf(lowLemma(g.object.pronLemma.empty() ? g.object.head : g.object.pronLemma));
+    const bool iobjCl = g.hasIndirect && g.indirectObject.isPronoun &&
+                        cliticOf(lowLemma(g.indirectObject.pronLemma.empty() ? g.indirectObject.head : g.indirectObject.pronLemma));
+    if (objCl || iobjCl) {
+      const frame::SemNP& cn = objCl ? g.object : g.indirectObject;
+      const int who = cliticOf(lowLemma(cn.pronLemma.empty() ? cn.head : cn.pronLemma));
+      int strongTok = -1;
+      for (size_t k = 0; k < g.obliques.size(); ++k) {
+        const frame::SemOblique& ob = g.obliques[k];
+        if (ob.prep == "to" && ob.np.isPronoun && strongOf(lowLemma(ob.np.pronLemma.empty() ? ob.np.head : ob.np.pronLemma)) == who) {
+          strongTok = ob.np.token;
+          c.cover(ob.np.token);
+          if (ob.token >= 0) c.cover(ob.token);
+          std::vector<frame::SemNP> gens = ob.np.genitive;   // "a mí del mal": "del mal" belongs to the verb
+          g.obliques.erase(g.obliques.begin() + (long)k);
+          for (const frame::SemNP& gn : gens) {
+            frame::SemOblique o2;
+            o2.prep = "of";
+            o2.np = gn;
+            o2.token = gn.token;
+            g.obliques.push_back(o2);
+          }
+          changed = true;
+          break;
+        }
+      }
+      if (strongTok < 0 && iobjCl && g.hasObject && g.object.isPronoun &&
+          strongOf(lowLemma(g.object.pronLemma.empty() ? g.object.head : g.object.pronLemma)) == who) {
+        strongTok = g.object.token;
+        c.cover(g.object.tokens);
+        c.cover(g.object.token);
+        g.hasObject = false;
+        g.object = frame::SemNP{};
+        changed = true;
+      }
+      if (strongTok >= 0) {
+        for (size_t t = 0; t < c.s.tokens.size(); ++t)   // the "a" of "a mí"
+          if (c.s.tokens[t].head == strongTok + 1 && c.s.tokens[t].lower == "a") c.cover((int)t);
+        // a noun phrase right after "a mí" (", tu siervo", "pecador") is said of the clitic
+        std::vector<frame::SemNP> noun;
+        if (g.hasObject && !g.object.isPronoun && g.object.token > strongTok) {
+          noun.push_back(g.object);
+          g.hasObject = false;
+          g.object = frame::SemNP{};
+        }
+        for (size_t k = 0; noun.empty() && k < g.obliques.size(); ++k)
+          if ((g.obliques[k].prep.empty() || g.obliques[k].prep == "-") && !g.obliques[k].np.isPronoun &&
+              g.obliques[k].np.token > strongTok) {
+            noun.push_back(g.obliques[k].np);
+            g.obliques.erase(g.obliques.begin() + (long)k);
+          }
+        if (iobjCl && !g.hasObject) {   // the clitic is the object
+          frame::SemNP cl0 = g.indirectObject;
+          for (const frame::SemNP& x : noun) cl0.apposition.push_back(x);
+          g.object = cl0;
+          g.hasObject = true;
+          g.hasIndirect = false;
+          g.indirectObject = frame::SemNP{};
+        } else if (objCl) {
+          for (const frame::SemNP& x : noun) g.object.apposition.push_back(x);
+        } else if (!noun.empty()) {   // nothing to hang it on: as it was
+          g.hasObject = true;
+          g.object = noun[0];
+        }
+      }
+    }
+  }
   return changed;
 }
 
 void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
+  // C37: "And yet he loves his home." / "The farmer is poor, and yet he is free.": "yet" opening its clause (after
+  // nothing but a conjunction) is the connector tamen, not adhūc (still); not "not ... yet" (nōndum)
+  if (c.st.lang == frame::SrcLang::En && !f00.negative)
+    for (size_t ai = 0; ai < f00.adverbs.size(); ++ai) {
+      const frame::SemAdverb& a = f00.adverbs[ai];
+      if (a.lemma != "yet" || a.token < 0 || (size_t)a.token >= c.s.tokens.size()) continue;
+      bool first = true;
+      for (int t : f00.tokens)
+        if (t >= 0 && t < a.token && (size_t)t < c.s.tokens.size() && c.s.tokens[(size_t)t].upos != "PUNCT" &&
+            c.s.tokens[(size_t)t].upos != "CCONJ")
+          first = false;
+      if (!first) continue;
+      SemFrame g = f00;
+      g.adverbs.erase(g.adverbs.begin() + (long)ai);
+      g.connectors.push_back("yet");
+      c.cover(a.token);
+      clauseInto(g, c, cl);
+      return;
+    }
   // C28: "not ... yet" -> nōndum, no nōn ("I don't know yet." -> Nōndum sciō.); "It's me." -> Ego sum (the pronoun
   // is the subject, the verb agrees with it)
   if (c.st.lang == frame::SrcLang::En) {
@@ -4896,6 +5235,10 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
       }
       cl.predAdj.push_back(la);
     }
+    // C37: "old and yet strong" -> vetus et tamen validus (yet before a coordinated adjective is tamen, not adhūc)
+    for (size_t i = 1; i < cl.predAdj.size() && i < f.predAdj.size(); ++i)
+      for (size_t k = 0; k < f.predAdj[i].adverbs.size() && k < cl.predAdj[i].adverbs.size(); ++k)
+        if (f.predAdj[i].adverbs[k] == "yet" && latin("tamen", Adv) != kNone) cl.predAdj[i].adverbs[k] = latin("tamen", Adv);
     // C37: "strong but slow" -> validī sed tardī; "not lazy but industrious" -> nōn pigra sed industria (the negation
     // goes with the first adjective, the verb stays positive)
     if (cl.predAdj.size() == 2 && f.predAdj.size() == 2 && f.predAdj[1].token >= 0) {
@@ -5175,7 +5518,13 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
   }
   for (const std::string& ij : f.interjections) {
     if (const char* la = tables::interjection(ij)) {
-      const uint32_t id = latin(la, Intj);
+      uint32_t id = latin(la, Intj);
+      if (id == kNone) {   // C37: the lexicon writes some heads with a breve too ("avē̆"): the interjection reading of the key
+        morph::Token mt;
+        morph::analyseLatin(la_, la, mt);
+        for (const lex::Analysis& a : mt.analyses)
+          if (la_.lemma(a.lemma).pos == Intj) { id = a.lemma; break; }
+      }
       if (id != kNone) cl.interjections.push_back(id);
     } else if (!f.hasPred && f.predAdj.empty() && !f.hasSubject && f.adverbs.empty()) {
       c.out.unknownWords.push_back(ij);   // never an empty translation: the unknown word stays in brackets
@@ -6203,6 +6552,18 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
     if (phraseNeg && but) c.out.flags.push_back("contrast-guess");
   }
   if (c.negConsumed) { cl.polarity = realise::Polarity::Pos; c.negConsumed = false; }
+  // C37: an adjective addressed alone in a hymn ("Ave mansa, ave piadosa") takes the Spanish adjective's gender
+  if (c.st.lang == frame::SrcLang::Es && !f.hasPred && !f.hasSubject && !cl.hasSubject && !cl.predAdj.empty() &&
+      (!cl.predGender || cl.predGender == N) && !f.predAdj.empty() && f.predAdj[0].token >= 0 && (size_t)f.predAdj[0].token < c.s.tokens.size()) {
+    const uint8_t g = esAdjectiveGender(c.s.tokens[(size_t)f.predAdj[0].token].lower, c.st);
+    if (g) cl.predGender = g;
+  }
+  // C37: the imperative of "be" in a prayer is estō ("Sé tú mi madre" -> Estō māter mea), the subject tū said
+  if (c.st.lang == frame::SrcLang::Es && cl.type == realise::ClauseType::Imp && cl.pred.lemma != kNone &&
+      cl.pred.lemma == latin("sum", Verb) && cl.pred.modal == kNone && !cl.predicative.empty()) {
+    cl.pred.tense = Future;
+    if (cl.hasSubject && cl.subject.isPronoun && cl.subject.pron.person == 2) cl.subject.emphasis = true;
+  }
   // C15: "not know" -> nesciō ("Nescīs?", "potestāte suā ūtī nescit") unless a negative word carries the negation
   if (cl.polarity == realise::Polarity::Neg && cl.type != realise::ClauseType::Imp) {
     const uint32_t scio = latin("sciō", Verb), nescio = latin("nesciō", Verb);
@@ -6269,7 +6630,9 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
       if (a.lemma == latin("multum", Adv) && latin("valdē", Adv) != kNone) a.lemma = latin("valdē", Adv);
   // C34: Spanish llevar / traer a person or an animal: dūcō (as C30's "bring" below; ferō is for things)
   if (c.st.lang == frame::SrcLang::Es && (text::lower(f.pred.lemma) == "llevar" || text::lower(f.pred.lemma) == "traer") &&
-      f.hasObject && !f.object.isPronoun && animate(f.object) && cl.hasObject && latin("dūcō", Verb) != kNone) {
+      f.hasObject && ((!f.object.isPronoun && animate(f.object)) ||
+                      (f.object.isPronoun && f.object.pron.person >= 1 && f.object.pron.person <= 2)) &&   // C37: "llévame"
+      cl.hasObject && latin("dūcō", Verb) != kNone) {
     cl.pred.lemma = latin("dūcō", Verb);
     for (Choice& x : c.out.choices)
       if (x.token == f.pred.token) { x.lemma = cl.pred.lemma; x.kind = "table"; x.note = "llevar a person or an animal: dūcō"; }

@@ -682,7 +682,8 @@ TEST_CASE("rules-o: try (VP_RULES_TRY_ES=<file>)") {
       c.endMs = c.startMs + 3500;
       in.push_back(c);
     }
-    auto r = e->translate(in, esOptions(), rules::Context{}, nullptr, nullptr);
+    const char* sg = std::getenv("VP_RULES_TRY_SPEAKER");   // C37: m | f | u (default f)
+    auto r = e->translate(in, esOptions(2, sg && *sg ? sg[0] : 'f'), rules::Context{}, nullptr, nullptr);
     REQUIRE(r.ok());
     for (size_t i = 0; i < r->size(); ++i) {
       const rules::CueOutput& c = r.value()[i];

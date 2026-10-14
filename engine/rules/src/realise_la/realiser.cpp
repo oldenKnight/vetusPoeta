@@ -440,7 +440,9 @@ void LatinRealiser::verbGroup(const LaClause& c, const AgreeInfo& subj, std::vec
       push(fin, p.modal, morph::imperative(num), "order.imp");
       push(inf, p.lemma, morph::infinitive(p.infTense, p.infVoice), "order.imp");
     } else {
-      push(fin, p.lemma, morph::imperative(num, p.voice), "order.imp");
+      Features fi = morph::imperative(num, p.voice);
+      if (p.tense == Future && p.lemma == k_.sum) fi.tense = Future;   // C37: estō (the future imperative of sum)
+      push(fin, p.lemma, fi, "order.imp");
     }
     return;
   }

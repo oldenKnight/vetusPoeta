@@ -188,7 +188,9 @@ const char* interjection(const std::string& w) {
       {"oh", "ō"},   {"o", "ō"},      {"alas", "ēheu"}, {"hey", "heus"}, {"wow", "papae"}, {"hooray", "iō"},
       {"ugh", "vah"}, {"ah", "ā"},    {"ay", "heu"},    {"eh", "heus"},  {"oye", "heus"},
       // C19
-      {"hurrah", "iō"}, {"hurray", "iō"}, {"yippee", "iō"}, {"bravo", "euge"}, {"aha", "ā"}};
+      {"hurrah", "iō"}, {"hurray", "iō"}, {"yippee", "iō"}, {"bravo", "euge"}, {"aha", "ā"},
+      // C37: greetings of prayers and hymns (Spanish source)
+      {"ave", "avē"}, {"salve", "salvē"}, {"amén", "āmēn"}, {"amen", "āmēn"}, {"hail", "avē"}};
   return lookup(kI, w);
 }
 

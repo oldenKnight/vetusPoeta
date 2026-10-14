@@ -1692,7 +1692,7 @@ TEST_CASE("rules-e: fixes after the blind check (own sentences of children's dia
       {"and nobody could help me look for it.", "Et nēmō mē adiuvāre poterat ut id quaererem."},   // sequence
       {"Please don't tell my brother about the secret door.", "Quaesō frātrī meō dē iānuā arcānā nōlī dīcere."},
       {"Tell the queen the truth.", "Dīc rēgīnae vēritātem."},
-      {"I was tired, but I could not sleep.", "Fessa eram sed dormīre nōn poteram."},
+      {"I was tired, but I could not sleep.", "Fessa eram, sed dormīre nōn poteram."},
       {"The rabbit hopped quickly into its hole.", "Cunīculus in foveam suam celeriter saluit."},
       {"The bird built its nest.", "Avis nīdum suum aedificāvit."},
       {"Hush, the baby is sleeping.", "Tacē, īnfāns dormit."},
@@ -3121,7 +3121,7 @@ TEST_CASE("rules-k: rules from the tuning sample, each with own sentences (work 
       {"We must help anyone in trouble.", "Adiuvāre dēbēmus eōs quī in perīculō sunt."},
       {"The doctor helps people in trouble.", "Medicus adiuvat eōs quī in perīculō sunt."},
       // a coordinated clause with its own subject after a predicate noun
-      {"You are a good friend, for you have helped me.", "Amīcus bonus es nam mē adiūvistī."},
+      {"You are a good friend, for you have helped me.", "Amīcus bonus es, nam mē adiūvistī."},
   });
 }
 
@@ -3651,7 +3651,7 @@ TEST_CASE("rules-m: narrative connectors and words of a story (work item e)") {
       {"She took the book home.", "Librum domum tulit."},
       {"He took his son to school.", "Fīlium suum ad lūdum dūxit."},
       {"She looked under the bed and behind the door.", "Sub lectō et post iānuam vīdit."},
-      {"Rufus chased the cat, but he did not catch it.", "Rūfus fēlem agitāvit sed eam nōn cēpit."},
+      {"Rufus chased the cat, but he did not catch it.", "Rūfus fēlem agitāvit, sed eam nōn cēpit."},
       {"They walked and walked.", "Ambulāvērunt et ambulāvērunt."},
       {"The dog stopped suddenly.", "Canis subitō cōnstitit."},
       {"Anna and Rufus got into the boat.", "Anna et Rūfus nāvem cōnscendērunt."},
@@ -3968,8 +3968,8 @@ TEST_CASE("rules-n: fixes after the blind check (own sentences)") {
       {"You are older than Marcus.", "Nātū maior es quam Marcus."},
       {"This house is older than the town.", "Haec domus vetustior est quam oppidum."},
       // "but I am better": a clause of its own (was an adjective of the noun), the contrasted pronoun said
-      {"He is a fast runner, but she is faster.", "Cursor celer est sed ea celerior est."},
-      {"My uncle is a good singer, but I am better.", "Avunculus meus cantor bonus est sed ego melior sum."},
+      {"He is a fast runner, but she is faster.", "Cursor celer est, sed ea celerior est."},
+      {"My uncle is a good singer, but I am better.", "Avunculus meus cantor bonus est, sed ego melior sum."},
   });
   // one person addressed by name is singular even when the next sentence answers with "we"
   const std::vector<Out> o = runBatch({"Marcus, why are you laughing?", "We saw a funny dog."});

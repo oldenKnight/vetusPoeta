@@ -258,6 +258,7 @@ class RulesEngine final : public Engine {
     if (!fb) {
       fb = std::make_unique<frame::FrameBuilder>(lang, pipe.get(), lang == frame::SrcLang::En ? en_ : es_, *cd_);
       fb->setCommaClauses(true);   // C34: Spanish comma-joined clauses apart (English unaffected)
+      fb->setProseConnectors(true);   // C37: ", so / yet + clause" as conjunctions (Latin only)
     }
     return Result<const frame::FrameBuilder*>(fb.get());
   }
@@ -2359,6 +2360,18 @@ class RulesEngine final : public Engine {
       }
       if (miss) addFlag(so.flags, "connector-guess");
     }
+    // C37 (calibration): a line that opens with a preposition and has no verb ("de la guerra y del hambre.", "in the
+    // garden.") whose Latin does not open with a preposition may have lost the relation to the line before: Check
+    {
+      size_t f0 = 0;
+      while (f0 < s.tokens.size() && s.tokens[f0].upos == "PUNCT") ++f0;
+      bool verb = false;
+      for (const nlp::Token& t : s.tokens) verb = verb || t.upos == "VERB" || t.upos == "AUX";
+      if (f0 < s.tokens.size() && s.tokens[f0].upos == "ADP" && !verb && !L.tokens.empty()) {
+        const std::string& p0 = L.tokens[0].features.pos;
+        if (p0.find("prep") == std::string::npos) addFlag(so.flags, "prep-dropped");
+      }
+    }
     // margins
     for (const transfer::Choice& c : so.choices)
       if (c.kind == "sense" && c.candidates.size() > 1) so.minMargin = std::min(so.minMargin, c.margin);
@@ -2777,7 +2790,7 @@ class RulesEngine final : public Engine {
 
   // C30b: the joined reading of a cue is worse than the cue alone: a Fix where the cue alone is not, a failed A1 / A3 /
   // A4 the cue alone passes, an unknown word or a missing form the cue alone does not have
-  static bool joinWorse(const CueOutput& joined, const CueOutput& alone) {
+  static bool joinWorse(const CueOutput& joined, const CueOutput& alone, bool spanish = false) {
     auto fails = [](const CueOutput& x, const char* id) {
       for (const Check& c : x.checks)
         if (c.id == id) return !c.ok;
@@ -2798,6 +2811,10 @@ class RulesEngine final : public Engine {
     if (unknown(joined) && !unknown(alone)) return true;
     if (flag(joined, "missing-form") && !flag(alone, "missing-form")) return true;
     if (flag(joined, "form-guess") && !flag(alone, "form-guess")) return true;   // C32: the cue-level name of it
+    // C37: Spanish verse lines ("Jesucristo, rey de la paz, / guarda mi alma en la noche."): a joined reading that loses
+    // a content word of this line (A7) the line alone keeps, or a guessed name the line alone does not need, is worse
+    if (spanish && fails(joined, "A7") && !fails(alone, "A7")) return true;
+    if (spanish && flag(joined, "name-guessed") && !flag(alone, "name-guessed")) return true;
     return false;
   }
 
@@ -3539,8 +3556,18 @@ class RulesEngine final : public Engine {
                             "split-agreement",   // C30
                             "join-discarded", "join-neighbour",   // C30b
                             "form-guess", "gender-inferred",   // C32
-                            "contrast-guess", "source-word", "vocative-dropped", "connector-guess"})   // C37
+                            "contrast-guess", "source-word", "vocative-dropped", "connector-guess", "prep-dropped"})   // C37
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
+      // C37 (calibration): a dictionary word chosen on a weak sense (the best candidate's score below 0.35: a minor
+      // sense, a gloss modifier only, "oxen" -> iugum, "pobres" -> paupertās) is never OK (flag weak-sense)
+      for (const transfer::Choice& c : a.choices)
+        if (c.kind == "sense" && c.lemma != lex::kNoLemma && !c.candidates.empty() && c.candidates[0].score < 0.35) {
+          chk = true;
+          addFlag(o.flags, "weak-sense");
+          o.reasons.push_back(Reason{-1, "sense", "\"" + c.source + "\" -> " + std::string(la_->lemma(c.lemma).head) +
+                                                  ": only a weak sense of the dictionary fits: check it", ""});
+          break;
+        }
       // a tier 3 word chosen while a tier 1/2 word of the same sense existed (fidelity 1, a correction aside)
       for (const transfer::Choice& c : a.choices)
         if (c.lowTier) {
@@ -3616,7 +3643,7 @@ class RulesEngine final : public Engine {
         glossary_ = &ctx.glossary;
         if (rs.ok() && rs.value().size() == 1) {
           solo[i] = std::make_unique<CueOutput>(rs.value()[0]);
-          worse[i] = joinWorse(o, *solo[i]);
+          worse[i] = joinWorse(o, *solo[i], opt.source == Lang::Es);
         }
       }
       outs.push_back(std::move(o));
@@ -3637,6 +3664,12 @@ class RulesEngine final : public Engine {
             if (cp.cue >= off && cp.cue - off < outs.size() && cp.cue != off + i) neighbour[cp.cue - off] = 1;
         }
       }
+      // C37: Spanish verse lines: when one line of a joined sentence keeps its own reading, every line of that sentence
+      // does (a phrase of the joined Latin would otherwise sit in the wrong line or be lost: "Iēsū Chrīste, rēx" /
+      // "pācis.")
+      if (opt.source == Lang::Es)
+        for (size_t i = 0; i < outs.size(); ++i)
+          if (neighbour[i] && solo[i]) worse[i] = 1;
       for (size_t i = 0; i < outs.size(); ++i) {
         if (worse[i] && solo[i]) {
           CueOutput so2 = *solo[i];

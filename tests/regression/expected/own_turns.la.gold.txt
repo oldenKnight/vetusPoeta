@@ -7,6 +7,7 @@
 # C28 review: the alternatives after the last " | " of cues 16 21 25 27 35 37 39 41 42 47 49 57 78 105 106 110 113 116 (117 vetoed by the main agent: cēterōs piscēs changes the meaning; the bare answer Nōn of 37 is accepted as school Latin next to minimē)
 # were proposed by the implementer after the first run (correct Latin the gold did not list; docs/rules_en_notes.md
 # "Quality loop 6"); cue 6: veterī corrected to vetere (vetere is the ablative of vetus). Veto freely.
+# C37 proposed gold alternative (the last of cue 21): senex for an old person with lēnis, as both are listed apart. Veto freely.
 Marce!
 - Quid est, māter?
 Ubi est soror tua?
@@ -27,7 +28,7 @@ Quae via brevior est?
 Haec, prope flūmen.
 Ecce! Canis magnus! | Ecce! Magnus canis! | Aspice! Canis magnus!
 Nōlī timēre.
-Vetus est et valdē mītis. | Senex est et valdē mītis. | Vetus et valdē lēnis est.
+Vetus est et valdē mītis. | Senex est et valdē mītis. | Vetus et valdē lēnis est. | Senex et valdē lēnis est.
 Cuius canis est?
 Agricolae.
 Prope pontem habitat

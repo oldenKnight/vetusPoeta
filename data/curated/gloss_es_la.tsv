@@ -84,7 +84,7 @@ locus	locus	lugar
 canis	canis	perro
 feles	fēlēs	gato
 equus	equus	caballo
-lepus	lepus	liebre, conejo
+lepus	lepus	liebre
 avis	avis	ave, pájaro
 flos	flōs	flor
 arbor	arbor	árbol
@@ -254,3 +254,36 @@ ningit	ningit	nevar
 vinco	vincō	ganar, vencer
 mitto	mittō	enviar, mandar (una cosa)
 finio	fīniō	terminar
+# C37: prayers and hymns (own lines; the teacher's Spanish glosses)
+precor	precor	rogar, suplicar, implorar
+oro	ōrō	orar, rezar
+custodio	custōdiō	guardar, custodiar, proteger
+consolor	cōnsōlor	consolar
+audio	audiō	oír, escuchar
+infirmus	īnfirmus	débil, enfermo
+servo	servō	salvar, conservar
+lux	lūx	luz
+plenus	plēnus	pleno, lleno
+mors	mors	muerte
+foeteo	foeteō	apestar, heder
+fidus	fīdus	fiel
+amen	āmēn	amén
+defendo	dēfendō	defender
+fugio	fugiō	huir
+pauper	pauper	pobre
+tristis	trīstis	triste
+dulcis	dulcis	dulce
+pius	pius	piadoso, pío
+mitis	mītis	manso, apacible
+peccator	peccātor	pecador
+bonitas	bonitās	bondad
+virgo	virgō	virgen, doncella
+duco	dūcō	guiar, conducir
+miser	miser	desdichado, mísero
+purus	pūrus	puro, limpio
+sanctus	sānctus	santo, sagrado
+vis	vīs	fuerza, vigor
+bonum	bonum	bien (lo bueno)
+quaero	quaerō	buscar
+malum	malum	mal (el mal)
+cuniculus	cunīculus	conejo
