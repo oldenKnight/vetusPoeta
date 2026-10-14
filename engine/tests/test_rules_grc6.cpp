@@ -155,7 +155,7 @@ TEST_CASE("rules-grc6: C29 constructions (pasts, places, hope, money, addresses,
   auto e = engine6();
   const std::vector<Case6> en = {
       // (1) irregular pasts read as a noun or a name; a subject noun read as an adjective
-      {"Mary wept for her brother.", "ἡ μαρία τὸν ἀδελφὸν αὐτῆς ἔκλαυσεν.", true},
+      {"Mary wept for her brother.", "ἡ μαρία τὸν ἀδελφὸν ἔκλαυσεν.", true},   // C38: the subject's own is the article
       {"The soldier wept because his horse died.", "ὁ στρατιώτης ἔκλαυσεν ὅτι ὁ ἵππος αὐτοῦ ἀπέθανεν.", true},
       {"The baby wept all night.", "τὸ βρέφος πᾶσαν τὴν νύκτα ἔκλαυσεν.", false},
       {"The children wept bitterly.", "οἱ παῖδες πικρῶς ἔκλαυσαν.", false},
@@ -183,7 +183,7 @@ TEST_CASE("rules-grc6: C29 constructions (pasts, places, hope, money, addresses,
       {"The farmer needs money.", "ὁ γεωργὸς ἀργυρίου δεῖται.", false},
       {"We need water.", "ὕδατος δεόμεθα.", false},
       {"I need you.", "δέομαί σου.", false},
-      {"The boy spent his money.", "ὁ παῖς τὸ ἀργύριον αὐτοῦ ἀνήλωσεν.", false},
+      {"The boy spent his money.", "ὁ παῖς τὸ ἀργύριον ἀνήλωσεν.", false},   // C38: the article (αὐτοῦ was expected)
       // (5) addresses
       {"Where are you, my son?", "ποῦ εἶ, ὦ υἱέ;", true},
       {"Why are you crying, girl?", "διὰ τί κλαίεις, ὦ κόρη;", false},
@@ -192,7 +192,7 @@ TEST_CASE("rules-grc6: C29 constructions (pasts, places, hope, money, addresses,
       {"The dog sat next to the boy.", "ὁ κύων παρὰ τῷ παιδὶ ἐκάθητο.", false},
       {"The house is next to the river.", "ἡ οἰκία παρὰ τῷ ποταμῷ ἐστιν.", false},
       {"She sat next to me.", "παρὰ ἐμοὶ ἐκάθητο.", false},
-      {"The girl stood beside her mother.", "ἡ κόρη παρὰ τῇ μητρὶ αὐτῆς εἱστήκει.", false},
+      {"The girl stood beside her mother.", "ἡ κόρη παρὰ τῇ μητρὶ εἱστήκει.", false},   // C38: the article
       // (7) loop-5 wishes repaired on the Greek side
       {"When one is tired, one sleeps.", "ὅτε τις κάμνει, καθεύδει τις.", true},
       {"We rode home on a donkey.", "ἐπὶ ὄνου οἴκαδε ἠλάσαμεν.", false},

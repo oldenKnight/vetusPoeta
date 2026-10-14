@@ -175,6 +175,13 @@ struct Translator::Impl : public detail::LexicalSource {
     return x;
   }
 
+  int takesAccusative(const std::string& key) const override {
+    const grc::Valency* v = gd.valency(key);
+    if (!v || v->frames.empty()) return -1;
+    const std::string& r = v->frames[0].raw;
+    return r == "acc" || (r.size() > 4 && r.compare(r.size() - 4, 4, "+acc") == 0) ? 1 : 0;
+  }
+
   std::string gloss(uint32_t lemma, Target tg, bool* pivot) const {
     const lex::Lemma l = lx.lemma(lemma);
     if (l.id == kNone) return std::string();
@@ -397,7 +404,12 @@ std::vector<std::pair<size_t, size_t>> splitSentences(std::string_view text) {
     if (!end && (unsigned char)c == 0xCD && i + 1 < text.size() && (unsigned char)text[i + 1] == 0xBE) { end = true; ++i; }
     if (!end) continue;
     size_t e = i + 1;
-    while (e < text.size() && (text[e] == '.' || text[e] == '!' || text[e] == '?' || text[e] == '"' || text[e] == ')')) ++e;
+    for (;;) {   // C38: also the closing » and ” (a lone "»" was read as a sentence without a verb)
+      if (e < text.size() && (text[e] == '.' || text[e] == '!' || text[e] == '?' || text[e] == '"' || text[e] == ')')) { ++e; continue; }
+      if (text.compare(e, 2, "\xC2\xBB") == 0) { e += 2; continue; }
+      if (text.compare(e, 3, "\xE2\x80\x9D") == 0) { e += 3; continue; }
+      break;
+    }
     size_t s0 = a;
     while (s0 < e && text[s0] == ' ') ++s0;
     if (e > s0) out.emplace_back(s0, e);

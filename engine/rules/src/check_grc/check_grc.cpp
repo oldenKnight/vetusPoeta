@@ -566,6 +566,12 @@ struct GreekChecker::Impl {
       // relative / demonstrative homographs are not articles when accented (ὅ, ἥ, οἵ, αἵ): the closed table splits them
       for (size_t j = i + 1; j < n && sameGroup(i, j); ++j) {
         if (onlyAdverbs(j)) continue;
+        // C38: a reflexive possessor between the article and its noun (τὴν ἑαυτοῦ οἰκίαν) is not what agrees
+        if (j == i + 1) {
+          const std::string k = text::greek_key(text::lower(T(j)));
+          if (k == text::greek_key("ἑαυτοῦ") || k == text::greek_key("ἑαυτῆς") || k == text::greek_key("ἑαυτῶν") ||
+              k == text::greek_key("ἐμαυτοῦ") || k == text::greek_key("σεαυτοῦ")) { artCovered[j] = 1; continue; }
+        }
         if (any(j, isArticle) || isPrep(j) || isVerb[j] || any(j, isInfinitive)) break;
         if (!any(j, isNominal)) break;
         const bool head = strongHead(j);

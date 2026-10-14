@@ -151,10 +151,15 @@ struct GrcNP {
   bool keep = false;
   // C35 (additive): a name in apposition after the noun, in the same case ("περὶ τῆς φίλης μου Λουκίας")
   std::vector<GrcNP> apposition;
+  // C38 (additive): a 3rd person possessor that is the clause's own subject ("his own house" -> τὴν ἑαυτοῦ οἰκίαν):
+  // ἑαυτοῦ / ἑαυτῆς / ἑαυτῶν between the article and the noun (possNumber / possGender), instead of αὐτοῦ after it
+  bool possReflexive = false;
 };
 
 struct GrcOblique { uint32_t prep = kNone; uint8_t case_ = 0; GrcNP np; bool front = false;
-                    bool end = false;   /* C16: after the verb ("ἐφυτεύσαμεν ἁμαρτόντες") */ };
+                    bool end = false;   /* C16: after the verb ("ἐφυτεύσαμεν ἁμαρτόντες") */
+                    /* C38 (additive): "not X but Y": 1 = οὐ / οὐκ before this phrase, 2 = ἀλλά before it */
+                    uint8_t contrast = 0; };
 struct GrcAdverb { uint32_t lemma = kNone; AdvPos pos = AdvPos::Auto; };
 
 struct GrcPredicate {
@@ -271,7 +276,8 @@ class GreekRealiser {
              ekeinos = kNone, tis = kNone, tisIndef = kNone, hoti = kNone, epei = kNone, hote = kNone, ei = kNone,
              ean = kNone, hina = kNone, hopos = kNone, hoste = kNone, hos2 = kNone /* ὡς */, emos = kNone,
              sos = kNone, hemeteros = kNone, humeteros = kNone, dei = kNone, exesti = kNone, phemi = kNone,
-             oudeis = kNone, medeis = kNone;
+             oudeis = kNone, medeis = kNone,
+             alla = kNone, heautou = kNone;   // C38 (additive): ἀλλά ("not X but Y"), ἑαυτοῦ (reflexive possessor)
   };
   const Closed& closed() const { return k_; }
   // Case a verb gives its object (valency_grc.tsv; `middle` selects mid: frames), Acc by default.

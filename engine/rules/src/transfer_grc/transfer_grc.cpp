@@ -7,6 +7,7 @@
 
 #include "frame/english.h"
 #include "transfer/tables.h"
+#include "vp/morph.h"
 #include "vp/morph_grc.h"
 #include "vp/text.h"
 #include "vp/transfer_grc.h"
@@ -727,7 +728,24 @@ uint32_t GreekTransfer::adverb(const std::string& lemma0, int token, Ctx& c, boo
 }
 
 // ---- noun phrases ---------------------------------------------------------------------------------------------------
-void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
+void GreekTransfer::npInto(const SemNP& n0, Ctx& c, GrcNP& o) const {
+  // C38: an irregular English plural the tagger left as its own lemma ("the oxen" -> μάνδρα "fold" in the singular)
+  SemNP nx;
+  const SemNP* np0 = &n0;
+  if (!n0.isPronoun && !n0.isName) {
+    static const char* const kIrr[][2] = {{"oxen", "ox"}, {"mice", "mouse"}, {"geese", "goose"}, {"teeth", "tooth"},
+                                          {"feet", "foot"}, {"lice", "louse"}, {nullptr, nullptr}};
+    const std::string h = text::lower(n0.head);
+    for (size_t i = 0; kIrr[i][0]; ++i)
+      if (h == kIrr[i][0]) {
+        nx = n0;
+        nx.head = kIrr[i][1];
+        nx.number = 2;
+        np0 = &nx;
+        break;
+      }
+  }
+  const SemNP& n = *np0;
   o = GrcNP{};
   c.cover(n.tokens);
   c.cover(n.token);
@@ -1131,6 +1149,12 @@ void GreekTransfer::npInto(const SemNP& n, Ctx& c, GrcNP& o) const {
   // πατρός; "μετὰ πατρός" is "with a father")
   if (c.st.lang == frame::SrcLang::Es && n.determiner.empty() && n.possessor.empty() && n.number != 2 && !n.isName &&
       in(text::lower(n.head), {"papá", "mamá", "abuela", "abuelo", "abuelita", "abuelito"}))
+    o.definite = true;
+  // C38: English "father / mother / grandfather ..." without a determiner and capital-less ("for father is waiting")
+  // is used like a name: the article (πατὴρ γὰρ μένει was "a father")
+  if (c.st.lang == frame::SrcLang::En && n.determiner.empty() && n.possessor.empty() && n.number != 2 && !n.isName &&
+      n.adjectives.empty() &&
+      in(text::lower(n.head), {"father", "mother", "grandfather", "grandmother", "dad", "mom", "mum", "grandma", "grandpa"}))
     o.definite = true;
   // a generic plural subject takes the article in Greek ("Flowers can't talk" -> τὰ ἄνθη)
   if (subjectRole && !o.definite && n.number == 2 && n.determiner.empty() && n.numeral.empty() && o.head != kNone &&
@@ -2224,6 +2248,108 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
       return;
     }
   }
+  // C38: English frame readings repaired on the Greek side (textbook prose): (a) a clause opening with "For" read as a
+  // preposition without an object ("For the farm is not large.": the connector was dropped) -> the connector "for"
+  // (γάρ); (b) "and yet" (connector "and" + adverb "yet": καὶ ἔτι was produced) -> the connector "and-yet" (δέ +
+  // ὅμως); (c) "and so, he is often delighted" ("so" read as a degree word of the predicate) -> the connector "so"
+  // (οὖν); (d) "provides him food" (the pronoun read as the object, the noun as the indirect object) -> swapped.
+  if (c.st.lang == frame::SrcLang::En) {
+    SemFrame fx = f;
+    bool changed = false;
+    auto hasConn = [&](const char* k) {
+      for (const std::string& x : fx.connectors) if (text::lower(x) == k) return true;
+      return false;
+    };
+    auto firstWordOf = [&](int tok) {   // the token opens its sentence or follows ; : , or a quote
+      for (int k = tok - 1; k >= 0; --k) {
+        const nlp::Token& t = c.s.tokens[(size_t)k];
+        if (t.upos == "PUNCT") return t.lower == ";" || t.lower == ":" || t.lower == "," || t.lower == "\"";
+        return false;
+      }
+      return true;
+    };
+    if (!hasConn("for") && fx.hasSubject) {
+      for (size_t k = 0; k + 1 < c.s.tokens.size(); ++k) {
+        const nlp::Token& t = c.s.tokens[k];
+        if (t.lower != "for" || !firstWordOf((int)k)) continue;
+        bool obl = false;
+        for (const frame::SemOblique& o : fx.obliques) obl = obl || o.token == (int)k;
+        bool subj = fx.subject.token == (int)k + 1 || fx.subject.token == (int)k + 2;
+        for (int tk : fx.subject.tokens) subj = subj || tk == (int)k + 1;
+        if (!obl && subj) { fx.connectors.insert(fx.connectors.begin(), "for"); c.cover((int)k); changed = true; break; }
+      }
+    }
+    for (size_t a = 0; a < fx.adverbs.size(); ++a) {
+      const frame::SemAdverb& av = fx.adverbs[a];
+      if (text::lower(av.lemma) != "yet" || av.token < 0) continue;
+      const bool afterAnd = av.token > 0 && c.s.tokens[(size_t)av.token - 1].lower == "and";
+      if (!afterAnd && !firstWordOf(av.token)) continue;
+      fx.connectors.erase(std::remove_if(fx.connectors.begin(), fx.connectors.end(),
+                                         [](const std::string& x) { return text::lower(x) == "and"; }), fx.connectors.end());
+      fx.connectors.insert(fx.connectors.begin(), "and-yet");
+      c.cover(av.token);
+      if (afterAnd) c.cover(av.token - 1);
+      fx.adverbs.erase(fx.adverbs.begin() + (long)a);
+      changed = true;
+      break;
+    }
+    for (frame::SemAdj& pa : fx.predAdj)
+      for (size_t a = 0; a < pa.adverbs.size() && a < pa.advTokens.size(); ++a) {
+        const int tk = pa.advTokens[a];
+        if (text::lower(pa.adverbs[a]) != "so" || tk < 0 || (size_t)tk + 1 >= c.s.tokens.size() ||
+            !(c.s.tokens[(size_t)tk + 1].lower == "," || (firstWordOf(tk) && pa.token != tk + 1)))
+          continue;
+        pa.adverbs.erase(pa.adverbs.begin() + (long)a);
+        pa.advTokens.erase(pa.advTokens.begin() + (long)a);
+        if (!hasConn("so")) fx.connectors.push_back("so");
+        c.cover(tk);
+        changed = true;
+        break;
+      }
+    // (e) "So the mother is glad." ("So" read as the adverb οὕτω): a clause-opening "so" before its subject is "so" (οὖν)
+    for (size_t a = 0; a < fx.adverbs.size(); ++a) {
+      const frame::SemAdverb& av = fx.adverbs[a];
+      if (text::lower(av.lemma) != "so" || av.token < 0 || !firstWordOf(av.token) || !fx.hasSubject || hasConn("so")) continue;
+      const int nx = av.token + 1;
+      bool subj = fx.subject.token == nx || fx.subject.token == nx + 1;
+      for (int tk : fx.subject.tokens) subj = subj || tk == nx;
+      if (!subj) continue;
+      fx.connectors.push_back("so");
+      c.cover(av.token);
+      fx.adverbs.erase(fx.adverbs.begin() + (long)a);
+      changed = true;
+      break;
+    }
+    // (f) "The daughter is beautiful and wise." ("wise" tagged as an adverb: a coordinated fragment) -> a second
+    // predicate adjective; a repaired misreading: Check
+    if (fx.copula && !fx.predAdj.empty())
+      for (size_t a = 0; a < fx.subordinate.size(); ++a) {
+        const frame::SemSub& sb = fx.subordinate[a];
+        if (sb.relation != Relation::Coord || sb.frame.size() != 1) continue;
+        const SemFrame& g = sb.frame[0];
+        if (g.type != Kind::Frag || g.hasPred || g.hasSubject || g.hasObject || g.adverbs.size() != 1 || !g.obliques.empty())
+          continue;
+        const std::string w = text::lower(g.adverbs[0].lemma);
+        if (w.size() > 2 && w.compare(w.size() - 2, 2, "ly") == 0) continue;
+        frame::SemAdj ad;
+        ad.lemma = w;
+        ad.token = g.adverbs[0].token;
+        fx.predAdj.push_back(ad);
+        fx.subordinate.erase(fx.subordinate.begin() + (long)a);
+        if (std::find(c.out.flags.begin(), c.out.flags.end(), "clause-repair") == c.out.flags.end())
+          c.out.flags.push_back("clause-repair");
+        changed = true;
+        break;
+      }
+    if (fx.hasObject && fx.object.isPronoun && fx.hasIndirect && !fx.indirectObject.isPronoun && fx.hasPred) {
+      std::swap(fx.object, fx.indirectObject);
+      changed = true;
+    }
+    if (changed) {
+      clauseInto(fx, c, cl);
+      return;
+    }
+  }
   // C31: "bleed" / "sangrar" (no Attic verb in greek.vpl; αἱμορραγέω is late): "blood flows" with the person in the
   // dative ("The boy is bleeding." -> αἷμα τῷ παιδὶ ῥεῖ, "I am bleeding." -> αἷμά μοι ῥεῖ) or, for a body part, out of
   // it ("His knee bled." -> αἷμα ἐκ τοῦ γόνατος αὐτοῦ ἔρρει); the past is the imperfect (the blood was flowing).
@@ -3052,6 +3178,7 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
     cl.hasObject = true;
     npInto(f.object.genitive[0], c, cl.object);
   }
+  bool contrastNeg = false;
   for (const frame::SemOblique& o : f.obliques) {
     if (state && (o.prep == "of" || o.prep == "about" || o.prep == "de") && !cl.hasObject) {   // "afraid of the dark"
       cl.hasObject = true;
@@ -3059,8 +3186,45 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
       c.cover(o.token);
       continue;
     }
+    // C38: "the land of the farm" read as the object + an "of" phrase of the verb (περὶ τοῦ ἀγροῦ "about the farm" was
+    // produced): the "of" phrase right after the object is its genitive attribute (τὴν γῆν τοῦ ἀγροῦ)
+    if (c.st.lang == frame::SrcLang::En && text::lower(o.prep) == "of" && f.hasObject && cl.hasObject && !f.object.isPronoun &&
+        o.token >= 0 && cl.object.genitive.empty() && !o.np.isPronoun) {
+      int last = f.object.token;
+      for (int tk : f.object.tokens) last = std::max(last, tk);
+      int first = o.token;
+      for (int tk : o.np.tokens) first = std::min(first, tk);
+      if (last >= 0 && (o.token == last + 1 || first == last + 2)) {
+        GrcNP g;
+        npInto(o.np, c, g);
+        c.cover(o.token);
+        cl.object.genitive.push_back(g);
+        continue;
+      }
+    }
+    // C38: "not in the city but in the fields" (the frame coordinates the second place with "but" inside the first):
+    // οὐκ ἐν τῇ πόλει ἀλλὰ ἐν τοῖς ἀγροῖς after the verb, the verb itself not negated ("ἐν τῇ πόλει καὶ τοῖς ἀγροῖς οὐκ
+    // οἰκεῖ" was OK and wrong)
+    if (f.negative && o.np.coord.size() == 1 && in(text::lower(o.np.coordConj), {"but", "pero", "sino"})) {
+      frame::SemOblique a = o, b = o;
+      a.np.coord.clear();
+      a.np.coordConj.clear();
+      b.np = o.np.coord[0];
+      const size_t n0 = cl.obliques.size();
+      obliqueInto(a, c, cl);
+      const size_t n1 = cl.obliques.size();
+      obliqueInto(b, c, cl);
+      if (n1 == n0 + 1 && cl.obliques.size() == n1 + 1) {
+        cl.obliques[n0].contrast = 1;
+        cl.obliques[n1].contrast = 2;
+        for (size_t q : {n0, n1}) { cl.obliques[q].end = true; cl.obliques[q].front = false; }
+        contrastNeg = true;
+      }
+      continue;
+    }
     obliqueInto(o, c, cl);
   }
+  if (contrastNeg) cl.polarity = Polarity::Pos;
   // copula predicate
   if (f.copula && !state) {
     for (const SemNP& pn : f.predicative) {
@@ -3418,6 +3582,12 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
       }
     }
     else if (k == "so" || k == "then" || k == "therefore" || k == "entonces" || k == "pues") g = "οὖν";
+    else if (k == "for") g = "γάρ";   // C38: a clause opening with "For"
+    else if (k == "and-yet") {        // C38: "and yet" -> δέ + ὅμως (ἔτι "still" was produced)
+      const uint32_t hom = greek("ὅμως", Adv) != kNone ? greek("ὅμως", Adv) : greek("ὅμως");
+      if (hom != kNone) { cl.adverbs.insert(cl.adverbs.begin(), GrcAdverb{hom, AdvPos::Front}); c.table(hom, k0, -1, "connector"); }
+      g = "δέ";
+    }
     else if (k == "because" || k == "porque") g = "ὅτι";
     else if (k == "now") g = "νῦν";
     else if (k == "also") g = "καί";
@@ -3852,6 +4022,37 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
       }
       case Relation::Coord: {
         gs.rel = SubRel::Coord;
+        // C38: "..., and yet ..." (the clause took δέ + ὅμως): no καί besides ("καὶ ὅμως δὲ" was produced)
+        {
+          const uint32_t de = greek("δέ", Particle) != kNone ? greek("δέ", Particle) : greek("δέ");
+          const uint32_t hom = greek("ὅμως", Adv) != kNone ? greek("ὅμως", Adv) : greek("ὅμως");
+          bool yet = false;
+          for (const GrcAdverb& av : sc.adverbs) yet = yet || (hom != kNone && av.lemma == hom);
+          if ((mk == "and" || mk.empty()) && yet && de != kNone &&
+              std::find(sc.connectors.begin(), sc.connectors.end(), de) != sc.connectors.end()) {
+            gs.noConj = true;
+            break;
+          }
+        }
+        // C38: a coordinated clause without a subject of its own agrees with the main clause's subject ("Οἱ παῖδες ...
+        // φιλοῦσι καὶ ἐν τῷ ἀγρῷ παίζει" had the singular)
+        if (!sf.hasSubject && !sc.hasSubject && sc.pred.number == 0 && cl.hasSubject && sf.type == Kind::Decl) {
+          const bool pl = cl.subject.isPronoun ? cl.subject.pron.number == Pl : (cl.subject.number == Pl || !cl.subject.coord.empty());
+          if (pl) {
+            sc.pred.number = Pl;
+            sc.pred.person = cl.subject.isPronoun && cl.subject.pron.person ? cl.subject.pron.person : 3;
+          }
+        }
+        // C38: "The father calls his son, but he does not hear.": an English "he / she" after a clause with a person
+        // subject and a person object of that gender may mean either (the son); the Greek drops the pronoun and so
+        // says the subject (ἀλλὰ οὐκ ἀκούει): a guess, never OK
+        if (c.st.lang == frame::SrcLang::En && sf.hasSubject && sf.subject.isPronoun && sf.subject.pron.person == 3 &&
+            sf.subject.pron.number != 2 && f.hasSubject && f.hasObject && !f.object.isPronoun && animate(f.object) &&
+            animate(f.subject) && f.object.number != 2 &&
+            std::find(c.out.flags.begin(), c.out.flags.end(), "subject-guess") == c.out.flags.end()) {
+          c.out.flags.push_back("subject-guess");
+          c.out.notes.push_back(rules::Reason{-1, "form", "\"" + sf.subject.surface + "\" may be the object of the first clause: check who is meant", ""});
+        }
         // C18: "Be quiet, the baby is sleeping": a statement after a command without a conjunction explains it (γάρ)
         const bool splice = mk.empty() && f.type == Kind::Imp && sf.type == Kind::Decl && sf.hasSubject && !sb.before;
         // C18: "We must hurry, or we will be late" -> "..., εἰ δὲ μή, ὑστερήσομεν" (or else after a command / must)
@@ -3904,6 +4105,38 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
                           return false;
                         }());
     if (akouo && person && cl.pred.voice != Passive) cl.object.case_ = Gen;
+  }
+  // C38: a 3rd person possessor pronoun that agrees with the clause's 3rd person subject is the subject's own: the
+  // article ("The father calls his son." -> τὸν υἱὸν καλεῖ), with "own" ἑαυτοῦ between article and noun ("his own
+  // house" -> τὴν ἑαυτοῦ οἰκίαν; τὴν ἴδιον οἰκίαν αὐτοῦ was produced); αὐτοῦ stays for another person's
+  // (a coordinated clause without its own subject takes the inherited one: "Chloe works ... and helps her mother")
+  const bool inherited = !f.hasSubject && !f.inheritedSubject.empty();
+  const SemNP* fsub = f.hasSubject ? &f.subject : inherited ? &f.inheritedSubject[0] : nullptr;
+  if (c.st.lang == frame::SrcLang::En && fsub && (cl.hasSubject || inherited) &&
+      !(fsub->isPronoun && fsub->pron.person && fsub->pron.person != 3)) {
+    const uint8_t sn = cl.hasSubject ? (cl.subject.isPronoun ? cl.subject.pron.number : cl.subject.number)
+                                     : (fsub->isPronoun ? (fsub->pron.number == 2 ? (uint8_t)Pl : (uint8_t)Sg)
+                                                        : (fsub->number == 2 ? (uint8_t)Pl : (uint8_t)Sg));
+    uint8_t sg = !cl.hasSubject ? 0 : cl.subject.isPronoun ? cl.subject.pron.gender : cl.subject.gender;
+    if (!sg && cl.hasSubject && !cl.subject.isPronoun && cl.subject.head != kNone) sg = lx_.lemma(cl.subject.head).gender;
+    if (!sg && fsub->isPronoun) sg = fsub->pron.gender;
+    const uint32_t idios = greek("ἴδιος", Adj);
+    auto own = [&](GrcNP& n) {
+      if (n.possPerson != 3 || n.possEmphatic || n.isPronoun) return;
+      if ((n.possNumber == Pl) != (sn == Pl)) return;
+      if (n.possNumber != Pl && n.possGender && sg && !morph::genderAdmits(sg, n.possGender) &&
+          !morph::genderAdmits(n.possGender, sg))
+        return;
+      bool ownAdj = false;
+      for (size_t a = 0; a < n.adjectives.size(); ++a)
+        if (idios != kNone && n.adjectives[a].lemma == idios) { n.adjectives.erase(n.adjectives.begin() + (long)a); ownAdj = true; break; }
+      if (ownAdj) n.possReflexive = true;
+      else n.possPerson = 0;
+      n.definite = true;
+    };
+    if (cl.hasObject) own(cl.object);
+    if (cl.hasIndirect) own(cl.indirect);
+    for (GrcOblique& o : cl.obliques) own(o.np);
   }
   c.frame = keepFrame;
   c.motion = keepMotion;

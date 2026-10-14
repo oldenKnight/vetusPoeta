@@ -64,6 +64,26 @@ void Analyser::readings(const std::string& word, Token& t, const std::vector<rul
   rs.clear();
   morph::Token mt;
   grc::analyse(lx_, word, mt);
+  // C38: the unaccented enclitic forms of εἰμί / φημί analysed as their accented forms (greek.vpl reads εἰσιν without
+  // features: the verb of "οἱ βόες ἰσχυροί εἰσιν" was lost)
+  {
+    static const char* const kEnc[][2] = {{"εἰμι", "εἰμί"}, {"ἐστι", "ἐστί"}, {"ἐστιν", "ἐστίν"}, {"ἐσμεν", "ἐσμέν"},
+                                          {"ἐστε", "ἐστέ"}, {"εἰσι", "εἰσί"}, {"εἰσιν", "εἰσίν"}, {"φημι", "φημί"},
+                                          {"φησι", "φησί"}, {"φησιν", "φησίν"}, {"φαμεν", "φαμέν"}, {"φατε", "φατέ"},
+                                          {"φασι", "φασί"}, {"φασιν", "φασίν"}};
+    const std::string low = text::nfc(text::lower(word));
+    for (const auto& e : kEnc)
+      if (low == text::nfc(e[0])) {
+        bool featured = false;
+        for (const lex::Analysis& a : mt.analyses) featured = featured || unpack(morph::packedOf(lx_, a)).mood != 0;
+        if (!featured) {
+          morph::Token m2;
+          grc::analyse(lx_, text::nfc(e[1]), m2);
+          if (!m2.analyses.empty()) mt = std::move(m2);
+        }
+        break;
+      }
+  }
   t.accentDiffers = mt.accentInsensitive;
   const std::string low = text::lower(word);
   // closed-class tables (article, personal / demonstrative / relative / interrogative pronouns, οὐδείς, numerals)
@@ -131,7 +151,14 @@ void Analyser::readings(const std::string& word, Token& t, const std::vector<rul
     if (f.mood == Optative) p -= 0.4;
     if (f.number == Dual) p -= 0.8;
     if (f.case_ == Voc) p -= 0.2;
-    if ((l.flags & lex::ProperName) && !t.capitalised) p -= 0.5;
+    if ((l.flags & lex::ProperName) && !t.capitalised) p -= 1.0;   // C38: was 0.5 (υἱόν read as the name Υἱός)
+    // C38: an adverb in -ως is the adverb lemma (βραδέως "slowly"; a genitive of βραδύς was chosen); a reading whose
+    // part of speech has the readable row wins over a homograph of another part of speech (γεωργός noun, γέρων noun)
+    if (l.pos == Adv && word.size() > 4 && word.compare(word.size() - 4, 4, "ως") == 0) p += 1.0;
+    {
+      const char* pn = l.pos == Noun ? "noun" : l.pos == Verb ? "verb" : l.pos == Adj ? "adj" : l.pos == Adv ? "adv" : "";
+      if (*pn && gt_.readable(l.key, pn) && gt_.readable(l.key, pn)->pos == pn) p += 0.3;
+    }
     if (l.freqRank) p += 0.2 * (1.0 - std::min<double>(l.freqRank, 5000) / 5000.0);
     if (mt.accentInsensitive) p -= 0.5;
     r.prior = p;
@@ -302,6 +329,15 @@ void Analyser::analyse(std::string_view sentence, Sentence& out, const std::vect
           if (r.name && r.lemma != kNone && !(lx_.lemma(r.lemma).flags & lex::ProperName)) r.name = false;
       }
     }
+    // C38: a capitalised word inside the sentence with a names_grc.tsv reading is the name ("ὁ Φίλιππος" was read as
+    // the adjective φίλιππος "fond of horses")
+    if (!first && cap) {
+      bool listed = false;
+      for (const Reading& r : t.readings) listed = listed || (r.name && r.lemma == kNone);
+      if (listed)
+        for (Reading& r : t.readings)
+          if (!r.name && !r.closed) r.prior -= 1.5;
+    }
     first = false;
   }
   // clauses: punctuation, subordinators, καί / ἀλλά between two finite verbs
@@ -343,6 +379,45 @@ void Analyser::analyse(std::string_view sentence, Sentence& out, const std::vect
     if (cut == out.tokens.size()) continue;
     for (size_t m = cut; m < out.tokens.size(); ++m) ++out.tokens[m].clause;
     k = cut;   // the loop goes on from the new clause
+  }
+  // C38: "μικρὸς δὲ ὁ κλῆρος καὶ οὐ πολὺν σῖτον παρέχει": a verbless predication (an articled nominative and a bare
+  // nominative adjective) before καί and a finite verb after it are two clauses (the copula is left out in the first)
+  for (size_t k = 0; k < out.tokens.size(); ++k) {
+    if (!coordWord(out.tokens[k]) || k == 0) continue;
+    const int cl = out.tokens[k].clause;
+    bool verbBefore = false, verbAfter = false, art = false, bareAdj = false;
+    uint8_t artGender = 0, artNumber = 0;
+    std::vector<std::pair<uint8_t, uint8_t>> adjGN;   // gender, number of the bare adjectives (they must agree)
+    for (size_t m = 0; m < out.tokens.size(); ++m) {
+      if (out.tokens[m].clause != cl || out.tokens[m].kind != TokKind::Word) continue;
+      if (finiteVerb(out.tokens[m])) (m < k ? verbBefore : verbAfter) = true;
+      if (m >= k) continue;
+      const Reading* r = out.tokens[m].best();
+      if (!r) continue;
+      const Features f = unpack(r->packed);
+      if (f.case_ != Nom) continue;
+      if (r->closed && f.pos == Article) { art = true; artGender = f.gender; artNumber = f.number; }
+      else if (r->lemma != kNone && !r->closed && lx_.lemma(r->lemma).pos == Adj) {
+        // bare: no article right before it
+        bool prevArt = false;
+        for (size_t q = m; q-- > 0;) {
+          if (out.tokens[q].kind != TokKind::Word) break;
+          const Reading* pr = out.tokens[q].best();
+          const std::string pk = text::greek_key(grc::ultimaToAcute(text::lower(out.tokens[q].text)));
+          if (pk == text::greek_key("δέ") || pk == text::greek_key("μέν") || pk == text::greek_key("γάρ")) continue;
+          prevArt = pr && pr->closed && unpack(pr->packed).pos == Article;
+          break;
+        }
+        if (!prevArt) { bareAdj = true; adjGN.emplace_back(f.gender, f.number); }
+      }
+    }
+    if (verbBefore || !verbAfter || !art || !bareAdj) continue;
+    bool agreeAll = true;
+    for (const auto& gn : adjGN)
+      agreeAll = agreeAll && (!artNumber || !gn.second || gn.second == artNumber) &&
+                 (!artGender || !gn.first || morph::genderAdmits(gn.first, artGender) || morph::genderAdmits(artGender, gn.first));
+    if (!agreeAll) continue;
+    for (size_t m = k; m < out.tokens.size(); ++m) ++out.tokens[m].clause;
   }
 }
 
@@ -492,6 +567,13 @@ void Analyser::disambiguate(Sentence& s) const {
       if (f.mood == Imperative && s.question) sc -= 0.5;
       // C38: a 2nd person middle / passive in -ει beside the 3rd person active of the same verb (λέγει, φιλεῖ, χαίρει)
       // is the rarer reading
+      // C38: an Attic contracted future identical to the present (καλεῖ) is read as the present
+      if (f.tense == Future)
+        for (size_t r2 = 0; r2 < s.tokens[i].readings.size(); ++r2) {
+          const Features g = feats(i, r2);
+          if (r2 != r && s.tokens[i].readings[r2].lemma == rd.lemma && g.tense == Present && g.person == f.person &&
+              g.number == f.number && g.mood == f.mood) { sc -= 0.75; break; }
+        }
       if (f.person == 2 && (f.voice == Middle || f.voice == Passive))
         for (size_t r2 = 0; r2 < s.tokens[i].readings.size(); ++r2) {
           const Features g = feats(i, r2);

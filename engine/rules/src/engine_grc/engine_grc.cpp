@@ -58,12 +58,72 @@ void addFlag(std::vector<std::string>& f, const std::string& x) {
   if (std::find(f.begin(), f.end(), x) == f.end()) f.push_back(x);
 }
 
+// C38: "O Zeus, ..." / "Oh Zeus, ..." / "¡Oh Dios, ...": the address word "O" / "Oh" before a capitalised name or noun
+// that a comma closes (within three words) is left out, so the frame builder reads the address as it reads "Timothy,
+// hurry" (the realiser writes ὦ + the vocative); the tagger read "O" as a preposition and the address was dropped.
+// an address follows at `at`: ("O " / "Oh ") + a capitalised word and at most two more words before a comma
+bool addressAfter(const std::string& src, size_t at) {
+  if (src.compare(at, 2, "O ") == 0) at += 2;
+  else if (src.compare(at, 3, "Oh ") == 0) at += 3;
+  if (at >= src.size() || !(src[at] >= 'A' && src[at] <= 'Z') || src.compare(at, 2, "I ") == 0) return false;
+  const size_t comma = src.find(',', at);
+  if (comma == std::string::npos) return false;
+  size_t words = 0;
+  for (size_t k = at; k < comma; ++k) {
+    words += src[k] == ' ';
+    if (src[k] == '!' || src[k] == '?' || src[k] == '.') return false;
+  }
+  return words <= 2;
+}
+
+std::string oAddress(const std::string& src) {
+  std::string out;
+  size_t i = 0;
+  bool start = true;
+  while (i < src.size()) {
+    const char ch = src[i];
+    if (start && (src.compare(i, 2, "O ") == 0 || src.compare(i, 3, "Oh ") == 0)) {
+      const size_t w = src.find(' ', i) + 1;
+      const bool cap = w < src.size() && ((src[w] >= 'A' && src[w] <= 'Z') || (unsigned char)src[w] >= 0xC3);
+      const bool notI = !(src.compare(w, 2, "I ") == 0 || src.compare(w, 2, "I'") == 0);
+      size_t comma = src.find(',', w);
+      size_t words = 0;
+      for (size_t k = w; k < comma && k < src.size(); ++k) words += src[k] == ' ';
+      if (cap && notI && comma != std::string::npos && words <= 2) { i = w; start = false; continue; }
+    }
+    if (start && ch == '"' && addressAfter(src, i + 1)) { ++i; continue; }   // a straight opening quote, as above
+    out += ch;
+    if (ch == '.' || ch == '!' || ch == '?' || ch == ';' || ch == ':') start = true;
+    else if (ch != ' ' && ch != '"' && ch != '\'' && (unsigned char)ch < 0x80 && ch != '(') start = false;
+    else if ((unsigned char)ch >= 0x80) {
+      // curly quotes and the Spanish marks keep the sentence start; any other letter ends it
+      const bool mark = src.compare(i, 3, "\xE2\x80\x9C") == 0 || src.compare(i, 3, "\xE2\x80\x9D") == 0 ||
+                        src.compare(i, 2, "\xC2\xA1") == 0 || src.compare(i, 2, "\xC2\xBF") == 0 ||
+                        src.compare(i, 2, "\xC2\xAB") == 0;
+      if (mark) {
+        const size_t len = (unsigned char)ch >= 0xE0 ? 3 : 2;
+        // an opening quote at a sentence start is left out: the frame builder loses an address after it ("“Zeus,
+        // life is hard" dropped Zeus; "“Timothy, hurry." became a statement); ¡ ¿ stay
+        const bool quote = src.compare(i, 3, "\xE2\x80\x9C") == 0 || src.compare(i, 2, "\xC2\xAB") == 0;
+        if (start && quote && addressAfter(src, i + len)) out.pop_back();
+        else out += src.substr(i + 1, len - 1);
+        i += len;
+        continue;
+      }
+      start = false;
+    }
+    ++i;
+  }
+  return out;
+}
+
 // C38: meaning coverage of an English / Spanish cue in its Greek (the calibration of OK on textbook prose: a name left
 // in Latin letters, "Oh Zeus" dropped, "For ..." without γάρ, "and yet" rendered ἔτι were rated OK). Text level, on
 // the source cue and the Greek: every sentence-opening connector of the source needs one of its Greek particles (a
 // count per class), an address with "O / Oh" or a trailing ", Name" needs ὦ, and the Greek has no Latin letters
 // outside a [bracket]. `lost` gets one line per fault.
-void sourceCoverage(const std::string& source, const std::string& greek, bool es, std::vector<std::string>& lost) {
+void sourceCoverage(const std::string& source, const std::string& greek, bool es, const GreekData& gd,
+                    std::vector<std::string>& lost) {
   // the Greek: particle keys (acute for grave) and Latin letters
   std::vector<std::string> gk;
   bool latin = false;
@@ -136,7 +196,14 @@ void sourceCoverage(const std::string& source, const std::string& greek, bool es
     const std::string& w = ws[k].w;
     const bool st = ws[k].start || (k > 0 && ws[k - 1].start && (ws[k - 1].w == "and" || ws[k - 1].w == "y"));
     if (!es) {
-      if (st && w == "for" && subjectWord(k + 1)) ++needGar;
+      if (st && w == "for" && k + 1 < ws.size() && ws[k].after == 0) {
+        static const char* const kNot[] = {"me", "you", "him", "her", "us", "them", "it", "example", "instance", "now",
+                                           "ever", "sure", "once", "a", "an", "all", "years", "days", "hours", "a",
+                                           "this", "that", "what", "how", "long", "some", "many", "one", "two", nullptr};
+        bool no = false;
+        for (const char* const* x = kNot; *x; ++x) no = no || ws[k + 1].w == *x;
+        if (!no) ++needGar;
+      }
       else if (st && w == "so" && (ws[k].after == ',' || subjectWord(k + 1))) ++needOun;
       else if (w == "therefore") ++needOun;
       else if (st && w == "and" && k + 1 < ws.size() && ws[k + 1].w == "yet") { ++needYet; ++k; }
@@ -158,6 +225,20 @@ void sourceCoverage(const std::string& source, const std::string& greek, bool es
   if (yet + de + alla < needYet) lost.push_back(es ? "\"sin embargo\" without δέ / ὅμως" : "\"and yet\" without δέ / ὅμως");
   if (yet + de + alla < needYet + needBut) lost.push_back(es ? "\"pero\" without ἀλλά / δέ" : "\"but\" without ἀλλά / δέ");
   if (count({"ὦ"}) < needO) lost.push_back("the address (ὦ ...) left out");
+  // a name of names_grc.tsv in the source needs one of its Greek forms ("“Zeus, life is hard" lost Zeus)
+  for (const W& x : ws) {
+    if (!x.cap) continue;
+    const NameEntry* e = gd.nameByEnglish(x.w);
+    if (!e || e->policy == curated::NamePolicy::Translate) continue;
+    bool found = false;
+    for (uint8_t c : {feat::Nom, feat::Gen, feat::Dat, feat::Acc, feat::Voc}) {
+      std::string f;
+      if (!declineName(*e, c, f)) continue;
+      const std::string k = text::greek_key(grc::ultimaToAcute(text::lower(f)));
+      for (const std::string& g : gk) found = found || g == k;
+    }
+    if (!found) lost.push_back("the name " + x.w + " left out");
+  }
 }
 
 // Rebuilds `text` with new token strings (same order); gaps between tokens are kept.
@@ -2778,7 +2859,7 @@ struct GreekPath::Impl {
     const bool prev = !cues.front().prevSource.empty();
     const bool next = !cues.back().nextSource.empty() && !frame::endsSentence(cues.back().sourceText);
     if (prev) texts.push_back(cues.front().prevSource);
-    for (const CueInput& c : cues) texts.push_back(c.sourceText);
+    for (const CueInput& c : cues) texts.push_back(oAddress(c.sourceText));
     if (next) texts.push_back(cues.back().nextSource);
     const size_t off = prev ? 1 : 0;
     const std::vector<frame::SourceSentence> sents = frame::mapSentences(texts);
@@ -2997,7 +3078,7 @@ struct GreekPath::Impl {
         // C38: meaning coverage (connectors, the address, Latin letters)
         if (a.greekText && !a.copied) {
           std::vector<std::string> lost;
-          sourceCoverage(cues[i].sourceText, o.target, lang == frame::SrcLang::Es, lost);
+          sourceCoverage(cues[i].sourceText, o.target, lang == frame::SrcLang::Es, gd, lost);
           Check cov{"coverage", lost.empty(), ""};
           for (size_t k = 0; k < lost.size(); ++k) cov.detail += (k ? "; " : "") + lost[k];
           o.checks.push_back(cov);

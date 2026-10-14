@@ -196,7 +196,7 @@ TEST_CASE("rules-grc5: C25 constructions (result clauses, irregular pasts, ancia
       {"The dog is his.", "ὁ κύων ἐκείνου ἐστίν.", false},
       // "lie" without a place is "tell lies" (κεῖμαι was OK and wrong); "lie to" -> ψεύδω + acc
       {"Do not lie!", "μὴ ψεύδου!", false},
-      {"He lied to his mother.", "τὴν μητέρα αὐτοῦ ἔψευσεν.", false},
+      {"He lied to his mother.", "τὴν μητέρα ἔψευσεν.", false},   // C38: the subject's own is the article (αὐτοῦ was expected)
       {"The cat lies on the bed.", "ἡ γαλῆ ἐπὶ τῆς κοίτης κεῖται.", false},
       // know how to + present infinitive (the complement verb took the main verb's row and vanished)
       {"I know how to read.", "οἶδα ἀναγιγνώσκειν.", false},
@@ -259,7 +259,7 @@ TEST_CASE("rules-grc5: C25 after the blind check (questions, address phrases, ti
       {"My friend and I played in the garden.", "ὁ φίλος μου καὶ ἐγὼ ἐν τῷ κήπῳ ἐπαίσαμεν.", true},
       {"My friend, come here.", "ὦ φίλε, ἐλθὲ δεῦρο.", false},
       // a when-clause read as a that-complement (ὅτι was produced): a time clause / participle
-      {"The girl smiled when she saw her mother.", "ἡ κόρη τὴν μητέρα αὐτῆς ἰδοῦσα ἐμειδίασεν.", true},
+      {"The girl smiled when she saw her mother.", "ἡ κόρη τὴν μητέρα ἰδοῦσα ἐμειδίασεν.", true},   // C38: the article
       {"The boy laughed when he saw the cat.", "ὁ παῖς τὴν γαλῆν ἰδὼν ἐγέλασεν.", true},
       // times of day: ἕωθεν, νύκτωρ (the poetic ἠώς was chosen); across -> διά + gen
       {"We swam in the river this morning.", "ἐν τῷ ποταμῷ ἕωθεν ἐνεύσαμεν.", false},
@@ -268,7 +268,7 @@ TEST_CASE("rules-grc5: C25 after the blind check (questions, address phrases, ti
       {"We sailed across the river.", "διὰ τοῦ ποταμοῦ ἐπλεύσαμεν.", false},
       // washing hands / feet / face: νίζομαι (λοῦσον τὰς χεῖρας was OK and wrong); the smooth augment ἐνίψατο
       {"Wash your face!", "νίψαι τὸ πρόσωπόν σου!", false},
-      {"The boy washed his feet in the river.", "ὁ παῖς τοὺς πόδας αὐτοῦ ἐν τῷ ποταμῷ ἐνίψατο.", false},
+      {"The boy washed his feet in the river.", "ὁ παῖς τοὺς πόδας ἐν τῷ ποταμῷ ἐνίψατο.", false},   // C38: the article
       // attributive participles of state verbs (kind ptc); oblique forms by rule are Check
       {"The hungry wolf came to the farm.", "ὁ πεινῶν λύκος εἰς τὸν ἀγρὸν ἦλθεν.", false},
       {"We gave water to the thirsty horses.", "τοῖς διψῶσιν ἵπποις ὕδωρ ἔδομεν.", false},

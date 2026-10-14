@@ -98,6 +98,8 @@ GreekRealiser::GreekRealiser(const lex::Lexicon& lx, const curated::CuratedData&
   k_.phemi = L("φημί", Verb);
   k_.oudeis = L("οὐδείς", Pron);
   k_.medeis = L("μηδείς", Pron);
+  k_.alla = L("ἀλλά", Conj);
+  k_.heautou = L("ἑαυτοῦ", Pron);
   secondKeys_ = gd.conditionSet("order.conn.second");
   firstKeys_ = gd.conditionSet("order.conn.first");
   timeAdv_ = gd.orderingList("order.adv", "time adverbs");
@@ -383,7 +385,7 @@ void GreekRealiser::np(const GrcNP& n, uint8_t case_, bool afterPrep, bool predi
       if (ad.predicative) adjWord(ad, a, "order.adj.pred", out);
   } else {
     const bool voc = case_ == Voc;
-    const bool definite = (n.definite || n.dem != Demonstrative::None || n.possEmphatic) && !voc &&
+    const bool definite = (n.definite || n.dem != Demonstrative::None || n.possEmphatic || n.possReflexive) && !voc &&
                           !(predicate && !n.forceArticle);
     auto articleWord = [&]() {
       GWord w;
@@ -404,6 +406,16 @@ void GreekRealiser::np(const GrcNP& n, uint8_t case_, bool afterPrep, bool predi
     if (n.interrogative != kNone) { GrcAdj q; q.lemma = n.interrogative; adjWord(q, a, "order.wh", out); }
     if (definite) out.push_back(articleWord());
     if (n.numeral != kNone) { GrcAdj q; q.lemma = n.numeral; adjWord(q, a, "order.num", out); }
+    if (n.possReflexive && definite) {   // C38: τὴν ἑαυτοῦ οἰκίαν
+      GWord w;
+      w.form = n.possNumber == Pl ? "ἑαυτῶν" : n.possGender == F ? "ἑαυτῆς" : "ἑαυτοῦ";
+      w.lemma = k_.heautou;
+      Features ft; ft.pos = Pron; ft.case_ = Gen; ft.number = n.possNumber; ft.gender = n.possGender ? n.possGender : (uint8_t)M;
+      ft.person = 3;
+      w.packed = pack(ft);
+      w.rule = "order.poss.refl";
+      out.push_back(std::move(w));
+    }
     if (n.possEmphatic && n.possPerson) {
       const uint32_t p = n.possPerson == 1 ? (n.possNumber == Pl ? k_.hemeteros : k_.emos)
                                            : (n.possNumber == Pl ? k_.humeteros : k_.sos);
@@ -449,7 +461,7 @@ void GreekRealiser::np(const GrcNP& n, uint8_t case_, bool afterPrep, bool predi
       if (definite) out.push_back(articleWord());
       adjWord(*ad, a, "order.adj", out);
     }
-    if (n.possPerson && !n.possEmphatic) {
+    if (n.possPerson && !n.possEmphatic && !n.possReflexive) {
       GrcNP p;
       p.isPronoun = true;
       p.pron.person = n.possPerson;
@@ -656,6 +668,12 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
     const uint8_t oc = ob.np.case_ ? ob.np.case_ : ob.prep == kNone ? (ob.case_ ? ob.case_ : (uint8_t)Dat)
                                                                    : prepCase(ob.prep, ob.case_);
     std::vector<GWord> w;
+    if (ob.contrast) {   // C38: "οὐκ ἐν τῇ πόλει ἀλλὰ ἐν τοῖς ἀγροῖς"
+      GWord cw;
+      if (ob.contrast == 1) { literal(k_.ou, "οὐ", cw, "neg.ou"); cw.proclitic = true; }
+      else literal(k_.alla, "ἀλλά", cw, "order.conj");
+      w.push_back(std::move(cw));
+    }
     if (ob.prep != kNone) {
       GWord pw;
       literal(ob.prep, "?", pw, "order.prep");

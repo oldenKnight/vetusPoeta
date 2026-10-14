@@ -262,7 +262,7 @@
 κεῖμαι	verb	lie	yacer		C33 ("lie asleep")
 πλοῖον	noun	boat	barco	m	reverse-only	C33 ("a floating vessel"; reverse-only: "boat" stays ναῦς)
 ἐπιστολή	noun	letter	carta	f		C33 ("message")
-σῖτος	noun	food	comida	f	mass	C33 (Spanish "grano, callo"); C38: food (the beginners' reader's sense; "grain" before)
+σῖτος	noun	food	alimento	m	mass	C33 (Spanish "grano, callo"); C38: food (the beginners' reader's sense; "grain" before)
 πρόβατον	noun	sheep	oveja	f	animal plural:sheep	C33 ("cattle")
 τρέφω	verb	raise	criar		C33 ("rear and keep")
 εἰσπλέω	verb	sail	navegar		C33 ("sail into": εἰσέπλευσεν εἰς τὸν λιμένα "sailed into the harbour")
@@ -310,4 +310,8 @@
 ὀργίζω	mid	get angry	enojarse		reverse-only	C38 (ὀργίζεται; "anger" was printed)
 ἄροτρον	noun	plough	arado	m	reverse-only	C38
 βαρύς	adj	heavy	pesado		reverse-only	C38
-γέρων	noun	old man	anciano	m	person reverse-only	C38
+γέρων	noun	old man	viejo	m	person reverse-only	C38
+οὐκέτι	adv	no longer	ya no		reverse-only	C38 ("no more")
+σῴζω	verb	save	salvar		reverse-only	C38 (Spanish "ahorrar")
+κάμνω	verb	be tired	estar cansado		reverse-only	C38 ("exert oneself")
+πάρειμι	verb	be here	estar aquí		reverse-only	C38 ("be by or present")

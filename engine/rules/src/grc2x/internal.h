@@ -65,6 +65,8 @@ class LexicalSource {
  public:
   virtual ~LexicalSource() = default;
   virtual Lexical lexical(uint32_t lemma, uint8_t pos, bool middle, Target t) const = 0;
+  // C38: valency_grc.tsv's first frame of a verb (greek_key): 1 an accusative object, 0 intransitive / other, -1 no row
+  virtual int takesAccusative(const std::string& key) const { (void)key; return -1; }
 };
 
 // Side information per token for the realisers (indexed by SemNP::token / SemAdj::token / SemPredicate::token).

@@ -194,7 +194,7 @@ TEST_CASE("rules-grc4: C21 constructions (degree words, weather verbs, negation 
       {"The children love this game.", "οἱ παῖδες ταύτην τὴν παιδιὰν φιλοῦσιν.", false},
       {"The queen has a gold ring.", "ἡ βασίλεια χρυσοῦν δακτύλιον ἔχει.", false},
       {"I lost my ring.", "τὸν δακτύλιόν μου ἀπώλεσα.", false},
-      {"The boy lost his ball.", "ὁ παῖς τὴν σφαῖραν αὐτοῦ ἀπώλεσεν.", false},
+      {"The boy lost his ball.", "ὁ παῖς τὴν σφαῖραν ἀπώλεσεν.", false},   // C38: the subject's own is the article (αὐτοῦ was expected)
       {"The old woman has a magic wand.", "ἡ γραῦς μαγικὴν ῥάβδον ἔχει.", false},
       {"The shepherd hit the dog with a rod.", "ὁ ποιμὴν τὸν κύνα ῥάβδῳ ἔβαλεν. | ὁ ποιμὴν τὸν κύνα ῥάβδῳ ἔπαισεν.", false},
       {"The king has a seal.", "ὁ βασιλεὺς σφραγῖδα ἔχει.", false},
@@ -316,9 +316,9 @@ TEST_CASE("rules-grc4: C21 after the blind check (checker, touch, bring, sad, mi
       {"The house is quiet tonight.", "ἡ οἰκία νύκτωρ ἤρεμός ἐστιν. | ἡ οἰκία νύκτωρ ἥσυχός ἐστιν.", false},   // C29: quiet -> ἥσυχος (readable_grc.tsv)
       // verbs of placing ask ποῦ
       {"Where did you put the key?", "ποῦ τὴν κλεῖν ἔθηκας;", false},
-      {"Where did the boy put his book?", "ποῦ ὁ παῖς τὸ βιβλίον αὐτοῦ ἔθηκεν;", false},
+      {"Where did the boy put his book?", "ποῦ ὁ παῖς τὸ βιβλίον ἔθηκεν;", false},   // C38: the article (αὐτοῦ was expected)
       // English verbs with the bare form as their past: a 3rd singular subject and no auxiliary -> past
-      {"The king put his seal on the letter.", "ὁ βασιλεὺς τὴν σφραγῖδα αὐτοῦ ἐπὶ τὴν ἐπιστολὴν ἔθηκεν.", false},
+      {"The king put his seal on the letter.", "ὁ βασιλεὺς τὴν σφραγῖδα ἐπὶ τὴν ἐπιστολὴν ἔθηκεν.", false},   // C38: the article
       {"The girl cut the bread.", "ἡ κόρη τὸν ἄρτον ἔτεμεν.", false},
       // loud -> βοάω (state row; was "μὴ ἴσθι οὕτω μέγα", "so big")
       {"Don't be so loud!", "μὴ βόα οὕτως! | μὴ οὕτω βόα!", false},
