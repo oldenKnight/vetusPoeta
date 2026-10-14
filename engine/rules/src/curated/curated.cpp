@@ -173,10 +173,10 @@ struct Loader {
       n.gender = g == "m" ? feat::M : g == "f" ? feat::F : g == "n" ? feat::N : 0;
       if (!n.gender) warn(no, "gender must be m, f or n");
       std::string_view dcl = cols[4];
-      if (dcl == "1" || dcl == "2" || dcl == "3") n.declension = dcl[0] - '0';
+      if (dcl == "1" || dcl == "2" || dcl == "3" || dcl == "4") n.declension = dcl[0] - '0';   // C37: 4 (Iēsus)
       else if (dcl == "indecl") n.declension = 0;
       else if (dcl == "-") n.declension = -1;
-      else { warn(no, "declension must be 1, 2, 3, indecl or -"); n.declension = 0; }
+      else { warn(no, "declension must be 1, 2, 3, 4, indecl or -"); n.declension = 0; }
       std::string_view pol = cols[5];
       if (pol == "keep") n.policy = NamePolicy::Keep;
       else if (pol == "decline") n.policy = NamePolicy::Decline;

@@ -115,3 +115,48 @@ Sofía	Sophia	Sophiae	f	1	decline	C34: Spanish spelling
 Lucía	Lūcia	Lūciae	f	1	decline	C34: Spanish spelling
 Rosa	Rosa	Rosae	f	1	decline	C34: Spanish spelling (also the flower: capitalised as a name only)
 Juan	Iōannēs	Iōannis	m	3	decline	C34: Spanish spelling
+# C37 (textbook prose and liturgy): gods of the reading books (Greek names give the Latin god the readers use), the
+# farmer of a Greek reading book, and sacred names of hymns and prayers (English and Spanish spellings; D18: the
+# ecclesiastical names are the ordinary Latin ones). Two-word names with two genitives are declined word by word
+# (Iēsus Chrīstus, Iēsū Chrīstī); declension 4 with the genitive in -ū is the Iēsus type (vocative Iēsū).
+Jupiter	Iuppiter	Iovis	m	3	decline	vocative Iuppiter
+Zeus	Iuppiter	Iovis	m	3	decline	the Greek god in a Latin text
+Juno	Iūnō	Iūnōnis	f	3	decline	
+Hera	Iūnō	Iūnōnis	f	3	decline	the Greek goddess in a Latin text
+Mars	Mārs	Mārtis	m	3	decline	
+Ares	Mārs	Mārtis	m	3	decline	the Greek god in a Latin text
+Minerva	Minerva	Minervae	f	1	decline	
+Athena	Minerva	Minervae	f	1	decline	the Greek goddess in a Latin text
+Neptune	Neptūnus	Neptūnī	m	2	decline	vocative Neptūne
+Poseidon	Neptūnus	Neptūnī	m	2	decline	the Greek god in a Latin text
+Venus	Venus	Veneris	f	3	decline	
+Aphrodite	Venus	Veneris	f	3	decline	the Greek goddess in a Latin text
+Ceres	Cerēs	Cereris	f	3	decline	
+Demeter	Cerēs	Cereris	f	3	decline	the Greek goddess in a Latin text
+Apollo	Apollō	Apollinis	m	3	decline	
+Mercury	Mercurius	Mercuriī	m	2	decline	vocative Mercurī
+Hermes	Mercurius	Mercuriī	m	2	decline	the Greek god in a Latin text
+Vulcan	Volcānus	Volcānī	m	2	decline	
+Bacchus	Bacchus	Bacchī	m	2	decline	
+Dionysus	Bacchus	Bacchī	m	2	decline	the Greek god in a Latin text
+Vesta	Vesta	Vestae	f	1	decline	
+Dikeopolis	Dicaeopolis	Dicaeopolidis	m	3	decline	the farmer of a Greek reading book (Greek Δικαιόπολις)
+Dikaiopolis	Dicaeopolis	Dicaeopolidis	m	3	decline	
+Dicaeopolis	Dicaeopolis	Dicaeopolidis	m	3	decline	
+God	Deus	-	m	-	translate	the lexicon's deus, capitalised (vocative Deus)
+Lord	Dominus	-	m	-	translate	the lexicon's dominus, capitalised (vocative Domine)
+Jesus	Iēsus	Iēsū	m	4	decline	vocative Iēsū
+Christ	Chrīstus	Chrīstī	m	2	decline	vocative Chrīste
+Jesus Christ	Iēsus Chrīstus	Iēsū Chrīstī	m	2	decline	both words declined
+Virgin	Virgō	-	f	-	translate	the lexicon's virgō, capitalised
+Dios	Deus	-	m	-	translate	Spanish spelling
+Señor	Dominus	-	m	-	translate	Spanish: the Lord (capitalised); "el señor" in lower case is a common noun
+Señora	Domina	-	f	-	translate	Spanish: Our Lady (capitalised)
+María	Marīa	Marīae	f	1	decline	Spanish spelling
+Jesús	Iēsus	Iēsū	m	4	decline	Spanish spelling
+Cristo	Chrīstus	Chrīstī	m	2	decline	Spanish spelling
+Jesucristo	Iēsus Chrīstus	Iēsū Chrīstī	m	2	decline	Spanish spelling, both words declined
+Virgen	Virgō	-	f	-	translate	Spanish spelling
+Reina	Rēgīna	-	f	-	translate	Spanish: the Queen (of heaven), capitalised
+Emperatriz	Imperātrīx	-	f	-	translate	Spanish: the Empress, capitalised
+Consolatriz	Cōnsōlātrīx	Cōnsōlātrīcis	f	3	decline	Spanish: the Comforter (a Late Latin title of Mary; not in the lexicon)

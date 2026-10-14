@@ -244,11 +244,16 @@ bool hardBreak(const Token& t) {
 
 // C15: a vocative-like span: [my|your|our|dear]? ADJ* NOUN|PROPN+ (no article, no verb), at most four words.
 bool vocativeSpan(const std::vector<Token>& tk, int a, int b) {
+  // C37: an opening quotation mark and "Oh" / "O" before the addressee ("“Oh Zeus, life is hard", "O Lord, ...")
+  while (a < b && tk[(size_t)a].upos == "PUNCT" && !segmentBreak(tk[(size_t)a])) ++a;
+  const bool oh = a < b && in(tk[(size_t)a].lower, {"oh", "o"});
+  if (oh) ++a;
   if (b < a || b - a > 3) return false;
   bool noun = false;
   for (int i = a; i <= b; ++i) {
     const Token& t = tk[(size_t)i];
     if (t.upos == "NOUN" || t.upos == "PROPN") { noun = true; continue; }
+    if (oh && t.upos == "INTJ" && i == b && upper(t.text)) { noun = true; continue; }   // C37: "Oh God," tagged INTJ
     if (t.upos == "ADJ" && i < b) continue;
     if (i == a && in(t.lower, {"my", "your", "our", "dear", "o"})) continue;
     if (t.upos == "ADJ" && i == b && i > a && in(tk[(size_t)a].lower, {"my", "your", "our"})) { noun = true; continue; }   // "my dear"
@@ -1420,6 +1425,8 @@ void FrameBuilder::buildNP(Ctx& c, int h, SemNP& np) const {
   if (ht.upos == "PROPN") {
     np.isName = true;
     np.head = ht.text;
+    // C37: a name of names_la.tsv ending in -s is one person ("Ceres", "Venus", "Zeus"), whatever the tagger's number
+    if (np.number == 2 && cd_.nameByEnglish(ht.text)) np.number = 1;
     // Spanish (C13): a capitalised word inside the sentence that spanish.vpl knows as a common noun is a title
     // ("la Reina de Corazones" -> Rēgīna Cordium): its lemma, translated and capitalised
     bool sentenceFirst = true;
@@ -2785,7 +2792,9 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       for (int k : c.kids[(size_t)h])
         if (c.ok(k) && c.dep(k) == "advmod" && in(c.t(k).lower, {"very", "too", "so", "quite", "rather", "really",
                                                                   "extremely", "muy", "demasiado", "tan", "bastante",
-                                                                  "as", "awfully", "terribly"})) {   // C22
+                                                                  "as", "awfully", "terribly"}) &&   // C22
+            !(en && c.t(k).lower == "so" && k + 1 < h && !in(c.t(k + 1).lower, {"very", "much"}))) {   // C37: "So he is
+                                                                  // often content": a connector, not a degree word
           a.adverbs.push_back(c.t(k).lower);
           a.advTokens.push_back(k);
           c.take(k);
@@ -3199,7 +3208,7 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       }
       // "then" / "so" at the start of the clause: connector
       if ((k == first || k == firstContent) && in(kl, {"then", "so", "entonces", "luego", "also", "therefore", "however",
-                                                       "besides", "still"})) {
+                                                       "besides", "still", "yet"})) {   // C37: "And yet he ..." -> tamen
         c.drop(k, Drop::Marker);   // accounted for by the connector table
         f.connectors.push_back(kl == "entonces" || kl == "luego" ? "then" : kl);
         continue;
@@ -3863,6 +3872,28 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
     f.pred.deliberative = true;
   else f.pred.deliberative = false;
 
+  // C37: "He plows the land of the farm": an "of" phrase right after the object that the parser hung on the verb is the
+  // object's genitive (terram praediī), unless the verb takes an "of" phrase of its own (remind / accuse / rob X of Y)
+  if (f.hasObject && !f.object.isPronoun && f.object.genitive.empty() && f.object.coord.empty() &&
+      !in(f.pred.lemma, {"remind", "accuse", "rob", "deprive", "convince", "warn", "inform", "tell", "clear", "cure",
+                         "rid", "relieve", "strip", "persuade", "ask", "think", "hear", "speak", "dream", "consist",
+                         "recordar", "acusar", "privar", "avisar", "informar", "hablar", "pensar", "soñar"})) {
+    int objLast = f.object.token;
+    for (int t : f.object.tokens) objLast = std::max(objLast, t);
+    for (size_t oi = 0; oi < f.obliques.size(); ++oi) {
+      const SemOblique& ob = f.obliques[oi];
+      if (ob.prep != "of" || ob.np.isPronoun || ob.np.token <= objLast || objLast < 0) continue;
+      int m = ob.np.token;
+      for (int t : ob.np.tokens) m = std::min(m, t);
+      bool adjacent = m > objLast;
+      for (int t = objLast + 1; adjacent && t < m; ++t)
+        adjacent = in(c.t(t).lower, {"of", "de", "del"}) || c.t(t).upos == "DET" || c.t(t).upos == "ADP";
+      if (!adjacent) continue;
+      f.object.genitive.push_back(ob.np);
+      f.obliques.erase(f.obliques.begin() + (long)oi);
+      break;
+    }
+  }
   // the interrogative NP of a wh question that is an object/oblique keeps its NP (realiser moves it first)
   (void)first;
 }
@@ -6117,6 +6148,38 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
         verbNext = verbNext || tk[(size_t)j].upos == "AUX" || tk[(size_t)j].upos == "VERB";
       if (tk[(size_t)i + 1].lower == "you" && !(tk[(size_t)i + 2].upos == "AUX" || tk[(size_t)i + 2].upos == "VERB")) verbNext = false;
       if (!verbNext) continue;
+      tk[(size_t)i].upos = "CCONJ";
+      tk[(size_t)i].feats = 0;
+      reparse = true;
+    }
+  // C37: "For the farm is small.", "..., for the water is heavy.": "for" at the start of a sentence (or after a comma,
+  // a semicolon or an opening quotation mark) before a noun phrase and its finite verb is the conjunction (nam); "For
+  // two days he walked" (a pronoun after the noun phrase) and "For the children, ..." (a comma) stay prepositions
+  if (nlp_ && lang_ == SrcLang::En)
+    for (int i = 0; i + 2 < n; ++i) {
+      if (tk[(size_t)i].lower != "for" || tk[(size_t)i].upos == "CCONJ") continue;
+      bool start = true;
+      for (int q = i - 1; q >= 0; --q) {
+        const std::string& w = tk[(size_t)q].text;
+        if (w == "," || w == ";" || w == ":") break;
+        if (tk[(size_t)q].upos == "PUNCT" || in(tk[(size_t)q].lower, {"and", "but"})) continue;
+        start = false;
+        break;
+      }
+      if (!start) continue;
+      int j = i + 1;
+      bool noun = false;
+      while (j < n && (in(tk[(size_t)j].upos, {"DET", "ADJ", "NUM", "NOUN", "PROPN"}) ||
+                       (tk[(size_t)j].upos == "PRON" && in(tk[(size_t)j].lower, {"my", "your", "his", "her", "its", "our", "their"})))) {
+        noun = noun || in(tk[(size_t)j].upos, {"NOUN", "PROPN"});
+        ++j;
+      }
+      if (!noun || j >= n || j - i > 5) continue;
+      const nlp::Token& v = tk[(size_t)j];
+      const bool finite = (v.upos == "AUX" && in(v.lower, {"is", "are", "was", "were", "has", "have", "had", "will", "can",
+                                                            "could", "would", "does", "do", "did", "must", "shall"})) ||
+                          (v.upos == "VERB" && fget(v, nlp::morph::VerbFormShift) == nlp::morph::VfFin);
+      if (!finite) continue;
       tk[(size_t)i].upos = "CCONJ";
       tk[(size_t)i].feats = 0;
       reparse = true;

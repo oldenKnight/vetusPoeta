@@ -992,7 +992,9 @@ bool Transfer::nameTableInto(const SemNP& n, Ctx& c, LaNP& o) const {
   for (const Try& t : tries) {
     const curated::NameEntry* e = cd_.nameByEnglish(t.s);
     if (!e) continue;
-    const bool multi = e->latinNom.find(' ') != std::string::npos;
+    // C37: a two-word name declined word by word ("Iēsus Chrīstus", genitive "Iēsū Chrīstī") is a name, not a noun phrase
+    const bool multi = e->latinNom.find(' ') != std::string::npos &&
+                       !(e->latinGen.find(' ') != std::string::npos && e->declension > 0);
     if (multi) {
       if (!latinNameNP(e->latinNom, o)) continue;
     } else {
@@ -1784,6 +1786,33 @@ void Transfer::npInto(const SemNP& n, Ctx& c, LaNP& o) const {
     const curated::NameEntry* esName = c.st.lang == frame::SrcLang::Es && !cd_.nameByEnglish(n.head) && !n.title
                                        ? cd_.nameByLatin(text::latin_key(n.head)) : nullptr;   // "Alicia" -> Alīcia
     const bool inTable = cd_.nameByEnglish(n.head) != nullptr || esName != nullptr;
+    // C37: a translated title of names_la.tsv without a declension of its own ("Dios" -> Deus, "Señor" -> Dominus,
+    // "Reina" -> Rēgīna) is the lexicon's noun, capitalised and declined from the lexicon (timōre Deī, Domine)
+    if (const curated::NameEntry* te = esName ? esName : cd_.nameByEnglish(n.head))
+      if (te->policy == curated::NamePolicy::Translate && te->declension < 0) {
+        const uint32_t id = morph::findLemma(la_, te->latinNom, Noun);
+        if (id != kNone) {
+          o.head = id;
+          o.capitalise = true;
+          o.nameWords = true;
+          if (n.number == 2) o.number = Pl;
+          Choice ch;
+          ch.token = n.token;
+          ch.source = n.head;
+          ch.lemma = id;
+          ch.kind = "name";
+          ch.note = "names_la.tsv: " + te->latinNom;
+          c.out.choices.push_back(ch);
+          c.cover(n.tokens);
+          for (const SemNP& g : n.genitive) {   // "Reina del cielo" -> Rēgīna caelī
+            LaNP x;
+            npInto(g, c, x);
+            o.genitive.push_back(x);
+            break;
+          }
+          return;
+        }
+      }
     bool glossary = false;
     if (c.st.context)
       for (const rules::GlossaryEntry& g : c.st.context->glossary)
@@ -2530,13 +2559,38 @@ bool Transfer::obliqueInto(const frame::SemOblique& ob, Ctx& c, LaClause& cl) co
   const std::string head = text::lower(n.head);
   // C30: "behind the rocks and in the tall grass": a conjunct with a preposition of its own is a phrase of its own,
   // joined by et (post saxa et in herbā altā)
-  if (c.st.lang == frame::SrcLang::En && !n.coord.empty())
+  // C37: "not in Athens but in the fields" -> nōn in Athēnīs sed in agrīs (the negation goes with the first phrase, the
+  // verb stays positive), Spanish "no en A sino en B" too
+  const bool contrast = c.frame && c.frame->negative && n.coord.size() == 1 &&
+                        (n.coordConj == "but" || n.coordConj == "sino" || n.coordConj == "pero");
+  if ((c.st.lang == frame::SrcLang::En || contrast) && !n.coord.empty())
     for (size_t q = 0; q < n.coord.size(); ++q) {
       const int ct = n.coord[q].token;
       std::string p2;
       for (size_t t = 0; ct >= 0 && t < c.s.tokens.size(); ++t)
         if (c.s.tokens[t].head == ct + 1 && c.s.tokens[t].deprel == "case" && (int)t < ct) p2 = c.s.tokens[t].lower;
       if (p2.empty()) continue;
+      if (contrast) {
+        frame::SemOblique o1 = ob;
+        o1.np.coord.clear();
+        o1.front = false;
+        frame::SemOblique o2 = ob;
+        if (c.st.lang == frame::SrcLang::En) o2.prep = p2;   // Spanish: the same preposition ("no en A sino en B")
+        o2.np = n.coord[q];
+        o2.np.coord.clear();
+        o2.token = ct;
+        o2.front = false;
+        LaOblique nonW;
+        nonW.np.fixed = "nōn";
+        cl.obliques.push_back(nonW);
+        obliqueInto(o1, c, cl);
+        LaOblique sedW;
+        sedW.np.fixed = "sed";
+        cl.obliques.push_back(sedW);
+        obliqueInto(o2, c, cl);
+        c.negConsumed = true;
+        return true;
+      }
       frame::SemOblique o1 = ob;
       o1.np.coord.erase(o1.np.coord.begin() + (long)q, o1.np.coord.end());
       frame::SemOblique o2 = ob;
@@ -4757,6 +4811,24 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
       }
       cl.predAdj.push_back(la);
     }
+    // C37: "strong but slow" -> validī sed tardī; "not lazy but industrious" -> nōn pigra sed industria (the negation
+    // goes with the first adjective, the verb stays positive)
+    if (cl.predAdj.size() == 2 && f.predAdj.size() == 2 && f.predAdj[1].token >= 0) {
+      bool but = false;
+      for (size_t t = 0; t < c.s.tokens.size(); ++t)
+        if (c.s.tokens[t].head == f.predAdj[1].token + 1 && c.s.tokens[t].deprel == "cc" &&
+            (c.s.tokens[t].lower == "but" || c.s.tokens[t].lower == "pero" || c.s.tokens[t].lower == "sino" ||
+             c.s.tokens[t].lower == "mas"))
+          but = true;
+      const uint32_t sed = latin("sed", Conj), non = latin("nōn", Adv);
+      if (but && sed != kNone) {
+        cl.predConj = sed;
+        if (f.negative && non != kNone && cl.predAdj[0].adverbs.empty()) {
+          cl.predAdj[0].adverbs.push_back(non);
+          c.negConsumed = true;
+        }
+      }
+    }
     // C22: a demonstrative subject agrees with the predicate noun ("This is my cat." -> Haec fēlēs mea est; "These
     // are ...": as before); "it" / "that" pointing at the situation is dropped and the verb agrees with the
     // predicate ("That is nonsense." -> Nūgae sunt.)
@@ -5969,6 +6041,17 @@ void Transfer::clauseInto(const SemFrame& f00, Ctx& c, LaClause& cl) const {
           sc.pred.tense = Future;
         ls.conj = latin(k, Conj);
         if (ls.asyndeton) ls.conj = kNone;   // C26: the elliptical nōlī after a comma
+        // C37: "Lucius is tired, for the water is heavy." -> ..., nam aqua ...: the source comma before a for / so / yet
+        // / but clause stays
+        if (ls.sep.empty() && (sb.marker == "for" || sb.marker == "so" || sb.marker == "yet" || sb.marker == "but") &&
+            !sf.tokens.empty()) {
+          int first = *std::min_element(sf.tokens.begin(), sf.tokens.end());
+          for (int q = first - 1; q >= 0 && (size_t)q < c.s.tokens.size(); --q) {
+            const nlp::Token& x = c.s.tokens[(size_t)q];
+            if (x.text == "," || x.text == ";") { ls.sep = x.text; break; }
+            if (x.upos != "CCONJ" && x.upos != "SCONJ" && !(x.upos == "ADV" && (x.lower == "yet" || x.lower == "so"))) break;
+          }
+        }
         // C17: ", so we walked ..." / ", but she ...": the clause's own connector joins it (itaque, not "et itaque")
         if (sb.marker.empty() && !sc.connectors.empty() && c.st.lang == frame::SrcLang::En) {
           const uint32_t first = sc.connectors[0];

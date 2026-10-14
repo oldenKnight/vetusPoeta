@@ -16,7 +16,42 @@ bool Names::decline(std::string_view nom, std::string_view gen, int declension, 
                     uint8_t number, std::string& out) {
   const int ci = case_ == Nom ? 0 : case_ == Gen ? 1 : case_ == Dat ? 2 : case_ == Acc ? 3 : case_ == Abl ? 4
                  : case_ == Voc ? 5 : -1;
+  // C37: a two-word name with both words declined ("Iēsus Chrīstus", "Iēsū Chrīstī"): each word by its own genitive
+  if (nom.find(' ') != std::string_view::npos && gen.find(' ') != std::string_view::npos && ci >= 0) {
+    auto split = [](std::string_view x) {
+      std::vector<std::string> w;
+      size_t a = 0;
+      while (a < x.size()) {
+        size_t b = x.find(' ', a);
+        if (b == std::string_view::npos) b = x.size();
+        if (b > a) w.emplace_back(x.substr(a, b - a));
+        a = b + 1;
+      }
+      return w;
+    };
+    const std::vector<std::string> nw = split(nom), gw = split(gen);
+    if (nw.size() == gw.size()) {
+      std::string all;
+      for (size_t i = 0; i < nw.size(); ++i) {
+        const int d = endsWith(gw[i], "ae") ? 1 : endsWith(gw[i], "ī") ? 2 : endsWith(gw[i], "is") ? 3
+                      : (endsWith(gw[i], "ū") || endsWith(gw[i], "ūs")) ? 4 : 0;
+        std::string one;
+        if (!d || !decline(nw[i], gw[i], d, gender, case_, number, one)) return false;
+        all += (i ? " " : "") + one;
+      }
+      out = all;
+      return true;
+    }
+  }
   if (declension <= 0 || ci < 0) { out = std::string(nom); return declension <= 0 && ci >= 0; }
+  if (declension == 4) {   // C37: Iēsus (gen. Iēsū: -us -ū -ū -um -ū -ū) and the 4th declension (-us -ūs -uī -um -ū -us)
+    if (!endsWith(nom, "us")) return false;
+    const std::string stem = dropSuffix(nom, "us");
+    static const char* const jesus[6] = {"us", "ū", "ū", "um", "ū", "ū"};
+    static const char* const fourth[6] = {"us", "ūs", "uī", "um", "ū", "us"};
+    out = stem + (endsWith(gen, "ūs") ? fourth[ci] : jesus[ci]);
+    return true;
+  }
   if (declension == 1) {
     static const char* const sg[6] = {"a", "ae", "ae", "am", "ā", "a"};
     static const char* const pl[6] = {"ae", "ārum", "īs", "ās", "īs", "ae"};
@@ -41,6 +76,7 @@ bool Names::decline(std::string_view nom, std::string_view gen, int declension, 
     static const char* const m[6] = {"@", "ī", "ō", "um", "ō", "e"};
     if (ci == 0) { out = std::string(nom); return true; }
     if (ci == 5) {
+      if (text::latin_key(nom) == "deus") { out = std::string(nom); return true; }   // C37: the vocative of Deus is Deus
       if (endsWith(nom, "ius")) { out = dropSuffix(nom, "ius") + "ī"; return true; }
       if (endsWith(nom, "us")) { out = dropSuffix(nom, "us") + "e"; return true; }
       out = std::string(nom);
