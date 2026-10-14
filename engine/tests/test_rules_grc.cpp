@@ -544,6 +544,67 @@ TEST_CASE("rules-grc: real lexicon - generate cells (tests/fixtures/rules_grc/ge
   MESSAGE("generated cells: " << ok << " / " << rows.size());
 }
 
+TEST_CASE("rules-grc: real lexicon - supplement lemmas of C38 (B4d): analyse, generate, gloss, reverse") {
+  NEED_GRC();
+  const lex::Lexicon& lx = realGrc().lx;
+  const uint32_t autourgos = grc::findLemma(lx, "αὐτουργός", Adj);
+  const uint32_t aperantos = grc::findLemma(lx, "ἀπέραντος", Adj);
+  const uint32_t georgeo = grc::findLemma(lx, "γεωργέω", Verb);
+  if (autourgos == kNone || aperantos == kNone || georgeo == kNone) {
+    MESSAGE("greek.vpl predates B4d (no αὐτουργός / ἀπέραντος / γεωργέω); repack it. Skipped.");
+    return;
+  }
+  struct A { const char* form; uint32_t lemma; const char* feats; };
+  const A rows[] = {{"αὐτουργός", autourgos, "nom sg m"},  {"αὐτουργοί", autourgos, "nom pl m"},
+                    {"γεωργέω", georgeo, "1 sg pres ind act"}, {"γεωργεῖ", georgeo, "3 sg pres ind act"},
+                    {"γεωργοῦσι", georgeo, "3 pl pres ind act"},
+                    {"γεωργοῦσιν", georgeo, "3 pl pres ind act"}, {"ἀπέραντος", aperantos, "nom sg f"},
+                    {"ἀπέραντον", aperantos, "acc sg m"},   {"ἀπέραντον", aperantos, "nom sg n"}};
+  morph::Token t;
+  for (const A& r : rows) {
+    grc::analyse(lx, text::nfc(r.form), t);
+    const Features want = parseFeats(r.feats);
+    bool hit = false;
+    for (const lex::Analysis& a : t.analyses)
+      if (a.lemma == r.lemma && featsMatch(unpack(lx.feature(a.feat)), want)) hit = true;
+    CHECK_MESSAGE(hit, r.form << ": no reading " << r.feats);
+    CHECK_MESSAGE(!t.accentInsensitive, r.form);
+  }
+  struct G { uint32_t lemma; uint8_t pos; const char* feats; const char* form; };
+  const G gens[] = {{autourgos, Adj, "nom pl m", "αὐτουργοί"},        {autourgos, Adj, "acc sg m", "αὐτουργόν"},
+                    {aperantos, Adj, "gen sg f", "ἀπεράντου"},        {aperantos, Adj, "nom pl n", "ἀπέραντα"},
+                    {georgeo, Verb, "3 sg pres ind act", "γεωργεῖ"},  {georgeo, Verb, "3 pl pres ind act", "γεωργοῦσι"},
+                    {georgeo, Verb, "3 sg aor ind act", "ἐγεώργησε"}, {georgeo, Verb, "pres inf act", "γεωργεῖν"},
+                    {georgeo, Verb, "1 sg pres ind act", "γεωργῶ"}};
+  for (const G& g : gens) {
+    Features f = parseFeats(g.feats);
+    f.pos = g.pos;
+    std::string out;
+    CHECK_MESSAGE(grc::generate(lx, g.lemma, f, out), g.feats);
+    CHECK_MESSAGE(out == text::nfc(g.form), g.feats << " -> " << out << " expected " << g.form);
+  }
+  CHECK(lx.lemma(autourgos).glossEn == "self-sufficient, working one's own land; self-employed farmer");
+  CHECK(lx.lemma(aperantos).glossEn == "endless, boundless");
+  CHECK(lx.lemma(georgeo).glossEn == "to farm, till, cultivate");
+  CHECK(lx.lemma(georgeo).glossEs == "cultivar, labrar");
+  CHECK(lx.lemma(georgeo).tier == 2);
+  std::vector<lex::Candidate> cand;
+  const std::pair<const char*, uint32_t> top[] = {{"farm", georgeo}, {"till", georgeo}, {"cultivate", georgeo},
+                                                  {"endless", aperantos}, {"self-employed", autourgos}};
+  for (const auto& kw : top) {
+    cand.clear();
+    lx.reverse(kw.first, cand);
+    REQUIRE_MESSAGE(!cand.empty(), kw.first);
+    CHECK_MESSAGE(cand[0].lemma == kw.second, kw.first);
+  }
+  // "boundless": ἄπειρος (Kaikki, also 160) keeps the first place by the lemma-id tie-break; ἀπέραντος is second
+  cand.clear();
+  lx.reverse("boundless", cand);
+  REQUIRE(cand.size() >= 2);
+  CHECK(lx.lemma(cand[0].lemma).key == text::greek_key("ἄπειρος"));
+  CHECK((cand[1].lemma == aperantos && cand[1].score == 160));
+}
+
 namespace {
 struct Row { std::vector<GrcClause> c; std::string expect; };
 

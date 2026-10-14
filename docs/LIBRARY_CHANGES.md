@@ -388,3 +388,103 @@ entries whose key is already empty), **grc 16 / 7** (; · ⁞ ⸳ ⸏◌ ⸐◌ 
   task (merge or demote the bracketed record), or the engine can prefer the lower tier among same-head lemmas.
   All other reports (`regression_report.txt`, `_oz`, `_grc`, `_grc_es`, `grc2x_report.txt`) are byte-identical.
 * Not run: sanitizer / MinGW builds (no C++ changed).
+
+# Library changes (B4d, LIB-5)
+
+Promotes the three whole Greek lemmas C38 added to `data/curated/lexicon_supplement_grc.tsv` (αὐτουργός, ἀπέραντος,
+γεωργέω) into the **live** `data/work/greek.vpl`. Only the pack stage ran, on the live B4c intermediates
+(`data/work/grc/*`, byte-identical to `data/work/next/grc/*`; the pack inputs' SHA-256 differ from the B4c pack meta only
+in the supplement table). No pipeline code changed (pack code hash unchanged). The previous file is kept as
+`data/work/greek.vpl.prev` until the main agent accepts.
+
+## How it was run
+```
+cp -p data/work/greek.vpl data/work/greek.vpl.prev
+python3 tools/build_library/build.py --raw data/raw --out data/work --next --lang grc --stage pack --force --out-vpl <scratch>
+python3 tools/build_library/build.py --raw data/raw --out data/work --lang grc --stage pack     # writes data/work/greek.vpl
+python3 tools/build_library/build.py --out data/work --lang grc --check                         # OK
+```
+Both packs gave the same file (SHA-256 below); each took 40-51 s wall, peak RSS 1.69 GB. Rollback:
+`mv data/work/greek.vpl.prev data/work/greek.vpl` (and `git checkout` the supplement row if needed).
+
+## Sizes
+| greek.vpl | size | SHA-256 |
+|---|---|---|
+| before (B4c, live since 2026-10-06) | 82,423,424 B | `957a36f7e0f0fc6c38217d95bd9e2c403e851c050343678ddc7a675b34f513ac` |
+| after (B4d) | **82,428,072 B** | **`ec752f613d386827aff1382f41ff55afa858ad278448eb89132d5f233c1b526c`** |
+
+(C38's candidate built from the row as committed was 82,428,056 B, `3da9056f...`; reproduced byte for byte here, then
+superseded by the γεωργέω headword row below.)
+
+## What changed, and nothing else
+Semantic comparison of the two files with `vpl_reader` (every key and its analyses, every lemma record decoded with its
+senses and cells, every reverse-index keyword and its candidate list):
+
+| count | before | after | Δ | explanation |
+|---|---|---|---|---|
+| lemmas | 23,698 | 23,701 | +3 | ids 23,698 αὐτουργός, 23,699 ἀπέραντος, 23,700 γεωργέω (appended after the B4c supplement ids) |
+| senses | 39,287 | 39,290 | +3 | one sense per supplement lemma |
+| GENX cells | 1,325,170 | 1,325,258 | +88 | 25 + 25 + 38 distinct tag sets |
+| analyses | 1,560,138 | 1,560,229 | +91 | 25 + 25 + 41 cell rows (γεωργέω: 38 tag sets + the alternatives γεωργέω, γεωργοῦσιν, ἐγεώργησεν) |
+| keys | 936,628 | 936,690 | +62 | 12 + 12 + 38 distinct forms, none previously in the file |
+| REVX keywords | 33,289 | 33,294 | +5 | self-employed, es:cultiva, es:cultivar, es:interminable, es:propia |
+| REVX candidates | 130,910 | 130,931 | +21 | 12 αὐτουργός + 4 ἀπέραντος + 5 γεωργέω (incl. es:), scored as in B4c |
+| features | 5,319 | 5,319 | 0 | |
+
+pack.json counts: `supplement_lemmas` 3 -> 6, `supplement_cells` 57 -> 145, `supplement_analyses` 58 -> 149,
+`extra_analyses_added` 111 -> 202 (the supplement analyses are counted there too: +91). Every other pack count is
+unchanged (`genx_cells` 1,325,113 counts the Kaikki cells only). Old lemma records changed: **0**; keys removed or
+changed: **0**; keywords removed: 0; in the 16 existing keywords that gained a candidate, the old candidates keep their
+order and scores. Validates (`vpl_inspect.py --validate --sha`); `build.py --out data/work --lang grc --check` OK.
+
+Reverse index (first candidates): farm / till / cultivate / es:cultivar / es:labrar -> γεωργέω 160 (farm before ἀγρός 90);
+endless / es:interminable -> ἀπέραντος 160 (before ἄπειρος 135); boundless: ἄπειρος 160 and ἀπέραντος 160, the
+Kaikki lemma first by the id tie-break; self-employed / self-sufficient / es:autosuficiente -> αὐτουργός 160.
+Watch: "working" (head word of the segment "working one's own land") now has αὐτουργός 160 first among adjectives
+(ἐργάζομαι 65 is a verb), and "farmer" gives αὐτουργός only 35 (γεωργός 180 stays first); no regression line
+moves, but a gloss reorder ("self-employed farmer; working one's own land") would be the data-side fix.
+
+## Supplement row fix (found by the new test)
+The γεωργέω row listed only Attic contracted forms, so the **dictionary form γεωργέω was not a key**: `findLemma("γεωργέω")`
+failed and a student typing the headword got "unknown" (Kaikki contract verbs have it: ποιέω, οἰκέω analyse as 1 sg
+present). Added `first-person singular present indicative active=γεωργέω` as a second form of that cell (ANAL only;
+GENX still generates γεωργῶ). +1 analysis, +1 key, nothing else. "γεωργέω" alone now reads "I till." (ok).
+
+## Tests
+* Python (`tools/build_library/tests/test_b4c.py`): the repository-table test now covers all six rows (counts 25 / 25 /
+  41, the generated form first, no final σ); `GreekB4c.test_supplement_appended` expected 3 supplement lemmas and had
+  been failing since C38 added rows (6 is right); new `test_b4d_lemmas`: ids, analyses of αὐτουργός αὐτουργοί γεωργέω
+  γεωργεῖ γεωργοῦσι(ν) ἀπέραντος ἀπέραντον (both readings), read-back by form, generation (αὐτουργοί, voc. αὐτουργέ,
+  ἀπεράντου, ἀπέραντα, γεωργῶ, γεωργεῖ, γεωργοῦσι, ἐγεώργησε), head / gloss_en / gloss_es / tier, top REVX candidates.
+  105/105 green; `compare_spec.py`, `make_vpl_spec.py --check`, `make_golden.py --check` OK.
+* C++ (`engine/tests/test_rules_grc.cpp`, real lexicon, skips with a message on a pre-B4d file): "supplement lemmas of
+  C38 (B4d)": 9 forms analyse exactly (no accent-insensitive fallback), 9 cells generate through `grc::generate`
+  (incl. γεωργῶ for 1 sg, γεωργεῖν), glosses and tier, reverse index (54 assertions).
+
+## Own sentences (written 15:35 UTC before any run; never textbook text)
+| # | Greek | English gold | GRC->EN first run | rating |
+|---|---|---|---|---|
+| 1 | ὁ γέρων αὐτουργός ἐστιν. | The old man is a (self-employed) farmer. | The old man is self-sufficient. | ok; **mismatch** (gloss head "self-sufficient") |
+| 2 | οἱ ἀδελφοὶ αὐτουργοί εἰσιν. | The brothers are farmers. | The brothers are self-sufficient. | ok; **mismatch** (same) |
+| 3 | ὁ πατὴρ τὸν ἀγρὸν γεωργεῖ. | The father farms / tills the field. | The father tills the field. | ok, right |
+| 4 | οἱ αὐτουργοὶ τὴν γῆν γεωργοῦσι. | The farmers till the land. | The self-sufficients till the earth. | ok; **wrong** ("self-sufficients") |
+| 5 | ὁ πόνος ἀπέραντός ἐστιν. | The toil / work is endless. | The work is endless. | ok, right |
+| 6 | ὁ δοῦλος ἔργον ἀπέραντον ἔχει. | The slave has endless work. | The slave was closing off endless. | check (ἔργον read as impf. of εἴργω, ἔχει dropped) |
+
+First run: **2/6 right, OK 5, 3 mismatches among OK** (1, 2, 4). With the old greek.vpl all six were Fix with the new
+words left out ("The old man is.", "The father the field."). GRC->ES: 1, 2, 4 "autosuficiente(s)", 3 "cultiva el
+campo", 5 "es interminable", 6 check. Not fixed here (rules side, not data; for C39 or the Greek rules owner): a
+`readable_grc.tsv` row αὐτουργός -> farmer / campesino (substantive use; the lexicon gloss's first segment is
+"self-sufficient", LSJ's sense is "working one's own land"), or reorder the supplement gloss; ἔργον should beat the
+εἴργω imperfect reading before a finite verb with no object. EN->GRC probes: "The father farms the field." ->
+Ὁ πατὴρ τὸν ἀγρὸν γεωργεῖ. (ok); "The work is endless." -> Τὸ ἔργον ἀπέραντόν ἐστιν. (ok); "The farmers till the land."
+-> fix ("till" tagged as a noun: frame).
+
+## Engine suites
+`cmake -S . -B build-b4d -DVP_BUILD_GUI=OFF` (LLM on) + build: 0 warnings; ctest 5/5 (vp_tests 364 cases, 81,209
+assertions, real data from data/work). Every regression report the suites write (17 files: grc, grc_es, grc_es2,
+grc2x, athen grc_en / en_grc, en, oz, es, es2, la2x, la2x3, orberg, prose, story, turns, prayer) is **byte-identical**
+with the old and the new greek.vpl (`VP_GREEK_VPL=data/work/greek.vpl.prev`): no expectation changed, none edited.
+ASan + LSan + UBSan (`-DVP_SANITIZE=ON -DVP_WITH_LLM=OFF`), `vp_tests -tc='lex:*,rules-grc*'`: 81 cases, 20,144
+assertions, zero reports. `VP_WITH_LLM=OFF tools/xcompile_check.sh`: OK (192 s, 0 warnings).
+`tools/make_dist.py` and `docs/BUILD.md` record no greek.vpl size or SHA-256 (checked): nothing to update.

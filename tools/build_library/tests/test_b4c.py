@@ -77,10 +77,10 @@ class SupplementFormat(unittest.TestCase):
         headword; principal parts read like Kaikki head lines."""
         es = supplement.load(CURATED, strict=True)
         heads = [e.head for e in es]
-        self.assertEqual(heads[:3], ["διδασκαλεῖον", "λάθος", "εὔνους"])
+        self.assertEqual(heads, ["διδασκαλεῖον", "λάθος", "εὔνους", "αὐτουργός", "ἀπέραντος", "γεωργέω"])  # C38 +3
         self.assertEqual(len(set(e.key for e in es)), len(es))
         by = {e.head: e for e in es}
-        for h, n in (("διδασκαλεῖον", 15), ("λάθος", 16), ("εὔνους", 27)):
+        for h, n in (("διδασκαλεῖον", 15), ("λάθος", 16), ("εὔνους", 27), ("αὐτουργός", 25), ("ἀπέραντος", 25)):
             self.assertEqual(len(by[h].cells), n, h)
             first = dict((" ".join(t), f) for t, f in reversed(by[h].cells))
             nom = "masculine feminine nominative singular" if by[h].pos == "adj" else "nominative singular"
@@ -96,6 +96,13 @@ class SupplementFormat(unittest.TestCase):
         self.assertEqual(supplement.principal(by["λάθος"], []), "λάθος n (genitive λάθους); third declension")
         self.assertEqual(supplement.principal(by["εὔνους"], []),
                          "εὔνους (neuter εὔνουν); second declension, contracted")
+        v = by["γεωργέω"]
+        self.assertEqual((v.pos, len(v.cells)), ("verb", 41))       # 38 tag sets + γεωργέω, γεωργοῦσιν, ἐγεώργησεν
+        cells = dict((" ".join(t), f) for t, f in reversed(v.cells))
+        self.assertEqual(cells["first-person singular present indicative active"], "γεωργῶ")
+        self.assertEqual(cells["third-person plural present indicative active"], "γεωργοῦσι")
+        for _t, f in v.cells:
+            self.assertFalse(f.endswith("σ"), f)
 
     def test_repository_overrides(self):
         """Every `old` value of data/curated/lexicon_overrides_grc.tsv is one the packer knows."""
@@ -136,7 +143,7 @@ class GreekB4c(unittest.TestCase):
         return {a[2]: a[3] for a in self.lx.analyses if a[0] == vptext.greek_key(form) and a[1] == lid}
 
     def test_supplement_appended(self):
-        self.assertEqual(self.c["supplement_lemmas"], 3)
+        self.assertEqual(self.c["supplement_lemmas"], 6)                  # B4c 3 + C38 3 (promoted in B4d)
         n_kaikki = 4
         for k, off in (("διδασκαλεῖον", 0), ("λάθοσ", 1), ("εὔνουσ", 2)):
             self.assertEqual(self.ids[k], n_kaikki + off)
@@ -182,6 +189,51 @@ class GreekB4c(unittest.TestCase):
         self.assertIn(lid, [c["lemma"] for c in r.reverse("school")])
         self.assertIn(lid, [c["lemma"] for c in r.reverse("es:escuela")])
         self.assertEqual(r.lemma(self.ids["εὔνουσ"])["principal"], "εὔνους (neuter εὔνουν); second declension, contracted")
+
+    def test_b4d_lemmas(self):
+        """B4d: the C38 rows (αὐτουργός, ἀπέραντος, γεωργέω) are appended after the B4c ones, analyse by form,
+        generate their cells, carry the curated gloss and lead the reverse index for their English words."""
+        n_kaikki = 4
+        ids = [self.ids[k] for k in ("αὐτουργόσ", "ἀπέραντοσ", "γεωργέω")]
+        self.assertEqual(ids, [n_kaikki + 3, n_kaikki + 4, n_kaikki + 5])
+        adj = lambda case, number, gender: F.pack(pos=F.POS["adj"], case=F.CASE[case], number=F.NUMBER[number],
+                                                  gender=F.GENDER[gender]) | ATTIC
+        pres3 = lambda number: verb("present", 3, number, "active", ATTIC)
+        want = (("αὐτουργός", "αὐτουργός", adj("nominative", "singular", "mf")),
+                ("αὐτουργοί", "αὐτουργός", adj("nominative", "plural", "mf")),
+                ("γεωργέω", "γεωργέω", verb("present", 1, "singular", "active", ATTIC)),  # the headword (B4d)
+                ("γεωργεῖ", "γεωργέω", pres3("singular")),
+                ("γεωργοῦσι", "γεωργέω", pres3("plural")),
+                ("γεωργοῦσιν", "γεωργέω", pres3("plural")),
+                ("ἀπέραντος", "ἀπέραντος", adj("nominative", "singular", "mf")),
+                ("ἀπέραντον", "ἀπέραντος", adj("accusative", "singular", "mf")),
+                ("ἀπέραντον", "ἀπέραντος", adj("nominative", "singular", "neuter")))
+        for form, lemma, f in want:
+            self.assertEqual(self.anal(form, lemma).get(f), resolve.FLAG_TABLE, (form, lemma))
+        r = vpl_reader.VplReader(data=self.data, check_sha=True)
+        for form, lemma, f in want:
+            lid = self.ids[vptext.greek_key(lemma)]
+            self.assertIn((lid, f), [(a["lemma"], a["feat"]) for a in r.lookup(vptext.greek_key(form))], form)
+        a, p, g = ids
+        self.assertEqual((r.generate(a, adj("nominative", "plural", "mf")), r.generate(a, adj("vocative", "singular",
+                                                                                                    "mf"))),
+                         ("αὐτουργοί", "αὐτουργέ"))
+        self.assertEqual((r.generate(p, adj("genitive", "singular", "mf")), r.generate(p, adj("nominative", "plural",
+                                                                                                    "neuter"))),
+                         ("ἀπεράντου", "ἀπέραντα"))
+        self.assertEqual(r.generate(g, verb("present", 1, "singular", "active", ATTIC)), "γεωργῶ")  # not γεωργέω
+        self.assertEqual((r.generate(g, pres3("singular")), r.generate(g, pres3("plural")),
+                          r.generate(g, verb("aorist", 3, "singular", "active", ATTIC))),
+                         ("γεωργεῖ", "γεωργοῦσι", "ἐγεώργησε"))
+        glosses = [(r.lemma(i)["head"], r.lemma(i)["gloss_en"], r.lemma(i)["gloss_es"], r.lemma(i)["tier"]) for i in ids]
+        self.assertEqual(glosses, [
+            ("αὐτουργός", "self-sufficient, working one's own land; self-employed farmer",
+             "autosuficiente, que cultiva su propia tierra", 2),
+            ("ἀπέραντος", "endless, boundless", "interminable, infinito", 2),
+            ("γεωργέω", "to farm, till, cultivate", "cultivar, labrar", 2)])
+        for kw, lid in (("farm", g), ("till", g), ("cultivate", g), ("es:cultivar", g), ("endless", p),
+                        ("boundless", p), ("es:interminable", p), ("self-employed", a), ("es:autosuficiente", a)):
+            self.assertEqual([(c["lemma"], c["score"]) for c in r.reverse(kw)][:1], [(lid, 160)], kw)
 
     def test_drop(self):
         imp = verb("imperfect", 1, "singular", "middle", ATTIC)
