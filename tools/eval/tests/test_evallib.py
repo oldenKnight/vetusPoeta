@@ -3,6 +3,7 @@
 The integration test needs a built vpengine: $VP_ENGINE, else build-eval/ or build/ (skipped when none exists)."""
 import csv
 import json
+import hashlib
 import os
 import re
 import shutil
@@ -143,7 +144,7 @@ class HeldoutGuard(unittest.TestCase):
     def test_real_set_is_intact(self):
         g = L.heldout_guard()
         self.assertTrue(g["ok"], g["reason"])
-        self.assertEqual(g["checked"], 3)
+        self.assertEqual(g["checked"], 4)   # 2 srt + own_heldout.en.txt + BURNED.txt (re-frozen in 980f459)
 
     def test_tampered_copy_refused(self):
         self.assertTrue(L.heldout_guard(self.dir)["ok"])
@@ -166,7 +167,16 @@ class HeldoutGuard(unittest.TestCase):
         with open(os.path.join(self.dir, "BURNED.txt"), "w") as f:
             f.write("# moved to regression\nown_heldout.en.srt 12\nown_heldout.en.srt 40  # debugging\n")
         self.assertEqual(L.read_burned(self.dir), {"own_heldout.en.srt": {"12", "40"}})
-        self.assertTrue(L.heldout_guard(self.dir)["ok"])   # BURNED.txt is metadata, not a data file
+        # BURNED.txt is frozen too (980f459): an edit without re-freezing is refused, a re-frozen one passes
+        self.assertFalse(L.heldout_guard(self.dir)["ok"])
+        frozen = os.path.join(self.dir, "FROZEN.sha256")
+        with open(os.path.join(self.dir, "BURNED.txt"), "rb") as f:
+            digest = hashlib.sha256(f.read()).hexdigest()
+        with open(frozen, encoding="utf-8") as f:
+            rows = [l if not l.rstrip().endswith("BURNED.txt") else digest + "  BURNED.txt\n" for l in f]
+        with open(frozen, "w", encoding="utf-8") as f:
+            f.writelines(rows)
+        self.assertTrue(L.heldout_guard(self.dir)["ok"])
 
 
 class Structure(unittest.TestCase):
