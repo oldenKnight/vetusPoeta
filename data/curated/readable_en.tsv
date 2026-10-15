@@ -903,3 +903,6 @@ lex	rectus	adj	straight
 lex	iudex	noun	judge	person
 lex	peto	verb	seek
 lex	delecto	verb	delight
+# ---- C43: prepositional phrases after the subject (own sentences tests/regression/own_pp*.txt) ----
+lex	iter	noun	journey
+lex	tutus	adj	safe

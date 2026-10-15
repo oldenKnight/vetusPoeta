@@ -961,3 +961,9 @@ lex	iudex	noun	juez	person
 lex	uinco	verb	vencer
 lex	conuiuium	noun	banquete
 lex	delecto	verb	complacer
+# ---- C43: prepositional phrases after the subject (own sentences tests/regression/own_pp*.txt); verb+thing = the
+# verb said of a thing subject ----
+lex	iter	noun	viaje
+lex	tutus	adj	seguro	estar
+lex	angustus	adj	estrecho
+lex	sto	verb+thing	estar

@@ -1334,6 +1334,64 @@ class RulesEngine final : public Engine {
     }
   }
 
+  // C43: "..., not very but enough." / "..., no muy, sino bastante.": a verbless tail of two degree words after a
+  // clause (C41 open note: the Latin was "valdē ... sed satis", the opposite). `cut` = the sentence without the tail
+  // (its final mark kept); `x`, `y` = the Latin adverbs.
+  static bool degreeTail(const std::string& text, bool es, std::string& cut, std::string& x, std::string& y) {
+    std::string body = text;
+    while (!body.empty() && body.back() == ' ') body.pop_back();
+    std::string fin;
+    while (!body.empty() && (body.back() == '.' || body.back() == '!')) { fin.insert(fin.begin(), body.back()); body.pop_back(); }
+    auto latinOf = [&](const std::string& w) -> const char* {
+      const std::string l = text::lower(w);
+      if (l == (es ? "muy" : "very")) return "valdē";
+      if (l == (es ? "mucho" : "much")) return "multum";
+      if (l == (es ? "demasiado" : "too")) return "nimis";
+      if (es ? (l == "bastante" || l == "suficiente") : (l == "enough" || l == "quite")) return "satis";
+      return nullptr;
+    };
+    const size_t sep = body.rfind(',');
+    if (sep == std::string::npos) return false;
+    std::vector<std::string> w;
+    {
+      std::string cur;
+      for (size_t i = sep + 1; i <= body.size(); ++i) {
+        const char c = i < body.size() ? body[i] : ' ';
+        if (c == ' ' || c == ',') { if (!cur.empty()) w.push_back(cur); cur.clear(); }
+        else cur += c;
+      }
+    }
+    // the comma found may be the one inside "no muy, sino bastante": look one comma further back
+    size_t at = sep;
+    if (w.size() == 2 && es) {
+      const size_t sep2 = body.rfind(',', sep == 0 ? 0 : sep - 1);
+      if (sep2 == std::string::npos || sep2 == sep) return false;
+      std::vector<std::string> w2;
+      std::string cur;
+      for (size_t i = sep2 + 1; i <= sep; ++i) {
+        const char c = i < sep ? body[i] : ' ';
+        if (c == ' ') { if (!cur.empty()) w2.push_back(cur); cur.clear(); }
+        else cur += c;
+      }
+      w2.insert(w2.end(), w.begin(), w.end());
+      w = w2;
+      at = sep2;
+    }
+    if (w.size() != 4 || text::lower(w[0]) != (es ? "no" : "not")) return false;
+    const std::string c = text::lower(w[2]);
+    if (!(es ? (c == "sino" || c == "pero") : c == "but")) return false;
+    const char* a = latinOf(w[1]);
+    const char* b = latinOf(w[3]);
+    if (!a || !b || std::string(a) == b) return false;
+    size_t e = at;
+    while (e > 0 && body[e - 1] == ' ') --e;
+    if (e == 0) return false;
+    cut = body.substr(0, e) + (fin.empty() ? std::string(".") : fin);
+    x = a;
+    y = b;
+    return true;
+  }
+
   void speech(const std::string& text, const frame::FrameBuilder& fb, const Options& opt, const Context& ctx,
               transfer::Memory& mem, const transfer::Settings& stIn, SentOut& so, bool alternatives,
               bool allowSplit = true) {
@@ -1365,6 +1423,33 @@ class RulesEngine final : public Engine {
           for (auto& t : so.latin.tokens) { ++t.start; ++t.end; }
         }
         if (trail && !so.latin.text.empty()) so.latin.text += "\"";
+        return;
+      }
+    }
+    // C43: "..., not very but enough": the clause alone, then ", nōn valdē sed satis" agreeing with nothing (adverbs)
+    if (allowSplit && (st.lang == frame::SrcLang::En || st.lang == frame::SrcLang::Es)) {
+      std::string cut, x, y;
+      if (degreeTail(text, st.lang == frame::SrcLang::Es, cut, x, y)) {
+        speech(cut, fb, opt, ctx, mem, st, so, alternatives, allowSplit);
+        if (so.latin.text.empty()) return;
+        std::string fin;
+        while (!so.latin.text.empty() && (so.latin.text.back() == '.' || so.latin.text.back() == '!')) {
+          fin.insert(fin.begin(), so.latin.text.back());
+          so.latin.text.pop_back();
+        }
+        so.latin.text += ",";
+        for (const std::string& w : {std::string("nōn"), x, std::string("sed"), y}) {
+          rules::TokenView t;
+          tokenInfo(w, t, true);
+          t.text = t.display = w;
+          so.latin.text += " ";
+          t.start = (int)so.latin.text.size();
+          so.latin.text += w;
+          t.end = (int)so.latin.text.size();
+          so.latin.tokens.push_back(t);
+          if (!so.srcOffset.empty()) so.srcOffset.push_back(-1);
+        }
+        so.latin.text += fin.empty() ? std::string(".") : fin;
         return;
       }
     }

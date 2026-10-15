@@ -528,6 +528,21 @@ void Analyser::disambiguate(Sentence& s) const {
             isNominal(chosen((size_t)q), chosenPos((size_t)q)))
           sc += chosen((size_t)q).case_ == f.case_ ? 1.25 : 0.0;
       }
+      // C43: a predicate adjective next to εἰμί after a subject and a prepositional phrase ("ἡ ὁδὸς ἡ πρὸς τὴν πόλιν
+      // μακρά ἐστιν": long, feminine singular with the road; the phrase hid the agreement and μακρά was neuter plural)
+      if (lp == Adj && f.case_ == Nom && ((nw >= 0 && keyOf((size_t)nw, pick[(size_t)nw]) == text::greek_key("εἰμί")) ||
+                                          (pw >= 0 && keyOf((size_t)pw, pick[(size_t)pw]) == text::greek_key("εἰμί")))) {
+        bool prepSeen = false;
+        for (long k = (long)i - 1; k >= 0; --k) {
+          if (!word((size_t)k) || s.tokens[(size_t)k].clause != s.tokens[i].clause) continue;
+          if (isPrep((size_t)k, pick[(size_t)k])) prepSeen = true;
+          const Features g = chosen((size_t)k);
+          if (prepSeen && chosenPos((size_t)k) == Noun && g.case_ == Nom) {
+            if (agree(f, g)) sc += 2.5;   // more than the preposition's case bonus a neuter accusative would take
+            break;
+          }
+        }
+      }
       // enclitic possessor after a noun
       if (rd.closed && lp == Pron && f.case_ == Gen && pw >= 0 && isNominal(chosen((size_t)pw), chosenPos((size_t)pw)))
         sc += 1.0;

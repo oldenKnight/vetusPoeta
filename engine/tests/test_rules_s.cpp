@@ -270,13 +270,17 @@ TEST_CASE("rules-s: Greek core rows (grc2x) and the audit's realiser fixes") {
 }
 
 // ---- (c) EN -> LA "..., not very but enough" ----------------------------------------------------------------------------
-TEST_CASE("rules-s: EN -> LA \"not very but enough\" is never OK") {
+// C43 changed this expectation: the Latin itself is now right ("Domus magna est, nōn valdē sed satis."), so the unit may
+// be OK; it is never OK with a wrong Latin (valdē without nōn said the opposite in C41).
+TEST_CASE("rules-s: EN -> LA \"not very but enough\" is OK only when the Latin says nōn valdē sed satis") {
   NEED_REALS();
   auto e = engineS();
   for (const char* s : {"The house is big, not very but enough.", "The road is long, not very but enough.",
                         "The farmer is rich, not very but enough."}) {
     const rules::CueOutput r = oneS(*e, s, optS(rules::Lang::En, rules::Lang::La));
-    CHECK_MESSAGE(r.confidence != rules::Confidence::Ok, s << " -> " << r.target);
+    CHECK_MESSAGE((r.confidence != rules::Confidence::Ok || r.target.find(", nōn valdē sed satis.") != std::string::npos),
+                  s << " -> " << r.target);
+    CHECK_MESSAGE(r.target.find("nōn valdē sed satis") != std::string::npos, s << " -> " << r.target);
   }
   const rules::CueOutput plain = oneS(*e, "The house is big.", optS(rules::Lang::En, rules::Lang::La));
   CHECK(plain.confidence == rules::Confidence::Ok);

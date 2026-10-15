@@ -1192,6 +1192,10 @@ std::vector<rules::CueOutput> Translator::cues(const std::vector<rules::CueInput
             if (n.rfind("gloss-doubt: ", 0) == 0) words += (words.empty() ? "" : "; ") + n.substr(13);
         o.checks.push_back(rules::Check{"gloss", false, (t == Target::Es ? "glosa sin revisar: " : "unreviewed gloss: ") + words});
       }
+      if (std::find(o.flags.begin(), o.flags.end(), "pp-attach") != o.flags.end())   // C43: two readings
+        o.checks.push_back(rules::Check{"pp-attach", false, t == Target::Es
+                                        ? "dos lecturas: la frase preposicional puede describir al sujeto o al verbo"
+                                        : "two readings: the prepositional phrase may describe the subject or the verb"});
       o.confidence = unknown ? rules::Confidence::Fix
                              : (ambiguous || check || mean < 0.7) ? rules::Confidence::Check : rules::Confidence::Ok;
       o.score = std::round(mean * 1000) / 1000;

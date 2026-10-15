@@ -376,7 +376,7 @@ class Es {
     const std::string word = nounWord(x);
     if (!hasDet && role != R::Voc) {
       const bool mentioned = in_.disc->seen(lemma);
-      const bool hasGen = !x.genitive.empty();
+      const bool hasGen = !x.genitive.empty() || !x.attrPP.empty();   // C43: "the water in the river"
       // a restrictive relative clause makes the noun definite ("the book which you gave me")
       const bool hasRel = !x.relative.empty();
       bool def = definite || lx.unique || mentioned || hasGen || hasRel;
@@ -482,6 +482,10 @@ class Es {
     negOut = false;
     int lexTok = f.pred.complementToken >= 0 && f.pred.particle == "peri" ? f.pred.complementToken : f.pred.token;
     std::string base = f.copula ? copulaVerb(f) : verbWord(lexTok);
+    // C43: a verb said otherwise of a thing ("Casa in monte stat": la casa está en el monte, not "está de pie")
+    if (lexTok >= 0 && f.hasSubject && !f.implicitSubject && !f.subject.isPronoun && !f.subject.isName &&
+        f.subject.token >= 0 && !lexOf(f.subject.token).person && tab_.find("lex", ti_[(size_t)lexTok].key, "verb+thing"))
+      base = tab_.find("lex", ti_[(size_t)lexTok].key, "verb+thing")->text;
     if (f.hasObject && lexTok >= 0 && tab_.find("lex", ti_[(size_t)lexTok].key, "verb+obj"))
       base = tab_.find("lex", ti_[(size_t)lexTok].key, "verb+obj")->text;
     if (lexTok >= 0 && f.type == Kind::Wh && f.wh.word == "quid" && tab_.find("lex", ti_[(size_t)lexTok].key, "verb+wh"))

@@ -51,6 +51,126 @@ std::string lowerFirst(const std::string& s) { return s; }
 
 struct NPInfo { SemNP np; uint8_t case_ = 0; bool article = false; int first = 0, last = 0; bool adjOnly = false; };
 
+// The target word of a Greek preposition with the case of its noun group (`head`: the group's head, or null).
+std::string prepWord(const TokInfo& t, const std::string& lexWord, uint8_t cs, const TokInfo* head, bool esT) {
+  std::string w = lexWord;
+  // case-dependent senses
+  if (keyIs(t, {"μετά"})) w = cs == Acc ? (esT ? "después de" : "after") : (esT ? "con" : "with");
+  else if (keyIs(t, {"παρά"})) w = cs == Gen ? (esT ? "de" : "from") : cs == Acc ? (esT ? "a" : "to") : (esT ? "junto a" : "beside");
+  else if (keyIs(t, {"διά"})) w = cs == Acc ? (esT ? "por" : "because of") : (esT ? "por" : "through");
+  else if (keyIs(t, {"ἐπί"})) w = cs == Acc ? (esT ? "contra" : "against") : (esT ? "sobre" : "on");
+  // C33: a neuter noun group after πρός read as a nominative is the accusative ("πρὸς τὸ ὄρος" was "near")
+  else if (keyIs(t, {"πρός"})) w = cs == Dat ? (esT ? "junto a" : "near") : (esT ? "hacia" : "to");
+  else if (keyIs(t, {"ὑπό"})) w = cs == Gen ? (esT ? "por" : "by") : (esT ? "bajo" : "under");
+  if (w.empty()) w = esT ? "en" : "in";
+  // C43: ἐν τῇ νήσῳ = on the island (also a mountain, a hill), never "in the island"
+  if (!esT && keyIs(t, {"ἐν"}) && head && keyIs(*head, {"νῆσος", "ὄρος", "λόφος"})) w = "on";
+  return w;
+}
+
+// C43: the word of a phrase that describes a noun: εἰς = to / a (the road to the village), ἐκ / ἀπό = from / de
+std::string attrWord(const TokInfo& t, const std::string& w, uint8_t cs, bool esT) {
+  if (keyIs(t, {"εἰς", "ἐς"}) || (keyIs(t, {"πρός"}) && cs == Acc)) return esT ? "a" : "to";
+  if (keyIs(t, {"ἐκ", "ἐξ", "ἀπό"})) return esT ? "de" : "from";
+  return w;
+}
+
+}  // namespace
+
+namespace {
+
+// C43: what a Greek prepositional phrase says (as la2x): direction / path / origin, place or company, topic (περί + gen.);
+// None for cause, agent, time, against.
+enum class PPKind : uint8_t { None, Dir, Loc, Topic };
+PPKind ppKind(const TokInfo& p, uint8_t cs, const TokInfo& head) {
+  if (keyIs(head, {"ἡμέρα", "νύξ", "χρόνος", "ἔτος", "ὥρα", "ἑσπέρα", "ἕως", "θέρος", "χειμών", "μήν"})) return PPKind::None;
+  if (keyIs(p, {"περί"})) return cs == Gen ? PPKind::Topic : PPKind::Loc;
+  if (keyIs(p, {"εἰς", "ἐς", "ἐκ", "ἐξ", "ἀπό"})) return PPKind::Dir;
+  if (keyIs(p, {"διά"})) return cs == Gen ? PPKind::Dir : PPKind::None;
+  if (keyIs(p, {"πρός", "παρά"})) return cs == Dat ? PPKind::Loc : PPKind::Dir;
+  if (keyIs(p, {"ἐπί"})) return cs == Acc ? PPKind::None : PPKind::Loc;
+  if (keyIs(p, {"ὑπό"})) return cs == Gen ? PPKind::None : PPKind::Loc;
+  if (keyIs(p, {"μετά"})) return cs == Gen ? PPKind::Loc : PPKind::None;
+  if (keyIs(p, {"ἐν", "σύν", "ἀμφί"})) return PPKind::Loc;
+  return PPKind::None;
+}
+
+// C43: the noun-phrase reading of a prepositional phrase right after an unbracketed subject (as la2x::attachPPs): in a
+// copula clause with a predicate, direction / origin / topic, and the place of a thing, describe the subject ("ἡ ὁδὸς
+// εἰς τὴν κώμην χαλεπή ἐστιν" = the road to the village is hard); a person with a place ("ἡ κόρη ἐν τῷ κήπῳ εὐδαίμων
+// ἐστίν") has two readings: Check (flag pp-attach). Another verb: only περί + gen. after a thing. Also "arrive at", not
+// "arrive into" (εἰς / πρός after ἀφικνέομαι).
+void attachPPs(const std::vector<TokInfo>& ti, const Side& side, Target tg, Built& out) {
+  const bool esT = tg == Target::Es;
+  auto lexOf = [&](int t) -> const Lexical* { return t >= 0 && (size_t)t < side.lex.size() ? &side.lex[(size_t)t] : nullptr; };
+  std::function<void(SemFrame&)> fr = [&](SemFrame& f) {
+    for (frame::SemSub& sb : f.subordinate)
+      for (SemFrame& g : sb.frame) fr(g);
+    if (!esT && f.hasPred && f.pred.lemma.compare(0, 6, "arrive") == 0)
+      for (frame::SemOblique& o : f.obliques)
+        if (o.token >= 0 && keyIs(ti[(size_t)o.token], {"εἰς", "ἐς", "πρός"}) && (o.prep == "into" || o.prep == "to")) o.prep = "at";
+    // "sail to the island", not "into" (a verb of travel reaches its place)
+    if (!esT && f.hasPred && (f.pred.lemma == "sail" || f.pred.lemma == "travel" || f.pred.lemma == "march" ||
+                              f.pred.lemma == "return" || f.pred.lemma == "flee"))
+      for (frame::SemOblique& o : f.obliques)
+        if (o.token >= 0 && keyIs(ti[(size_t)o.token], {"εἰς", "ἐς"}) && o.prep == "into") o.prep = "to";
+    if (f.type != Kind::Decl || !f.hasSubject || f.implicitSubject || f.subject.isPronoun || f.subject.isName ||
+        f.subject.token < 0 || !f.subject.coord.empty())
+      return;
+    const bool pred = !f.predAdj.empty() || !f.predicative.empty();
+    if (f.copula && !pred) return;
+    if (!f.copula) {
+      static const char* const speech[] = {"say", "speak", "tell", "write", "hear", "think", "know", "learn", "teach",
+                                           "ask", "read", "sing", "talk", "decir", "hablar", "contar", "escribir", "oír",
+                                           "pensar", "saber", "aprender", "enseñar", "preguntar", "leer", "cantar"};
+      if (!f.hasPred || f.pred.token < 0 || pred) return;
+      for (const char* w : speech)
+        if (f.pred.lemma == w || f.pred.lemma.compare(0, std::char_traits<char>::length(w) + 1, std::string(w) + " ") == 0) return;
+    }
+    const Lexical* sl = lexOf(f.subject.token);
+    const bool person = sl && sl->person;
+    std::vector<int> predToks;
+    for (const SemAdj& a : f.predAdj) predToks.push_back(a.token);
+    for (const SemNP& x : f.predicative) predToks.push_back(x.token);
+    int last = f.subject.token;
+    for (int t : f.subject.tokens)
+      if (std::find(predToks.begin(), predToks.end(), t) == predToks.end()) last = std::max(last, t);
+    for (size_t k = 0; k < f.obliques.size();) {
+      const frame::SemOblique& o = f.obliques[k];
+      bool ok = o.token == last + 1 && o.np.token >= 0 && (f.pred.token < 0 || o.token < f.pred.token);
+      for (int t : predToks) ok = ok && (t < 0 || t > o.token);
+      if (!ok) { ++k; continue; }
+      const TokInfo& p = ti[(size_t)o.token];
+      const PPKind kind = ppKind(p, ti[(size_t)o.np.token].f.case_, ti[(size_t)o.np.token]);
+      bool attach = false, doubt = false;
+      if (!f.copula) {
+        attach = kind == PPKind::Topic && !person;
+      } else if (kind == PPKind::Dir) {
+        bool own = false;   // an adjective that takes the phrase itself (ready for, free from, safe from)
+        for (const SemAdj& a : f.predAdj)
+          for (const char* w : {"ready", "free", "safe", "listo", "libre", "seguro", "preparado"}) own = own || a.lemma == w;
+        attach = !own;
+      } else if (kind == PPKind::Loc || kind == PPKind::Topic) {
+        if (person) doubt = true;
+        else attach = true;
+      }
+      if (doubt) {
+        if (std::find(out.flags.begin(), out.flags.end(), "pp-attach") == out.flags.end()) out.flags.push_back("pp-attach");
+        break;
+      }
+      if (!attach) break;
+      frame::SemOblique a = o;
+      a.prep = attrWord(p, o.prep, ti[(size_t)o.np.token].f.case_, esT);
+      a.front = false;
+      last = o.token;
+      for (int t : o.np.tokens) last = std::max(last, t);
+      f.subject.attrPP.push_back(a);
+      f.obliques.erase(f.obliques.begin() + (long)k);
+    }
+  };
+  for (SemFrame& f : out.frames) fr(f);
+}
+
 }  // namespace
 
 // ---- frame fill ------------------------------------------------------------------------------------------------------
@@ -120,7 +240,8 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
     size_t k = 0;
     auto lexOf = [&](size_t i) -> const Lexical& { return side.lex[i]; };
     // NP starting at idx[k]
-    auto readNP = [&](size_t& kk, NPInfo& np) -> bool {
+    std::function<bool(size_t&, NPInfo&)> readNP;
+    readNP = [&](size_t& kk, NPInfo& np) -> bool {
       if (kk >= idx.size()) return false;
       size_t i = idx[kk];
       if (!(nominal(ti[i]) || ti[i].lpos == Article)) return false;
@@ -132,9 +253,50 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
       std::vector<size_t> members;
       std::vector<std::vector<size_t>> advs;   // degree adverbs before each member
       std::vector<size_t> pendingAdv;
+      std::vector<frame::SemOblique> attrs;   // C43: prepositional phrases in attributive position
+      std::vector<int> attrToks;
+      // C43: a prepositional phrase at kk inside the group: kept when `need` is false or the group's own word of case
+      // `cs` follows it ("ἡ διὰ τῶν ὀρῶν ὁδός"); kk moves past it
+      auto attrPP = [&](size_t& at, bool need) -> bool {
+        if (at >= idx.size() || ti[idx[at]].lpos != Prep) return false;
+        size_t k2 = at + 1;
+        NPInfo inner;
+        if (!readNP(k2, inner) || inner.adjOnly) return false;
+        if (need) {
+          if (k2 >= idx.size()) return false;
+          const TokInfo& nx = ti[idx[k2]];
+          if (!nominal(nx) || nx.lpos == Article || nx.f.case_ != cs || (num && nx.f.number && nx.f.number != num)) return false;
+        }
+        const size_t pt = idx[at];
+        frame::SemOblique o;
+        o.prep = attrWord(ti[pt], prepWord(ti[pt], lexOf(pt).word, inner.case_, inner.np.token >= 0 ? &ti[(size_t)inner.np.token] : nullptr, esT), inner.case_, esT);
+        o.np = inner.np;
+        o.token = (int)pt;
+        attrs.push_back(o);
+        out.roles[pt] = "preposition";
+        attrToks.push_back((int)pt);
+        for (int tk : inner.np.tokens) { out.roles[(size_t)tk] = "oblique"; attrToks.push_back(tk); }
+        at = k2;
+        return true;
+      };
       while (kk < idx.size()) {
         const size_t j = idx[kk];
         const TokInfo& t = ti[j];
+        // C43: between the article and its noun (attributive position)
+        if (t.lpos == Prep && !members.empty() && ti[members.back()].lpos == Article && ti[members.back()].f.case_ == cs &&
+            attrPP(kk, true))
+          continue;
+        // C43: a repeated article before the phrase after the noun ("ἡ ὁδὸς ἡ πρὸς τὴν πόλιν")
+        if (t.lpos == Article && !members.empty() && t.f.case_ == cs && kk + 1 < idx.size() && ti[idx[kk + 1]].lpos == Prep) {
+          bool headSeen = false;
+          for (size_t m : members) headSeen = headSeen || ti[m].lpos == Noun || ti[m].lpos == Name;
+          size_t k2 = kk + 1;
+          if (headSeen && attrPP(k2, false)) {
+            attrToks.push_back((int)j);
+            kk = k2;
+            continue;
+          }
+        }
         if ((t.lpos == Adv || t.lpos == Particle) && !negWord(t) && kk + 1 < idx.size() && nominal(ti[idx[kk + 1]]) &&
             ti[idx[kk + 1]].f.case_ == cs && !members.empty() && ti[idx[kk + 1]].lpos == Adj) {
           pendingAdv.push_back(j);
@@ -363,6 +525,13 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
           ++kk;
         }
       }
+      if (!attrs.empty()) {   // C43
+        for (frame::SemOblique& o : attrs) np.np.attrPP.push_back(std::move(o));
+        for (int tk : attrToks) {
+          np.np.tokens.push_back(tk);
+          np.last = std::max(np.last, tk);
+        }
+      }
       return true;
     };
     // walk the clause
@@ -493,16 +662,7 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
         size_t kk = k + 1;
         NPInfo np;
         if (readNP(kk, np)) {
-          std::string w = lw.word;
-          // case-dependent senses
-          if (keyIs(t, {"μετά"})) w = np.case_ == Acc ? (esT ? "después de" : "after") : (esT ? "con" : "with");
-          else if (keyIs(t, {"παρά"})) w = np.case_ == Gen ? (esT ? "de" : "from") : np.case_ == Acc ? (esT ? "a" : "to") : (esT ? "junto a" : "beside");
-          else if (keyIs(t, {"διά"})) w = np.case_ == Acc ? (esT ? "por" : "because of") : (esT ? "por" : "through");
-          else if (keyIs(t, {"ἐπί"})) w = np.case_ == Acc ? (esT ? "contra" : "against") : (esT ? "sobre" : "on");
-          // C33: a neuter noun group after πρός read as a nominative is the accusative ("πρὸς τὸ ὄρος" was "near")
-          else if (keyIs(t, {"πρός"})) w = np.case_ == Dat ? (esT ? "junto a" : "near") : (esT ? "hacia" : "to");
-          else if (keyIs(t, {"ὑπό"})) w = np.case_ == Gen ? (esT ? "por" : "by") : (esT ? "bajo" : "under");
-          if (w.empty()) w = esT ? "en" : "in";
+          const std::string w = prepWord(t, lw.word, np.case_, np.np.token >= 0 ? &ti[(size_t)np.np.token] : nullptr, esT);
           out.roles[i] = "preposition";
           for (int tk : np.np.tokens) out.roles[(size_t)tk] = "oblique";
           frame::SemOblique o;
@@ -987,7 +1147,9 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
       uint8_t tense = v.f.tense;
       if (vkey == "οἶδα") tense = tense == Pluperfect ? Imperfect : Present;   // perfect with present meaning
       // C41: δέδοικα "I fear" (was "I have feared"), ἔοικα "it seems"
-      else if ((vkey == text::greek_key("δείδω") || vkey == text::greek_key("ἔοικα")) && (tense == Perfect || tense == Pluperfect))
+      // C43: κάθημαι "sit", κεῖμαι "lie" (the tables list their present as a perfect: "has been seated")
+      else if ((vkey == text::greek_key("δείδω") || vkey == text::greek_key("ἔοικα") || vkey == text::greek_key("κάθημαι") ||
+                vkey == text::greek_key("κεῖμαι")) && (tense == Perfect || tense == Pluperfect))
         tense = tense == Pluperfect ? Imperfect : Present;
       switch (tense) {
         case Imperfect: f.pred.tense = Tense::Past; f.pred.aspect = Aspect::Progressive; break;
@@ -1202,6 +1364,7 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
   for (const SemFrame& f : out.frames) anyVerb = anyVerb || f.hasPred;
   if (!anyVerb) out.flags.push_back("no-verb");
   (void)lowerFirst;
+  attachPPs(ti, side, tg, out);   // C43
   coverage(s, ti, side, out);
 }
 
@@ -1240,6 +1403,7 @@ void coverage(const Sentence& s, const std::vector<TokInfo>& ti, const Side& sid
     for (const SemNP& y : x.genitive) np(y);
     for (const SemNP& y : x.coord) np(y);
     for (const SemNP& y : x.apposition) np(y);
+    for (const frame::SemOblique& o : x.attrPP) { mark(o.token); np(o.np); }   // C43
   };
   bool roleDoubt = false;
   std::function<void(const SemFrame&)> fr = [&](const SemFrame& f) {
@@ -1351,6 +1515,7 @@ std::string enNP(const SemNP& n, const Side& side, bool object) {
   if (!noun.empty()) w.push_back(noun);
   else if (n.adjectives.empty()) w.push_back(pl ? "ones" : "one");
   for (const SemNP& g : n.genitive) w.push_back("of " + enNP(g, side, true));
+  for (const frame::SemOblique& o : n.attrPP) w.push_back(o.prep + " " + enNP(o.np, side, true));   // C43
   for (const SemNP& c : n.coord) { w.push_back(n.coordConj.empty() ? "and" : n.coordConj); w.push_back(enNP(c, side, object)); }
   return join(w);
 }
@@ -1790,6 +1955,11 @@ std::string esNP(const SemNP& n, const Side& side) {
     if (x.compare(0, 3, "el ") == 0) w.push_back("del " + x.substr(3));
     else w.push_back("de " + x);
   }
+  for (const frame::SemOblique& o : n.attrPP) {   // C43: el camino a la aldea
+    const std::string x = esNP(o.np, side);
+    if ((o.prep == "a" || o.prep == "de") && x.compare(0, 3, "el ") == 0) w.push_back((o.prep == "a" ? "al " : "del ") + x.substr(3));
+    else w.push_back(o.prep + " " + x);
+  }
   return join(w);
 }
 
@@ -1878,7 +2048,7 @@ std::string esClause(const SemFrame& f, const Side& side) {
       bool st = false;
       for (const char* sw : {"listo", "enfermo", "cansado", "contento", "lleno", "vacío", "abierto", "cerrado", "vivo",
                             "muerto", "despierto", "dormido", "sentado", "sano", "solo", "ocupado", "preparado",
-                            "tranquilo", "enojado", "sucio", "limpio", "mojado", "seco", "roto"})
+                            "tranquilo", "enojado", "sucio", "limpio", "mojado", "seco", "roto", "seguro"})
         st = st || a.lemma == sw;
       state = state && st;
     }
@@ -1923,6 +2093,17 @@ std::string esClause(const SemFrame& f, const Side& side) {
     }
     // C31: a catenative complement ("ἐλπίζομεν νικήσειν" -> "esperamos ganar")
     if (p.modality == Modality::None && !p.complementVerb.empty()) vg.push_back(p.complementVerb);
+  }
+  // C43: "estar sentado" / "estar cansado": the participle agrees with the subject ("la muchacha está sentada")
+  if (verb.compare(0, 6, "estar ") == 0 && verb.find(' ', 6) == std::string::npos && verb.size() > 7 && verb.back() == 'o' &&
+      f.hasSubject && !vg.empty()) {
+    uint8_t g = M;
+    if (!f.subject.isPronoun) g = esGender(f.subject, side);
+    else if (f.subject.pron.gender) g = f.subject.pron.gender == F ? F : M;
+    const std::string tail = verb.substr(6);
+    std::string& last = vg.back();
+    if (last.size() > tail.size() && last.compare(last.size() - tail.size(), tail.size(), tail) == 0)
+      last = last.substr(0, last.size() - tail.size()) + es::adjective(tail, g == F ? F : M, number == 2 ? 2 : 1);
   }
   std::vector<std::string> rest;
   if (!obj.empty()) rest.push_back(obj);

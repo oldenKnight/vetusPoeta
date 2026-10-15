@@ -363,7 +363,7 @@ class En {
     const uint32_t lemma = x.token >= 0 ? ti_[(size_t)x.token].lemma : lex::kNoLemma;
     if (!hasDet && role != R::Voc) {
       const bool mentioned = in_.disc->seen(lemma);
-      const bool hasGen = !x.genitive.empty();
+      const bool hasGen = !x.genitive.empty() || !x.attrPP.empty();   // C43: "the water in the river"
       // a restrictive relative clause makes the noun definite ("the book which you gave me")
       const bool hasRel = !x.relative.empty();
       bool def = definite || lx.unique || mentioned || hasGen || hasRel;

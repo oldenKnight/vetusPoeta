@@ -584,9 +584,13 @@ std::vector<rules::CueOutput> Translator::cues(const std::vector<rules::CueInput
         for (const std::string& w : doubtWords) gc.detail += " " + w;
         o.checks.push_back(gc);
       }
+      if (std::find(o.flags.begin(), o.flags.end(), "pp-attach") != o.flags.end())   // C43: two readings
+        o.checks.push_back(rules::Check{"pp-attach", false, t == Target::Es
+                                        ? "dos lecturas: la frase preposicional puede describir al sujeto o al verbo"
+                                        : "two readings: the prepositional phrase may describe the subject or the verb"});
       const double mean = ns ? conf / (double)ns : 1.0;
       for (const char* f : {"name-guessed", "no-verb", "accent-differs", "meaning-coverage", "greek-left", "role-doubt",
-                            "gloss-doubt"})
+                            "gloss-doubt", "pp-attach"})
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) check = true;
       o.confidence = unknown ? rules::Confidence::Fix
                              : (ambiguous || check || mean < 0.7) ? rules::Confidence::Check : rules::Confidence::Ok;

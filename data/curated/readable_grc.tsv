@@ -422,7 +422,7 @@
 ἐλάσσων	adj	smaller	menor		reverse-only
 ἐλάττων	adj	smaller	menor		reverse-only
 πούς	noun	foot	pie	m	reverse-only
-ἱερός	adj	holy	sagrado		reverse-only
+ἱερός	adj	holy	sagrado		reverse-only noun:temple|templo noun-pl:sacrifices|sacrificios	C43: τὸ ἱερόν = the temple
 εὐθύς	adj	straight	recto		reverse-only
 εἶμι	verb	go	ir		reverse-only
 ταχύς	adj	fast	rápido		reverse-only
@@ -626,3 +626,12 @@
 ἡμέτερος	adj	our	nuestro		reverse-only
 ὑμέτερος	adj	your	su		reverse-only
 φέρω	verb	bring	traer		reverse-only	C41: the lexicon's own words, now reviewed (carry is the other sense)
+# ---- C43: prepositional phrases after the subject (own sentences tests/regression/own_pp_grc.grc.txt) ----
+ὕλη	noun	forest	bosque	m	reverse-only
+στενός	adj	narrow	estrecho		reverse-only
+λόφος	noun	hill	colina	f	reverse-only
+κάθημαι	verb	sit	estar sentado		reverse-only
+κάθημαι	mid	sit	estar sentado		reverse-only
+ἀσφαλής	adj	safe	seguro		reverse-only
+εὐδαίμων	adj	happy	feliz		reverse-only
+στρατόπεδον	noun	camp	campamento	m	reverse-only
