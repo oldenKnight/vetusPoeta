@@ -159,6 +159,13 @@ class LexicalSource {           // implemented by the Translator
   virtual std::string nameIn(const TokInfo& t, Target lang) const = 0;
 };
 
+// C43: a prepositional phrase right after the subject noun of a copula clause with a predicate ("Via per montēs longa
+// est": the road through the mountains is long) moves into SemNP::attrPP of the subject when it says where to / from /
+// through, or (for a thing) where it is; a person with a place ("Puella in hortō laeta est") keeps the adverbial
+// reading and the flag pp-attach (two readings: Check). With another verb only dē after a thing ("Liber dē bellō ...").
+// Verbs of motion and position keep their phrases.
+void attachPPs(Built& b, const std::vector<TokInfo>& ti, const LexicalSource& src);
+
 struct RealiseIn {
   const Sentence* s = nullptr;
   const std::vector<TokInfo>* ti = nullptr;

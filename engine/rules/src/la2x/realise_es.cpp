@@ -410,8 +410,20 @@ class Es {
       appendWord(out, "de");
       appendWord(out, np(gn, R::Prep, true));
     }
+    for (const frame::SemOblique& o : x.attrPP) appendWord(out, attribute(o));   // C43: el camino por los montes
     if (!x.relative.empty()) appendWord(out, relative(x, x.relative[0]));
     return out;
+  }
+
+  // C43: a prepositional phrase that describes a noun ("a" for ad / in + acusativo, "de" for ā / ē: prep rows with the
+  // feature <case>.attr)
+  std::string attribute(const frame::SemOblique& o) {
+    const size_t colon = o.prep.find(':');
+    const std::string prep = o.prep.substr(0, colon), cs = colon == std::string::npos ? "-" : o.prep.substr(colon + 1);
+    std::string w = tab_.text("prep", prep, {cs + ".attr", cs});
+    if (w.empty()) w = s_.tokens[(size_t)std::max(0, o.token)].text;
+    appendWord(w, np(o.np, R::Prep, true));
+    return w;
   }
 
   // personal "a" before a person object

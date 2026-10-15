@@ -745,6 +745,10 @@ phrase	dies saturni	-	sábado
 phrase	dies solis	-	domingo
 prep	post	acc.place	detrás de
 prep	ante	acc.place	delante de
+# C43: <case>.attr = the preposition of a phrase that describes a noun ("via ex urbe": el camino de la ciudad)
+prep	e	abl.attr	de
+prep	ex	abl.attr	de
+prep	trans	acc.attr	a través de
 lex	iratus	adj	enojado	estar
 lex	charta	noun	carta	
 lex	error	noun	error	

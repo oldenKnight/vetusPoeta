@@ -675,6 +675,9 @@ struct Analyser::Impl {
       o.lpos = o.f.pos;
       o.key = text::latin_key(r.display);
     }
+    // C43: mīlle the numeral is indeclinable: it goes with a plural noun ("mīlle mīlitēs" = a thousand soldiers, never
+    // "the soldiers of the mile")
+    if (o.key == "mille" && (o.f.pos == Num || o.lpos == Num)) o.f.number = 0;
     const Features& f = o.f;
     const uint8_t pos = f.pos ? f.pos : o.lpos;
     o.finite = pos == Verb && (f.mood == Indicative || f.mood == Subjunctive || f.mood == Imperative) && f.person != 0 &&
@@ -1299,6 +1302,37 @@ struct Analyser::Impl {
         if (personOther || bare) d -= 2.0;
       }
     }
+    // C43: a subject noun, a prepositional phrase, then a noun / adjective homograph next to sum ("Epistula ad mātrem
+    // brevis est": short, not the noun "dactyl"): the adjective reading that agrees with the subject is the predicate
+    // (the phrase between them hides the agreement from the pair terms)
+    if (sumHere && prep)
+      for (int i : nomNouns) {
+        const RI& r = ri[(size_t)i][ch[(size_t)i]];
+        if (r.name || r.lpos != Noun || r.personNoun) continue;
+        bool nextToSum = false;
+        for (int k : {i - 1, i + 1, i + 2}) {
+          if (k < C.first || k > C.last || ri[(size_t)k].empty() || s.tokens[(size_t)k].kind != TokKind::Word) continue;
+          const RI& x = ri[(size_t)k][ch[(size_t)k]];
+          if (x.key == "sum" && x.finite && (k != i + 2 || (!ri[(size_t)(i + 1)].empty() && ri[(size_t)(i + 1)][ch[(size_t)(i + 1)]].key == "non"))) nextToSum = true;
+        }
+        if (!nextToSum) continue;
+        for (int j : nomNouns) {
+          if (j >= i - 2) continue;
+          const RI& subj = ri[(size_t)j][ch[(size_t)j]];
+          if (subj.name || subj.lpos != Noun) continue;
+          bool prepBetween = false;
+          for (int k = j + 1; k < i; ++k)
+            if (!ri[(size_t)k].empty() && ri[(size_t)k][ch[(size_t)k]].prep) prepBetween = true;
+          if (!prepBetween) continue;
+          const uint8_t gs = subj.f.gender ? subj.f.gender : subj.lgender;
+          bool adjAgrees = false;
+          for (const RI& x : ri[(size_t)i])
+            if (x.lpos == Adj && x.f.case_ == Nom && (x.f.number == subj.f.number || !x.f.number || !subj.f.number) &&
+                genderCompat(x.f.gender ? x.f.gender : x.lgender, gs) && (x.tier == 1 || x.tier == 2))
+              adjAgrees = true;
+          if (adjAgrees) { d -= 2.0; break; }
+        }
+      }
     const bool carry = verb && isKeyOf(verb->key, {"porto", "fero", "affero", "mitto", "duco", "traho", "ueho"});
     if (personCtx && verb && !verb->copula && !verb->intrOnly && (!verb->motion || carry) && verb->f.person == 3 &&
         (verb->f.voice != Passive || (verb->lflags & lex::Deponent)) && !accSeen && nomCount == 1 && nomTok >= 0) {

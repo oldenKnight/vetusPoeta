@@ -665,6 +665,11 @@ phrase	dies saturni	-	Saturday
 phrase	dies solis	-	Sunday
 prep	post	acc.place	behind
 prep	ante	acc.place	in front of
+# C43: <case>.attr = the preposition of a phrase that describes a noun ("via ad urbem": the road to the city)
+prep	ad	acc.attr	to
+prep	in	acc.attr	to
+prep	e	abl.attr	from
+prep	ex	abl.attr	from
 lex	iratus	adj	angry
 lex	charta	noun	card
 lex	error	noun	mistake

@@ -77,6 +77,7 @@ void tokInfos(const lex::Lexicon& la, const Sentence& s, std::vector<TokInfo>& o
       x.lgender = r->nameGender;
     }
     if (!x.f.gender && r->nameGender) x.f.gender = r->nameGender;
+    if (x.key == "mille" && (x.f.pos == Num || x.lpos == Num)) x.f.number = 0;   // C43: indeclinable (mīlle mīlitēs)
     // participles: the verb they belong to (deponents read actively in periphrases)
     if (x.lpos == Participle) x.verbLemma = verbOfParticipleLemma(la, r->lemma, buf);
     else if (x.lpos == Verb && x.f.mood == ParticipleMood) x.verbLemma = r->lemma;
@@ -1697,6 +1698,127 @@ class Builder {
 };
 
 }  // namespace
+
+namespace {
+
+// C43: the last token of a noun phrase without its prepositional phrases (head, adjectives, genitives, possessors);
+// the predicate adjective that left the subject is not counted (its token may stay in SemNP::tokens)
+int lastOf(const SemNP& x) {
+  int m = x.token;
+  for (const frame::SemAdj& a : x.adjectives) m = std::max(m, a.token);
+  for (const SemNP& g : x.genitive) {
+    m = std::max(m, lastOf(g));
+    for (int t : g.tokens) m = std::max(m, t);
+  }
+  for (const SemNP& p : x.possessor) m = std::max(m, p.token);
+  for (const SemNP& a : x.apposition) m = std::max(m, a.token);
+  return m;
+}
+
+enum class PPKind : uint8_t { None, Dir, Loc, Topic };
+
+// What a Latin prepositional phrase says: direction / path / origin (ad, in + acc., per, trāns, ē / ex, ā / ab), place
+// or company (in + abl., sub, apud, prope, cum, ...), topic (dē); None: cause, time, against, for (never a noun's).
+PPKind ppKind(const std::string& prep, const std::string& cs, const Lexical& obj) {
+  const bool time = !obj.timePrep.empty() || obj.event;
+  if (isKey(prep, {"propter", "ob", "pro", "prae", "contra", "sine", "praeter", "usque"})) return PPKind::None;
+  if (time && isKey(prep, {"per", "post", "ante", "inter", "in", "sub", "ad", "intra", "circa", "circum"})) return PPKind::None;
+  if (prep == "de") return PPKind::Topic;
+  if (isKey(prep, {"ad", "per", "trans", "e", "ex", "a", "ab", "abs", "ultra"})) return PPKind::Dir;
+  if (prep == "in") return cs == "acc" ? PPKind::Dir : PPKind::Loc;
+  if (isKey(prep, {"sub", "apud", "prope", "ante", "post", "inter", "circum", "super", "supra", "infra", "extra", "intra",
+                   "iuxta", "cum"}))
+    return PPKind::Loc;
+  return PPKind::None;
+}
+
+class PPAttach {
+ public:
+  PPAttach(const std::vector<TokInfo>& ti, const LexicalSource& src, std::vector<std::string>& flags)
+      : ti_(ti), src_(src), flags_(flags) {}
+
+  void frame(SemFrame& f) {
+    for (frame::SemSub& ss : f.subordinate)
+      for (SemFrame& g : ss.frame) frame(g);
+    if (f.type != Kind::Decl || !f.hasSubject || f.implicitSubject || f.subject.isPronoun || f.subject.isName ||
+        f.subject.token < 0 || !f.subject.coord.empty() || f.existential)
+      return;
+    const int verb = f.pred.token;
+    const bool pred = !f.predAdj.empty() || !f.predicative.empty();
+    if (f.copula && !pred) return;   // "Classis in portū est": the place is the predicate
+    const std::string vkey = verb >= 0 ? ti_[(size_t)verb].key : std::string();
+    if (!f.copula) {
+      // another verb: only dē after a thing ("Liber dē bellō puerōs dēlectat": the book about the war); a verb of
+      // saying, writing, thinking or hearing takes dē itself
+      if (!f.hasPred || verb < 0 || pred || isKey(vkey, {"dico", "narro", "loquor", "scribo", "audio", "cogito", "puto",
+                                                         "doceo", "disco", "lego", "canto", "rogo", "quaero", "moneo",
+                                                         "nuntio", "fabulor", "disputo", "sentio", "scio", "cognosco",
+                                                         "intellego", "memini", "obliuiscor", "queror", "clamo",
+                                                         "respondeo", "despero", "dubito", "iudico", "decerno", "ago",
+                                                         "tracto", "laudo", "rideo", "gaudeo", "doleo", "timeo"}))
+        return;
+    }
+    const bool person = src_.lexical(ti_[(size_t)f.subject.token], Target::En).person;
+    int last = lastOf(f.subject);
+    for (size_t k = 0; k < f.obliques.size();) {
+      const frame::SemOblique& o = f.obliques[k];
+      if (o.prep.empty() || o.prep[0] == '#' || o.token != last + 1 || o.token <= f.subject.token ||
+          (verb >= 0 && o.token > verb) || o.np.token < 0) {
+        ++k;
+        continue;
+      }
+      bool beforePred = true;
+      for (const frame::SemAdj& a : f.predAdj) beforePred = beforePred && (a.token < 0 || a.token > o.token);
+      for (const SemNP& x : f.predicative) beforePred = beforePred && (x.token < 0 || x.token > o.token);
+      if (!beforePred) { ++k; continue; }
+      const size_t colon = o.prep.find(':');
+      const std::string prep = o.prep.substr(0, colon), cs = colon == std::string::npos ? "" : o.prep.substr(colon + 1);
+      const PPKind kind = ppKind(prep, cs, src_.lexical(ti_[(size_t)o.np.token], Target::En));
+      bool attach = false, doubt = false;
+      if (!f.copula) {
+        attach = kind == PPKind::Topic && !person;
+      } else if (kind == PPKind::Dir) {
+        // an adjective that takes the phrase itself: tūtus / līber ā (safe from), parātus ad (ready for)
+        bool own = false;
+        for (const frame::SemAdj& a : f.predAdj)
+          own = own || (isKey(prep, {"a", "ab", "abs", "e", "ex"}) &&
+                        isKey(a.lemma, {"tutus", "liber", "uacuus", "alienus", "immunis", "diuersus", "longus", "procul"})) ||
+                (isKey(prep, {"ad", "in"}) && isKey(a.lemma, {"paratus", "aptus", "idoneus", "utilis", "promptus",
+                                                              "propensus", "benignus", "crudelis", "iratus", "pius",
+                                                              "fidelis", "liberalis", "durus", "acerbus"}));
+        attach = !own;
+      } else if (kind == PPKind::Loc || kind == PPKind::Topic) {
+        // a thing in a place has the place as its attribute ("Templum in colle antīquum est"); a person in a place
+        // may be happy there or be the one there ("Puella in hortō laeta est"): two readings, Check
+        if (person) doubt = true;
+        else attach = true;
+      }
+      if (doubt) {
+        if (std::find(flags_.begin(), flags_.end(), "pp-attach") == flags_.end()) flags_.push_back("pp-attach");
+        ++k;
+        break;
+      }
+      if (!attach) break;
+      last = o.token;
+      for (int t : o.np.tokens) last = std::max(last, t);
+      last = std::max(last, lastOf(o.np));
+      f.subject.attrPP.push_back(o);
+      f.obliques.erase(f.obliques.begin() + (long)k);
+    }
+  }
+
+ private:
+  const std::vector<TokInfo>& ti_;
+  const LexicalSource& src_;
+  std::vector<std::string>& flags_;
+};
+
+}  // namespace
+
+void attachPPs(Built& b, const std::vector<TokInfo>& ti, const LexicalSource& src) {
+  PPAttach a(ti, src, b.flags);
+  for (SemFrame& f : b.frames) a.frame(f);
+}
 
 void buildFrames(const lex::Lexicon& la, const Tables& tab, const Sentence& s, const std::vector<TokInfo>& ti,
                  Built& out, bool devotional) {

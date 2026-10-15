@@ -774,6 +774,7 @@ struct Translator::Impl final : public detail::LexicalSource {
     devotionalNow = disc.devotional;
     detail::Built b;
     detail::buildFrames(lx, t == Target::En ? en : es, out.analysis, ti, b, disc.devotional);
+    detail::attachPPs(b, ti, *this);   // C43: a prepositional phrase that belongs to the subject noun
     detail::RealiseIn in;
     in.s = &out.analysis;
     in.ti = &ti;
@@ -1170,7 +1171,7 @@ std::vector<rules::CueOutput> Translator::cues(const std::vector<rules::CueInput
       o.checks.push_back(a1);
       o.checks.push_back(amb);
       const double mean = sents.empty() ? 1.0 : conf / (double)sents.size();
-      for (const char* f : {"abl-abs", "gloss-missing", "name-guessed", "no-verb", "gloss-doubt"})
+      for (const char* f : {"abl-abs", "gloss-missing", "name-guessed", "no-verb", "gloss-doubt", "pp-attach"})
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) check = true;
       // C36: meaning coverage (a dropped / added content word, an existential for a copula, a dangling conjunction,
       // a wrong-gender participle, a lost vocative, a guessed "it", "without the" for a first mention)

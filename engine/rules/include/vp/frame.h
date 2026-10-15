@@ -75,6 +75,7 @@ struct SemAdj {
 };
 
 struct SemFrame;
+struct SemOblique;
 
 struct SemNP {
   std::string head;              // source lemma; names keep the written form ("Alice")
@@ -109,6 +110,9 @@ struct SemNP {
   // -> canem suum, cui nōmen erat Rūfus): 0 or 1 NP; `calledRel` for the relative form, `calledPast` its tense
   std::vector<SemNP> called;
   bool calledRel = false, calledPast = false;
+  // C43: prepositional phrases that modify this noun ("via per montēs": the road through the mountains; Greek "ἡ διὰ
+  // τῶν ὀρῶν ὁδός"); filled by la2x / grc2x only, said right after the noun (and its genitives)
+  std::vector<SemOblique> attrPP;
 };
 
 struct SemOblique { std::string prep; SemNP np; int token = -1; bool front = false; };
