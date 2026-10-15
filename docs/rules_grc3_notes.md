@@ -1357,3 +1357,17 @@ llegó al atardecer." (was "arribaron" / "arribó": the English-pivot gloss; ἀ
 ### Still open
 PP after the subject noun (blind); εἰς after "arrive" ("arrive into"); ἐν τῇ νήσῳ "in the island"; λύω of a wall; "many
 money" for χρήματα πολλά (Check).
+
+## PP attachment (C43)
+Own material and tests: rules_la2x_notes.md "PP attachment (C43)" (own_pp_grc.grc.txt, test_rules_t.cpp).
+* Attributive position in readNP: article + phrase + noun (ἡ διὰ τῆς ὕλης ὁδός) and noun + repeated article + phrase
+  (ἡ ὁδὸς ἡ πρὸς τὴν πόλιν) go to SemNP::attrPP; εἰς / πρός + acc. = to / a, ἐκ / ἀπό = from / de there.
+* attachPPs (after the frames): the same rule as la2x for an unbracketed phrase right after the subject (pp-attach for a
+  person with a place); arrive at (not into) after ἀφικνέομαι, sail / travel / return to; ἐν + νῆσος / ὄρος / λόφος = on.
+* Analysis: a predicate adjective next to εἰμί agreeing with the subject across the phrase (μακρά was neuter plural).
+* κάθημαι / κεῖμαι perfect forms = present (sits); Spanish "estar sentado" agrees (está sentada); seguro takes estar.
+* Rows (reverse-only): ὕλη forest / bosque, στενός, λόφος hill / colina, κάθημαι sit, ἀσφαλής safe, εὐδαίμων happy /
+  feliz, στρατόπεδον camp; ἱερός noun:temple|templo.
+* Numbers: own GRC -> EN 2 -> 13/13, GRC -> ES 3 -> 13/13 (wrong among OK 8 + 3 -> 0). Blind (first and only run):
+  GRC -> EN 4/5, GRC -> ES 3/5, wrong among OK 1 + 2: μένω read as wait (gold stay), and ἐπὶ τῷ ποταμῷ = "sobre el
+  río" (ἐπί + dat. as an attribute should be junto a); not tuned. Open: ἐπί + dat. "by / junto a" as an attribute.

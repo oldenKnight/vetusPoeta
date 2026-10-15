@@ -333,3 +333,26 @@ EN -> LA "not very but enough" is Check but the Latin is still "valdē ... sed s
 on the Latin side); mīlle read as the noun "mile" (Check); multa as "fine" (Check); a PP after the subject noun read as a
 predicate adverbial (blind 3); "in lītus" = onto the shore; Spanish personal "a" for a person noun without a row
 ("llama un pastor").
+
+## PP attachment (C43)
+Own material first (884aca9): tests/regression/own_pp.la.txt (17), own_pp_grc.grc.txt (13), own_pp.en.txt (2), gold in
+expected/own_pp*.gold.txt; units la 12-14 / grc 10-11 have two readings and are right only as Check. Tests:
+engine/tests/test_rules_t.cpp (report regression_report_t.txt).
+* la2x::detail::attachPPs (readable.cpp, after buildFrames): a prepositional phrase right after an explicit common-noun
+  subject of a copula clause with a predicate (adjective or noun) moves into the new SemNP::attrPP when it says where to /
+  from / through / about (ad, in + acc., per, trāns, ē / ex, ā / ab, dē), or where a thing is (in + abl., sub, apud,
+  cum, ...); a person with a place or a topic keeps the adverbial reading with flag pp-attach (Check, check id pp-attach).
+  Not for time nouns, propter / ob / prō / contrā, or an adjective that takes the phrase itself (tūtus ā, parātus ad).
+  Another verb: only dē after a thing, not after a verb of saying / thinking. Motion and position verbs unchanged.
+* Realisers: the phrase after the noun (and its genitives), prep rows <case>.attr (ad / in + acc. = to / a, ē / ex =
+  from / de, trāns = a través de); a noun with such a phrase is definite (the water in the river).
+* Analysis: a noun / adjective homograph next to sum after subject + phrase is the predicate adjective (brevis =
+  short, not "dactyl"); mīlle the numeral has no number (a thousand soldiers, not "of the mile").
+* Rows: iter journey / viaje, tūtus safe / seguro (estar), angustus estrecho, stō verb+thing estar (new feature
+  verb+thing: the verb said of a thing subject, Spanish only).
+* EN / ES -> LA (engine.cpp): a verbless tail ", not very but enough" / ", no muy, sino bastante" is cut before the
+  analysis and given back as ", nōn valdē sed satis" (valdē / multum / nimis / satis).
+* Numbers (vpengine serve, text project, fidelity 2, speaker m): own LA -> EN 8 -> 17/17, LA -> ES 6 -> 16/17 (wrong among
+  OK 6 + 6 -> 0), EN -> LA 1 -> 2/2. Blind (la half) 4/5 EN, 4/5 ES, wrong among OK 0. All other reports byte-identical
+  except regression_report_s (templum stat = está, not "está de pie"; not very but enough right). Owner material
+  identical in all nine directions.
