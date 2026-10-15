@@ -828,3 +828,132 @@ lex	mors	noun	muerte
 lex	charitas	noun	caridad	mass
 lex	caritas	noun	caridad	mass
 lex	serenus	adj	sereno
+# ---- C41: auditoría del vocabulario básico (como readable_en.tsv; nota pl:<palabra> = el plural tiene sentido propio:
+# se dice en singular, castra = el campamento, o en ese plural si la palabra termina en -s, cōpiae = las tropas) ----
+lex	lex	noun	ley
+lex	imperium	noun	poder
+lex	exercitus	noun	ejército
+lex	periculum	noun	peligro
+lex	consilium	noun	plan
+lex	castrum	noun	fortaleza	pl:campamento
+lex	copia	noun	abundancia	pl:tropas
+lex	aedes	noun	templo	pl:casa
+lex	littera	noun	letra	pl:carta
+lex	ops	noun	ayuda	pl:riqueza
+lex	uirtus	noun	valor	mass
+lex	regnum	noun	reino
+lex	scelus	noun	crimen
+lex	refero	verb	devolver
+lex	beneficium	noun	favor
+lex	seruo	verb	salvar
+lex	litus	noun	playa
+lex	turba	noun	multitud
+lex	dignus	adj	digno
+lex	cunctus	adj	todo
+lex	aetas	noun	edad
+lex	muto	verb	cambiar
+lex	princeps	noun	jefe	person
+lex	consul	noun	cónsul	person
+lex	nosco	verb	conocer
+lex	cursus	noun	carrera
+lex	agmen	noun	columna
+lex	iniuria	noun	injusticia
+lex	ingenium	noun	talento
+lex	campus	noun	llanura
+lex	mora	noun	retraso
+adv	longe	-	lejos	end
+lex	caedes	noun	matanza	mass
+lex	ordo	noun	orden
+lex	praesto	verb	sobresalir
+lex	numen	noun	poder divino
+lex	crimen	noun	acusación
+lex	sinus	noun	pliegue
+lex	posco	verb	exigir
+lex	anima	noun	alma
+lex	contingo	verb	tocar
+lex	classis	noun	flota
+lex	affero	verb	traer
+lex	dubito	verb	dudar
+lex	dubius	adj	dudoso
+lex	condo	verb	fundar
+adv	quondam	-	una vez	front time
+lex	auctor	noun	autor	person
+lex	iudico	verb	juzgar
+lex	pecus	noun	ganado	mass
+lex	efficio	verb	realizar
+lex	exerceo	verb	ejercitar
+lex	honestus	adj	honrado
+lex	regio	noun	región
+lex	sententia	noun	opinión
+lex	uinculum	noun	cadena
+lex	species	noun	aspecto
+lex	prohibeo	verb	impedir
+lex	cresco	verb	crecer
+lex	existimo	verb	pensar
+lex	accedo	verb	acercarse
+lex	prouincia	noun	provincia
+lex	sors	noun	suerte
+lex	repeto	verb	volver a
+lex	constituo	verb	decidir
+lex	cohors	noun	cohorte
+lex	gigno	verb	engendrar
+lex	supero	verb	vencer
+lex	deficio	verb	faltar
+lex	praemium	noun	recompensa
+lex	supplicium	noun	castigo
+adv	undique	-	por todas partes	end
+lex	aureus	adj	de oro
+lex	lateo	verb	estar escondido
+lex	permitto	verb	permitir
+lex	spiritus	noun	espíritu
+lex	superi	noun	dioses	person
+lex	decet	verb	convenir
+lex	aeternus	adj	eterno
+lex	curo	verb	cuidar
+lex	damno	verb	condenar
+lex	tempestas	noun	tormenta
+lex	pietas	noun	piedad	mass
+lex	saeculum	noun	época
+lex	laedo	verb	herir
+lex	odi	verb	odiar
+lex	tribunus	noun	tribuno	person
+lex	bos	noun	buey
+lex	offero	verb	ofrecer
+lex	recedo	verb	retirarse
+lex	proprius	adj	propio
+lex	certo	verb	competir
+lex	consumo	verb	consumir
+lex	corrumpo	verb	arruinar
+lex	praetor	noun	pretor	person
+lex	differo	verb	diferir
+lex	priuatus	adj	privado
+lex	uereor	verb	temer
+lex	celebro	verb	celebrar
+lex	conficio	verb	acabar
+lex	iuro	verb	jurar
+lex	auctoritas	noun	autoridad	mass
+lex	aptus	adj	apto
+lex	consequor	verb	alcanzar
+lex	censeo	verb	opinar
+lex	prodo	verb	traicionar
+adv	item	-	igualmente	front
+lex	caueo	verb	tener cuidado
+lex	praecipio	verb	aconsejar
+lex	consuetudo	noun	costumbre
+lex	afficio	verb	afectar
+lex	adhibeo	verb	emplear
+lex	arbitror	verb	pensar
+lex	diligo	verb	amar
+lex	mons	noun	monte
+lex	collis	noun	colina
+lex	aequor	noun	mar
+lex	animus	noun	espíritu
+adv	fortiter	-	valientemente	end
+lex	rarus	adj	raro
+lex	potens	adj	poderoso
+lex	falsus	adj	falso
+lex	rectus	adj	recto
+lex	iudex	noun	juez	person
+lex	uinco	verb	vencer
+lex	conuiuium	noun	banquete
+lex	delecto	verb	complacer

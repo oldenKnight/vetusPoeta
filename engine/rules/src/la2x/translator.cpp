@@ -137,7 +137,44 @@ struct Translator::Impl final : public detail::LexicalSource {
   detail::Coverage coverage;                // meaning coverage of the readable sentence (C36)
   bool devotionalNow = false;               // C36: the current text is devotional (lexical() picks devotional words)
 
+  const lex::Lexicon* enLex = nullptr;      // C41: english.vpl / spanish.vpl for the gloss calibration (may be null)
+  const lex::Lexicon* esLex = nullptr;
+
   Impl(const lex::Lexicon& l, const curated::CuratedData& c) : lx(l), cd(c), analyser(l, c) {}
+
+  // C41: the lexicon gloss of `lemma` is a pointer to another lemma ("synonym of X"): lexiconGloss() follows it
+  bool glossRedirects(uint32_t lemma, Target t) const {
+    const lex::Lemma l = lx.lemma(lemma);
+    const std::string_view g = t == Target::En ? l.glossEn : l.glossEs;
+    for (const char* ref : {"synonym of ", "alternative form of ", "alternative spelling of ", "contraction of ",
+                            "sinónimo de ", "forma alternativa de "})
+      if (startsWith(std::string(g), ref)) return true;
+    return false;
+  }
+
+  // C41: content words of the sentence whose gloss is no teacher's row and is either not the lexicon's own first sense
+  // (Spanish via the English pivot, a followed "synonym of") or not a dictionary word of the target language. One note
+  // per word ("gloss-doubt: vīs (want)").
+  void glossDoubts(const std::vector<TokInfo>& ti, Target t, std::vector<std::string>& notes) const {
+    const detail::Tables& tab = t == Target::En ? en : es;
+    for (const TokInfo& x : ti) {
+      if (!x.word || x.name || x.lemma == lex::kNoLemma) continue;
+      const uint8_t p = x.f.pos == Participle ? (uint8_t)Participle : x.lpos;
+      if (p != Noun && p != Verb && p != Adj && p != Adv && p != Participle) continue;
+      if (x.key == "sum") continue;
+      bool closed = false;   // an adverb / determiner / connector of the readable tables' closed classes
+      for (const char* kind : {"adv", "det", "conj", "sub", "prep", "intj", "wh", "phrase"})
+        closed = closed || tab.has(kind, x.key);
+      if (closed) continue;
+      const Lexical lw = lexical(x, t);
+      if (lw.missing || lw.word.empty() || lw.table) continue;
+      const bool notFirst = lw.pivot || lw.redirect;
+      const bool notWord = !glossIsDictionaryWord(t == Target::En ? enLex : esLex, lw.word, t == Target::Es);
+      if (!notFirst && !notWord) continue;
+      const std::string n = "gloss-doubt: " + x.text + " (" + lw.word + (notFirst ? ", not a first sense" : "") + ")";
+      if (std::find(notes.begin(), notes.end(), n) == notes.end()) notes.push_back(n);
+    }
+  }
 
   // ---- participles ----
   uint32_t verbOfParticiple(uint32_t p) const {
@@ -333,6 +370,7 @@ struct Translator::Impl final : public detail::LexicalSource {
       if (const detail::Row* r = tb.find("lex", pk, "adj")) {
         out.word = r->text;
         out.adjective = true;
+        out.table = true;   // C41
         return out;
       }
     }
@@ -356,11 +394,16 @@ struct Translator::Impl final : public detail::LexicalSource {
         if ((row = tab.find("lex", st + e, pn))) { enRow = en.find("lex", st + e, pn); break; }
       }
     }
-    if (row) out.word = row->text;
-    else {
+    if (row) {
+      out.word = row->text;
+      out.table = true;   // C41
+    } else {
       bool pivot = false;
       out.word = glossFor(lemma, pos, lang, &pivot);
       out.pivot = pivot;
+      // C41: a curated Spanish gloss (gloss_es_la.tsv) is a teacher's row; "synonym of X" is not this lemma's sense
+      if (lang == Target::Es && rowFits(lemma, key, pos) && curatedEs(key, l.head)) out.table = true;
+      else out.redirect = glossRedirects(lemma, lang);
       if (out.word.empty() && lang == Target::Es) {
         out.word = "[" + morph::displayForm(l.head, false) + "]";
         out.missing = true;
@@ -399,6 +442,12 @@ struct Translator::Impl final : public detail::LexicalSource {
       if (devotionalNow && !dv.empty()) out.word = dv;
       const std::string fw = noteWord("f:");
       if (!fw.empty() && t.f.gender == F) out.word = fw;
+      // C41: a plural with a sense of its own (castra = camp, cōpiae = troops, litterae = letter): note pl:<word>
+      const std::string pw = noteWord("pl:");
+      if (!pw.empty() && t.f.number == Pl) {
+        out.word = pw;
+        out.invariable = pw.back() == 's';   // "troops" / "tropas" is the plural already; "camp" is said in the singular
+      }
     }
     for (const detail::Row* r : {row, enRow}) {
       if (!r) continue;
@@ -749,6 +798,15 @@ struct Translator::Impl final : public detail::LexicalSource {
     }
     out.frame = b.frames.empty() ? std::string() : frame::describe(b.frames[0]);
     words(out.analysis, ti, b, t, out.words);
+    {
+      // C41: a gloss no teacher wrote that is not the lexicon's own first sense, or not a dictionary word: Check
+      std::vector<std::string> doubts;
+      glossDoubts(ti, t, doubts);
+      if (!doubts.empty()) {
+        out.flags.push_back("gloss-doubt");
+        for (std::string& d : doubts) out.coverage.push_back(std::move(d));
+      }
+    }
     for (const Word& w : out.words)   // the periphrasis note also explains the reading ("Why this reading?")
       if (!w.note.empty() && w.token >= 0) {
         std::vector<std::string>& why = out.analysis.tokens[(size_t)w.token].why;
@@ -927,6 +985,70 @@ Result<std::unique_ptr<Translator>> Translator::create(const lex::Lexicon& la, c
 const Analyser& Translator::analyser() const { return impl_->analyser; }
 void Translator::resetDiscourse() { impl_->disc.clear(); }
 
+void Translator::setTargetLexicons(const lex::Lexicon* english, const lex::Lexicon* spanish) {
+  impl_->enLex = english;
+  impl_->esLex = spanish;
+}
+
+bool glossIsDictionaryWord(const lex::Lexicon* target, std::string_view gloss, bool spanish) {
+  if (!target) return true;
+  std::vector<std::string> ws;
+  {
+    std::string cur;
+    for (char c : gloss) {
+      if (c == ' ' || c == '\t') {
+        if (!cur.empty()) ws.push_back(cur);
+        cur.clear();
+      } else {
+        cur += c;
+      }
+    }
+    if (!cur.empty()) ws.push_back(cur);
+  }
+  auto drop = [&](std::initializer_list<const char*> lead) {
+    while (ws.size() > 1) {
+      bool hit = false;
+      for (const char* x : lead) hit = hit || text::lower(ws[0]) == x;
+      if (!hit) break;
+      ws.erase(ws.begin());
+    }
+  };
+  if (spanish) drop({"el", "la", "los", "las", "un", "una"});
+  else drop({"to", "be", "a", "an", "the"});
+  if (ws.empty() || ws.size() > 3) return false;
+  const std::string first = text::lower(ws[0]);
+  if (first == "not" || (spanish && first == "no" && ws.size() > 1)) return false;
+  std::vector<lex::Analysis> an;
+  for (std::string w : ws) {
+    while (!w.empty() && (w.back() == '.' || w.back() == ',' || w.back() == '!' || w.back() == '?' || w.back() == ')' ||
+                          w.back() == '\'')) w.pop_back();
+    while (!w.empty() && (w[0] == '(' || w[0] == '\'' || w[0] == '-')) w.erase(0, 1);
+    if (w.empty()) return false;
+    const std::string low = text::lower(w);
+    for (const char* ph : {"something", "someone", "somebody", "sth", "sb", "algo", "alguien"})
+      if (low == ph) return false;
+    // another script (Greek, a macron Latin word) or a bracketed source word is never a target-language word
+    for (unsigned char c : w)
+      if (c == '[' || c == ']') return false;
+    an.clear();
+    const std::string k = spanish ? text::es_key(w) : text::en_key(w);
+    if (k.empty() || !target->lookup(k, an) || an.empty()) {
+      // a hyphenated compound ("well-known"): each part
+      if (w.find('-') == std::string::npos) return false;
+      size_t a = 0;
+      while (a <= w.size()) {
+        const size_t e = w.find('-', a);
+        const std::string part = w.substr(a, e == std::string::npos ? std::string::npos : e - a);
+        an.clear();
+        if (part.empty() || !target->lookup(spanish ? text::es_key(part) : text::en_key(part), an) || an.empty()) return false;
+        if (e == std::string::npos) break;
+        a = e + 1;
+      }
+    }
+  }
+  return true;
+}
+
 std::string Translator::gloss(uint32_t lemma, Target t, bool* pivot) const {
   bool p = false;
   const lex::Lemma l = impl_->lx.lemma(lemma);
@@ -1048,7 +1170,7 @@ std::vector<rules::CueOutput> Translator::cues(const std::vector<rules::CueInput
       o.checks.push_back(a1);
       o.checks.push_back(amb);
       const double mean = sents.empty() ? 1.0 : conf / (double)sents.size();
-      for (const char* f : {"abl-abs", "gloss-missing", "name-guessed", "no-verb"})
+      for (const char* f : {"abl-abs", "gloss-missing", "name-guessed", "no-verb", "gloss-doubt"})
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) check = true;
       // C36: meaning coverage (a dropped / added content word, an existential for a copula, a dangling conjunction,
       // a wrong-gender participle, a lost vocative, a guessed "it", "without the" for a first mention)
@@ -1060,6 +1182,14 @@ std::vector<rules::CueOutput> Translator::cues(const std::vector<rules::CueInput
         for (const std::string& f : o.flags) lost = lost || detail::Coverage::isCoverageFlag(f);
         o.checks.push_back(rules::Check{"meaning", !lost, lost ? "check the meaning: " + detailText : ""});
         if (lost) check = true;
+      }
+      // C41: a gloss no teacher wrote that is not the lexicon's first sense or not a dictionary word (only when found)
+      if (std::find(o.flags.begin(), o.flags.end(), "gloss-doubt") != o.flags.end()) {
+        std::string words;
+        for (const SentenceOut& so : sents)
+          for (const std::string& n : so.coverage)
+            if (n.rfind("gloss-doubt: ", 0) == 0) words += (words.empty() ? "" : "; ") + n.substr(13);
+        o.checks.push_back(rules::Check{"gloss", false, (t == Target::Es ? "glosa sin revisar: " : "unreviewed gloss: ") + words});
       }
       o.confidence = unknown ? rules::Confidence::Fix
                              : (ambiguous || check || mean < 0.7) ? rules::Confidence::Check : rules::Confidence::Ok;

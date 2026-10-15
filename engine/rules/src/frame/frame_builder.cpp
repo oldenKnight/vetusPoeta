@@ -6795,10 +6795,13 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
       }
   }
   // C39 (g): "..., not much, but enough.": a verbless "not much / many" between commas is an ellipsis of the clause
-  // before it; read with care (Check): the negation of a fragment may be lost by a realiser
+  // before it; read with care (Check): the negation of a fragment may be lost by a realiser. C41: also a degree word
+  // ("..., not very but enough": the Latin was "valdē magna est sed satis", the opposite, rated OK)
   if (lang_ == SrcLang::En && nlp_)
     for (int i = 0; i + 1 < (int)tk.size(); ++i) {
-      if (tk[(size_t)i].lower != "not" || !in(tk[(size_t)i + 1].lower, {"much", "many", "enough", "a"})) continue;
+      if (tk[(size_t)i].lower != "not" ||
+          !in(tk[(size_t)i + 1].lower, {"much", "many", "enough", "a", "very", "too", "so", "quite", "really", "that"}))
+        continue;
       int a = i, b = i + 1;
       while (a > 0 && !in(tk[(size_t)a - 1].text, {",", ":", ";"})) --a;
       while (b + 1 < (int)tk.size() && !in(tk[(size_t)b + 1].text, {",", ":", ";", ".", "!", "?"})) ++b;

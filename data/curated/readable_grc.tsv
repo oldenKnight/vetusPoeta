@@ -98,7 +98,7 @@
 μικρός	adj	small	pequeño		
 μέγας	adj	big	grande		
 καλός	adj	beautiful	hermoso		
-σοφός	adj	wise	sabio		
+σοφός	adj	wise	sabio		noun:wise_man|sabio noun-pl:wise_men|sabios	C41: with the article a person ("the wise man", not "the wise trusts")
 λευκός	adj	white	blanco		
 ἀγαθός	adj	good	bueno		
 κακός	adj	bad	malo		
@@ -321,3 +321,308 @@
 # C39: ἔργον has its own row, so the noun wins over the imperfect / participle of ἔργω (εἴργω, "close off") when
 # nothing else decides ("ἔργον ἔχει" was "I was closing off"); after an article or an adjective it was already the noun
 ἔργον	noun	work	trabajo	m	reverse-only	C39 (the EN / ES -> Greek choice for "work" is unchanged)
+# C41: core vocabulary audit (the DCC core list run through grc2x; the Spanish of a lemma without a row came through
+# the English pivot and was often not a sense of the Greek word at all: castellano, chibolo, dispuesen, consuetud).
+# Every row here is reverse-only: it reads Greek back and does not change the EN / ES -> Greek choice.
+γίγνομαι	verb	become	llegar a ser		reverse-only
+ἄλλος	adj	other	otro		reverse-only
+λόγος	noun	word	palabra	f	reverse-only
+οὕτως	adv	thus	así		reverse-only
+πρότερος	adj	former	anterior		reverse-only
+τοιοῦτος	adj	such	tal		reverse-only
+εἶπον	verb	say	decir		reverse-only
+ἵημι	verb	send	enviar		reverse-only
+μόνος	adj	alone	solo		reverse-only
+δοκέω	verb	seem	parecer		reverse-only
+ἕτερος	adj	other	otro		reverse-only
+ὅσος	adj	as much as	cuanto		reverse-only
+σῶμα	noun	body	cuerpo	m	reverse-only
+δεῖ	verb	be necessary	ser necesario		reverse-only
+ἔτι	adv	still	todavía		reverse-only
+φύσις	noun	nature	naturaleza	f	generic reverse-only
+ἀρχή	noun	beginning	principio	m	reverse-only
+φύω	verb	produce	producir		reverse-only
+ἅπας	adj	all	todo		reverse-only
+ὅμοιος	adj	similar	semejante		reverse-only
+γῆ	noun	earth	tierra	f	reverse-only
+δύναμις	noun	power	poder	m	reverse-only
+κύριος	noun	lord	señor	m	person reverse-only
+μᾶλλον	adv	more	más		reverse-only
+ὅλος	adj	whole	entero		reverse-only
+μέρος	noun	part	parte	f	reverse-only
+χράομαι	verb	use	usar		reverse-only
+χρόνος	noun	time	tiempo	m	generic reverse-only
+ἴσος	adj	equal	igual		reverse-only
+μόνον	adv	only	solo		reverse-only
+ψυχή	noun	soul	alma	f	reverse-only
+αἴτιος	adj	responsible	responsable		reverse-only
+μάλιστα	adv	especially	sobre todo		reverse-only
+ὑπάρχω	verb	exist	existir		reverse-only
+ποτε	adv	once	una vez		reverse-only
+ἤδη	adv	already	ya		reverse-only
+γένος	noun	family	familia	f	reverse-only
+τόπος	noun	place	lugar	m	reverse-only
+πράσσω	verb	do	hacer		reverse-only
+πράττω	verb	do	hacer		reverse-only
+πρῶτος	adj	first	primero		reverse-only
+εὑρίσκω	verb	find	encontrar		reverse-only
+υἱός	noun	son	hijo	m	person reverse-only
+ἴδιος	adj	own	propio		reverse-only
+γιγνώσκω	verb	know	conocer		reverse-only
+τυγχάνω	verb	happen	suceder		reverse-only
+ἅμα	adv	at the same time	al mismo tiempo		reverse-only
+τρόπος	noun	way	manera	f	reverse-only
+μέσος	adj	middle	medio		reverse-only
+συμβαίνω	verb	happen	suceder		reverse-only
+πλέω	verb	sail	navegar		reverse-only
+τότε	adv	then	entonces		reverse-only
+χρή	verb	be necessary	ser necesario		reverse-only
+ζῷον	noun	animal	animal	m	animal reverse-only
+πρᾶγμα	noun	thing	cosa	f	plural:affairs reverse-only
+ἐναντίος	adj	opposite	contrario		reverse-only
+τίθημι	verb	put	poner		reverse-only
+εἶδον	verb	see	ver		reverse-only
+χείρ	noun	hand	mano	f	reverse-only
+ὀλίγος	adj	little	poco		reverse-only
+κοινός	adj	common	común		reverse-only
+κινέω	verb	move	mover		reverse-only
+πάσχω	verb	suffer	sufrir		reverse-only
+τοσοῦτος	adj	so much	tanto		reverse-only
+εἶτα	adv	then	luego		reverse-only
+ἀληθής	adj	true	verdadero		reverse-only
+δίκαιος	adj	just	justo		noun:just_man|hombre_justo noun-pl:just|justos reverse-only
+μέλλω	verb	be about to	ir a		reverse-only
+ἐθέλω	verb	want	querer		reverse-only
+λοιπός	adj	remaining	restante		reverse-only
+ἀνάγκη	noun	necessity	necesidad	f	generic reverse-only
+δεύτερος	adj	second	segundo		reverse-only
+πόλεμος	noun	war	guerra	f	generic reverse-only
+χώρα	noun	country	país	m	reverse-only
+ζάω	verb	live	vivir		reverse-only
+ζῶ	verb	live	vivir		reverse-only
+πλῆθος	noun	crowd	multitud	f	reverse-only
+ἥλιος	noun	sun	sol	m	reverse-only
+αἰτία	noun	cause	causa	f	reverse-only
+πείθω	verb	persuade	persuadir		reverse-only
+πείθω	mid	obey	obedecer		reverse-only
+πλεῖστος	adj	most	muchísimo		reverse-only
+εἶδος	noun	form	forma	f	reverse-only
+κύκλος	noun	circle	círculo	m	reverse-only
+πάθος	noun	suffering	sufrimiento	m	reverse-only
+ὀνομάζω	verb	name	nombrar		reverse-only
+ἀρετή	noun	virtue	virtud	f	generic reverse-only
+ἔτος	noun	year	año	m	reverse-only
+τρίτος	adj	third	tercero		reverse-only
+πνεῦμα	noun	breath	aliento	m	reverse-only
+ὀρθός	adj	straight	recto		reverse-only
+θάλασσα	noun	sea	mar	m	reverse-only
+διαφέρω	verb	differ	diferir		reverse-only
+δόξα	noun	opinion	opinión	f	reverse-only
+πῦρ	noun	fire	fuego	m	reverse-only
+ἐλάσσων	adj	smaller	menor		reverse-only
+ἐλάττων	adj	smaller	menor		reverse-only
+πούς	noun	foot	pie	m	reverse-only
+ἱερός	adj	holy	sagrado		reverse-only
+εὐθύς	adj	straight	recto		reverse-only
+εἶμι	verb	go	ir		reverse-only
+ταχύς	adj	fast	rápido		reverse-only
+ποταμός	noun	river	río	m	reverse-only
+οὐσία	noun	property	propiedad	f	reverse-only
+ἀριθμός	noun	number	número	m	reverse-only
+ὕστερος	adj	later	posterior		reverse-only
+φυλάσσω	verb	guard	guardar		reverse-only
+καιρός	noun	right time	momento oportuno	m	reverse-only
+ἀμφότερος	adj	both	ambos		reverse-only
+σημεῖον	noun	sign	señal	f	reverse-only
+δηλόω	verb	show	mostrar		reverse-only
+οἰκεῖος	adj	own	propio		reverse-only
+τέλος	noun	end	fin	m	reverse-only
+ἡγέομαι	verb	lead	guiar		reverse-only
+ἄξιος	adj	worthy	digno		reverse-only
+δῆλος	adj	clear	claro		reverse-only
+ἔρομαι	verb	ask	preguntar		reverse-only
+μέγεθος	noun	size	tamaño	m	reverse-only
+πολλάκις	adv	often	a menudo		reverse-only
+χάρις	noun	favour	favor	m	reverse-only
+ἔπειτα	adv	then	después		reverse-only
+σχῆμα	noun	form	forma	f	reverse-only
+τροφή	noun	food	alimento	m	mass reverse-only
+μανθάνω	verb	learn	aprender		reverse-only
+ἐνταῦθα	adv	here	aquí		reverse-only
+κόσμος	noun	order	orden	m	reverse-only
+αἱρέω	verb	take	tomar		reverse-only
+αἱρέω	mid	choose	elegir		reverse-only
+προστίθημι	verb	add	añadir		reverse-only
+ἀξιόω	verb	think worthy	considerar digno		reverse-only
+νέος	adj	young	joven		noun:young_man|joven noun-pl:young_men|jóvenes reverse-only
+ἔοικα	verb	seem	parecer		reverse-only
+καθίστημι	verb	establish	establecer		reverse-only
+τέχνη	noun	skill	arte	m	reverse-only
+χρῆμα	noun	thing	cosa	f	plural:money reverse-only
+πέμπω	verb	send	enviar		reverse-only
+φωνή	noun	voice	voz	f	reverse-only
+ἀπόλλυμι	verb	destroy	destruir		reverse-only
+ἀπόλλυμι	mid	perish	morir		reverse-only
+θάνατος	noun	death	muerte	f	generic reverse-only
+ἔθνος	noun	nation	nación	f	reverse-only
+ἀποδίδωμι	verb	give back	devolver		reverse-only
+νοῦς	noun	mind	mente	f	reverse-only
+ἀποθνῄσκω	verb	die	morir		reverse-only
+εὖ	adv	well	bien		reverse-only
+κρίνω	verb	judge	juzgar		reverse-only
+ἀναιρέω	verb	take up	recoger		reverse-only
+μακρός	adj	long	largo		reverse-only
+ἡδονή	noun	pleasure	placer	m	generic reverse-only
+δεινός	adj	terrible	terrible		reverse-only
+διαφορά	noun	difference	diferencia	f	reverse-only
+κρατέω	verb	rule	dominar		reverse-only
+ἕπομαι	verb	follow	seguir		reverse-only
+ἥσσων	adj	weaker	más débil		reverse-only
+ἥττων	adj	weaker	más débil		reverse-only
+ὄρος	noun	mountain	montaña	f	reverse-only
+δυνατός	adj	powerful	poderoso		reverse-only
+ἄριστος	adj	best	mejor		reverse-only
+ῥᾴδιος	adj	easy	fácil		reverse-only
+ἀφαιρέω	verb	take away	quitar		reverse-only
+τύχη	noun	fortune	fortuna	f	reverse-only
+φανερός	adj	clear	evidente		reverse-only
+πρόσωπον	noun	face	cara	f	reverse-only
+πιστεύω	verb	trust	confiar en		reverse-only
+διδάσκω	verb	teach	enseñar		reverse-only
+ἄνω	adv	up	arriba		reverse-only
+τάσσω	verb	arrange	ordenar		reverse-only
+τάττω	verb	arrange	ordenar		reverse-only
+ὀφθαλμός	noun	eye	ojo	m	reverse-only
+δέχομαι	verb	receive	recibir		reverse-only
+ἀφικνέομαι	verb	arrive	llegar		reverse-only
+ἐργάζομαι	verb	work	trabajar		reverse-only
+μάχη	noun	battle	batalla	f	reverse-only
+ἀδύνατος	adj	impossible	imposible		reverse-only
+ἀκριβής	adj	exact	exacto		reverse-only
+στόμα	noun	mouth	boca	f	reverse-only
+χωρίς	adv	apart	aparte		reverse-only
+κρείσσων	adj	stronger	más fuerte		reverse-only
+κρείττων	adj	stronger	más fuerte		reverse-only
+βραχύς	adj	short	corto		reverse-only
+ἰσχυρός	adj	strong	fuerte		reverse-only
+ἀλήθεια	noun	truth	verdad	f	reverse-only
+ἀθάνατος	adj	immortal	inmortal		reverse-only
+δίκη	noun	justice	justicia	f	generic reverse-only
+χωρίον	noun	place	lugar	m	reverse-only
+ἡδύς	adj	sweet	dulce		reverse-only
+νόσος	noun	disease	enfermedad	f	reverse-only
+παλαιός	adj	old	antiguo		reverse-only
+ἀφίημι	verb	let go	soltar		reverse-only
+ἄλλως	adv	otherwise	de otro modo		reverse-only
+πρᾶξις	noun	action	acción	f	reverse-only
+σαφής	adj	clear	claro		reverse-only
+ὁμολογέω	verb	agree	estar de acuerdo		reverse-only
+ναός	noun	temple	templo	m	reverse-only
+πατρίς	noun	fatherland	patria	f	reverse-only
+ὀξύς	adj	sharp	agudo		reverse-only
+γνώμη	noun	opinion	opinión	f	reverse-only
+τιμή	noun	honour	honor	m	reverse-only
+προσήκω	verb	belong	corresponder		reverse-only
+ἀδικέω	verb	wrong	dañar		reverse-only
+πρέσβυς	noun	old man	anciano	m	person reverse-only
+μίγνυμι	verb	mix	mezclar		reverse-only
+λαός	noun	people	pueblo	m	reverse-only
+θυγάτηρ	noun	daughter	hija	f	person reverse-only
+παραδίδωμι	verb	hand over	entregar		reverse-only
+ἔξω	adv	outside	fuera		reverse-only
+νῆσος	noun	island	isla	f	reverse-only
+ἐπιστήμη	noun	knowledge	conocimiento	m	reverse-only
+ἐάω	verb	allow	permitir		reverse-only
+θαυμάζω	verb	admire	admirar		reverse-only
+αἰσθάνομαι	verb	perceive	percibir		reverse-only
+καταλαμβάνω	verb	seize	tomar		reverse-only
+μιμνήσκω	verb	remind	recordar		reverse-only
+θνῄσκω	verb	die	morir		reverse-only
+ἀποκτείνω	verb	kill	matar		reverse-only
+ἁπλῶς	adv	simply	simplemente		reverse-only
+πίπτω	verb	fall	caer		reverse-only
+κατασκευάζω	verb	prepare	preparar		reverse-only
+ἀγών	noun	contest	certamen	m	reverse-only
+κωλύω	verb	prevent	impedir		reverse-only
+ἁμαρτάνω	verb	make a mistake	equivocarse		reverse-only
+διαφθείρω	verb	destroy	destruir		reverse-only
+τάξις	noun	order	orden	m	reverse-only
+πειράω	verb	try	intentar		reverse-only
+βάλλω	verb	throw	lanzar		reverse-only
+πονηρός	adj	wicked	malvado		reverse-only
+βάρβαρος	adj	barbarian	bárbaro		noun:barbarian|bárbaro noun-pl:barbarians|bárbaros reverse-only
+συμφέρω	verb	be useful	ser útil		reverse-only
+πυνθάνομαι	verb	learn	enterarse de		reverse-only
+τέμνω	verb	cut	cortar		reverse-only
+χρήσιμος	adj	useful	útil		reverse-only
+ὅπλον	noun	weapon	arma	f	reverse-only
+πίστις	noun	trust	confianza	f	reverse-only
+ὑπολαμβάνω	verb	suppose	suponer		reverse-only
+ποιητής	noun	poet	poeta	m	person reverse-only
+βελτίων	adj	better	mejor		reverse-only
+ἀποκρίνω	verb	separate	separar		reverse-only
+ἀποκρίνω	mid	answer	responder		reverse-only
+κίνδυνος	noun	danger	peligro	m	reverse-only
+κατηγορέω	verb	accuse	acusar		reverse-only
+τρέπω	verb	turn	volver		reverse-only
+κτάομαι	verb	acquire	adquirir		reverse-only
+λείπω	verb	leave	dejar		reverse-only
+ἐλπίς	noun	hope	esperanza	f	generic reverse-only
+γραφή	noun	writing	escrito	m	reverse-only
+τίκτω	verb	give birth to	dar a luz		reverse-only
+θυμός	noun	spirit	ánimo	m	reverse-only
+βλέπω	verb	see	ver		reverse-only
+φόβος	noun	fear	miedo	m	generic reverse-only
+πολιτεία	noun	constitution	constitución	f	reverse-only
+στάδιον	noun	stade	estadio	m	reverse-only
+φρονέω	verb	think	pensar		reverse-only
+τοιόσδε	adj	such	tal		reverse-only
+ὁρμάω	verb	set out	partir		reverse-only
+δράω	verb	do	hacer		reverse-only
+σκοπέω	verb	examine	examinar		reverse-only
+γράμμα	noun	letter	letra	f	reverse-only
+ἐρωτάω	verb	ask	preguntar		reverse-only
+πολεμέω	verb	make war	hacer la guerra		reverse-only
+ἐλαύνω	verb	drive	conducir		reverse-only
+δέδοικα	verb	fear	temer		reverse-only
+ὧδε	adv	thus	así		reverse-only
+αἰσχρός	adj	shameful	vergonzoso		reverse-only
+εἰρήνη	noun	peace	paz	f	generic reverse-only
+ἁλίσκομαι	verb	be captured	ser capturado		reverse-only
+ἀμείνων	adj	better	mejor		reverse-only
+χείρων	adj	worse	peor		reverse-only
+βοηθέω	verb	help	ayudar		reverse-only
+λαμπρός	adj	bright	brillante		reverse-only
+ἀπαλλάσσω	verb	set free	liberar		reverse-only
+ἀπαλλάττω	verb	set free	liberar		reverse-only
+βουλεύω	verb	plan	planear		reverse-only
+μάλα	adv	very	muy		reverse-only
+αἰτέω	verb	ask for	pedir		reverse-only
+σωτηρία	noun	safety	salvación	f	reverse-only
+γλῶσσα	noun	tongue	lengua	f	reverse-only
+γλῶττα	noun	tongue	lengua	f	reverse-only
+τολμάω	verb	dare	atreverse		reverse-only
+ἄδικος	adj	unjust	injusto		reverse-only
+μυρίος	adj	countless	innumerable		reverse-only
+αὐτίκα	adv	at once	enseguida		reverse-only
+ἐλεύθερος	adj	free	libre		noun:free_man|hombre_libre noun-pl:free_men|hombres_libres reverse-only
+στρατιά	noun	army	ejército	m	reverse-only
+συμφορά	noun	misfortune	desgracia	f	reverse-only
+ἔπος	noun	word	palabra	f	reverse-only
+στρατός	noun	army	ejército	m	reverse-only
+φράζω	verb	tell	decir		reverse-only
+πέμπτος	adj	fifth	quinto		reverse-only
+μάρτυς	noun	witness	testigo	m	person reverse-only
+χαλκοῦς	adj	bronze	de bronce		reverse-only
+ἕβδομος	adj	seventh	séptimo		reverse-only
+φῶς	noun	light	luz	f	reverse-only
+ἕκτος	adj	sixth	sexto		reverse-only
+ἔνατος	adj	ninth	noveno		reverse-only
+εἰκοστός	adj	twentieth	vigésimo		reverse-only
+ἑκατόν	adj	hundred	cien		reverse-only
+δείδω	verb	fear	temer		reverse-only
+ἐμός	adj	my	mi		reverse-only
+σός	adj	your	tu		reverse-only
+ἡμέτερος	adj	our	nuestro		reverse-only
+ὑμέτερος	adj	your	su		reverse-only
+φέρω	verb	bring	traer		reverse-only	C41: the lexicon's own words, now reviewed (carry is the other sense)

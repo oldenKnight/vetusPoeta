@@ -127,6 +127,9 @@ struct Lexical {                // the target-language word for a Latin content 
   bool meal = false;
   bool abstract = false;        // C39: an abstract noun said in general: no article as a subject even after a mention
   bool ppIndef = false;         // C36 review: "in vīllā" with no earlier mention is "in a farmhouse"            // C36: a meal as an object: "wait for dinner" / "esperan la cena"
+  // C41: where the word came from: a readable / gloss_es_la row (a teacher's gloss), or the lexicon gloss followed
+  // through "synonym of X" (not the lemma's own first sense)
+  bool table = false, redirect = false;
 };
 
 struct Discourse {              // memory across sentences of one text (articles, restored pronouns)

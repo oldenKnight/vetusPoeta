@@ -333,6 +333,14 @@ class Builder {
       const bool clauseFirst = firstWord;
       firstWord = false;
       if ((int)i == verb || !t.word) continue;
+      // C41: longē / procul right before ā / ab / ē / ex is "far from" / "lejos de": the realiser says it with the
+      // preposition ("Legiō longē ā castrīs manet" was "The legion stays from the camp far")
+      if (isKey(t.key, {"longe", "procul"}) && i + 1 < ti_.size() && ti_[i + 1].lpos == Prep &&
+          isKey(ti_[i + 1].key, {"a", "ab", "abs", "e", "ex"})) {
+        used_[i] = 1;
+        out_.roles[i] = "adverb";
+        continue;
+      }
       if (isKey(tk, {"domi", "domum", "rus", "ruri", "rure", "humi"}) && tab_.has("adv", tk) &&
           !(t.f.case_ == Acc && verb >= 0 && !motionVerb(ti_[(size_t)verb].key)) &&
           (t.f.case_ == Loc || t.f.case_ == Acc || t.f.case_ == Abl || t.lpos == Adv) &&
@@ -920,6 +928,15 @@ class Builder {
     x.np.head = t.key;
     x.np.surface = s_.tokens[h].text;
     x.np.number = t.f.number == Pl ? 2 : 1;
+    if (t.f.number == Pl)   // C41: a plural with a sense of its own (castra = a camp): note pl:<word>, said in the
+      if (const Row* lr = tab_.find("lex", t.key, "noun")) {   // singular unless the word is itself a plural (troops)
+        const size_t at = lr->note.find("pl:");
+        if (at != std::string::npos && (at == 0 || lr->note[at - 1] == ' ')) {
+          const size_t e = lr->note.find(' ', at);
+          const std::string w = lr->note.substr(at + 3, e == std::string::npos ? std::string::npos : e - at - 3);
+          if (!w.empty() && w.back() != 's') x.np.number = 1;
+        }
+      }
     x.np.isName = t.name;
     x.np.srcGender = genderOf(t);
     x.np.tokens.push_back((int)h);
@@ -1494,8 +1511,24 @@ class Builder {
           break;
         }
     }
-    // copula without a predicate yet: the subject's last adjective is the predicate ("Iūlia laeta est")
-    if (copula && !f.existential && f.predAdj.empty() && f.predicative.empty() && f.hasSubject && !f.subject.adjectives.empty()) {
+    // copula without a predicate yet: the subject's last adjective is the predicate ("Iūlia laeta est"). C41: not when
+    // the clause says where the subject is ("Classis Rōmāna in portū est" = the Roman fleet is in the harbour, was
+    // "The fleet is Roman in the harbor"): the place is the predicate, the adjective next to its noun an attribute
+    bool placePred = false;
+    for (const NPx& x : nps) {   // the prepositional phrases become obliques below
+      if (x.used || !x.governed || x.np.tokens.empty()) continue;
+      const TokInfo& pt = ti_[(size_t)x.np.tokens.front()];
+      placePred = placePred || (x.case_ == Abl && isKey(pt.key, {"in", "sub"})) ||
+                  (x.case_ == Acc && isKey(pt.key, {"apud", "prope", "ante", "post", "inter", "super", "extra", "intra",
+                                                    "circum"}));
+    }
+    for (const frame::SemAdverb& a : f.adverbs) placePred = placePred || isKey(a.lemma, {"hic", "ibi", "domi", "ruri"});
+    if (placePred && f.hasSubject && !f.subject.adjectives.empty()) {
+      const int at = f.subject.adjectives.back().token;   // right next to its noun
+      placePred = at >= 0 && f.subject.token >= 0 && std::abs(at - f.subject.token) == 1;
+    }
+    if (copula && !f.existential && f.predAdj.empty() && f.predicative.empty() && f.hasSubject && !f.subject.adjectives.empty() &&
+        !placePred) {
       f.predAdj.push_back(f.subject.adjectives.back());
       f.subject.adjectives.pop_back();
       out_.roles[(size_t)f.predAdj.back().token] = "predicate";

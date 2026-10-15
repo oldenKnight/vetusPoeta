@@ -187,6 +187,13 @@ class Translator {
   std::string gloss(uint32_t lemma, Target, bool* pivot = nullptr) const;
   const Analyser& analyser() const;
 
+  // C41: the English / Spanish lexicons (english.vpl / spanish.vpl; either may be null) for the gloss calibration: a
+  // content word whose gloss comes from no readable row and is not the lexicon's own first sense (a Spanish gloss via
+  // the English pivot, a gloss followed through "synonym of"), or that is not a dictionary word of the target language
+  // (glossIsDictionaryWord), makes the cue Check (flag gloss-doubt, check "gloss"). Without lexicons only the first
+  // rule applies. The pointers must outlive the translator's use of them.
+  void setTargetLexicons(const lex::Lexicon* english, const lex::Lexicon* spanish);
+
  private:
   struct Impl;
   std::unique_ptr<Impl> impl_;
@@ -194,5 +201,11 @@ class Translator {
 
 // Byte ranges [first, second) of the sentences of a Latin text (split after . ! ? ; and closing quotes).
 std::vector<std::pair<size_t, size_t>> splitSentences(std::string_view text);
+
+// C41: is a gloss ("look for", "estar lejos", "truth") a dictionary word of the target language? Every word of it
+// (after a leading "to" / "be" / article) must be a form english.vpl / spanish.vpl knows; a gloss of more than three
+// words, one opening with a negation ("not a lie"), one with an object placeholder ("something", "algo") or with a
+// word in another script is not. `target` null: true (nothing to check against).
+bool glossIsDictionaryWord(const lex::Lexicon* target, std::string_view gloss, bool spanish);
 
 }  // namespace vp::la2x

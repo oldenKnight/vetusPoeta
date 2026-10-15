@@ -924,6 +924,10 @@ class En {
       in_.disc->mention(ti_[(size_t)o.np.token].lemma);
       return "on the way";
     }
+    // C41: longē / procul + ā / ab / ē / ex (the frame builder left the adverb to the preposition)
+    if (w.empty() && o.token > 0 && isKey(prep, {"a", "ab", "abs", "e", "ex"}) &&
+        isKey(ti_[(size_t)o.token - 1].key, {"longe", "procul"}) && ti_[(size_t)o.token - 1].lpos != Prep)
+      w = "far from";
     if (w.empty()) w = tab_.text("prep", prep, {cs});
     if (w.empty()) w = s_.tokens[(size_t)std::max(0, o.token)].text;
     std::string out = w;

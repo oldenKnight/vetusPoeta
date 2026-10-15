@@ -405,7 +405,7 @@ lex	oppidum	noun	town
 lex	ager	noun	field
 lex	silua	noun	forest
 lex	flumen	noun	river
-lex	insula	noun	island
+lex	insula	noun	island	on
 lex	liber	noun	book
 lex	epistula	noun	letter
 lex	rosa	noun	rose
@@ -767,3 +767,134 @@ lex	timor	noun	fear	mass abstract
 lex	amor	noun	love	mass abstract
 lex	senectus	noun	old age	mass abstract
 lex	otium	noun	leisure	mass abstract
+# ---- C41: core vocabulary audit (the DCC core list run through la2x; every row below replaces a lexicon gloss a
+# teacher marks wrong or odd: a later sense, a definition, an adverb for an adjective, a participle of another verb).
+# Note pl:<word> = the plural has a sense of its own: said in the singular (castra = a camp, litterae = a letter), or
+# as that plural when the word ends in -s (cōpiae = troops).
+# Note on (as C36): in + ablative is "on" (on the mountain, on the hill).
+lex	lex	noun	law
+lex	imperium	noun	power
+lex	exercitus	noun	army
+lex	periculum	noun	danger
+lex	consilium	noun	plan
+lex	castrum	noun	fort	pl:camp
+lex	copia	noun	supply	pl:troops
+lex	aedes	noun	temple	pl:house
+lex	littera	noun	letter	pl:letter
+lex	ops	noun	help	pl:wealth
+lex	uirtus	noun	courage	mass abstract
+lex	regnum	noun	kingdom
+lex	scelus	noun	crime
+lex	refero	verb	bring back
+lex	beneficium	noun	kindness
+lex	seruo	verb	save
+lex	litus	noun	shore
+lex	turba	noun	crowd
+lex	dignus	adj	worthy
+lex	cunctus	adj	all
+lex	aetas	noun	age
+lex	muto	verb	change
+lex	princeps	noun	leader	person
+lex	consul	noun	consul	person
+lex	nosco	verb	get to know
+lex	cursus	noun	course
+lex	agmen	noun	column
+lex	iniuria	noun	injustice
+lex	ingenium	noun	talent
+lex	campus	noun	plain
+lex	mora	noun	delay
+adv	longe	-	far	end
+lex	caedes	noun	slaughter	mass
+lex	ordo	noun	order
+lex	praesto	verb	excel
+lex	numen	noun	divine power
+lex	crimen	noun	charge
+lex	sinus	noun	fold
+lex	posco	verb	demand
+lex	anima	noun	soul
+lex	contingo	verb	touch
+lex	classis	noun	fleet
+lex	affero	verb	bring
+lex	dubito	verb	doubt
+lex	dubius	adj	doubtful
+lex	condo	verb	found
+adv	quondam	-	once	front time
+lex	auctor	noun	author	person
+lex	iudico	verb	judge
+lex	pecus	noun	cattle	mass
+lex	efficio	verb	accomplish
+lex	exerceo	verb	train
+lex	honestus	adj	honourable
+lex	regio	noun	region
+lex	sententia	noun	opinion
+lex	uinculum	noun	chain
+lex	species	noun	appearance
+lex	prohibeo	verb	prevent
+lex	cresco	verb	grow
+lex	existimo	verb	think
+lex	accedo	verb	approach
+lex	prouincia	noun	province
+lex	sors	noun	lot
+lex	repeto	verb	return to
+lex	constituo	verb	decide
+lex	cohors	noun	cohort
+lex	gigno	verb	beget
+lex	supero	verb	overcome
+lex	deficio	verb	fail
+lex	praemium	noun	reward
+lex	supplicium	noun	punishment
+adv	undique	-	from all sides	end
+lex	aureus	adj	golden
+lex	lateo	verb	lie hidden
+lex	permitto	verb	allow
+lex	spiritus	noun	spirit
+lex	superi	noun	gods above	person
+lex	decet	verb	be fitting
+lex	aeternus	adj	eternal
+lex	curo	verb	care for
+lex	damno	verb	condemn
+lex	tempestas	noun	storm
+lex	pietas	noun	devotion	mass abstract
+lex	saeculum	noun	age
+lex	laedo	verb	hurt
+lex	odi	verb	hate
+lex	tribunus	noun	tribune	person
+lex	bos	noun	ox
+lex	offero	verb	offer
+lex	recedo	verb	withdraw
+lex	proprius	adj	own
+lex	certo	verb	compete
+lex	consumo	verb	consume
+lex	corrumpo	verb	ruin
+lex	praetor	noun	praetor	person
+lex	differo	verb	differ
+lex	priuatus	adj	private
+lex	uereor	verb	fear
+lex	celebro	verb	celebrate
+lex	conficio	verb	finish
+lex	iuro	verb	swear
+lex	auctoritas	noun	authority	mass
+lex	aptus	adj	suitable
+lex	consequor	verb	overtake
+lex	censeo	verb	think
+lex	prodo	verb	betray
+adv	item	-	likewise	front
+lex	caueo	verb	beware
+lex	praecipio	verb	advise
+lex	consuetudo	noun	custom
+lex	afficio	verb	affect
+lex	adhibeo	verb	use
+lex	arbitror	verb	think
+lex	diligo	verb	love
+lex	mons	noun	mountain	on
+lex	collis	noun	hill	on
+lex	aequor	noun	sea
+lex	animus	noun	spirit
+adv	fortiter	-	bravely	end
+lex	rarus	adj	rare
+lex	potens	adj	powerful
+lex	falsus	adj	false
+lex	rectus	adj	straight
+lex	iudex	noun	judge	person
+lex	peto	verb	seek
+lex	delecto	verb	delight

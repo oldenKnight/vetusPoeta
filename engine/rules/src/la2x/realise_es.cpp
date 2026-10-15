@@ -873,6 +873,10 @@ class Es {
       const Lexical lx = lexOf(o.np.token);
       if (lx.timePrep.empty() && !lx.event) w = tab_.text("prep", prep, {cs + ".place"});
     }
+    // C41: longē / procul + ā / ab / ē / ex (the frame builder left the adverb to the preposition)
+    if (w.empty() && o.token > 0 && isKey(prep, {"a", "ab", "abs", "e", "ex"}) &&
+        isKey(ti_[(size_t)o.token - 1].key, {"longe", "procul"}) && ti_[(size_t)o.token - 1].lpos != Prep)
+      w = "lejos de";
     if (w.empty()) w = tab_.text("prep", prep, {cs});
     if (w.empty()) w = s_.tokens[(size_t)std::max(0, o.token)].text;
     // con + mí / ti -> conmigo / contigo

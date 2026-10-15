@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "grc2x/internal.h"
+#include "vp/la2x.h"
 #include "vp/morph.h"
 #include "vp/morph_grc.h"
 #include "vp/realise_la.h"
@@ -136,6 +137,8 @@ struct Translator::Impl : public detail::LexicalSource {
   const grc::GreekData& gd;
   const grc::GreekTables& gt;
   detail::Analyser analyser;
+  const lex::Lexicon* enLex = nullptr;   // C41: english.vpl / spanish.vpl for the gloss calibration (may be null)
+  const lex::Lexicon* esLex = nullptr;
   Impl(const lex::Lexicon& l, const curated::CuratedData& c, const grc::GreekData& g, const grc::GreekTables& t)
       : lx(l), cd(c), gd(g), gt(t), analyser(l, c, g, t) {}
 
@@ -243,6 +246,26 @@ struct Translator::Impl : public detail::LexicalSource {
       if ((c >= 0x370 && c <= 0x3FF) || (c >= 0x1F00 && c <= 0x1FFF)) { out.flags.push_back("greek-left"); break; }
       i = j > i ? j : i + 1;
     }
+    // C41: a content word whose gloss no readable_grc.tsv row gives and that came through the English pivot (not the
+    // lexicon's own sense) or is not a dictionary word of the target language ("not a lie", "usually weaker than ...",
+    // "dispuesen"): the cue is Check (flag gloss-doubt; one note per word in out.glossDoubts)
+    for (size_t i = 0; i < s.tokens.size() && i < ti.size(); ++i) {
+      const detail::TokInfo& x = ti[i];
+      if (!x.word || x.name || x.closed || x.lemma == kNone) continue;
+      if (x.lpos != Noun && x.lpos != Verb && x.lpos != Adj && x.lpos != Adv) continue;
+      if (x.key == "εἰμί") continue;
+      const Features f = x.f;
+      const bool middle = f.voice == Middle || f.voice == Passive;
+      const detail::Lexical lw = lexical(x.lemma, x.lpos, middle, tg);
+      if (lw.row || lw.silent) continue;
+      // no gloss at all ("δέδοικα": the lexicon's gloss of δείδω is a usage note in brackets) is a doubt too
+      const bool none = lw.missing || lw.word.empty();
+      const bool notWord = none || !la2x::glossIsDictionaryWord(tg == Target::En ? enLex : esLex, lw.word, tg == Target::Es);
+      if (!lw.pivot && !notWord) continue;
+      const std::string n = x.text + " (" + (none ? std::string("-") : lw.word) + (lw.pivot ? ", vía inglés" : "") + ")";
+      if (std::find(out.glossDoubts.begin(), out.glossDoubts.end(), n) == out.glossDoubts.end()) out.glossDoubts.push_back(n);
+    }
+    if (!out.glossDoubts.empty()) out.flags.push_back("gloss-doubt");
     for (size_t i = 0; i < b.frames.size(); ++i) {
       if (i) out.frame += " | ";
       out.frame += frame::describe(b.frames[i]);
@@ -325,6 +348,11 @@ void Translator::sentence(std::string_view greek, Target t, SentenceOut& out,
 }
 
 void Translator::resetDiscourse() {}
+
+void Translator::setTargetLexicons(const lex::Lexicon* english, const lex::Lexicon* spanish) {
+  impl_->enLex = english;
+  impl_->esLex = spanish;
+}
 
 std::string Translator::gloss(uint32_t lemma, Target t, bool* pivot) const { return impl_->gloss(lemma, t, pivot); }
 
@@ -471,7 +499,7 @@ std::vector<rules::CueOutput> Translator::cues(const std::vector<rules::CueInput
       double conf = 0;
       size_t ns = 0;
       bool unknown = false, ambiguous = false, check = false, accent = false;
-      std::vector<std::string> unknownWords, ambiguousWords, accentWords, droppedWords;
+      std::vector<std::string> unknownWords, ambiguousWords, accentWords, droppedWords, doubtWords;
       std::string wordByWord;
       std::vector<std::pair<std::string, std::string>> second;   // C40: (sentence, the same with a second reading)
       for (const auto& r : ranges) {
@@ -483,6 +511,7 @@ std::vector<rules::CueOutput> Translator::cues(const std::vector<rules::CueInput
         conf += so.confidence;
         ++ns;
         for (const std::string& w : so.dropped) droppedWords.push_back(w);
+        for (const std::string& w : so.glossDoubts) doubtWords.push_back(w);
         for (const std::string& f : so.flags)
           if (std::find(o.flags.begin(), o.flags.end(), f) == o.flags.end()) o.flags.push_back(f);
         for (const Word& w : so.words) {
@@ -550,8 +579,14 @@ std::vector<rules::CueOutput> Translator::cues(const std::vector<rules::CueInput
         if (roleDoubt) cov.detail += std::string(cov.detail.empty() ? "" : "; ") + "a noun group's role is a guess";
         o.checks.push_back(cov);
       }
+      if (!doubtWords.empty()) {   // C41: only when found
+        rules::Check gc{"gloss", false, t == Target::Es ? "glosa sin revisar:" : "unreviewed gloss:"};
+        for (const std::string& w : doubtWords) gc.detail += " " + w;
+        o.checks.push_back(gc);
+      }
       const double mean = ns ? conf / (double)ns : 1.0;
-      for (const char* f : {"name-guessed", "no-verb", "accent-differs", "meaning-coverage", "greek-left", "role-doubt"})
+      for (const char* f : {"name-guessed", "no-verb", "accent-differs", "meaning-coverage", "greek-left", "role-doubt",
+                            "gloss-doubt"})
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) check = true;
       o.confidence = unknown ? rules::Confidence::Fix
                              : (ambiguous || check || mean < 0.7) ? rules::Confidence::Check : rules::Confidence::Ok;

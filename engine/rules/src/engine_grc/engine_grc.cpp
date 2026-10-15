@@ -3431,7 +3431,10 @@ Result<std::vector<CueOutput>> GreekPath::translate(const std::vector<CueInput>&
                                                     const rules::Context& ctx,
                                                     const std::function<void(size_t)>& progress,
                                                     const std::function<bool()>& cancelled) {
-  if (fromGreek(opt)) return Result<std::vector<CueOutput>>(impl_->back->cues(cues, opt, ctx, progress, cancelled));
+  if (fromGreek(opt)) {
+    impl_->back->setTargetLexicons(impl_->enLex, impl_->esLex);   // C41: the gloss calibration of grc2x
+    return Result<std::vector<CueOutput>>(impl_->back->cues(cues, opt, ctx, progress, cancelled));
+  }
   return impl_->translate(cues, opt, ctx, progress, cancelled);
 }
 

@@ -4020,7 +4020,10 @@ class RulesEngine final : public Engine {
       if (err) *err = c.error();
       return nullptr;
     }
-    if (la2x_ && la2xLex_ == la_) return la2x_.get();
+    if (la2x_ && la2xLex_ == la_) {
+      la2x_->setTargetLexicons(en_, es_);   // C41 la2x hook: gloss calibration against english.vpl / spanish.vpl
+      return la2x_.get();
+    }
     la2x_.reset();
     const std::vector<stdfs::path> dirs = {cfg_.curatedDir, stdfs::path(cfg_.dataDir) / "curated",
                                            stdfs::path(cfg_.dataDir) / ".." / "curated",
@@ -4032,6 +4035,7 @@ class RulesEngine final : public Engine {
     }
     la2x_ = std::move(r.value());
     la2xLex_ = la_;
+    la2x_->setTargetLexicons(en_, es_);   // C41 la2x hook
     return la2x_.get();
   }
   Result<std::vector<CueOutput>> la2xTranslate(const std::vector<CueInput>& cues, const Options& opt, const Context& ctx,

@@ -12,3 +12,4 @@ Error-measurement harness (task C10). How to run and how the numbers are defined
 | `tests/test_evallib.py` | `python3 -m unittest discover -s tools/eval/tests` |
 | `make_heldout.py` | builds the held-out SRT from a public-domain text (frozen set in tests/heldout) |
 | `llm_gate.py` | local-model minimal-pair gate (task C5) |
+| `core_audit.py` | core vocabulary audit of la2x / grc2x (C41): every lemma of a DCC-style core list as a citation form (and optional own sentences) through `vpengine serve`, the chosen gloss compared with the core sense; report with heads, verdicts and outputs only (no definitions); test `tests/test_core_audit.py` |

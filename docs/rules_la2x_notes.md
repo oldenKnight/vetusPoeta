@@ -263,3 +263,73 @@ Owner material (by unit number, never quoted): la->en right 9 -> 12/14 (8, 12, 1
 "work is long" for "the work is long"), OK units 3 10 11 13 unchanged, wrong among OK 0; la->es unchanged. la2x own
 201/201, own_prose / own_prayer reports byte-identical. Still open: blind LA -> EN 3 (a common-noun subject before
 "līber est et dominus suus": "The free farmer is his own master and."), owner unit 9 (dangling et, nōn multum).
+
+## Core vocabulary audit (C41)
+Own material first (31efb88, before any change): tests/regression/own_core.la.txt (15 Latin sentences of core words,
+gold expected/own_core.{en,es}.gold.txt), own_core.en.txt (2 EN -> LA "not very but enough" lines, gold
+expected/own_core.la.gold.txt); the Greek half is in rules_grc3_notes.md. Blind 10 in data/work/eval/c41-blind/ (WRITTEN
+2026-10-15 01:41 UTC). Tests: engine/tests/test_rules_s.cpp (report <build>/regression_report_s.txt).
+
+### The audit (tools/eval/core_audit.py, test tools/eval/tests/test_core_audit.py)
+Every content lemma of the DCC Latin core list (data/work/la/dcc_la.tsv, gitignored; 914 of its 997 rows are nouns,
+verbs, adjectives, adverbs) was run as its citation form through `vpengine serve` (text project, la-en and la-es) and the
+chosen gloss (the word-by-word line) compared with the list's English sense and the Spanish list's sense (light stemming;
+verdicts ok / weak / nosense / long / leak / missing; the chosen lemma compared with the list's lemma ids), plus 40 own
+audit sentences (two per 50 ranks, data/work/eval/c41-audit/sentences.la.txt). Report with heads, verdicts and outputs
+only (never the list's definitions): data/work/eval/c41-audit/{first,final}/la/audit.tsv.
+* First run: English flagged 317 (nosense 276, long 21, missing 18, weak 2; 164 of them rated OK), Spanish 103 (43 OK).
+* Every flagged lemma was reviewed by hand as a teacher would: most are fine synonyms (big / great, want / wish, earth /
+  land, take / seize, so / thus), citation-form homographs the clause resolves (aequor read as aequō, nemus as nō, vīs as
+  volō, malus the apple tree, labor as lābor, nātus as nāscor; in the audit sentences they come out right), or closed-class
+  words with their own rows. Wrong or odd ones (a later sense, a definition, an adverb for an adjective, a participle of
+  another verb, a non-word) got a readable row: **readable_en.tsv +127 rows, readable_es.tsv +127** (lēx law was "the legal
+  machinery of a state", exercitus army was "exercise", perīculum danger was "trial", imperium power was "The empire",
+  castra camp was "castles", virtūs courage was "manhood", cūnctus all was "collectively", recēdō withdraw was "retire to
+  one's bedroom", supplicium punishment was "kneeling", nūmen divine power was "a nod of the head", classis fleet was a
+  Servian census class, condō found was "put together", dīligō love / amar was "esteem" / "elegir", ...). English output
+  changed for 113 lemmas, Spanish for 64. Final run: English flagged 222 (112 rated OK), Spanish 131 (61 OK): all
+  reviewed as acceptable (the Spanish count rose because the new rows use other good words than the Spanish list,
+  e.g. todo for cūnctus, ejercitar for exerceō).
+* Kept on purpose: transeō "get through" (A9 of "I can't get through"), cōnferō "grant" (C36 prayer), simul "together",
+  errō "be wrong", precor "beg" (C36 rows).
+
+### Calibration (translator.cpp, glossDoubts; flag gloss-doubt, check "gloss")
+A content word (noun, verb, adjective, participle, adverb; not sum, not a closed-class row) whose gloss comes from no
+readable_en / readable_es / gloss_es_la row and either is not the lexicon's own first sense (a Spanish gloss through the
+English pivot, a gloss followed through "synonym of X") or is not a dictionary word (la2x::glossIsDictionaryWord: every
+word of it, after a leading to / be / article, is a form english.vpl / spanish.vpl knows; more than three words, a
+leading negation, an object placeholder or another script fail) makes the cue Check; the check "gloss" (only when found)
+names the words ("unreviewed gloss: sīmiam (mono, not a first sense)"). The engine passes english.vpl / spanish.vpl
+(Translator::setTargetLexicons). Effect on every suite: none of the 17 regression reports, la2x3 (own prose / prayer),
+grc2x, orberg or the la2x fixtures lost an OK unit; owner material: one la -> es unit went OK -> Check (dēlectō through
+the pivot), given back by a reviewed row (complacer, the same text). Wrong among OK 0 everywhere.
+
+### Realiser fixes the audit sentences needed (la2x)
+* Note pl:<word> (readable rows): a plural with a sense of its own; said in the singular (castra = the camp, litterae = a
+  letter, aedēs = a house) unless the word is itself a plural ending in -s (cōpiae = the troops, verb agreement kept).
+* longē / procul right before ā / ab / ē / ex: "far from" / "lejos de" ("The legion stays far from the camp"; was "stays
+  from the castles long", OK and wrong).
+* A copula clause that says where its subject is keeps the adjective next to the noun as an attribute ("Classis Rōmāna in
+  portū est" = The Roman fleet is in the harbour; was "The fleet is Roman in the harbor", OK and wrong); "Iūlia laeta est",
+  "Puella in hortō laeta est" unchanged.
+* Note on for mōns, collis, īnsula (on the mountain / hill / island).
+* Spanish: -iar / -uar verbs that stress the i / u (envía, confía, guía, continúa, actúa; was "envia", "confia"); -gión
+  and -nión nouns are feminine (la legión, la región, la opinión; was "el legión").
+* EN -> LA (frame_builder.cpp): the C39 ellipsis doubt also covers "not very / too / so / quite / really / that" between
+  commas ("The house is big, not very but enough." was "Domus valdē magna est sed satis.", the opposite, rated OK; now
+  Check; the Latin itself is still wrong, see Still open).
+
+### Numbers (vpengine serve, text project, fidelity 2, speaker m, LLM off)
+Own material first run -> final: LA -> EN 8 -> 13/15, LA -> ES 11 -> 13/15 (each 12 as written + 1 proposal), wrong among
+OK 4 + 1 -> 0; EN -> LA "not very but enough" 0 -> 0/2, wrong among OK 1 -> 0 (both Check). The misses left are Check
+(castra relīquērunt "abandoned a camp", omnibus "certain everyone"). Audit sentences (40): OK 19 -> 19 (EN), 19 -> 18
+(ES); about 13 of the first-run OK units carried a wrong gloss or misreading, none after (one "into the shore" left).
+Blind (first and only run 02:22 UTC, data/work/eval/c41-blind/first_run.txt): LA -> EN 3/5, LA -> ES 3/5, wrong among OK 1
+each: the same unit, a prepositional phrase belonging to the subject noun read as an adverbial ("is long through the
+mountains"); not tuned afterwards.
+
+### Still open
+EN -> LA "not very but enough" is Check but the Latin is still "valdē ... sed satis" (needs the nōn X sed Y tail of C40 (c)
+on the Latin side); mīlle read as the noun "mile" (Check); multa as "fine" (Check); a PP after the subject noun read as a
+predicate adverbial (blind 3); "in lītus" = onto the shore; Spanish personal "a" for a person noun without a row
+("llama un pastor").

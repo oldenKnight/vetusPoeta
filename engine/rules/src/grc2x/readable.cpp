@@ -231,6 +231,24 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
         if (t.key == "οὗτοσ") { x.determiner = num == Pl ? "these" : "this"; x.definite = true; continue; }
         if (t.key == "ἐκεῖνοσ") { x.determiner = num == Pl ? "those" : "that"; x.definite = true; continue; }
         if (t.key == "πᾶσ") { x.determiner = num == Pl ? "all" : "every"; continue; }
+        // C41: the possessive adjectives are possessors ("ὁ ἐμὸς πατήρ" = my father, "ἡ ἡμετέρα οἰκία" = our house /
+        // nuestra casa; was "the my father", "la casa nuestra", "el padre mina")
+        if (t.key == "ἐμόσ" || t.key == "σόσ" || t.key == "ἡμέτεροσ" || t.key == "ὑμέτεροσ") {
+          SemNP po;
+          po.isPronoun = true;
+          po.pron.person = (t.key == "ἐμόσ" || t.key == "ἡμέτεροσ") ? 1 : 2;
+          po.pron.number = (t.key == "ἡμέτεροσ" || t.key == "ὑμέτεροσ") ? 2 : 1;
+          po.token = (int)m;
+          po.tokens.push_back((int)m);
+          x.possessor.push_back(po);
+          continue;
+        }
+        // C41: plural πολλοί / ὀλίγοι before or after a noun are quantity words ("πολλοὺς λόγους" = many words, never
+        // "much words" / "palabras muchas"); with the article they stay adjectives (οἱ πολλοί, "the many")
+        if ((t.key == "πολύσ" || t.key == "ὀλίγοσ") && num == Pl && !np.article) {
+          x.determiner = t.key == "πολύσ" ? "many" : "few";
+          continue;
+        }
         if (t.key == "οὐδείσ" || t.key == "μηδείσ") { x.determiner = "no"; x.negative = true; continue; }
         if (t.key == "πόσοσ") { x.interrogative = true; x.wh = "how many"; continue; }
         if (t.lpos == Num || t.key == "δύο" || t.key == "τρεῖσ" || t.key == "εἷσ" || t.key == "τέτταρεσ") {
@@ -299,10 +317,14 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
               if (h.f.gender != N && h.f.gender != 0) hx.person = true;
               if (esT) hx.gender = h.f.gender == F ? F : M;
               x.srcGender = hx.gender;
-            } else if (!esT && x.number == 2 && hx.plural.empty() && !x.head.empty() && hx.row && !hx.person &&
+            } else if (!esT && x.number == 2 && hx.plural.empty() && !x.head.empty() && !hx.person &&
                        !hx.animal && !(x.head[0] >= 'A' && x.head[0] <= 'Z')) {
-              hx.plural = x.head;   // a readable adjective ("the wise"); a person row is a noun ("the allies")
+              // a readable adjective ("the wise"); a person row is a noun ("the allies"). C41: also an adjective
+              // without a row ("οἱ ἄδικοι" = the unjust, was "the unjusts")
+              hx.plural = x.head;
             }
+            // C41: Spanish: a masculine / feminine adjective used as a noun is a person ("castiga a los injustos")
+            if (esT && hx.noun.empty() && h.f.gender != N && h.f.gender != 0) hx.person = true;
           }
         }
       }
@@ -760,6 +782,9 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
             sf.hasSubject = true;
             sf.subject = merged[(size_t)subjI].np;
             for (int tk : sf.subject.tokens) out.roles[(size_t)tk] = "subject (infinitive)";
+            // C41: the generic article is bare only in a present statement ("I think that the war will end")
+            if (sf.pred.tense != Tense::Present && sf.subject.token >= 0 && (size_t)sf.subject.token < side.lex.size())
+              side.lex[(size_t)sf.subject.token].generic = false;
           } else {   // the same subject as the finite verb
             SemNP pr;
             pr.isPronoun = true;
@@ -886,6 +911,26 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
       for (const SemAdj& a : f.predicative[0].adjectives) f.predAdj.push_back(a);
       f.predicative.clear();
     }
+    // C41: the genitive of comparison after a comparative predicate ("ὁ δοῦλος κρείττων ἐστὶ τοῦ δεσπότου" = stronger
+    // than the master / más fuerte que el amo; was "stronger of the master")
+    if (eimi) {
+      auto comparative = [&](const SemAdj& a) {
+        if (a.token < 0 || (size_t)a.token >= ti.size()) return false;
+        const TokInfo& t = ti[(size_t)a.token];
+        if (t.f.degree == Comparative) return true;
+        for (const char* ck : {"κρείττων", "κρείσσων", "ἥττων", "ἥσσων", "βελτίων", "ἀμείνων", "χείρων", "ἐλάττων",
+                              "ἐλάσσων", "μείζων", "πλείων", "πλέων"})
+          if (t.key == text::greek_key(ck)) return true;
+        return false;
+      };
+      bool comp = false;
+      for (const SemNP& pn : f.predicative)
+        for (const SemAdj& a : pn.adjectives) comp = comp || (pn.head.empty() && comparative(a));
+      for (const SemAdj& a : f.predAdj) comp = comp || comparative(a);
+      if (comp)
+        for (frame::SemOblique& o : f.obliques)
+          if (o.prep == "of" || o.prep == "de") o.prep = esT ? "que" : "than";
+    }
     // C31: "αἷμα τῷ παιδὶ ῥεῖ" (blood flows to the boy) is "the boy is bleeding", "αἷμα ἐκ τῆς ῥινὸς ῥεῖ" "the nose is
     // bleeding": the person in the dative (or the body part after ἐκ) is the subject of "bleed" / "sangrar"
     bool bleed = false;
@@ -941,6 +986,9 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
       if (bleed) f.pred.lemma = esT ? "sangrar" : "bleed";
       uint8_t tense = v.f.tense;
       if (vkey == "οἶδα") tense = tense == Pluperfect ? Imperfect : Present;   // perfect with present meaning
+      // C41: δέδοικα "I fear" (was "I have feared"), ἔοικα "it seems"
+      else if ((vkey == text::greek_key("δείδω") || vkey == text::greek_key("ἔοικα")) && (tense == Perfect || tense == Pluperfect))
+        tense = tense == Pluperfect ? Imperfect : Present;
       switch (tense) {
         case Imperfect: f.pred.tense = Tense::Past; f.pred.aspect = Aspect::Progressive; break;
         case Aorist: f.pred.tense = Tense::Past; break;
@@ -950,6 +998,20 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
         default: break;
       }
       if (mod != Modality::None && tense == Imperfect) { f.pred.aspect = Aspect::Simple; f.pred.pastModal = true; }
+      // C41: the generic article (readable tag generic) is bare in English only in a general statement in the present
+      // ("ἡ εἰρήνη καλή ἐστιν" = peace is beautiful, "τὴν ἀρετὴν τιμᾷ" = honours virtue); a past / future clause or a
+      // prepositional phrase keeps "the" ("announced the peace", "the war ended", "I think that the war will end")
+      {
+        auto plain = [&](const SemNP& x) {
+          if (x.token >= 0 && (size_t)x.token < side.lex.size()) side.lex[(size_t)x.token].generic = false;
+        };
+        for (const frame::SemOblique& o : f.obliques) plain(o.np);
+        if (tense != Present || mod != Modality::None) {
+          if (f.hasObject) plain(f.object);
+          if (f.hasIndirect) plain(f.indirectObject);
+          if (f.hasSubject) plain(f.subject);
+        }
+      }
       if (tense == Present && !eimi && mod == Modality::None && side.lex[vi].motion) f.pred.aspect = Aspect::Progressive;
       if (v.f.mood == Imperative) f.type = Kind::Imp;
       if (v.f.mood == Subjunctive && me && !p.sub) f.type = Kind::Imp;   // μή + aorist subjunctive: prohibition
@@ -1170,7 +1232,8 @@ void coverage(const Sentence& s, const std::vector<TokInfo>& ti, const Side& sid
       if (t < 0 || (size_t)t >= n) continue;
       const TokInfo& m = ti[(size_t)t];
       if (m.lpos == Article || m.lpos == Num || m.lpos == Det) mark(t);
-      for (const char* k : {"οὗτοσ", "ἐκεῖνοσ", "πᾶσ", "οὐδείσ", "μηδείσ", "πόσοσ", "δύο", "τρεῖσ", "εἷσ", "τέτταρεσ"})
+      for (const char* k : {"οὗτοσ", "ἐκεῖνοσ", "πᾶσ", "οὐδείσ", "μηδείσ", "πόσοσ", "δύο", "τρεῖσ", "εἷσ", "τέτταρεσ",
+                            "πολύσ", "ὀλίγοσ"})   // C41: many / few as determiners
         if (m.key == k) mark(t);
     }
     for (const SemNP& y : x.possessor) np(y);
@@ -1639,9 +1702,10 @@ std::string esArticle(uint8_t g, bool pl, bool definite, const std::string& noun
   return "un";
 }
 
-std::string esPossessive(const SemNP& p, bool pl) {
+std::string esPossessive(const SemNP& p, bool pl, uint8_t g = 0) {
   const int person = p.pron.person ? p.pron.person : 3;
   const bool ppl = p.pron.number == 2;
+  if (person == 1 && ppl && g == F) return pl ? "nuestras" : "nuestra";   // C41: nuestra casa
   if (person == 1) return ppl ? (pl ? "nuestros" : "nuestro") : (pl ? "mis" : "mi");
   if (person == 2) return ppl ? (pl ? "sus" : "su") : (pl ? "tus" : "tu");
   return pl ? "sus" : "su";
@@ -1698,11 +1762,13 @@ std::string esNP(const SemNP& n, const Side& side) {
     noun = lx && !lx->plural.empty() ? lx->plural : es::plural(noun);
   }
   if (!n.possessor.empty()) {
-    w.push_back(esPossessive(n.possessor[0], pl));
+    w.push_back(esPossessive(n.possessor[0], pl, g));
     if (n.possessor[0].pronLemma == "own") w.push_back(es::adjective("propio", g == F ? F : M, pl ? 2 : 1));   // C38
   }
   else if (n.determiner == "all") { w.push_back(g == F ? "todas" : "todos"); w.push_back(esArticle(g, true, true, noun)); }
   else if (n.determiner == "every") w.push_back(g == F ? "cada" : "cada");
+  else if (n.determiner == "many") w.push_back(g == F ? "muchas" : "muchos");   // C41
+  else if (n.determiner == "few") w.push_back(g == F ? "pocas" : "pocos");
   else if (n.determiner == "no") w.push_back(g == F ? "ninguna" : "ningún");
   else if (n.determiner == "this") w.push_back(g == F ? "esta" : "este");
   else if (n.determiner == "these") w.push_back(g == F ? "estas" : "estos");

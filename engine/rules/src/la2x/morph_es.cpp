@@ -190,17 +190,31 @@ std::string regular(const std::string& inf, VTense t, int idx) {
   static const char* const kFut[] = {"é", "ás", "á", "emos", "éis", "án"};
   static const char* const kCond[] = {"ía", "ías", "ía", "íamos", "íais", "ían"};
   const bool strongSlot = idx == 0 || idx == 1 || idx == 2 || idx == 5;
+  // C41: -iar / -uar verbs whose i / u carries the stress in the stressed-stem slots (envía, confía, continúa; was
+  // "envia", "confia"); the other -iar verbs (cambiar, estudiar) keep the diphthong
+  auto hiatus = [&](std::string st) {
+    static const char* const kIar[] = {"envi", "confi", "gui", "cri", "vari", "desvi", "fi", "ampli", "espi", "vaci",
+                                       "enfri", "desafi", "resfri", "acentu", "actu", "continu", "evalu",
+                                       "gradu", "situ", "insinu", "efectu", nullptr};
+    if (cls != 'a' || !strongSlot) return st;
+    bool hit = false;
+    for (size_t k = 0; kIar[k] && !hit; ++k) hit = st == kIar[k];
+    if (!hit) return st;
+    const char v = st.back();
+    st.pop_back();
+    return st + (v == 'i' ? "\xC3\xAD" : "\xC3\xBA");
+  };
   switch (t) {
     case VTense::Infinitive: return inf;
     case VTense::Present: {
       const char* e = (cls == 'a' ? kPresA : cls == 'e' ? kPresE : kPresI)[idx];
-      std::string st = type && strongSlot ? changeStem(stem, type, true) : stem;
+      std::string st = type && strongSlot ? changeStem(stem, type, true) : hiatus(stem);
       if (uir && std::string(e).compare(0, 1, "i") != 0 && std::string(e).compare(0, 1, "í") != 0) st += "y";
       return ortho(st, e, cls);
     }
     case VTense::SubjPresent: {
       const char* e = (cls == 'a' ? kSubjA : kSubjE)[idx];
-      std::string st = stem;
+      std::string st = hiatus(stem);
       if (type && strongSlot) st = changeStem(stem, type, true);
       else if (type && cls == 'i') st = changeStem(stem, type, false);
       if (uir) st += "y";
@@ -497,7 +511,9 @@ uint8_t nounGender(std::string_view noun, uint8_t latinGender) {
     if (w == x) return feat::M;
   for (const char* x : kFem)
     if (w == x) return feat::F;
-  if (endsWith(w, "a") || endsWith(w, "ción") || endsWith(w, "sión") || endsWith(w, "dad") || endsWith(w, "tad") ||
+  // C41: -gión / -nión are feminine too (la legión, la región, la opinión, la unión; was "el legión")
+  if (endsWith(w, "a") || endsWith(w, "ción") || endsWith(w, "sión") || endsWith(w, "gión") || endsWith(w, "nión") ||
+      endsWith(w, "dad") || endsWith(w, "tad") ||
       endsWith(w, "tud") || endsWith(w, "umbre") || endsWith(w, "ez") || endsWith(w, "triz") || endsWith(w, "isis"))
     return feat::F;
   if (endsWith(w, "e") || endsWith(w, "o") || endsWith(w, "or") || endsWith(w, "aje") || endsWith(w, "ma") || endsWith(w, "án") ||

@@ -108,6 +108,9 @@ struct SentenceOut {
   // C40 (additive): the readable sentence again with the second reading of a word (readable_grc tag alt:<en>|<es>,
   // "The man is self-sufficient." beside "The man is self-employed."); offered as CueOutput alternatives
   std::vector<std::string> alternatives;
+  // C41 (additive): content words whose gloss no readable row gives and that are not the lexicon's own sense (pivot) or
+  // not a dictionary word ("ἀλήθειαν (not a lie)"); flag "gloss-doubt"
+  std::vector<std::string> glossDoubts;
 };
 
 class Translator {
@@ -145,6 +148,12 @@ class Translator {
   // source has no content word. Never throws (an internal error counts as 1.0).
   double roundTripOverlap(std::string_view greekText, const std::vector<std::string>& sourceLemmas,
                           Target sourceLang) const;
+
+  // C41 (as la2x::Translator::setTargetLexicons): english.vpl / spanish.vpl (either may be null) for the gloss
+  // calibration of cues(): a content word with no readable_grc.tsv row whose gloss came through the English pivot or is
+  // not a dictionary word of the target language (la2x::glossIsDictionaryWord) makes the cue Check (flag gloss-doubt,
+  // check "gloss"). The pointers must outlive the translator's use of them.
+  void setTargetLexicons(const lex::Lexicon* english, const lex::Lexicon* spanish);
 
  private:
   struct Impl;

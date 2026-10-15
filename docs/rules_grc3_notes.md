@@ -1305,3 +1305,55 @@ word order of "also ... not" is still poor); regression_report_athen_en_grc 39 -
 "The farmer has oxen, not many, but strong." (the parse of "has oxen"; Check); ES "campesinos" -> χῶραι (lexical,
 pre-existing); "οἱ σοφοὶ τὴν ἀλήθειαν ζητοῦσιν" -> "look for the not a lie" (ἀλήθεια has no readable row; pre-existing);
 owner en-grc unit 9 "οὐ καὶ" order.
+
+## Core vocabulary audit (C41)
+Own material first (31efb88, before any change): tests/regression/own_core_grc.grc.txt (15 Attic sentences of core words,
+gold expected/own_core_grc.{en,es}.gold.txt); the Latin half, the calibration rule and the audit tool are described in
+rules_la2x_notes.md "Core vocabulary audit (C41)". Tests: engine/tests/test_rules_s.cpp.
+### The audit
+Every content lemma of the DCC Greek core list (data/work/grc/dcc_grc.tsv, gitignored; 454 of its 524 rows) was run as its
+citation form through grc-en and grc-es and compared with the list's sense (the Spanish through the English entries'
+Spanish translations, data/work/en/translations_es.tsv), plus 22 own audit sentences (two per 50 ranks). Report:
+data/work/eval/c41-audit/{first,final}/grc/audit.tsv (heads, verdicts, outputs only).
+* First run: English flagged 145 (nosense 87, missing 44, long 10, leak 3: "often as anaphor to τόσος", "usually weaker than
+  βούλομαι", δέδοικα), Spanish 129 (leak 5). The Spanish of a lemma without a readable row came through the English pivot
+  and was often no sense of the Greek word at all (κύριος castellano, νέος chibolo, ἐθέλω "dispuesen", δίκη consuetud,
+  ἐμός mina, γένος carrera, ποιητής artífice, κίνδυνος discrimen, βλέπω lucir, ἀποκτείνω afrijolar).
+* Reviewed by hand; **readable_grc.tsv +303 rows**, all tagged reverse-only (the EN / ES -> Greek choice is unchanged;
+  every EN -> GRC report byte-identical), Attic and Ionic spellings both where greek.vpl has two lemmas (πράττω / πράσσω,
+  τάττω / τάσσω, κρείττων / κρείσσων, ἥττων / ἥσσων, γλῶττα / γλῶσσα, ἀπαλλάττω / ἀπαλλάσσω, ζῶ / ζάω, θάλασσα), δείδω
+  for δέδοικα (the lexicon's gloss is a usage note), the possessive adjectives, ἀθάνατος; σοφός gains noun:wise_man|sabio
+  noun-pl:wise_men|sabios. English output changed for 144 lemmas, Spanish for 191. Final run: English flagged 87 (7 rated
+  OK), Spanish 88 (10 OK), reviewed: particles and numerals that print nothing alone (γε, δή, ἄν, πέντε), comparatives read
+  as the comparative of ἀγαθός (right in a sentence), citation homographs (τρεῖς as τρέω, πλέον as πλέω).
+* φέρω bring / traer and δείκνυμι were tried as carry / mostrar and dropped (C38 expectations "brings", "enseñó"); φέρω
+  now has a reviewed row with the lexicon's own words (bring / traer), so it is no doubt.
+### grc2x fixes the audit sentences needed
+* Calibration (translator.cpp): as la2x; a content word with no readable row whose gloss came through the English pivot,
+  is not a dictionary word, or is empty (δέδοικα) makes the cue Check (flag gloss-doubt, SentenceOut::glossDoubts, check
+  "gloss"); Translator::setTargetLexicons is set by GreekPath before a grc-en / grc-es job.
+* πολλοί / ὀλίγοι without the article are quantity words: many / few, muchos / pocos before the noun ("πολλοὺς λόγους" =
+  many words; was "much words" / "palabras muchas", OK and wrong).
+* ἐμός σός ἡμέτερος ὑμέτερος are possessors (my father / mi padre, our house / nuestra casa; was "the my father", "el padre
+  mina"); esPossessive gives nuestra / nuestras.
+* The genitive of comparison after a comparative predicate: "κρείττων ἐστὶ τοῦ δεσπότου" = stronger than the master / más
+  fuerte que el amo (was "stronger of the master", OK and wrong).
+* δέδοικα and ἔοικα: the perfect is a present (I fear; was "I have done the wolf", OK and wrong).
+* The generic tag (bare English noun) applies only in a statement in the present and never in a prepositional phrase:
+  "ἡ εἰρήνη καλή ἐστιν" = Peace is beautiful, "τὴν ἀρετὴν τιμᾷ" = honours virtue, but "τὴν εἰρήνην ἤγγειλεν" = announced
+  the peace, "ὁ πόλεμος ἐτελεύτησεν" = the war ended, "οἴομαι τὸν πόλεμον τελευτήσειν" = that the war will end. New generic
+  rows: φύσις χρόνος ἀνάγκη πόλεμος ἀρετή θάνατος ἡδονή δίκη εἰρήνη ἐλπίς φόβος.
+* An adjective used as a noun with the article: no English -s for any adjective (the unjust; was "the unjusts"), and in
+  Spanish a masculine / feminine one is a person (castiga a los injustos).
+### Numbers
+Own material first run -> final: GRC -> EN 8 -> 15/15, GRC -> ES 8 -> 15/15 (14 as written + 1 proposal); wrong among OK
+5 + 4 -> 0. Audit sentences (22): OK 17 -> 18 (EN), 17 -> 17 (ES); about 9 of the first-run OK units carried a wrong gloss;
+left: "lives in the island", "arrive into the mountain", λύω "untie a wall". Owner material (athen grc-en / grc-es, by
+count only): outputs and confidences identical. Blind GRC -> EN 3/5, GRC -> ES 2/5, wrong among OK 1 each (the same unit:
+a prepositional phrase after the subject noun read with the predicate, "is difficult into the village"); not tuned.
+### Changed expectations
+test_rules_grc8.cpp: "οἱ σύμμαχοι ἀφίκοντο." -> "Los aliados llegaron." and "ἡ ναῦς πρὸς ἑσπέραν ἀφίκετο." -> "La nave
+llegó al atardecer." (was "arribaron" / "arribó": the English-pivot gloss; ἀφικνέομαι = llegar, the es-MX core verb).
+### Still open
+PP after the subject noun (blind); εἰς after "arrive" ("arrive into"); ἐν τῇ νήσῳ "in the island"; λύω of a wall; "many
+money" for χρήματα πολλά (Check).

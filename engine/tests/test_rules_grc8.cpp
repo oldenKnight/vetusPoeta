@@ -240,7 +240,7 @@ TEST_CASE("rules-grc8: GRC -> EN / ES readable glosses (military, political, fam
       {"οἱ ὁπλῖται τὰς ἀσπίδας ἔφερον.", "The hoplites were bringing the shields.", "Los hoplitas traían los escudos."},
       {"ὁ ἡγεμὼν τὴν ὁδὸν ἔδειξεν.", "The leader showed the road.", "El jefe enseñó el camino."},
       {"ὁ ἄρχων τὸν νόμον ἔγραψεν.", "The ruler wrote the law.", "El gobernante escribió la ley."},
-      {"οἱ σύμμαχοι ἀφίκοντο.", "The allies arrived.", "Los aliados arribaron."},
+      {"οἱ σύμμαχοι ἀφίκοντο.", "The allies arrived.", "Los aliados llegaron."},   // C41: ἀφικνέομαι = llegar (was arribar)
       {"ὁ στρατὸς πρὸς τὸ ὄρος ἐπορεύετο.", "The army was marching to the mountain.", "El ejército marchaba hacia la montaña."},
       {"ὁ κῆρυξ τὴν εἰρήνην ἤγγειλεν.", "The herald announced the peace.", "El heraldo anunció la paz."},
       {"ἡ νίκη καλή ἐστιν.", "The victory is beautiful.", "La victoria es hermosa."},
@@ -264,7 +264,7 @@ TEST_CASE("rules-grc8: GRC -> EN / ES readable glosses (military, political, fam
       {"ἡ πατρὶς ἐλευθέρα ἐστίν.", "The fatherland is free.", "La patria es libre."},
       // times of day read back
       {"ἅμα τῇ ἕῳ οἱ στρατιῶται ἀπῆλθον.", "At dawn the soldiers went away.", "Al amanecer los soldados se fueron."},
-      {"ἡ ναῦς πρὸς ἑσπέραν ἀφίκετο.", "The ship arrived towards evening.", "La nave arribó al atardecer."},
+      {"ἡ ναῦς πρὸς ἑσπέραν ἀφίκετο.", "The ship arrived towards evening.", "La nave llegó al atardecer."},   // C41: llegar
       {"οἱ παῖδες μεσημβρίας καθεύδουσιν.", "The boys sleep at noon.", "Los niños duermen a mediodía."},
       {"οἱ λύκοι νυκτὸς ἔρχονται.", "The wolves are coming at night.", "Los lobos vienen de noche."},
       // πάλιν ἥξω, ἐφάνθη
