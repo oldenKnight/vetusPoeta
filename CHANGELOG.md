@@ -3,6 +3,16 @@
 All notable changes to vetus poeta. Dates are in ISO format. The task ledger with every measurement is
 [docs/STATUS.md](docs/STATUS.md).
 
+## Unreleased - 2026-10-15
+
+- Real prose and liturgy: Latin and Greek <-> English and Spanish on textbook prose and medieval verse (C36-C38), meaning-
+  coverage checks so a dropped word is never rated OK, sacred names, Ave / Salve, vocatives, prohibitions.
+- Plain-text projects are no longer wrapped at 42 characters like subtitles (C39).
+- Latin town locative (Rōmae, Athēnīs), proper adjectives capitalised, Greek adjectives used as nouns, "not X but Y",
+  "although" (quamquam, καίπερ, μέν ... ὅμως δέ), prepositional phrases attached to the subject noun (C39-C43).
+- Core vocabulary audit of the Latin and Greek reading directions (about 1,370 lemmas) with a gloss-doubt check (C41).
+- Greek lexicon: αὐτουργός, γεωργέω, ἀπέραντος added (B4d).
+
 ## 0.1.0 - 2026-10-06
 
 The first version: English and Spanish subtitles and texts into Latin and Ancient Greek, Latin and Greek into English

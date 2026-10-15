@@ -1,6 +1,6 @@
 # HANDOFF — read on restart
 
-Last updated: 2026-10-05 (session 1, step 1 of the production process).
+Last updated: 2026-10-15.
 
 ## Where we are
 - Owner approved the plan ("start"). Decisions in `docs/DECISIONS.md`. Ledger in `docs/STATUS.md`.
@@ -17,27 +17,22 @@ Last updated: 2026-10-05 (session 1, step 1 of the production process).
   404 MB, English 3.3 GB, es.wiktionary extract 103 MB gz. If `data/raw/dl-done.flag` is
   missing, check `data/raw/dl-*.log` and rerun the curl commands (they resume with `-C -`).
 
-## Next step (updated 2026-10-06, evening)
-- 77 tasks DONE through C35 / R8 (Latin loops 1-5, two acceptance loops, Greek loops 1-5, Orbergise on real material,
-  latinity toggle D18, Latin loops 6-8, Greek loops 6-8, Spanish-source loops C34 (Latin) and C35 (Greek), release passes R1-R8). No implementer running; every commit is pushed to
-  claude/fervent-cannon-6qif8i. The tree is release-ready on Linux; nothing engineering-side is pending that does not
-  need the owner's input (second file, main branch, Google Translate run, Windows smoke test).
-- Waiting on the owner: the Alice .srt (acceptance run: `tools/eval/run_eval.py --tuned`, then a tuning loop C18 on
-  its first-run mismatches, then the true held-out file), a `main` branch for the draft pull request, the Google
-  Translate side-by-side on his machine (docs/EVAL.md §5), the Windows smoke checklist (docs/BUILD.md).
-- Next engineering candidates if time remains before the files arrive: Greek loop 3 (docs/rules_grc2_notes.md "After
-  B4c"), LIB-5 (duplicate caelum lemmas 1599/1600 in latin.vpl, tier review sheets), the 27 remaining oz_sample
-  mismatches (docs/rules_en_notes.md "Quality loop 3").
-- Review protocol: `git archive HEAD | tar -x -C <scratch>` then build + ctest + xcompile there, so other
-  implementers' uncommitted files do not pollute the verification. Commit the ledger with pathspecs
-  (`git commit docs/STATUS.md -m ...`) so staged files of implementers are not swept in.
-- Gold Latin: tests/regression/expected/*.gold.txt (main agent). Held-out hygiene: nobody reads tests/heldout,
-  tests/eval_gold or data/work/eval/heldout-*; BURNED.txt lists the 100 cues moved to the tuning sample.
-- Quality state (honest): tuned EN 114/114, ES 100/100, Greek 114/114 (ES->GRC 39/40), oz_sample 78/100; held-out
-  automatic errors own 2/74 (2.7 %), oz 97/700 (13.9 %); wrong among OK 0 everywhere; model gate 74.9 % so Latin
-  reranking is off. Acceptance file (owner's partial Alice, 82 cues): expert wrong rate 79 % at first run, 27 % after
-  loop 1 (C22), 3.7 % after loop 2 (C24; tuned number, no < 1 % claim). Latinity toggle (D18) done in UI and engine.
-  Next honest test: the owner's second file (held-out, never tuned on).
+## Next step (updated 2026-10-15)
+- Tasks DONE through C43 / E22 (after R8: E19-E22 on the owner's second material, C36-C41, C43, B4d). C42 (Spanish ->
+  Latin hymn verse) is DEFERRED: the first task of the next session. No implementer running; everything is pushed to
+  claude/fervent-cannon-6qif8i.
+- Quality state (honest): owner's second material (Athenaze ch. 1 + medieval hymn, 100 units, tuned on) 17 -> 79/100,
+  wrong among OK 8 -> 0; held-out automatic errors own 2/74, Oz 98/700, wrong among OK 0 in every run. Known weak spot:
+  Spanish -> Latin verse (8/22, all misses rated Check / Fix). Text projects are no longer wrapped like subtitles (C39).
+- Before the next release: run R9 (full build, ctest, ASan, xcompile with GUI + LLM, make_dist) on a clean archive.
+- Waiting on the owner: an unseen file (>= 370 units) for an honest < 1 % test, a `main` branch for the draft pull
+  request, the Google Translate side-by-side on his machine (docs/EVAL.md §5), the Windows smoke checklist
+  (docs/BUILD.md).
+- Review protocol: `git archive HEAD | tar -x -C <scratch>` then build + ctest + ASan + xcompile there. Commit the
+  ledger with pathspecs. After a usage-limit interruption: checkpoint the implementer's files in a `wip:` commit, push,
+  and resume the same implementer with a message. Run implementers one at a time (parallel runs exhaust the limit).
+- Gold: tests/regression/expected/*.gold.txt; implementers append alternatives only, the main agent reviews them.
+  Held-out hygiene: nobody reads tests/heldout, tests/eval_gold or data/work/eval/heldout-*.
 
 ## Open items for the owner
 - The owner's PARTIAL Alice file arrived 2026-10-07 13:13 UTC (82 cues) with his own free Latin version; both are in
