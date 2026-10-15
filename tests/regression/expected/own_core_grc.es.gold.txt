@@ -1,0 +1,17 @@
+# Gold Spanish (es-MX) for tests/regression/own_core_grc.grc.txt (C41), written before any C41 change and before the
+# engine was run. Alternatives after " | ".
+Los sabios buscan la verdad. | Los hombres sabios buscan la verdad.
+El alma es inmortal.
+El tiempo muestra todo. | El tiempo revela todo. | El tiempo muestra todas las cosas. | El tiempo revela todas las cosas. | El tiempo lo muestra todo. | El tiempo lo revela todo. | El tiempo aclara todo.
+Los ciudadanos guardan la ley. | Los ciudadanos cumplen la ley. | Los ciudadanos protegen la ley. | Los ciudadanos observan la ley.
+La paz es buena, pero la guerra es mala. | La paz es hermosa, pero la guerra es mala. | La paz es buena, y la guerra es mala. | La paz es bella, pero la guerra es mala. | La paz es noble, pero la guerra es mala.
+El maestro enseña a los niños. | El maestro enseña a los muchachos.
+La nave entra en el puerto. | El barco entra en el puerto. | La nave llega al puerto. | El barco llega al puerto. | La nave va al puerto. | El barco va al puerto. | La nave viene al puerto. | El barco viene al puerto. | El barco entra al puerto. | La nave entra al puerto.
+El anciano no encuentra el camino. | El viejo no encuentra el camino.
+Los soldados salvan la ciudad. | Los soldados salvan a la ciudad.
+La justicia castiga a los injustos. | La justicia castiga a los hombres injustos.
+El hermano envía la carta a la madre. | El hermano le envía la carta a la madre. | El hermano manda la carta a la madre. | El hermano le manda la carta a la madre. | Su hermano envía la carta a su madre.
+Los dioses aman a los hombres. | Los dioses quieren a los hombres. | Los dioses aman a las personas. | Los dioses aman a los seres humanos.
+El médico cura el cuerpo. | El médico sana el cuerpo. | El médico trata el cuerpo. | El médico cuida el cuerpo.
+El hombre bueno honra la virtud. | El buen hombre honra la virtud. | El hombre bueno respeta la virtud. | El buen hombre respeta la virtud.
+La noche es larga, pero el día es corto. | La noche es larga, y el día es corto. | La noche es larga, mientras que el día es corto.

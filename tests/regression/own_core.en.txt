@@ -1,0 +1,4 @@
+# C41: own English sentences, EN -> LA, "not very but enough" after a predicate adjective (C40 open note). Not part of
+# the 30 core sentences; written before any C41 change. Gold: expected/own_core.la.gold.txt (or Check).
+The house is big, not very but enough.
+The road is long, not very but enough.

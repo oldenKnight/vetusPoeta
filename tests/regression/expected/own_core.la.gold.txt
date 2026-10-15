@@ -1,0 +1,4 @@
+# Gold Latin for tests/regression/own_core.en.txt (C41), written before any C41 change. Alternatives after " | ".
+# A rendering with valdē and no nōn (it says the opposite) is wrong; Check is the minimum the row asks for.
+Casa magna est, nōn valdē sed satis. | Casa satis magna est, nōn valdē. | Domus magna est, nōn valdē sed satis. | Casa magna est, nōn admodum sed satis.
+Via longa est, nōn valdē sed satis. | Via satis longa est, nōn valdē. | Iter longum est, nōn valdē sed satis. | Via longa est, nōn admodum sed satis.
