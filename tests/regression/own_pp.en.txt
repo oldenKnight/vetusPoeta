@@ -1,0 +1,4 @@
+# C43: own English sentences, EN -> LA, "not very but enough" after a predicate adjective (the Latin itself, C41 open
+# note). Side item, not part of the 30 sentences; written before any C43 change. Gold: expected/own_pp.la.gold.txt.
+The garden is small, not very but enough.
+The water is cold, not very but enough.

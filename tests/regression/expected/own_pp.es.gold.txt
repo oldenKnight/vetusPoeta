@@ -1,0 +1,19 @@
+# Gold Spanish (es-MX) for tests/regression/own_pp.la.txt (C43), written before any C43 change and before the engine was
+# run. Alternatives after " | ". Units 12-14: both readings are right, and the unit must be Check.
+El camino por el bosque es estrecho. | El camino a través del bosque es estrecho. | La senda por el bosque es estrecha. | La vía por el bosque es estrecha. | El camino por la selva es estrecho.
+El viaje a la ciudad no es largo. | El camino a la ciudad no es largo. | El viaje hacia la ciudad no es largo. | El camino hacia la ciudad no es largo.
+La carta a la madre es breve. | La carta a la madre es corta. | La carta para la madre es breve. | La carta para la madre es corta. | La carta a su madre es breve. | La carta a su madre es corta.
+El puente sobre el río es nuevo. | El puente a través del río es nuevo.
+El templo en la colina es antiguo. | El templo de la colina es antiguo. | El templo sobre la colina es antiguo.
+El libro sobre la guerra es largo. | El libro acerca de la guerra es largo. | El libro de la guerra es largo.
+El hombre del pueblo es agricultor. | El hombre del pueblo es campesino. | El hombre de la ciudad es agricultor. | El hombre de la ciudad es campesino. | El hombre del pueblo es un agricultor. | El hombre del pueblo es un campesino.
+El niño corre por el bosque. | El muchacho corre por el bosque. | El niño corre a través del bosque. | El muchacho corre a través del bosque.
+Los marineros navegan a la isla. | Los marineros navegan hacia la isla.
+La niña está sentada en el jardín. | La niña se sienta en el jardín. | La muchacha está sentada en el jardín. | La muchacha se sienta en el jardín. | La chica está sentada en el jardín.
+La casa está en el monte. | La casa está en la montaña. | La casa se levanta en el monte. | La casa está sobre el monte. | La cabaña está en el monte. | La choza está en el monte.
+La niña en el jardín está contenta. | La niña está contenta en el jardín. | La niña del jardín está contenta. | La niña en el jardín está feliz. | La niña está feliz en el jardín. | La niña en el jardín está alegre. | La niña está alegre en el jardín. | La muchacha en el jardín está contenta. | La muchacha está contenta en el jardín.
+Los soldados están seguros en el campamento. | Los soldados en el campamento están seguros. | Los soldados del campamento están seguros. | Los soldados están a salvo en el campamento. | Los soldados en el campamento están a salvo.
+El agricultor está contento con su hijo. | El agricultor con su hijo está contento. | El campesino está contento con su hijo. | El campesino con su hijo está contento. | El agricultor está feliz con su hijo. | El agricultor está alegre con su hijo.
+Mil soldados están en la ciudad. | Hay mil soldados en la ciudad.
+La nave llega a la isla. | El barco llega a la isla. | La nave alcanza la isla. | El barco alcanza la isla.
+Muchos hombres viven en la isla. | Muchas personas viven en la isla. | Mucha gente vive en la isla. | Muchos hombres habitan en la isla. | Muchos hombres habitan la isla.

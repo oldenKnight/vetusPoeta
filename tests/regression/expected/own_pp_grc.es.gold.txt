@@ -1,0 +1,15 @@
+# Gold Spanish (es-MX) for tests/regression/own_pp_grc.grc.txt (C43), written before any C43 change and before the
+# engine was run. Alternatives after " | ". Units 10-11: both readings are right, and the unit must be Check.
+El camino por el bosque es estrecho. | El camino a través del bosque es estrecho. | La senda por el bosque es estrecha.
+El camino a la ciudad es largo. | El camino hacia la ciudad es largo.
+La carta a la madre es breve. | La carta a la madre es corta. | La carta para la madre es breve. | La carta para la madre es corta. | La carta a su madre es breve. | La carta a su madre es corta.
+La casa en la ciudad es hermosa. | La casa de la ciudad es hermosa. | La casa en la ciudad es bella. | La casa de la ciudad es bella. | La casa en la ciudad es bonita. | La casa de la ciudad es bonita.
+Los hombres en la isla son felices. | Los hombres de la isla son felices. | Las personas en la isla son felices. | Las personas de la isla son felices. | La gente de la isla es feliz. | Los hombres de la isla son dichosos.
+El templo en la colina es antiguo. | El templo de la colina es antiguo. | El templo sobre la colina es antiguo.
+El niño corre por el bosque. | El muchacho corre por el bosque. | El niño corre a través del bosque. | El muchacho corre a través del bosque.
+Los marineros navegan a la isla. | Los marineros navegan hacia la isla.
+La muchacha está sentada en el jardín. | La niña está sentada en el jardín. | La joven está sentada en el jardín. | La muchacha se sienta en el jardín. | La niña se sienta en el jardín. | La joven se sienta en el jardín.
+La muchacha en el jardín es feliz. | La muchacha es feliz en el jardín. | La niña en el jardín es feliz. | La niña es feliz en el jardín. | La joven en el jardín es feliz. | La joven es feliz en el jardín. | La muchacha del jardín es feliz. | La niña del jardín es feliz.
+Los soldados en el campamento están seguros. | Los soldados están seguros en el campamento. | Los soldados del campamento están seguros. | Los soldados están a salvo en el campamento. | Los soldados en el campamento están a salvo.
+La nave llega a la isla. | El barco llega a la isla. | La nave alcanza la isla. | El barco alcanza la isla.
+Muchos hombres viven en la isla. | Muchas personas viven en la isla. | Mucha gente vive en la isla. | Muchos hombres habitan en la isla. | Muchos hombres habitan la isla.

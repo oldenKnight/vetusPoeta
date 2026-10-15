@@ -1,0 +1,4 @@
+# Gold Latin for tests/regression/own_pp.en.txt (C43), written before any C43 change. Alternatives after " | ".
+# A rendering with valdē and no nōn (it says the opposite) is wrong.
+Hortus parvus est, nōn valdē sed satis. | Hortus satis parvus est, nōn valdē. | Hortus parvus est, nōn admodum sed satis.
+Aqua frīgida est, nōn valdē sed satis. | Aqua satis frīgida est, nōn valdē. | Aqua frīgida est, nōn admodum sed satis.
