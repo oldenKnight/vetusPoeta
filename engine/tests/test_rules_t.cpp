@@ -219,7 +219,8 @@ TEST_CASE("rules-t: grc2x attributive position and a phrase after the subject no
   exactT(*e,
          {{"ὁ ἐν τῷ ἀγρῷ λίθος μέγας ἐστίν.", "La piedra en el campo es grande."},
           {"ἡ ἐπιστολὴ ἐκ τῆς πόλεως μακρά ἐστιν.", "La carta de la ciudad es larga."},
-          {"ὁ γέρων ἐν τῇ οἰκίᾳ κάθηται.", "El viejo está sentado en la casa."}},
+          {"ὁ γέρων ἐν τῇ οἰκίᾳ κάθηται.", "El viejo está sentado en la casa."},
+          {"ἡ ἐπὶ τῇ κρήνῃ οἰκία μικρά ἐστιν.", "La casa junto a la fuente es pequeña."}},   // review: not "sobre"
          optT(rules::Lang::Grc, rules::Lang::Es));
   for (rules::Lang t : {rules::Lang::En, rules::Lang::Es}) {
     const rules::CueOutput r = oneT(*e, "ὁ παῖς ἐν τῷ ἀγρῷ εὐδαίμων ἐστίν.", optT(rules::Lang::Grc, t));

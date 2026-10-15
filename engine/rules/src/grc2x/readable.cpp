@@ -65,6 +65,9 @@ std::string prepWord(const TokInfo& t, const std::string& lexWord, uint8_t cs, c
   if (w.empty()) w = esT ? "en" : "in";
   // C43: ἐν τῇ νήσῳ = on the island (also a mountain, a hill), never "in the island"
   if (!esT && keyIs(t, {"ἐν"}) && head && keyIs(*head, {"νῆσος", "ὄρος", "λόφος"})) w = "on";
+  // C43 review: ἐπὶ τῷ ποταμῷ (a river, the sea, a lake, a spring) = by / junto a; "sobre el río" is over the river
+  if (keyIs(t, {"ἐπί"}) && cs == Dat && head && keyIs(*head, {"ποταμός", "θάλαττα", "θάλασσα", "λίμνη", "κρήνη"}))
+    w = esT ? "junto a" : "by";
   return w;
 }
 
