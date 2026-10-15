@@ -288,7 +288,8 @@ TEST_CASE("rules-q: EN -> GRC enough is ἱκανός, never βουπόρος; t
     const rules::CueOutput r = oneQ(*e, s, o);
     INFO(s << " -> " << r.target);
     CHECK(r.target.find("βουπόρ") == std::string::npos);
-    if (std::string(s).find("not much") != std::string::npos) CHECK(r.confidence != rules::Confidence::Ok);
+    // C40 (c): the ellipsis keeps its negation now (οὐ πολὺ / πολὺν ἀλλὰ ἱκανόν, agreeing with the noun) and may be OK
+    if (std::string(s).find("not much") != std::string::npos) CHECK(r.target.find("οὐ πολ") != std::string::npos);
     else CHECK((r.target.find("ἱκαν") != std::string::npos || r.target.find("Ἱκαν") != std::string::npos));
   }
   CHECK(oneQ(*e, "The farmer has enough food.", o).target == "Ὁ γεωργὸς ἱκανὸν σῖτον ἔχει.");
@@ -342,14 +343,15 @@ TEST_CASE("rules-q: own material vs gold (tests/regression/own_frame*.txt; repor
   NEED_REALQ();
   auto e = engineQ();
   struct F { const char* src; const char* gold; rules::Lang s, t; int floor; int okMissMax; };
-  // floors: the counts after C39 (first run before any rule: 7 / 18, 2 / 4, 1 / 7, 0 / 4, 3 / 6); grc-en keeps the
-  // two αὐτουργός units of item (h) that rows alone cannot fix (docs/rules_grc3_notes.md "Frame follow-ups (C39)")
+  // floors: the counts after C39 (first run before any rule: 7 / 18, 2 / 4, 1 / 7, 0 / 4, 3 / 6); C40 fixed the two
+  // αὐτουργός units of grc-en (the noun reading, item b; two gold alternatives proposed) and the "not much, but
+  // enough" units of en-grc (item c)
   const F files[] = {
       {"own_frame.en.txt", "own_frame.la.gold.txt", rules::Lang::En, rules::Lang::La, 15, 0},
       {"own_frame.es.txt", "own_frame.es.la.gold.txt", rules::Lang::Es, rules::Lang::La, 2, 0},
       {"own_frame.la.txt", "own_frame.en.gold.txt", rules::Lang::La, rules::Lang::En, 7, 0},
-      {"own_frame_grc.en.txt", "own_frame_grc.grc.gold.txt", rules::Lang::En, rules::Lang::Grc, 2, 0},
-      {"own_frame_grc.grc.txt", "own_frame_grc.en.gold.txt", rules::Lang::Grc, rules::Lang::En, 3, 2},
+      {"own_frame_grc.en.txt", "own_frame_grc.grc.gold.txt", rules::Lang::En, rules::Lang::Grc, 4, 0},
+      {"own_frame_grc.grc.txt", "own_frame_grc.en.gold.txt", rules::Lang::Grc, rules::Lang::En, 5, 0},
   };
   std::ostringstream rep;
   for (const F& f : files) {

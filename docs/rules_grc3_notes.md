@@ -1263,3 +1263,45 @@ own_athen.grc.gold.txt (proposals below). No other Greek source file.
   αἴρει καὶ αὐτὸν ἐκ τοῦ ἀγροῦ φέρει." (αὐτόν before the phrase); own_frame_grc.grc.gold.txt unit 4, file line 7 (υἱέος, ἐκ τοῦ
   μικροῦ ἀγροῦ, ἑκάστης ἡμέρας). The doubt / flag verb-doubt of the English frame appears on Greek cues but the Greek
   confidence list was not changed.
+
+## Last cases (C40)
+Own material and tests: rules_en_notes.md "Last cases (C40)" (test_rules_r.cpp). Greek files touched: data/curated/
+readable_grc.tsv (αὐτουργός row, the tag comment), engine/rules/src/grc2x/{internal.h, translator.cpp, readable.cpp},
+engine/rules/src/transfer_grc/transfer_grc.cpp, engine/rules/src/realise_grc/realiser_grc.cpp, engine/rules/src/
+engine_grc/engine_grc.cpp, include/vp/grc2x.h and realise_grc.h (additive fields).
+### (b) an adjective used as a noun (grc2x)
+readable_grc tags noun:<en>|<es> and noun-pl:<en>|<es> ("_" for a space): an adjective with the article and no noun of
+its own reads as that noun (ὁ αὐτουργός = the farmer who works his own land / el campesino que trabaja su propia tierra,
+οἱ αὐτουργοί = the farmers who work their own land; a masculine / feminine one is a person: "ve a los campesinos");
+tag alt:<en>|<es>: a second reading offered as an alternative sentence (CueOutput alternatives, reason "second reading of
+a word"). αὐτουργός as a predicate: self-employed / autónomo, alternative self-sufficient / autosuficiente. Without a
+noun tag the English plural of a readable adjective row takes no -s ("οἱ ἀγαθοί" = the good; was "the goods"); a row
+tagged person / animal is a noun gloss and keeps its plural (σύμμαχοι = the allies), a capitalised one too (the
+Athenians).
+### (c) "..., not much, but enough" (EN / ES -> GRC)
+A verbless tail ", not A(,) but B" / ": not A but B" (Spanish "no A, pero / sino B") at the end of a sentence is cut off
+before the analysis (the parser read it as a coordination or the root: "Σῖτος καὶ πολὺ καὶ βουπόρος οὔ") and given
+back after the clause it follows (a clause coordinated after the main one when there is one) as "οὐ A ἀλλὰ B"
+agreeing with that clause's object in case, gender and number (two end obliques, contrast 1 / 2, new
+GrcOblique::pauseBefore for the comma or the raised dot): "ὁ γεωργὸς σῖτον ἔχει, οὐ πολὺν ἀλλὰ ἱκανόν", "ἡ κόρη οἰκίαν
+ἔχει, οὐ μεγάλην ἀλλὰ καλήν", "βιβλία ἔχει, οὐ πολλὰ ἀλλὰ ἀγαθά". Only when the word right before the tail is that
+object and both words have a Greek adjective; otherwise the tail is reported lost (flag ellipsis, Check).
+### (d) although / though / aunque
+The same subject: καίπερ + the present participle agreeing with the main subject, after it (ὁ δοῦλος καίπερ κάμνων τοὺς
+λίθους φέρει; "be" + adjective: ἡ κόρη καίπερ μικρὰ οὖσα, the adjective agreeing through predGender / predNumber); another
+subject before the main clause: "X μέν ..., ὅμως δὲ ..." (ἡ μὲν ὁδὸς μακρά ἐστιν, ὅμως δὲ ὁ παῖς ...; Check when the main
+clause brings a connector of its own); after the main clause: ", καίτοι" + the indicative. ἀλλά at the head of the
+concessive clause (it said the opposite) is gone. GrcSub with participle and conj: the realiser writes the conj before
+the participle.
+### Numbers
+Own material, first run -> final: GRC -> EN 1 -> 3/3 (wrong among OK 1 -> 0), GRC -> ES 1 -> 3/3 (2 as written + 1
+proposal; wrong among OK 1 -> 0), EN -> GRC 0 -> 4/4, ES -> GRC 0 -> 2/2 (1 as written + 1 proposal). C39 own_frame
+GRC -> EN 3 -> 5/6, wrong among OK 2 -> 0 (units 1-2 fixed; 2 gold proposals), EN -> GRC 2 -> 4/4. Owner material (by
+unit number only): grc-en units 3 and 12 read the predicate as self-employed now (self-sufficient offered as the
+alternative; unit 12 no longer matches the owner's wording literally: the main agent decides), en-grc unit 14 keeps the
+negation and agrees with its noun (OK; was Check), en-grc unit 9 has a concessive word (μέν ... ὅμως δέ, Check: the
+word order of "also ... not" is still poor); regression_report_athen_en_grc 39 -> 40/50 (unit 10, the same tail).
+### Still open
+"The farmer has oxen, not many, but strong." (the parse of "has oxen"; Check); ES "campesinos" -> χῶραι (lexical,
+pre-existing); "οἱ σοφοὶ τὴν ἀλήθειαν ζητοῦσιν" -> "look for the not a lie" (ἀλήθεια has no readable row; pre-existing);
+owner en-grc unit 9 "οὐ καὶ" order.

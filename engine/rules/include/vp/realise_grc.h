@@ -159,7 +159,9 @@ struct GrcNP {
 struct GrcOblique { uint32_t prep = kNone; uint8_t case_ = 0; GrcNP np; bool front = false;
                     bool end = false;   /* C16: after the verb ("ἐφυτεύσαμεν ἁμαρτόντες") */
                     /* C38 (additive): "not X but Y": 1 = οὐ / οὐκ before this phrase, 2 = ἀλλά before it */
-                    uint8_t contrast = 0; };
+                    uint8_t contrast = 0;
+                    /* C40 (additive): a pause before the phrase ("," or "·"): ", οὐ πολὺν ἀλλὰ ἱκανόν" after the verb */
+                    std::string pauseBefore; };
 struct GrcAdverb { uint32_t lemma = kNone; AdvPos pos = AdvPos::Auto; };
 
 struct GrcPredicate {

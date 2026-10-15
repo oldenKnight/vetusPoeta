@@ -1,8 +1,9 @@
 # Gold English for tests/regression/own_frame_grc.grc.txt (C39), written before any C39 rule and before the engine was
 # run. Alternatives after " | ".
+# C40 proposed alternatives added after the run (veto freely): unit 2 "the farmers who work their own land" (the noun reading of αὐτουργοί, item b), unit 5 "self-employed" (the predicate reading C40 asks for).
 The farmer works in the field. | The farmer toils in the field. | The farmer who works his own land works in the field. | The farmer who works his own land toils in the field.
-The farmers love the oxen. | The farmers like the oxen. | The farmers love their oxen.
+The farmers love the oxen. | The farmers like the oxen. | The farmers love their oxen. | The farmers who work their own land love the oxen.
 The work is hard. | The work is difficult.
 Philip does not love the long work. | Philip does not like the long work.
-The father is a farmer who works his own land. | The father is a farmer. | The father is self-sufficient. | The father works his own land.
+The father is a farmer who works his own land. | The father is a farmer. | The father is self-sufficient. | The father works his own land. | The father is self-employed.
 The work of the slave is long. | The slave's work is long.

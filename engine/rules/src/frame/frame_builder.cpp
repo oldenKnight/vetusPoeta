@@ -3352,6 +3352,18 @@ void FrameBuilder::buildClause(Ctx& c, int h, SemFrame& f) const {
       // coordinated clause (same subject unless it has its own)
       SemSub s;
       s.relation = Relation::Coord;
+      // C40 (d): "..., although the road is long": a conjunct clause with its own concessive subordinator (the parser
+      // hung it on the main verb as a conjunct) is the concessive clause, not "and" (et via longa est lost although)
+      for (int g : c.kids[(size_t)k])
+        if (c.ok(g) && c.dep(g) == "mark" && in(c.t(g).lower, {"although", "though", "aunque"}) && s.marker.empty()) {
+          bool cc = false;
+          for (int g2 : c.kids[(size_t)k]) cc = cc || (c.ok(g2) && c.dep(g2) == "cc");
+          if (cc) break;
+          s.relation = Relation::Concession;
+          s.marker = "although";
+          c.drop(g, Drop::Marker);
+          c.take(g);
+        }
       for (int g : c.kids[(size_t)k])
         if (c.ok(g) && c.dep(g) == "cc" && s.marker.empty()) {
           s.marker = canonConnector(lang_, c.t(g).lower);
@@ -6714,6 +6726,62 @@ void FrameBuilder::analyse(std::string_view sentence, SemSentence& out, bool cla
       fr::nounRelative(tk, true);
     }
   }
+  // C40: "... and provides him food.": a noun after a pronoun object of the same verb, read as the verb's xcomp (a
+  // purpose clause "ut cibus" / "ἵνα σῖτος"), is the direct object and the pronoun the indirect one
+  if (lang_ == SrcLang::En && nlp_)
+    for (int i = 1; i < n; ++i) {
+      nlp::Token& t = tk[(size_t)i];
+      if (t.upos != "NOUN" || t.deprel != "xcomp" || t.head <= 0 || t.head > n || tk[(size_t)t.head - 1].upos != "VERB")
+        continue;
+      // verbs of giving only ("they made him king" keeps its object complement)
+      if (!in(tk[(size_t)t.head - 1].lemma, {"provide", "give", "bring", "send", "offer", "show", "hand", "lend", "sell",
+                                             "pay", "supply", "grant", "tell", "teach", "buy", "pass", "throw", "owe",
+                                             "promise", "serve", "pour", "cook", "bake"}))
+        continue;
+      bool own = false;   // a word of its own clause ("to", a copula, a subject) keeps the xcomp
+      for (int k = 0; k < n; ++k)
+        if (tk[(size_t)k].head == i + 1 && in(tk[(size_t)k].deprel, {"mark", "cop", "nsubj", "aux", "case"})) own = true;
+      if (own) continue;
+      int j = i - 1;
+      while (j >= 0 && tk[(size_t)j].head == i + 1 && in(tk[(size_t)j].deprel, {"det", "amod", "nummod"})) --j;
+      if (j < 0 || tk[(size_t)j].upos != "PRON" || tk[(size_t)j].deprel != "obj" || tk[(size_t)j].head != t.head) continue;
+      tk[(size_t)j].deprel = "iobj";
+      t.deprel = "obj";
+    }
+  // C40 (d): "..., and although the hut is small, it gives shelter": the parser made the concessive clause a conjunct
+  // and the clause after it (its main clause) a time clause under it or another conjunct; "although" was then lost
+  // ("et casa parva est et tēctum dat", OK). The tree is turned round: the later clause is the conjunct, the concessive
+  // one its subordinate ("and" moves to it). A rebuilt structure: Check (doubt concession-repair).
+  if (nlp_)
+    for (int k = 0; k < n; ++k) {
+      if (tk[(size_t)k].deprel != "conj") continue;
+      int mark = -1, v = -1;
+      for (int g = 0; g < n; ++g)
+        if (tk[(size_t)g].head == k + 1 && tk[(size_t)g].deprel == "mark" && in(tk[(size_t)g].lower, {"although", "though", "aunque"}))
+          mark = g;
+      if (mark < 0) continue;
+      bool child = false;
+      for (int g = k + 1; g < n && v < 0; ++g) {
+        const bool under = tk[(size_t)g].head == k + 1 && in(tk[(size_t)g].deprel, {"advcl", "parataxis"});
+        const bool beside = tk[(size_t)g].head == tk[(size_t)k].head && in(tk[(size_t)g].deprel, {"conj", "parataxis"});
+        if ((under || beside) && in(tk[(size_t)g].upos, {"VERB", "AUX", "ADJ", "NOUN"})) { v = g; child = under; }
+      }
+      if (v < 0) continue;
+      bool vOwn = false, vSubj = false;   // the later clause: no subordinator or conjunction of its own, a subject
+      for (int g = 0; g < n; ++g) {
+        if (tk[(size_t)g].head != v + 1) continue;
+        vOwn = vOwn || tk[(size_t)g].deprel == "mark" || tk[(size_t)g].deprel == "cc";
+        vSubj = vSubj || tk[(size_t)g].deprel == "nsubj";
+      }
+      if (vOwn || !vSubj) continue;
+      if (child) tk[(size_t)v].head = tk[(size_t)k].head;
+      tk[(size_t)v].deprel = "conj";
+      tk[(size_t)k].head = v + 1;
+      tk[(size_t)k].deprel = "advcl";
+      for (int g = 0; g < mark; ++g)
+        if (tk[(size_t)g].head == k + 1 && tk[(size_t)g].deprel == "cc") tk[(size_t)g].head = v + 1;
+      out.doubt("concession-repair");
+    }
   // C39: "The well supplies water.": a noun right after the opening determiner and right before the finite verb that
   // heads the sentence is its subject (the parser hung "well" on the verb as parataxis: "Puteus, aquam praebet")
   if (lang_ == SrcLang::En && nlp_) {

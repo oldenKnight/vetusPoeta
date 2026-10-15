@@ -288,6 +288,21 @@ void buildFrames(const lex::Lexicon& lx, const Sentence& s, const std::vector<To
                 for (size_t av : advs[mi]) { a.adverbs.push_back(lexOf(av).word); a.advTokens.push_back((int)av); }
             x.adjectives.push_back(a);
             x.head.clear();
+          } else if (np.adjOnly && np.article && h.lpos == Adj) {
+            // C40 (b): an adjective used as a noun with the article: its readable noun ("ὁ αὐτουργός" = the farmer who
+            // works his own land; a masculine / feminine one is a person); without one the English plural of an
+            // adjective takes no -s ("the self-sufficient", never "the self-sufficients")
+            Lexical& hx = side.lex[head];
+            if (!hx.noun.empty()) {
+              x.head = hx.noun;
+              hx.plural = hx.nounPlural;
+              if (h.f.gender != N && h.f.gender != 0) hx.person = true;
+              if (esT) hx.gender = h.f.gender == F ? F : M;
+              x.srcGender = hx.gender;
+            } else if (!esT && x.number == 2 && hx.plural.empty() && !x.head.empty() && hx.row && !hx.person &&
+                       !hx.animal && !(x.head[0] >= 'A' && x.head[0] <= 'Z')) {
+              hx.plural = x.head;   // a readable adjective ("the wise"); a person row is a noun ("the allies")
+            }
           }
         }
       }
@@ -1678,7 +1693,10 @@ std::string esNP(const SemNP& n, const Side& side) {
   const uint8_t g = esGender(n, side);
   const bool pl = n.number == 2;
   std::string noun = n.head;
-  if (pl && !noun.empty()) noun = es::plural(noun);
+  if (pl && !noun.empty()) {   // C40: a readable plural of its own (noun-pl:) for a multi-word noun
+    const Lexical* lx = lexAt(side, n.token);
+    noun = lx && !lx->plural.empty() ? lx->plural : es::plural(noun);
+  }
   if (!n.possessor.empty()) {
     w.push_back(esPossessive(n.possessor[0], pl));
     if (n.possessor[0].pronLemma == "own") w.push_back(es::adjective("propio", g == F ? F : M, pl ? 2 : 1));   // C38

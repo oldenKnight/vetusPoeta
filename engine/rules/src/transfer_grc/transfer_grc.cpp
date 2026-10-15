@@ -3875,7 +3875,62 @@ void GreekTransfer::clauseInto(const SemFrame& f, Ctx& c, GrcClause& cl) const {
         }
         break;
       case Relation::Result: gs.rel = SubRel::Result; break;
-      case Relation::Concession: gs.rel = SubRel::Coord; gs.conj = conj("ἀλλά"); break;
+      case Relation::Concession: {
+        // C40 (d): although / though / aunque. The main clause's subject: καίπερ + a participle agreeing with it ("Although
+        // he is tired, the slave carries the stones" -> ὁ δοῦλος καίπερ κάμνων τοὺς λίθους φέρει); another subject:
+        // "X μέν ..., ὅμως δὲ ..." before the main clause, καίτοι + the indicative after it (ἀλλά at the head of the
+        // concessive clause said the opposite)
+        gs.rel = SubRel::Coord;
+        const uint32_t kaiper = greek("καίπερ", Particle) != kNone ? greek("καίπερ", Particle) : greek("καίπερ");
+        const uint32_t eimi = greek("εἰμί", Verb);
+        int same = 0;
+        if (sf.hasSubject) same = sameSubject(false);
+        else if (f.hasSubject && sc.pred.person != 1 && sc.pred.person != 2)   // "aunque está cansada" (no subject said)
+          same = 1;
+        // a verb, or "be" + adjective(s) (καίπερ μικρὸς ὤν: the adjective agrees with the main subject)
+        const bool copAdj = sc.pred.lemma == eimi && !sc.predAdj.empty() && sc.predicative.empty();
+        const bool plainPtc = sc.type == ClauseType::Decl && sc.pred.lemma != kNone && (sc.pred.lemma != eimi || copAdj) &&
+                              sc.pred.modal == kNone && sc.predicative.empty() && (sc.predAdj.empty() || copAdj) &&
+                              sc.subs.empty() && sc.polarity == Polarity::Pos && f.type == Kind::Decl &&
+                              sf.pred.tense != frame::Tense::Future;
+        uint8_t num = Sg, gen = M;
+        std::string probe;
+        if (same && plainPtc && kaiper != kNone && mainAgree(num, gen) &&
+            participle(lx_, sc.pred.lemma, Present, sc.pred.voice, Nom, num, gen, probe)) {
+          if (same == 2) { cl.subject = sc.subject; cl.hasSubject = true; }
+          gs.participle = true;
+          gs.conj = kaiper;
+          sc.hasSubject = false;
+          sc.pred.tense = Present;
+          sc.connectors.clear();
+          if (copAdj) { sc.predGender = gen; sc.predNumber = num; }
+          c.table(kaiper, mk, sf.pred.token, "although + the same subject: καίπερ + the participle");
+          break;
+        }
+        const uint32_t men = greek("μέν", Particle) != kNone ? greek("μέν", Particle) : greek("μέν");
+        const uint32_t de = greek("δέ", Particle) != kNone ? greek("δέ", Particle) : greek("δέ");
+        const uint32_t hom = greek("ὅμως", Adv) != kNone ? greek("ὅμως", Adv) : greek("ὅμως");
+        const uint32_t kaitoi = greek("καίτοι", Particle) != kNone ? greek("καίτοι", Particle) : greek("καίτοι");
+        if (sb.before && men != kNone && de != kNone && hom != kNone && cl.connectors.empty()) {
+          gs.noConj = true;
+          sc.connectors.clear();
+          sc.connectors.push_back(men);
+          cl.connectors.push_back(de);
+          cl.adverbs.insert(cl.adverbs.begin(), GrcAdverb{hom, AdvPos::Front});
+          c.table(hom, mk, sf.pred.token, "although (another subject): μέν ..., ὅμως δέ ...");
+          // a connector of the main clause of its own ("also", "so") sits beside ὅμως δέ by a guess: Check
+          if (!f.connectors.empty() && std::find(c.out.flags.begin(), c.out.flags.end(), "clause-repair") == c.out.flags.end())
+            c.out.flags.push_back("clause-repair");
+          break;
+        }
+        if (!sb.before && kaitoi != kNone) {
+          gs.conj = kaitoi;
+          c.table(kaitoi, mk, sf.pred.token, "although after the main clause: καίτοι + the indicative");
+          break;
+        }
+        gs.conj = conj("ἀλλά");
+        break;
+      }
       case Relation::Complement: {
         if (sf.type == Kind::Wh) { gs.rel = SubRel::IndirectQ; break; }
         // C18: "so cold that ...", "so fast that ...": a result clause, ὥστε + the indicative for an actual result (οὐ),

@@ -163,6 +163,25 @@ struct Translator::Impl : public detail::LexicalSource {
         x.plural = tags.substr(pl + 7, e - pl - 7);
       }
       if (tg == Target::Es) x.gender = r->esGender == "f" ? F : r->esGender == "m" ? M : 0;
+      // C40 (b): noun:<en>|<es>, noun-pl:<en>|<es>, alt:<en>|<es> ("_" stands for a space)
+      auto tagValue = [&](const char* name) {
+        const std::string k = std::string(name) + ":";
+        for (size_t at = tags.find(k); at != std::string::npos; at = tags.find(k, at + 1)) {
+          if (at > 0 && tags[at - 1] != ' ') continue;
+          size_t e = at + k.size();
+          while (e < tags.size() && tags[e] != ' ') ++e;
+          const std::string v = tags.substr(at + k.size(), e - at - k.size());
+          const size_t bar = v.find('|');
+          std::string w = tg == Target::En ? v.substr(0, bar) : bar == std::string::npos ? std::string() : v.substr(bar + 1);
+          std::replace(w.begin(), w.end(), '_', ' ');
+          return w;
+        }
+        return std::string();
+      };
+      x.noun = tagValue("noun");
+      x.nounPlural = tagValue("noun-pl");
+      x.alt = tagValue("alt");
+      x.row = true;
       return x;
     }
     if (tg == Target::En) {
@@ -203,6 +222,20 @@ struct Translator::Impl : public detail::LexicalSource {
     out.text = tg == Target::En ? detail::realiseEnglish(b, side) : detail::realiseSpanish(b, side);
     for (const std::string& f : b.flags) out.flags.push_back(f);
     out.dropped = b.dropped;
+    // C40 (b): a word with a second reading (alt:) gives the sentence once more with that reading
+    for (const detail::Lexical& lw : side.lex) {
+      if (lw.alt.empty() || lw.word.empty() || lw.alt == lw.word) continue;
+      for (size_t at = out.text.find(lw.word); at != std::string::npos; at = out.text.find(lw.word, at + 1)) {
+        const size_t e = at + lw.word.size();
+        auto letter = [](char ch) { return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (unsigned char)ch >= 0x80 || ch == '-'; };
+        if ((at > 0 && letter(out.text[at - 1])) || (e < out.text.size() && letter(out.text[e]))) continue;
+        std::string a = out.text;
+        a.replace(at, lw.word.size(), lw.alt);
+        if (std::find(out.alternatives.begin(), out.alternatives.end(), a) == out.alternatives.end())
+          out.alternatives.push_back(a);
+        break;
+      }
+    }
     // C38: a Greek word left in the English / Spanish sentence (an untranslated vocative "Ζεῦ, ...") is never OK
     for (size_t i = 0; i < out.text.size();) {
       size_t j = i;
@@ -440,11 +473,13 @@ std::vector<rules::CueOutput> Translator::cues(const std::vector<rules::CueInput
       bool unknown = false, ambiguous = false, check = false, accent = false;
       std::vector<std::string> unknownWords, ambiguousWords, accentWords, droppedWords;
       std::string wordByWord;
+      std::vector<std::pair<std::string, std::string>> second;   // C40: (sentence, the same with a second reading)
       for (const auto& r : ranges) {
         SentenceOut so;
         impl_->sentence(std::string_view(in.sourceText).substr(r.first, r.second - r.first), t, so, &ctx.glossary);
         if (!o.target.empty() && !so.text.empty()) o.target += ' ';
         o.target += so.text;
+        for (const std::string& a : so.alternatives) second.emplace_back(so.text, a);
         conf += so.confidence;
         ++ns;
         for (const std::string& w : so.dropped) droppedWords.push_back(w);
@@ -521,6 +556,13 @@ std::vector<rules::CueOutput> Translator::cues(const std::vector<rules::CueInput
       o.confidence = unknown ? rules::Confidence::Fix
                              : (ambiguous || check || mean < 0.7) ? rules::Confidence::Check : rules::Confidence::Ok;
       o.score = std::round(mean * 1000) / 1000;
+      for (const auto& sa : second) {   // C40 (b): a second reading of a word ("self-sufficient")
+        const size_t at = o.target.find(sa.first);
+        if (at == std::string::npos) continue;
+        std::string a = o.target;
+        a.replace(at, sa.first.size(), sa.second);
+        o.alternatives.push_back(rules::Alternative{a, "second reading of a word", 0.6});
+      }
       if (!wordByWord.empty()) o.alternatives.push_back(rules::Alternative{wordByWord, "word by word", 0.5});
     } catch (const std::exception& e) {
       o.target = in.sourceText;

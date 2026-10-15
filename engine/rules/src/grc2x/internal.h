@@ -58,6 +58,11 @@ struct Lexical {
   bool silent = false;        // C38: a readable row "-" (the word is deliberately not translated)
   bool generic = false;       // C38: readable tag "generic": no English article for the Greek generic one (life)
   std::string plural;         // irregular English plural ("men"), "" = rule
+  // C40 (b): readable tags noun:<en>|<es> and noun-pl:<en>|<es> (an adjective used as a noun with the article:
+  // αὐτουργός "farmer who works his own land"; "_" for a space) and alt:<en>|<es> (a second reading of the word,
+  // offered as an alternative sentence: "self-sufficient")
+  std::string noun, nounPlural, alt;
+  bool row = false;           // C40: the word comes from a readable_grc.tsv row (not the lexicon's gloss)
   uint8_t gender = 0;         // Spanish noun gender (feat::M / F)
 };
 

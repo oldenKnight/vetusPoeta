@@ -3579,7 +3579,8 @@ class RulesEngine final : public Engine {
                             "join-discarded", "join-neighbour",   // C30b
                             "form-guess", "gender-inferred",   // C32
                             "contrast-guess", "source-word", "connector-guess", "prep-dropped",   // C37
-                            "verb-doubt"})   // C39: the only verb is a word far more often a noun
+                            "verb-doubt",   // C39: the only verb is a word far more often a noun
+                            "concession-repair"})   // C40: "and although X, Y" read again (a rebuilt tree)
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       // C37 (calibration): a dictionary word chosen on a weak sense (the best candidate's score below 0.35: a minor
       // sense, a gloss modifier only, "oxen" -> iugum, "pobres" -> paupertās) is never OK (flag weak-sense)

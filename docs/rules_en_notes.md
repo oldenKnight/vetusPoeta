@@ -1853,3 +1853,38 @@ Only appended (no alternative removed): own_frame.la.gold.txt unit 2 = file line
 "The well gives water." (gives tagged as an adjective modifier: Fix, honest); "The river provides water, not much but
 enough." (parse); "los soldados" -> virī (ES); "The Greeks are brave." -> Graeca (pre-existing); the C39 blind lines
 EN -> LA 1 (bell rings -> pulsat), 4 (in Rōmā), LA -> EN 3 (a common-noun subject before līber est et dominus suus).
+
+## Last cases (C40)
+Material first (0abae86, before any rule): tests/regression/own_last.en.txt (8, EN -> LA), own_last.es.txt (3, ES -> LA),
+own_last_grc.grc.txt (3, GRC -> EN / ES), own_last_grc.en.txt (4, EN -> GRC), own_last_grc.es.txt (2, ES -> GRC) = 20
+own sentences with gold in expected/own_last*.gold.txt; 10 blind lines in data/work/eval/c40-blind/ (WRITTEN 2026-10-14
+20:43 UTC). Tests: engine/tests/test_rules_r.cpp (report regression_report_r.txt). Greek side: rules_grc3_notes.md.
+### (a) the locative of towns and small islands
+names_la.tsv rows with the note "city" / "island" (new: Corinth, Carthage, Sparta, Troy, Thebes, Syracuse, Naples,
+Pompeii, Delphi, Capua, Tarentum, Brundisium, Rhodes, Delos, Ithaca; Spanish spellings Atenas, Corinto, Cartago ...;
+Ostia left out: "ostia" is a common Latin word for la2x) take no preposition: "in / at" -> the locative (Rōmae,
+Corinthī, Athēnīs, Carthāgine, Londiniī, Delphīs: realise::Names::decline now has the locative, 1st -ae / -īs, 2nd -ī /
+-īs, 3rd -e; a 2nd-declension plural town declines as a plural), "to" -> the accusative with any verb but "be" ("The
+ships sail to Rome" was Rōmae, a dative read as a locative; "We have been to Rome" stays Rōmae fuimus), "from" -> the
+ablative. Spanish: the frame names the prepositions in English (en -> in, a -> to, de -> of): "de" is "from" only after
+a verb of motion ("Hablamos de Roma" stays dē Rōmā). A town with an attribute keeps the preposition (in antīquā Rōmā);
+"in Rome and Athens" -> Rōmae et Athēnīs. domī / rūrī were already right (C17, C37).
+Frame repairs met on the way: "My friend was at Rome yesterday." (the parser made "Rome yesterday" one noun and Rome was
+lost, OK): a time word after the noun of a prepositional phrase at the end is an adverb; "The farmer has food." / "The
+boy has books." ("has" the auxiliary of a noun, the clause a fragment "Cibus.", or "books" a verb): retagged at the end
+of retagForms; "... and provides him food" (food read as an xcomp, "ut cibus"): with a verb of giving the noun is the
+object and the pronoun the indirect object ("They made him king" keeps its complement).
+### (d) although -> quamquam
+Already right before a clause; new: "..., although the road is long" after the main clause (the parser hung it as a
+conjunct: "et via longa est", the concession lost) -> quamquam + indicative, and "..., and although X, Y" (the
+concessive clause read as the conjunct and its main clause under it, or beside it: "et casa parva est et tēctum dat",
+OK and wrong) -> the tree is turned round (doubt concession-repair, Check: "et quamquam casa parva est, tēctum dat").
+### Numbers
+Own material, first run -> final (text project, fidelity 2, speaker m): EN -> LA 4 -> 8/8 (wrong among OK 1 -> 0),
+ES -> LA 1 -> 3/3. C39 own_frame Latin files unchanged. Owner material (by unit number only): en-la unit 2 now has the
+locative (still Check: frame fallback), unit 9 although -> quamquam (Check, concession-repair); no other unit changed in
+la-en, en-la, es-la, la-es; wrong among OK 0. Blind EN -> LA 2/3, ES -> LA 0/1 (wrong among OK 0).
+### Still open
+"The farmer has oxen." (still a fragment "Bovēs.", Check); "the city of Rome" -> in urbe Rōmae (apposition urbe Rōmā
+would be classical); "The farmer is rich, not very but enough." (Latin "valdē dīves est sed satis", pre-existing); the C40
+blind lines ES -> LA 1 (amo -> genitor) and EN -> GRC 3 (sail as a noun).

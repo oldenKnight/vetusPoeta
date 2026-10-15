@@ -1,4 +1,5 @@
 # Gold Attic Greek for tests/regression/own_last_grc.es.txt (C40), written before any C40 rule and before the engine
 # was run. Polytonic, no elision; alternatives after " | ".
-καίπερ κάμνουσα ἡ κόρη ᾄδει. | ἡ κόρη, καίπερ κάμνουσα, ᾄδει. | ἡ κόρη καίπερ κάμνουσα ᾄδει.
+# C40 proposed alternative added after the run (veto freely): unit 1 ἡ παῖς (the girl; παῖς is common gender) for κόρη.
+καίπερ κάμνουσα ἡ κόρη ᾄδει. | ἡ κόρη, καίπερ κάμνουσα, ᾄδει. | ἡ κόρη καίπερ κάμνουσα ᾄδει. | ἡ παῖς καίπερ κάμνουσα ᾄδει. | καίπερ κάμνουσα ἡ παῖς ᾄδει. | ἡ παῖς, καίπερ κάμνουσα, ᾄδει.
 ἄρτον ἔχομεν, οὐ πολὺν ἀλλὰ ἱκανόν. | ἔχομεν ἄρτον, οὐ πολὺν ἀλλὰ ἱκανόν.

@@ -43,6 +43,16 @@ bool Names::decline(std::string_view nom, std::string_view gen, int declension, 
       return true;
     }
   }
+  // C40 (a): the locative of a town or small island (names_la.tsv note "city" / "island"): Rōmae, Athēnīs, Corinthī,
+  // Londiniī, Delphīs, Carthāgine
+  if (case_ == Loc && declension > 0 && nom.find(' ') == std::string_view::npos) {
+    if (declension == 1 && endsWith(nom, "ae")) { out = dropSuffix(nom, "ae") + "īs"; return true; }
+    if (declension == 1 && endsWith(nom, "a")) { out = dropSuffix(nom, "a") + "ae"; return true; }
+    if (declension == 2 && endsWith(nom, "ī")) { out = dropSuffix(nom, "ī") + "īs"; return true; }   // Delphī
+    if (declension == 2 && endsWith(gen, "ī")) { out = std::string(gen); return true; }
+    if (declension == 3 && endsWith(gen, "is")) { out = dropSuffix(gen, "is") + "e"; return true; }
+    return false;
+  }
   if (declension <= 0 || ci < 0) { out = std::string(nom); return declension <= 0 && ci >= 0; }
   if (declension == 4) {   // C37: Iēsus (gen. Iēsū: -us -ū -ū -um -ū -ū) and the 4th declension (-us -ūs -uī -um -ū -us)
     if (!endsWith(nom, "us")) return false;
@@ -66,6 +76,11 @@ bool Names::decline(std::string_view nom, std::string_view gen, int declension, 
     return true;
   }
   if (declension == 2) {
+    if (endsWith(nom, "ī") && endsWith(gen, "ōrum")) {   // C40: a plural town name (Delphī, Pompēiī)
+      static const char* const pl[6] = {"ī", "ōrum", "īs", "ōs", "īs", "ī"};
+      out = dropSuffix(nom, "ī") + pl[ci];
+      return true;
+    }
     if (!endsWith(gen, "ī")) return false;
     const std::string stem = dropSuffix(gen, "ī");
     if (endsWith(nom, "um") || gender == N) {

@@ -6,6 +6,9 @@
 # singular with the gender column; tags: person, animal (Spanish personal "a" for objects), mass (no "a"), motion
 # (present progressive in English: "is coming"), plural:<form> (an irregular English plural), reverse-only (C33: the row
 # reads Greek back but is not a taught gloss of the EN / ES -> Greek path).
+# C40: tags noun:<english>|<spanish> and noun-pl:<english>|<spanish> (an adjective used as a noun with the article;
+# "_" for a space; a masculine / feminine one is a person) and alt:<english>|<spanish> (a second reading, offered as an
+# alternative sentence).
 # C38: tag "generic" (the Greek generic article is no English article: ὁ βίος "life"). Rows for the core words of a beginners' reader, chapters 1-5.
 δοῦλος	noun	slave	esclavo	m	person
 λίθος	noun	stone	piedra	f	
@@ -290,7 +293,7 @@
 γεωργέω	verb	till	cultivar		reverse-only	C38 (greek.vpl lacks the lemma: lexicon_supplement_grc.tsv)
 στενάζω	verb	groan	gemir			C38 ("sigh, moan")
 ἄοκνος	adj	tireless	incansable			C38 ("resolute")
-αὐτουργός	adj	self-sufficient	autosuficiente		reverse-only	C38 (greek.vpl lacks the lemma: lexicon_supplement_grc.tsv)
+αὐτουργός	adj	self-employed	autónomo		reverse-only noun:farmer_who_works_his_own_land|campesino_que_trabaja_su_propia_tierra noun-pl:farmers_who_work_their_own_land|campesinos_que_trabajan_su_propia_tierra alt:self-sufficient|autosuficiente	C38 (greek.vpl lacks the lemma: lexicon_supplement_grc.tsv); C40: with the article a noun (the small farmer of Attica), as a predicate self-employed / self-sufficient
 παρέχω	verb	provide	proporcionar			C38 ("hold beside")
 ἱκανός	adj	enough	suficiente		reverse-only	C38 ("competent")
 πόνος	noun	work	trabajo	m	mass reverse-only	C38 ("labor")

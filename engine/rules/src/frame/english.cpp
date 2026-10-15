@@ -888,6 +888,17 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
         changed = true;
       }
     }
+    // C40 (a): "My friend was at Rome yesterday.": a time word right after the noun of a prepositional phrase at the end
+    // is an adverb (the parser made "Rome yesterday" one noun with yesterday its head, and Rome was lost)
+    int pp = i - 1;
+    while (pp >= 0 && isIn(tk[(size_t)pp].upos, {"PROPN", "NOUN", "ADJ", "DET"})) --pp;
+    if (isIn(t.lower, {"yesterday", "today", "tomorrow", "tonight"}) && t.upos == "NOUN" && i >= 2 &&
+        isIn(tk[(size_t)i - 1].upos, {"PROPN", "NOUN"}) && pp >= 0 && pp < i - 1 && tk[(size_t)pp].upos == "ADP" &&
+        (i + 1 >= n || tk[(size_t)i + 1].upos == "PUNCT")) {
+      t.upos = "ADV";
+      t.feats = 0;
+      changed = true;
+    }
   }
   // C39 (e): "The Greek slave reads a book.": after a determiner, a capitalised adjective of a proper name (english.vpl
   // lists the adjective with its capital: Greek, Roman, Athenian) before a word with a noun reading is that adjective
@@ -1000,6 +1011,37 @@ bool retagForms(std::vector<Token>& tk, const lex::Lexicon& lx) {
       if (pt.upos != "NOUN" && pt.upos != "PROPN") { tk[(size_t)p].upos = "NOUN"; tk[(size_t)p].feats = nlp::morph::fromString("Number=Sing"); }
       if (demote) { tk[(size_t)i + 1].upos = "NOUN"; tk[(size_t)i + 1].feats = nlp::morph::fromString("Number=Sing"); }
       changed = true;
+    }
+  }
+  // C40: "The farmer has food." / "The farmer has oxen." were read with "has" as the auxiliary of the noun (the noun the
+  // root, the clause a fragment): an auxiliary have whose head is a noun (after the retags above), with no verb after it
+  // in its clause, is the main verb
+  for (int i = 0; i < n; ++i) {
+    Token& t = tk[(size_t)i];
+    if (!isIn(t.lower, {"has", "have", "had"}) || t.upos != "AUX" || t.deprel != "aux" || t.head <= 0 || t.head > n ||
+        t.head - 1 <= i)
+      continue;
+    Token& hd = tk[(size_t)t.head - 1];
+    // "The boy has books.": an -s word after "has" is never a 3rd singular verb: the plural noun
+    const bool sNoun = hd.upos == "VERB" && t.head - 1 == i + 1 && hd.lower.size() > 2 && hd.lower.back() == 's' &&
+                       verb3sg(lx, hd.lower) && hasNoun(lx, hd.lower);
+    if (sNoun || isIn(hd.upos, {"NOUN", "PROPN", "NUM"})) {
+      bool verbAfter = false;
+      for (int k = i + 1; k < n && tk[(size_t)k].upos != "PUNCT"; ++k)
+        verbAfter = verbAfter || tk[(size_t)k].upos == "VERB" || tk[(size_t)k].upos == "AUX";
+      if (sNoun) {
+        verbAfter = false;
+        for (int k = i + 2; k < n && tk[(size_t)k].upos != "PUNCT"; ++k)
+          verbAfter = verbAfter || tk[(size_t)k].upos == "VERB" || tk[(size_t)k].upos == "AUX";
+      }
+      if (!verbAfter) {
+        t.upos = "VERB";
+        t.feats = nlp::morph::fromString(t.lower == "had" ? "Tense=Past|VerbForm=Fin|Mood=Ind"
+                                         : t.lower == "has" ? "Number=Sing|Person=3|Tense=Pres|VerbForm=Fin|Mood=Ind"
+                                                            : "Tense=Pres|VerbForm=Fin|Mood=Ind");
+        if (sNoun) { hd.upos = "NOUN"; hd.feats = nlp::morph::fromString("Number=Plur"); }
+        changed = true;
+      }
     }
   }
   return changed;

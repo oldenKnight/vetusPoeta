@@ -353,6 +353,48 @@ void shiftNP(frame::SemNP& n, int d) {
 // "when" and often takes the verb of X for a noun ("the bell rang" -> rang of bell) and loses Y's subject. X and Y are
 // analysed apart (X alone: "the bell rang." is retagged by C17's english helpers) and merged: Y with X as a time
 // clause before it. False when the sentence does not have that shape or a part does not give a clause.
+// C40 (c): "..., not much, but enough." / ": not big but beautiful" / "..., no mucho, pero suficiente." at the end of a
+// sentence: a verbless contrast about the noun before it. The parser read it as a coordination or the root ("Σῖτος καὶ
+// πολὺ καὶ βουπόρος οὔ", the negation lost); the tail is cut off before the analysis and given back by the engine as
+// "οὐ A ἀλλὰ B" agreeing with that noun. `cut` = the sentence without the tail (its final mark kept).
+struct NotButTail { std::string a, b, pause; bool on = false; };
+bool notButTail(const std::string& text, bool es, std::string& cut, NotButTail& t) {
+  t = NotButTail{};
+  std::string body = text;
+  while (!body.empty() && body.back() == ' ') body.pop_back();
+  std::string fin;
+  while (!body.empty() && (body.back() == '.' || body.back() == '!')) { fin.insert(fin.begin(), body.back()); body.pop_back(); }
+  auto word = [](const std::string& x, size_t& i, std::string& w) {
+    w.clear();
+    while (i < x.size() && x[i] == ' ') ++i;
+    while (i < x.size() && (((unsigned char)x[i] >= 0x80) || std::isalpha((unsigned char)x[i]))) w += x[i++];
+    return !w.empty();
+  };
+  const std::string neg = es ? "no" : "not";
+  for (size_t sep = body.find_first_of(",:"); sep != std::string::npos; sep = body.find_first_of(",:", sep + 1)) {
+    size_t i = sep + 1;
+    std::string w, a, b;
+    if (!word(body, i, w) || text::lower(w) != neg || !word(body, i, a)) continue;
+    while (i < body.size() && (body[i] == ' ' || body[i] == ',')) ++i;
+    if (!word(body, i, w)) continue;
+    const std::string c = text::lower(w);
+    if (!(es ? (c == "pero" || c == "sino") : c == "but")) continue;
+    if (!word(body, i, b)) continue;
+    while (i < body.size() && body[i] == ' ') ++i;
+    if (i != body.size()) continue;
+    size_t e = sep;
+    while (e > 0 && body[e - 1] == ' ') --e;
+    if (e == 0) return false;
+    cut = body.substr(0, e) + (fin.empty() ? std::string(".") : fin);
+    t.a = text::lower(a);
+    t.b = text::lower(b);
+    t.pause = body[sep] == ':' ? "\xC2\xB7" : ",";
+    t.on = true;
+    return true;
+  }
+  return false;
+}
+
 bool frontedWhen(const std::string& text, const frame::FrameBuilder& fb, frame::SemSentence& out) {
   std::string low = text::lower(text);
   size_t lead = 0;
@@ -1908,6 +1950,64 @@ struct GreekPath::Impl {
     }
   }
 
+  NotButTail notBut_;   // C40 (c): the tail of the sentence being translated (cut off before the analysis)
+  // C40 (c): "οὐ A ἀλλὰ B" after the clause, agreeing with its object (else its subject); nothing when a word of the
+  // tail has no Greek adjective (the tail is then lost: Check)
+  void notButInto(GrcClauseOut& co, const transfer::Settings& st, int lastWord) {
+    notBut_.on = false;
+    // the clause the tail follows: the last clause coordinated after the main one ("... and gives him fruit: not much
+    // but enough" is about the fruit)
+    GrcClause* tgt = &co.clause;
+    for (;;) {
+      GrcSub* last = nullptr;
+      for (GrcSub& sb : tgt->subs)
+        if (!sb.before && !sb.participle && !sb.clause.empty()) last = &sb;
+      if (!last || last->rel != SubRel::Coord) break;
+      tgt = &last->clause[0];
+    }
+    GrcClause& cl = *tgt;
+    bool subAfter = false;
+    for (const GrcSub& sb : cl.subs) subAfter = subAfter || (!sb.before && !sb.participle);
+    // the noun it agrees with: the object, when it is the word right before the tail
+    const GrcNP* ref = cl.hasObject && !subAfter ? &cl.object : nullptr;
+    if (ref) {
+      bool lastIsObject = false;
+      for (const transfer::Choice& ch : co.choices) lastIsObject = lastIsObject || (ch.token == lastWord && ch.lemma == ref->head);
+      if (!lastIsObject) ref = nullptr;
+    }
+    auto lost = [&]() {
+      addFlag(co.flags, "ellipsis");
+      co.notes.push_back(Reason{-1, "form", "\"not " + notBut_.a + " but " + notBut_.b + "\" could not be given back: check it", ""});
+    };
+    if (!ref || ref->isPronoun || ref->isName || ref->head == kNone || !ref->coord.empty()) { lost(); return; }
+    transfer::Choice ca, cb;
+    const uint32_t a = xfer->select(notBut_.a, feat::Adj, {}, false, false, st, ca);
+    const uint32_t b = xfer->select(notBut_.b, feat::Adj, {}, false, false, st, cb);
+    if (a == kNone || b == kNone || lx.lemma(a).pos != feat::Adj || lx.lemma(b).pos != feat::Adj) { lost(); return; }
+    uint8_t g = ref->gender;
+    if (!g) {
+      const uint8_t lg = lx.lemma(ref->head).gender;
+      g = lg == feat::F || lg == feat::FN ? feat::F : lg == feat::N ? feat::N : feat::M;
+    }
+    const uint8_t cs = ref->case_ ? ref->case_ : (uint8_t)feat::Acc;
+    for (int k = 0; k < 2; ++k) {
+      GrcOblique ob;
+      ob.end = true;
+      ob.contrast = k == 0 ? 1 : 2;
+      ob.case_ = cs;
+      ob.np.head = k == 0 ? a : b;
+      ob.np.gender = g;
+      ob.np.number = ref->number;
+      ob.np.case_ = cs;
+      if (k == 0) ob.pauseBefore = notBut_.pause;
+      cl.obliques.push_back(ob);
+      transfer::Choice& ch = k == 0 ? ca : cb;
+      ch.lemma = k == 0 ? a : b;
+      ch.note = "not ... but after a noun: agrees with it";
+      co.choices.push_back(ch);
+    }
+  }
+
   Impl(const lex::Lexicon& l, curated::CuratedData c, GreekData g, GreekTables t, PathConfig k)
       : lx(l), cd(std::move(c)), gd(std::move(g)), gt(std::move(t)), cfg(k) {
     cd.replacePhrasebooks(gd.phrasebook(), gt.phrasebookEs());
@@ -2232,6 +2332,18 @@ struct GreekPath::Impl {
 
   void speech(const std::string& text, const frame::FrameBuilder& fb, const rules::Options& opt, transfer::Memory& mem,
               const transfer::Settings& st, SentOut& so, bool alternatives, bool allowSplit = true) {
+    // C40 (c): a verbless "..., not A, but B" tail: the sentence before it analysed alone, the tail given back below
+    if (!notBut_.on) {
+      std::string cut;
+      NotButTail t;
+      if (notButTail(text, st.lang == frame::SrcLang::Es, cut, t)) {
+        notBut_ = t;
+        speech(cut, fb, opt, mem, st, so, alternatives, allowSplit);
+        if (notBut_.on) addFlag(so.flags, "ellipsis");   // no clause took the tail back: it is lost (Check)
+        notBut_ = NotButTail{};
+        return;
+      }
+    }
     frame::SemSentence s;
     // C25: quoted sound words ("woof", "moo") are kept as written (see quotedSounds); the parser reads a pronoun there
     std::vector<std::pair<size_t, size_t>> soundSpans;
@@ -2461,6 +2573,13 @@ struct GreekPath::Impl {
         GrcClauseOut co;
         if (u.vocative) xfer->vocative(u.frame.subject, s, st, mem, co);
         else xfer->clause(u.frame, s, st, mem, co);
+        if (notBut_.on && !u.vocative) {
+          bool lastClause = true;
+          for (size_t uj = ui + 1; uj < s.units.size(); ++uj) lastClause = lastClause && s.units[uj].type != frame::Unit::Clause;
+          int lastWord = (int)s.tokens.size() - 1;
+          while (lastWord >= 0 && s.tokens[(size_t)lastWord].upos == "PUNCT") --lastWord;
+          if (lastClause) notButInto(co, st, lastWord);
+        }
         if (!pendingParticle.empty()) {
           uint32_t id = findLemma(lx, pendingParticle, feat::Particle);
           if (id == kNone) id = findLemma(lx, pendingParticle);
@@ -3128,7 +3247,7 @@ struct GreekPath::Impl {
                             "realia", "name-kept", "contact-relative", "noun-infinitive", "purpose-guess", "light-verb",
                             "phrase-order", "participle-phrase", "ellipsis", "clause-repair", "wh-statement", "det-adverb",
                             "past-form", "subject-guess", "fragment", "free-relative", "speech-inversion", "idiom",
-                            "lexicon-gap", "meaning-coverage"})   // C38: a connector / address / name lost   // C33: a form the lexicon lacks, the nearest attested one written
+                            "lexicon-gap", "meaning-coverage", "concession-repair"})   // C40: "and although X, Y" read again   // C38: a connector / address / name lost   // C33: a form the lexicon lacks, the nearest attested one written
         if (std::find(o.flags.begin(), o.flags.end(), f) != o.flags.end()) chk = true;
       for (const transfer::Choice& c : a.choices)
         if (c.lowTier) {

@@ -105,6 +105,9 @@ struct SentenceOut {
   Sentence analysis;
   // C38 (additive): the Greek content words the readable sentence lost (meaning coverage; flag "meaning-coverage")
   std::vector<std::string> dropped;
+  // C40 (additive): the readable sentence again with the second reading of a word (readable_grc tag alt:<en>|<es>,
+  // "The man is self-sufficient." beside "The man is self-employed."); offered as CueOutput alternatives
+  std::vector<std::string> alternatives;
 };
 
 class Translator {

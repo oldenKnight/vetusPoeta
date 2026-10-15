@@ -593,6 +593,8 @@ void GreekRealiser::verbGroup(const GrcClause& c, const Agree& subj, std::vector
 void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<GWord>& out, const Ctx& ctx) {
   std::array<std::vector<GWord>, kSlotCount> s;
   std::vector<GWord> intj, conn2, polite;
+  std::string pauseMark;   // C40: GrcOblique::pauseBefore
+  const char* pauseRule = "";
   const char* orderRule = "order.decl";
 
   // subject agreement
@@ -680,6 +682,11 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
       w.push_back(std::move(pw));
     }
     np(ob.np, oc, ob.prep != kNone, false, o, w);
+    if (!ob.pauseBefore.empty() && !w.empty()) {   // C40: marked here, the comma goes on the word before it below
+      pauseRule = w.front().rule;
+      w.front().rule = "pause.before";
+      pauseMark = ob.pauseBefore;
+    }
     const bool wh = ob.np.interrogative != kNone || (ob.np.head != kNone && ob.np.head == k_.tis);
     append(wh ? s[kWH] : ob.front ? s[kFRONT] : ob.end ? s[kEND] : s[kOBL], w);
   }
@@ -814,6 +821,11 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
     pctx.ante.case_ = subjCase;
     if (pctx.ante.person <= 2 && pctx.ante.number == Pl) pctx.ante.gender = M;   // "we" / "you" (a group): masculine
     std::vector<GWord> body;
+    if (sub.conj != kNone) {   // C40 (d): a concessive participle: καίπερ before it ("καίπερ κάμνων")
+      GWord lead;
+      literal(sub.conj, "καίπερ", lead, "order.ptc");
+      body.push_back(std::move(lead));
+    }
     clause(sub.clause[0], o, body, pctx);
     append(s[kPTC], body);
   }
@@ -907,6 +919,13 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
     for (int sl : seq)
       if (sl >= 0 && sl < kSlotCount) append(content, s[sl]);
   }
+  if (!pauseMark.empty())   // C40: the pause before a phrase that asked for one
+    for (size_t i = 0; i < content.size(); ++i)
+      if (std::string_view(content[i].rule) == "pause.before") {
+        if (i > 0 && content[i - 1].punctAfter.empty()) content[i - 1].punctAfter = pauseMark;
+        content[i].rule = pauseRule;
+        break;
+      }
   // yes/no: ἆρα (optional) / ἆρα μή (expects no)
   if (c.type == ClauseType::Yn && (c.ara || c.bias == YnBias::ExpectNo)) {
     std::vector<GWord> lead;
@@ -1004,7 +1023,10 @@ void GreekRealiser::clause(const GrcClause& c, const GrcOptions& o, std::vector<
         default: break;
       }
     }
-    if (sub.noConj && !sub.before) {   // C18: "..., ὀψὲ γάρ ἐστιν": a comma before the clause with its own particle
+    // C18: "..., ὀψὲ γάρ ἐστιν": a comma before the clause with its own particle; C40: and before καίτοι ("...,
+    // καίτοι ἡ ὁδὸς μακρά ἐστιν")
+    const bool kaitoi = conj != kNone && sub.rel == SubRel::Coord && lx_.lemma(conj).key == std::string_view("καίτοι");
+    if ((sub.noConj || kaitoi) && !sub.before) {
       std::vector<GWord>& prev = after.empty() ? clauseWords : after;
       if (!prev.empty() && prev.back().punctAfter.empty()) prev.back().punctAfter = ",";
     }

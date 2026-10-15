@@ -2885,11 +2885,33 @@ bool Transfer::obliqueInto(const frame::SemOblique& ob, Ctx& c, LaClause& cl) co
     return obliqueInto(o2, c, cl);
   }
   // C28: a town takes no preposition: "from Athens" -> Athēnīs, "to Rome" -> Rōmam (names_la.tsv note "city")
-  if (c.st.lang == frame::SrcLang::En && n.isName && (prep == "from" || ((prep == "to" || prep == "into") && c.motion))) {
+  // C40 (a): also the place where: "in / at Rome" -> the locative Rōmae (Corinthī, Athēnīs, Carthāgine; never in
+  // Rōmā), for towns and small islands (note "island"); the Spanish source the same ("en Roma", "a Roma" after a verb
+  // of motion, "de / desde Atenas" after one); a town with an adjective keeps the preposition
+  // (the Spanish frame names its prepositions in English: en -> in, a -> to, de -> of, desde -> from)
+  const bool esSrc = c.st.lang == frame::SrcLang::Es;
+  const bool townWhere = prep == "in" || prep == "at";
+  const bool townFrom = prep == "from" || (esSrc && prep == "of" && c.motion);
+  // a town is a goal with any verb but "be" ("The ships sail to Rome": Rōmae, a dative, was read as the locative; "We
+  // have been to Rome" stays Rōmae fuimus, below)
+  const bool beTo = c.frame && c.frame->hasPred && text::lower(c.frame->pred.lemma) == "be";
+  const bool townTo = (prep == "to" && (c.motion || !beTo)) || (prep == "into" && c.motion);
+  auto town = [&](const SemNP& x) {
+    if (!x.isName || !x.adjectives.empty()) return false;
+    const curated::NameEntry* ne = cd_.nameByEnglish(x.head);
+    if (!ne && esSrc) ne = cd_.nameByLatin(text::latin_key(x.head));   // "Roma" -> Rōma
+    return ne && (ne->note.find("city") != std::string::npos || ne->note.find("island") != std::string::npos);
+  };
+  bool allTowns = town(n);
+  for (const SemNP& x : n.coord) allTowns = allTowns && town(x) && x.coord.empty();   // "in Rome and Athens"
+  if ((c.st.lang == frame::SrcLang::En || esSrc) && n.isName && (townFrom || townTo || townWhere) &&
+      (n.coord.empty() || allTowns)) {
     const curated::NameEntry* ne = cd_.nameByEnglish(n.head);
-    if (ne && ne->note.find("city") != std::string::npos) {
+    if (!ne && esSrc) ne = cd_.nameByLatin(text::latin_key(n.head));
+    if (ne && (ne->note.find("city") != std::string::npos || ne->note.find("island") != std::string::npos) &&
+        (!townWhere || allTowns)) {
       LaOblique o;
-      o.case_ = prep == "from" ? (uint8_t)Abl : (uint8_t)Acc;
+      o.case_ = townFrom ? (uint8_t)Abl : townTo ? (uint8_t)Acc : (uint8_t)Loc;
       npInto(n, c, o.np);
       o.np.case_ = o.case_;
       o.front = ob.front;
