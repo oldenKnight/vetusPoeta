@@ -1,0 +1,11 @@
+# C40: own English sentences, EN -> LA, items (a) (the locative of towns and domus / rūs; to a town without a
+# preposition) and (d) (although -> quamquam + indicative). Our own sentences, written before any C40 rule.
+# Gold: expected/own_last.la.gold.txt.
+The sailor lives in Rome.
+The merchant stays at Corinth with his brother.
+The philosophers teach in Athens.
+The soldier lives at Carthage.
+The girls stay at home today.
+My father works in the country.
+The farmer goes to Rome with his son.
+Although he is tired, the farmer works in the field.

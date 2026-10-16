@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<style>
+:root { --bg: #fbfaf7; --fg: #1d1b18; --muted: #6b665e; --line: #ddd8cf; --good: #1f6f3a; --bad: #a3271f; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #171614; --fg: #ece8e1; --muted: #a39d93; --line: #39352f; --good: #6fcf8f; --bad: #f08a80; }
+}
+body { background: var(--bg); color: var(--fg); font: 15px/1.45 "Gentium Plus", Georgia, serif; margin: 0 16px 48px; }
+h1 { font-size: 1.3rem; margin: 20px 0 8px; }
+p.note, .m { color: var(--muted); font-size: 0.85rem; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+th { position: sticky; top: 0; background: var(--bg); }
+td.n { color: var(--muted); width: 3em; }
+td.g { color: var(--muted); }
+.good { color: var(--good); } .bad { color: var(--bad); }
+.wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<h1>{{TITLE}}</h1>
+<p class="note">Internal evaluation only. The {{SYSTEM}} column is third-party output: keep this file under data/work/, never commit or redistribute it.</p>
+<ul>
+{{SUMMARY}}
+</ul>
+<p class="note">{{DEFINITION}}</p>
+<div class="wrap"><table>
+<thead><tr><th>#</th><th>Source</th><th>Gold</th><th>A: vetus poeta</th><th>B: {{SYSTEM}}</th></tr></thead>
+<tbody>
+{{ROWS}}
+</tbody>
+</table></div>
+</body>
+</html>

@@ -1,0 +1,47 @@
+1
+00:00:01,000 --> 00:00:03,500
+La niña ve la rosa.
+
+2
+00:00:04,000 --> 00:00:06,500
+El marinero vive en la isla.
+
+3
+00:00:07,000 --> 00:00:09,500
+El agricultor lleva agua.
+
+4
+00:00:10,000 --> 00:00:12,500
+Marco lee un libro.
+
+5
+00:00:13,000 --> 00:00:15,500
+{\an8}El perro duerme en la calle.
+
+6
+00:00:16,000 --> 00:00:18,500
+Los niños juegan en el jardín.
+
+7
+00:00:19,000 --> 00:00:21,500
+La madre llama a su hija.
+
+8
+00:00:22,000 --> 00:00:24,500
+El sol brilla en el cielo.
+
+9
+00:00:25,000 --> 00:00:27,500
+<i>El lobo corre por el bosque.</i>
+
+10
+00:00:28,000 --> 00:00:30,500
+Los estudiantes escuchan al maestro.
+
+11
+00:00:31,000 --> 00:00:33,500
+El barco llega al puerto.
+
+12
+00:00:34,000 --> 00:00:36,500
+El pájaro canta en el árbol.

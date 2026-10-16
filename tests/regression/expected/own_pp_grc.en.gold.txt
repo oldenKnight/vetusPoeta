@@ -1,0 +1,15 @@
+# Gold English for tests/regression/own_pp_grc.grc.txt (C43), written before any C43 change and before the engine was
+# run. Alternatives after " | ". Units 10-11: both readings are right, and the unit must be Check.
+The road through the forest is narrow. | The road through the woods is narrow. | The road through the wood is narrow. | The way through the forest is narrow. | The path through the forest is narrow.
+The road to the city is long. | The road towards the city is long. | The road toward the city is long. | The way to the city is long.
+The letter to the mother is short. | The letter to his mother is short. | The letter to her mother is short. | The letter to the mother is brief.
+The house in the city is beautiful. | The house in the city is fine. | The house in the city is lovely. | The house in the city is pretty.
+The people on the island are happy. | The men on the island are happy. | The people on the island are fortunate. | The men on the island are fortunate.
+The temple on the hill is old. | The temple on the hill is ancient.
+The boy runs through the forest. | The boy runs through the woods. | The boy runs through the wood. | The child runs through the forest. | The boy is running through the forest.
+The sailors sail to the island. | The sailors sail towards the island. | The sailors sail toward the island. | The sailors are sailing to the island.
+The girl sits in the garden. | The girl is sitting in the garden. | The maiden sits in the garden.
+The girl in the garden is happy. | The girl is happy in the garden. | The girl in the garden is fortunate. | The girl is fortunate in the garden.
+The soldiers in the camp are safe. | The soldiers are safe in the camp.
+The ship arrives at the island. | The ship reaches the island. | The ship comes to the island.
+Many people live on the island. | Many men live on the island. | Many people dwell on the island. | Many men dwell on the island.

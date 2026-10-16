@@ -1,0 +1,8 @@
+# C39: own Attic sentences, GRC -> EN, item (h) (αὐτουργός as a noun = a farmer working his own land; ἔργον after an
+# article or adjective is never a form of εἴργω). Our own sentences. Gold: expected/own_frame_grc.en.gold.txt.
+ὁ αὐτουργὸς ἐν τῷ ἀγρῷ πονεῖ.
+οἱ αὐτουργοὶ τοὺς βοῦς φιλοῦσιν.
+τὸ ἔργον χαλεπόν ἐστιν.
+ὁ Φίλιππος τὸ μακρὸν ἔργον οὐ φιλεῖ.
+αὐτουργός ἐστιν ὁ πατήρ.
+τὸ ἔργον τοῦ δούλου μακρόν ἐστιν.

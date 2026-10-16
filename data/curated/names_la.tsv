@@ -1,0 +1,197 @@
+# english	latin_nom	latin_gen	gender	declension	policy	note
+Alice	Alīcia	Alīciae	f	1	decline	
+Mary	Marīa	Marīae	f	1	decline	
+Anna	Anna	Annae	f	1	decline	
+Anne	Anna	Annae	f	1	decline	
+Julia	Iūlia	Iūliae	f	1	decline	
+Lucy	Lūcia	Lūciae	f	1	decline	
+Emma	Emma	Emmae	f	1	decline	
+Sophia	Sophia	Sophiae	f	1	decline	
+Sophie	Sophia	Sophiae	f	1	decline	
+Clara	Clāra	Clārae	f	1	decline	
+Helen	Helena	Helenae	f	1	decline	
+Diana	Diāna	Diānae	f	1	decline	
+Laura	Laura	Laurae	f	1	decline	
+Victoria	Victōria	Victōriae	f	1	decline	
+Elizabeth	Elīsabetha	Elīsabethae	f	1	decline	
+Margaret	Margarīta	Margarītae	f	1	decline	
+Catherine	Catharīna	Catharīnae	f	1	decline	
+Katherine	Catharīna	Catharīnae	f	1	decline	
+Christina	Chrīstīna	Chrīstīnae	f	1	decline	
+Rose	Rosa	Rosae	f	1	decline	
+Dinah	Dīna	Dīnae	f	1	decline	
+John	Iōannēs	Iōannis	m	3	decline	
+Peter	Petrus	Petrī	m	2	decline	
+Paul	Paulus	Paulī	m	2	decline	
+Mark	Marcus	Marcī	m	2	decline	
+Marcus	Marcus	Marcī	m	2	decline	
+Julius	Iūlius	Iūliī	m	2	decline	
+Anthony	Antōnius	Antōniī	m	2	decline	
+Antonio	Antōnius	Antōniī	m	2	decline	
+George	Geōrgius	Geōrgiī	m	2	decline	
+Henry	Henrīcus	Henrīcī	m	2	decline	
+Charles	Carolus	Carolī	m	2	decline	
+William	Gulielmus	Gulielmī	m	2	decline	
+Thomas	Thomās	Thomae	m	1	decline	Greek-type first declension masculine
+James	Iacōbus	Iacōbī	m	2	decline	
+Jacob	Iacōbus	Iacōbī	m	2	decline	
+Michael	Michaēl	Michaēlis	m	3	decline	
+David	Dāvīd	Dāvīd	m	indecl	keep	indeclinable
+Daniel	Daniēl	Daniēlis	m	3	decline	
+Joseph	Iōsēphus	Iōsēphī	m	2	decline	
+Francis	Franciscus	Franciscī	m	2	decline	
+Edward	Eduardus	Eduardī	m	2	decline	
+Richard	Rīcardus	Rīcardī	m	2	decline	
+Robert	Rōbertus	Rōbertī	m	2	decline	
+Alexander	Alexander	Alexandrī	m	2	decline	
+Philip	Philippus	Philippī	m	2	decline	
+Stephen	Stephanus	Stephanī	m	2	decline	
+Lewis	Ludovīcus	Ludovīcī	m	2	decline	
+Louis	Ludovīcus	Ludovīcī	m	2	decline	
+Arthur	Artūrus	Artūrī	m	2	decline	
+Walt	Gualterus	Gualterī	m	2	decline	
+Walter	Gualterus	Gualterī	m	2	decline	
+Rufus	Rūfus	Rūfī	m	2	decline	C30: a dog's name in the own story (Latin cognomen)
+Claudia	Claudia	Claudiae	f	1	decline	C32
+Livia	Līvia	Līviae	f	1	decline	C32
+Lucius	Lūcius	Lūciī	m	2	decline	C32 (vocative Lūcī)
+Titus	Titus	Titī	m	2	decline	C32
+London	Londinium	Londiniī	n	2	decline	city
+England	Anglia	Angliae	f	1	decline	
+Rome	Rōma	Rōmae	f	1	decline	city
+Athens	Athēnae	Athēnārum	f	1	decline	plural city
+Paris	Lutētia	Lutētiae	f	1	decline	city
+Mexico	Mexicum	Mexicī	n	2	decline	
+Spain	Hispānia	Hispāniae	f	1	decline	
+France	Gallia	Galliae	f	1	decline	
+Italy	Ītalia	Ītaliae	f	1	decline	
+Greece	Graecia	Graeciae	f	1	decline	
+Egypt	Aegyptus	Aegyptī	f	2	decline	
+America	America	Americae	f	1	decline	
+Queen	Rēgīna	Rēgīnae	f	1	translate	title used as name
+King	Rēx	Rēgis	m	3	translate	title used as name
+Duchess	Ducissa	Ducissae	f	1	translate	
+Duke	Dux	Ducis	m	3	translate	
+Prince	Prīnceps	Prīncipis	m	3	translate	
+Princess	Prīncipissa	Prīncipissae	f	1	translate	Medieval form; flexible: fīlia rēgis
+Mr	dominus	dominī	m	2	translate	abbreviations expanded
+Mrs	domina	dominae	f	1	translate	
+Miss	domina	dominae	f	1	translate	
+Sir	domine	-	m	-	translate	vocative only
+Madam	domina	-	f	-	translate	vocative only
+Majesty	Māiestās	Māiestātis	f	3	translate	"Your Majesty" -> Māiestās Tua (phrasebook)
+# Names of the public-domain tuning sample (C15): translated titles and places; several Latin words are declined as
+# noun + adjective / genitive ("Leō Timidus", "Urbs Smaragdōrum"). "of" names are matched with or without "the".
+Oz	Oz	-	m	0	keep	indeclinable
+Kansas	Kansia	Kansiae	f	1	translate	country: in + acc / abl
+Dorothy	Dorothēa	Dorothēae	f	1	translate	
+Scarecrow	Terriculum	Terriculī	n	2	translate	
+Tin Woodman	Lignātor Stanneus	-	m	-	translate	
+Cowardly Lion	Leō Timidus	-	m	-	translate	
+Wicked Witch	Saga Mala	-	f	-	translate	
+Emerald City	Urbs Smaragdōrum	-	f	-	translate	place: ad + acc
+City of Emeralds	Urbs Smaragdōrum	-	f	-	translate	place: ad + acc
+Great Wizard	Magnus Magus	-	m	-	translate	
+Witch of the North	Saga Septentriōnis	-	f	-	translate	
+Golden Cap	Pilleus Aureus	-	m	-	translate	
+Power of Evil	Potestās Malī	-	f	-	translate	
+King of Beasts	Rēx Bēstiārum	-	m	-	translate	
+# C22 (acceptance loop 1): places and people of a children's story and of an English history lesson. Two-word Latin
+# names are declined as noun + adjective ("ad Terram Mīrābilem", "in Terrā Mīrābilī").
+Wonderland	Terra Mīrābilis	-	f	-	translate	place: noun + adjective, both declined
+Terra Mirabilis	Terra Mīrābilis	-	f	-	translate	the Latin name written in an English text
+Earth	Terra	Terrae	f	1	decline	the planet ("the centre of the Earth" -> medium Terrae)
+Edwin	Eduinus	Eduinī	m	2	decline	
+Morcar	Morcarus	Morcarī	m	2	decline	
+Stigand	Stigandus	Stigandī	m	2	decline	
+Mercia	Mercia	Merciae	f	1	decline	
+Northumbria	Northumbria	Northumbriae	f	1	decline	
+Canterbury	Cantuāria	Cantuāriae	f	1	decline	"archbishop of Canterbury" -> archiepiscopus Cantuāriae
+Pablo	Paulus	Paulī	m	2	decline	C34: Spanish spelling (the source column holds any source language)
+Pablito	Paulus	Paulī	m	2	decline	C34: Spanish diminutive of Pablo
+Mateo	Matthaeus	Matthaeī	m	2	decline	C34: Spanish spelling (vocative Matthaee)
+Matthew	Matthaeus	Matthaeī	m	2	decline	C34
+Sofía	Sophia	Sophiae	f	1	decline	C34: Spanish spelling
+Lucía	Lūcia	Lūciae	f	1	decline	C34: Spanish spelling
+Rosa	Rosa	Rosae	f	1	decline	C34: Spanish spelling (also the flower: capitalised as a name only)
+Juan	Iōannēs	Iōannis	m	3	decline	C34: Spanish spelling
+# C37 (textbook prose and liturgy): gods of the reading books (Greek names give the Latin god the readers use), the
+# farmer of a Greek reading book, and sacred names of hymns and prayers (English and Spanish spellings; D18: the
+# ecclesiastical names are the ordinary Latin ones). Two-word names with two genitives are declined word by word
+# (Iēsus Chrīstus, Iēsū Chrīstī); declension 4 with the genitive in -ū is the Iēsus type (vocative Iēsū).
+Jupiter	Iuppiter	Iovis	m	3	decline	vocative Iuppiter
+Zeus	Iuppiter	Iovis	m	3	decline	the Greek god in a Latin text
+Juno	Iūnō	Iūnōnis	f	3	decline	
+Hera	Iūnō	Iūnōnis	f	3	decline	the Greek goddess in a Latin text
+Mars	Mārs	Mārtis	m	3	decline	
+Ares	Mārs	Mārtis	m	3	decline	the Greek god in a Latin text
+Minerva	Minerva	Minervae	f	1	decline	
+Athena	Minerva	Minervae	f	1	decline	the Greek goddess in a Latin text
+Neptune	Neptūnus	Neptūnī	m	2	decline	vocative Neptūne
+Poseidon	Neptūnus	Neptūnī	m	2	decline	the Greek god in a Latin text
+Venus	Venus	Veneris	f	3	decline	
+Aphrodite	Venus	Veneris	f	3	decline	the Greek goddess in a Latin text
+Ceres	Cerēs	Cereris	f	3	decline	
+Demeter	Cerēs	Cereris	f	3	decline	the Greek goddess in a Latin text
+Apollo	Apollō	Apollinis	m	3	decline	
+Mercury	Mercurius	Mercuriī	m	2	decline	vocative Mercurī
+Hermes	Mercurius	Mercuriī	m	2	decline	the Greek god in a Latin text
+Vulcan	Volcānus	Volcānī	m	2	decline	
+Bacchus	Bacchus	Bacchī	m	2	decline	
+Dionysus	Bacchus	Bacchī	m	2	decline	the Greek god in a Latin text
+Vesta	Vesta	Vestae	f	1	decline	
+Dikeopolis	Dicaeopolis	Dicaeopolidis	m	3	decline	the farmer of a Greek reading book (Greek Δικαιόπολις)
+Dikaiopolis	Dicaeopolis	Dicaeopolidis	m	3	decline	
+Dicaeopolis	Dicaeopolis	Dicaeopolidis	m	3	decline	
+God	Deus	-	m	-	translate	the lexicon's deus, capitalised (vocative Deus)
+Lord	Dominus	-	m	-	translate	the lexicon's dominus, capitalised (vocative Domine)
+Jesus	Iēsus	Iēsū	m	4	decline	vocative Iēsū
+Christ	Chrīstus	Chrīstī	m	2	decline	vocative Chrīste
+Jesus Christ	Iēsus Chrīstus	Iēsū Chrīstī	m	2	decline	both words declined
+Virgin	Virgō	-	f	-	translate	the lexicon's virgō, capitalised
+Dios	Deus	-	m	-	translate	Spanish spelling
+Señor	Dominus	-	m	-	translate	Spanish: the Lord (capitalised); "el señor" in lower case is a common noun
+Señora	Domina	-	f	-	translate	Spanish: Our Lady (capitalised)
+María	Marīa	Marīae	f	1	decline	Spanish spelling
+Jesús	Iēsus	Iēsū	m	4	decline	Spanish spelling
+Cristo	Chrīstus	Chrīstī	m	2	decline	Spanish spelling
+Jesucristo	Iēsus Chrīstus	Iēsū Chrīstī	m	2	decline	Spanish spelling, both words declined
+Virgen	Virgō	-	f	-	translate	Spanish spelling
+Reina	Rēgīna	-	f	-	translate	Spanish: the Queen (of heaven), capitalised
+Emperatriz	Imperātrīx	-	f	-	translate	Spanish: the Empress, capitalised
+Consolatriz	Cōnsōlātrīx	Cōnsōlātrīcis	f	3	decline	Spanish: the Comforter (a Late Latin title of Mary; not in the lexicon)
+Madre	Māter	-	f	-	translate	Spanish: the Mother (of God), capitalised
+Hijo	Fīlius	-	m	-	translate	Spanish: the Son, capitalised
+Padre	Pater	-	m	-	translate	Spanish: the Father, capitalised
+# C40 (a): towns and small islands take the locative for the place where (Rōmae, Corinthī, Athēnīs, Carthāgine), the
+# accusative without a preposition for "to" and the ablative for "from"; note "city" / "island" marks them. Spanish
+# spellings after the English ones (the source column holds any source language).
+Corinth	Corinthus	Corinthī	f	2	decline	city
+Carthage	Carthāgō	Carthāginis	f	3	decline	city
+Sparta	Sparta	Spartae	f	1	decline	city
+Troy	Trōia	Trōiae	f	1	decline	city
+Thebes	Thēbae	Thēbārum	f	1	decline	plural city
+Syracuse	Syrācūsae	Syrācūsārum	f	1	decline	plural city
+Naples	Neāpolis	Neāpolis	f	3	decline	city
+Pompeii	Pompēiī	Pompēiōrum	m	2	decline	plural city
+Delphi	Delphī	Delphōrum	m	2	decline	plural city
+Capua	Capua	Capuae	f	1	decline	city
+Tarentum	Tarentum	Tarentī	n	2	decline	city
+Brundisium	Brundisium	Brundisiī	n	2	decline	city
+Rhodes	Rhodus	Rhodī	f	2	decline	island city
+Delos	Dēlus	Dēlī	f	2	decline	island
+Ithaca	Ithaca	Ithacae	f	1	decline	island
+Atenas	Athēnae	Athēnārum	f	1	decline	plural city; Spanish spelling
+Corinto	Corinthus	Corinthī	f	2	decline	city; Spanish spelling
+Cartago	Carthāgō	Carthāginis	f	3	decline	city; Spanish spelling
+Esparta	Sparta	Spartae	f	1	decline	city; Spanish spelling
+Troya	Trōia	Trōiae	f	1	decline	city; Spanish spelling
+Tebas	Thēbae	Thēbārum	f	1	decline	plural city; Spanish spelling
+Siracusa	Syrācūsae	Syrācūsārum	f	1	decline	plural city; Spanish spelling
+Nápoles	Neāpolis	Neāpolis	f	3	decline	city; Spanish spelling
+Pompeya	Pompēiī	Pompēiōrum	m	2	decline	plural city; Spanish spelling
+Delfos	Delphī	Delphōrum	m	2	decline	plural city; Spanish spelling
+Rodas	Rhodus	Rhodī	f	2	decline	island city; Spanish spelling
+Ítaca	Ithaca	Ithacae	f	1	decline	island; Spanish spelling
+Londres	Londinium	Londiniī	n	2	decline	city; Spanish spelling
+París	Lutētia	Lutētiae	f	1	decline	city; Spanish spelling

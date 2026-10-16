@@ -1,0 +1,50 @@
+# sentence	expected findings ("-" clean; ids of faults; "<id>w" a warning)	note (our own sentences)
+ὁ παῖς ἐν τῷ ἀγρῷ ἐστιν.	-	
+ἆρα ἡ κόρη τὴν μητέρα φιλεῖ;	-	
+τὰ ἄνθη οὐ δύναται λαλεῖν.	-	neuter plural subject, singular verb
+τὰ ἄνθη οὐ δύνανται λαλεῖν.	-	the plural verb is also allowed
+οἱ δοῦλοι τὸν λίθον αἴρουσιν.	-	
+οἱ δοῦλοι τὸν λίθον αἴρει.	A3	plural subject, singular verb
+ὁ δοῦλος τὸν λίθον αἴρουσιν.	A3	singular subject, plural verb
+ἡ παῖς τρέχει.	-	παῖς is masculine or feminine
+τὴν παῖς τρέχει.	A3	article case
+ὁ κόρη τρέχει.	A3	article gender
+τὸ κόρη τρέχει.	A3	article gender
+ὁ καλὸς παῖς τρέχει.	-	
+ὁ καλὴ παῖς τρέχει.	A3	attributive adjective gender
+ἡ θύρα μικρά ἐστιν.	-	predicate adjective
+ἡ θύρα μικρός ἐστιν.	A3	predicate adjective gender
+αἱ θύραι μικραί εἰσιν.	-	
+ἐν τῷ ἀγρῷ μένει.	-	
+ἐν τὸν ἀγρὸν μένει.	A4	ἐν governs the dative
+εἰς τὸν ἀγρὸν βαίνει.	-	
+εἰς τῷ ἀγρῷ βαίνει.	A4	εἰς governs the accusative
+μετὰ τοῦ πατρὸς βαδίζει.	-	
+μετὰ τὸν πατέρα βαδίζει.	-	μετά + accusative (after) is grammatical
+μετὰ τῷ πατρὶ βαδίζει.	A4	
+παρὰ τῷ πατρὶ μένει.	-	παρά + dative
+ἄνευ τοῦ πατρὸς ἥκει.	-	
+ἄνευ τὸν πατέρα ἥκει.	A4	
+ὁ παῖς τῷ πατρὶ ἕπεται.	-	dative verb
+ὁ παῖς τὸν πατέρα ἕπεται.	A4	ἕπομαι takes the dative
+ὁ βασιλεὺς τῆς πόλεως ἄρχει.	-	genitive verb (ruling)
+ὁ βασιλεὺς τὴν πόλιν ἄρχει.	A4	ἄρχω takes the genitive
+ὁ παῖς τῷ λίθῳ ὁρᾷ.	A4	ὁράω takes the accusative
+ὁ δεσπότης τῷ δούλῳ τὸν οἶνον δίδωσιν.	-	
+ὁ ἀνὴρ ὃν ὁρᾷς σοφός ἐστιν.	-	relative clause
+ὁ ἀνὴρ ἣν ὁρᾷς σοφός ἐστιν.	A3	relative pronoun gender
+ὁ παις τρέχει.	A1w	accent differs (Check, not Fix)
+ὁ παῖς τρεχει.	A1w	
+ὁ ξυλοφρυγάνωψ τρέχει.	A1	unknown word
+ἄνθρωπος τις ἦλθεν.	A1bw	enclitic: the host needs a second accent
+καλός ὁ κῆπος.	A1bw	acute before another word should be grave
+οὐκ βαίνω.	A1bw	οὐ before a consonant
+οὐ οἶδα.	A1bw	οὐκ before a vowel
+ἡ Ἀλίκη τὴν γαλῆν ζητεῖ.	-	name from names_grc.tsv
+ὁ Μᾶρκος τῇ Ἀλίκῃ τὴν σφαῖραν δίδωσιν.	-	
+τὸν Δικαιόπολιν ὁρῶ.	-	
+δός μοι τὴν σφαῖραν.	-	
+ἔξεστί σοι ἀπελθεῖν.	-	
+δεῖ ἡμᾶς ἀπελθεῖν.	-	
+οὐκ ἔστι ποτόν.	-	
+ἀλλ’ οὐκ οἶδα.	-	elided ἀλλά

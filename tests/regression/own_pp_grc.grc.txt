@@ -1,0 +1,18 @@
+# C43: own Attic sentences, GRC -> EN / ES: a prepositional phrase after or inside the subject noun group (attributive
+# position, copula and predicate adjective, verbs of motion and of position, both readings possible) and the side items
+# (arrive at, on the island). Our own sentences, written before any C43 change and before the engine was run on them.
+# Gold: expected/own_pp_grc.en.gold.txt and expected/own_pp_grc.es.gold.txt. Units 10-11 have two possible readings:
+# the gold lists both and the unit must be Check (flag pp-attach), never OK.
+ἡ διὰ τῆς ὕλης ὁδὸς στενή ἐστιν.
+ἡ ὁδὸς ἡ πρὸς τὴν πόλιν μακρά ἐστιν.
+ἡ ἐπιστολὴ πρὸς τὴν μητέρα βραχεῖά ἐστιν.
+ἡ ἐν τῇ πόλει οἰκία καλή ἐστιν.
+οἱ ἐν τῇ νήσῳ ἄνθρωποι εὐδαίμονές εἰσιν.
+τὸ ἱερὸν ἐπὶ τοῦ λόφου παλαιόν ἐστιν.
+ὁ παῖς διὰ τῆς ὕλης τρέχει.
+οἱ ναῦται εἰς τὴν νῆσον πλέουσιν.
+ἡ κόρη ἐν τῷ κήπῳ κάθηται.
+ἡ κόρη ἐν τῷ κήπῳ εὐδαίμων ἐστίν.
+οἱ στρατιῶται ἐν τῷ στρατοπέδῳ ἀσφαλεῖς εἰσιν.
+ἡ ναῦς εἰς τὴν νῆσον ἀφικνεῖται.
+πολλοὶ ἄνθρωποι ἐν τῇ νήσῳ οἰκοῦσιν.

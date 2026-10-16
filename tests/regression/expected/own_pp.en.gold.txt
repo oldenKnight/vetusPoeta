@@ -1,0 +1,19 @@
+# Gold English for tests/regression/own_pp.la.txt (C43), written before any C43 change and before the engine was run.
+# Alternatives after " | ". Units 12-14: both readings are right, and the unit must be Check.
+The road through the forest is narrow. | The road through the woods is narrow. | The road through the wood is narrow. | The way through the forest is narrow. | The path through the forest is narrow. | The street through the forest is narrow.
+The journey to the city is not long. | The road to the city is not long. | The way to the city is not long. | The journey to the city isn't long. | The march to the city is not long.
+The letter to the mother is short. | The letter to his mother is short. | The letter to her mother is short. | The letter to my mother is short. | The letter to the mother is brief.
+The bridge across the river is new. | The bridge over the river is new.
+The temple on the hill is old. | The temple on the hill is ancient.
+The book about the war is long. | The book on the war is long. | The book of the war is long.
+The man from the town is a farmer. | The man of the town is a farmer.
+The boy runs through the forest. | The boy runs through the woods. | The boy runs through the wood. | The boy is running through the forest. | The child runs through the forest.
+The sailors sail to the island. | The sailors sail towards the island. | The sailors sail toward the island. | The sailors are sailing to the island.
+The girl sits in the garden. | The girl is sitting in the garden. | The girl sits in the yard.
+The cottage stands on the mountain. | The house stands on the mountain. | The hut stands on the mountain. | The cottage stands on the hill. | The house stands on the hill. | The cottage is on the mountain. | The house is on the mountain.
+The girl in the garden is happy. | The girl is happy in the garden. | The girl in the garden is glad. | The girl is glad in the garden. | The girl in the garden is joyful. | The girl is joyful in the garden.
+The soldiers are safe in the camp. | The soldiers in the camp are safe.
+The farmer is happy with his son. | The farmer with his son is happy. | The farmer is glad with his son. | The farmer with his son is glad. | The farmer is happy with the son. | The farmer with the son is happy.
+A thousand soldiers are in the city. | There are a thousand soldiers in the city. | One thousand soldiers are in the city. | There are one thousand soldiers in the city.
+The ship reaches the island. | The ship arrives at the island. | The ship comes to the island.
+Many people live on the island. | Many men live on the island. | Many people dwell on the island. | Many men dwell on the island.

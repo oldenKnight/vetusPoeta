@@ -1,0 +1,3 @@
+Spain-only word "fichero"
+Spain-only word "ordenador"
+Spain-only word "vale"

@@ -1,0 +1,18 @@
+# form	person	number	gender	role	note
+# Spanish clitic pronouns (C13; teacher-editable). role: acc (direct object), dat (indirect object), refl (always
+# reflexive or pronominal), any (accusative, dative or reflexive by context). The tokenizer splits these off verbs
+# ("dámelo" -> da me lo, "siéntate" -> sienta te); the frame builder makes them arguments: a clitic of the verb's
+# own person is reflexive (pronominal verb "irse" when phrasal_es_la.tsv has a "se" row), "le/les" the indirect
+# object, "lo/la/los/las" the direct object, "me/te/nos/os" the indirect object when the verb already has a direct
+# object or is a giving/telling verb, else the direct object. Our own list.
+me	1	sg	-	any	
+te	2	sg	-	any	
+se	3	-	-	refl	also "se lo" = le lo (indirect object)
+nos	1	pl	-	any	
+os	2	pl	-	any	Spain; es-MX uses "los/les" with ustedes
+lo	3	sg	m	acc	
+la	3	sg	f	acc	
+los	3	pl	m	acc	
+las	3	pl	f	acc	
+le	3	sg	-	dat	also "usted" (2nd person polite)
+les	3	pl	-	dat	also "ustedes"

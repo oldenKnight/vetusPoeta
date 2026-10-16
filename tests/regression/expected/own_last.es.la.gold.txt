@@ -1,0 +1,5 @@
+# Gold Latin for tests/regression/own_last.es.txt (C40), written before any C40 rule and before the engine was run.
+# Alternatives after " | ".
+Frāter meus Corinthī habitat. | Frāter meus Corinthī vīvit.
+Epistula Athēnīs venit. | Litterae Athēnīs veniunt.
+Quamquam pluit, puer in hortō lūdit. | Puer, quamquam pluit, in hortō lūdit.

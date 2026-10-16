@@ -1,0 +1,109 @@
+# verb	particle	latin	frame	note
+# English phrasal verbs (lemma + particle) -> one Latin verb lemma (C2b; teacher-editable). particle "-" = the bare
+# verb with a fixed Latin frame. frame: empty (the Latin verb as it is), refl (adds the reflexive object: "inclīnāte
+# vōs"), intr (no object), acc / dat / abl (case of the object noun). Our own list.
+go	away	abeō		"Then go away." -> Abī igitur.
+go	off	abeō		
+run	away	aufugiō		"It ran away." -> Aufūgit.
+run	off	aufugiō		
+come	back	redeō		"Come back here!" -> Redī hūc!
+go	back	redeō		
+get	back	redeō		
+cut	off	abscīdō		"she'll cut off our heads"
+get	through	trānseō		"I can't get through." -> Trānsīre nōn possum.
+go	through	trānseō		
+sit	down	cōnsīdō		
+stand	up	surgō		
+get	up	surgō		
+go	in	intrō		
+go	inside	intrō		
+come	in	intrō		
+come	inside	intrō		
+go	out	exeō		
+come	out	exeō		
+get	out	exeō		
+run	out	excurrō		
+fall	down	cadō		
+give	back	reddō		
+find	out	cognōscō		
+wake	up	expergīscor		
+pick	up	tollō		
+put	on	induō		
+take	off	exuō		
+throw	away	abiciō		
+go	on	pergō		
+turn	back	revertor		
+go	up	ascendō		
+go	down	dēscendō		
+come	down	dēscendō		
+climb	up	ascendō		
+give	up	dēsinō		
+hurry	up	festīnō		
+shut	up	taceō		
+look	around	circumspiciō		
+come	along	veniō		
+get	along	prōcēdō		
+go	along	prōcēdō		
+bow	-	inclīnō	refl	"Everyone bow!" -> Omnēs, inclīnāte vōs!
+get	down	dēscendō		C15: "Can't you get down?" -> Nōn potes dēscendere?
+keep	on	pergō		"we can keep on to the Emerald City"
+keep	away	arceō|absum	acc	C15: with an object arceō ("keep away the wild beasts"), without one absum ("keep away from Oz")
+chop	down	caedō		
+cut	down	caedō		
+# C17 (quality loop 3)
+walk	on	pergō		"We walked on." -> Perrēximus.
+go	on	pergō		
+move	on	pergō		
+carry	on	pergō		
+hide	-	cēlō|lateō		C19: with an object cēlō ("hide the key"), without one lateō ("The fox hid behind the tree")
+roll	by	praetereō	intr	C24: "The years roll by." -> Annī praetereunt.
+roll	away	āvolō	intr	C24: "The mist rolls away." -> Nebula āvolat.
+leave	-	relinquō|-		C24: with an object relinquō ("The birds leave the nest." -> Avēs nīdum relinquunt); without one the verb's own translation ("The ship is leaving." -> Nāvis exit)
+think	over	cōgitō		C26: "think it over" -> id cōgitāre
+chase	-	agitō		C30: "Rufus chased a rabbit" -> cunīculum agitāvit (vēnor is to hunt)
+take	out	prōmō		C30: "She took the bread out of her basket." -> pānem ē corbe prōmpsit
+step	back	recēdō		C30: "She stepped back." -> Recessit.
+jump	out	exsiliō		C30: "The dog jumped out first." -> Canis prīmus exsiluit.
+walk	back	redeō		C30: "They walked back to the river." -> Ad flūmen rediērunt.
+go	back	redeō		C30
+# C37: prefixed English verbs whose whole word the dictionary gives a minor sense of a simple verb ("provide" ->
+# videō "see to it"): the Latin verb of the whole word (test "rules-p: 200 prefixed verbs")
+provide	-	praebeō		C37: "The farm provides food." -> Praedium cibum praebet.
+supply	-	praebeō		C37
+defend	-	dēfendō		C37 (teneō is to hold)
+extend	-	extendō		C37
+intend	-	cōgitō		C37: "I intend to go." -> Īre cōgitō.
+require	-	requīrō		C37
+express	-	exprimō		C37
+derive	-	dēdūcō		C37
+predict	-	praedīcō		C37: foretell
+promote	-	prōmoveō		C37
+proclaim	-	prōnūntiō		C37
+recover	-	recuperō		C37
+repay	-	reddō		C37
+dismiss	-	dīmittō		C37
+release	-	dīmittō		C37
+inspect	-	īnspiciō		C37
+examine	-	īnspiciō		C37
+inquire	-	quaerō		C37
+expect	-	exspectō		C37
+reside	-	habitō		C37
+refresh	-	reficiō		C37
+reflect	-	cōgitō		C37: think (to bend back is reflectō)
+occupy	-	occupō		C37
+obtain	-	obtineō		C37
+contain	-	contineō		C37
+retain	-	retineō		C37
+prolong	-	prōdūcō		C37
+reduce	-	minuō		C37
+procure	-	parō		C37
+comprehend	-	intellegō		C37
+prosecute	-	accūsō		C37
+deter	-	dēterreō		C37
+decline	-	recūsō		C37
+consume	-	cōnsūmō		C37
+end	-	fīniō|dēsinō		C37: with an object fīniō, without one dēsinō ("The work never ends." -> Labor numquam dēsinit)
+present	-	offerō|adsum		C37: with an object offerō ("They present a gift."), without one adsum
+design	-	excōgitō		C37: plan (putō is to think)
+develop	-	excolō		C37: cultivate, develop (cōnfirmō is to strengthen)
+condemn	-	damnō		C37

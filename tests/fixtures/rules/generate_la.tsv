@@ -1,0 +1,116 @@
+# Generation expectations for engine/tests/test_rules_la.cpp (real data/work/latin.vpl). Our own list.
+# lemma head	lemma pos	features (vp::morph builders)	expected form (macrons)	flags (rule = paradigm fallback)
+sum	verb	1 sg pres ind act	sum	
+sum	verb	2 sg pres ind act	es	
+sum	verb	3 sg pres ind act	est	
+sum	verb	3 pl pres ind act	sunt	
+sum	verb	3 sg impf ind act	erat	
+sum	verb	3 sg fut ind act	erit	
+sum	verb	3 sg perf ind act	fuit	
+sum	verb	3 sg plup ind act	fuerat	
+sum	verb	3 sg pres subj act	sit	
+sum	verb	3 sg impf subj act	esset	
+sum	verb	pres inf act	esse	
+possum	verb	3 sg pres ind act	potest	
+possum	verb	3 pl pres ind act	possunt	
+possum	verb	3 sg impf ind act	poterat	
+possum	verb	3 sg perf ind act	potuit	
+possum	verb	3 sg pres subj act	possit	
+possum	verb	3 sg impf subj act	posset	
+possum	verb	pres inf act	posse	
+eō	verb	3 sg pres ind act	it	
+eō	verb	3 pl pres ind act	eunt	
+eō	verb	3 sg impf ind act	ībat	
+eō	verb	3 sg fut ind act	ībit	
+eō	verb	3 sg pres subj act	eat	
+eō	verb	pres inf act	īre	
+eō	verb	2 sg pres imp act	ī	
+eō	verb	2 pl pres imp act	īte	
+ferō	verb	3 sg pres ind act	fert	
+ferō	verb	3 pl pres ind act	ferunt	
+ferō	verb	3 sg impf ind act	ferēbat	
+ferō	verb	3 sg fut ind act	feret	
+ferō	verb	3 sg perf ind act	tulit	
+ferō	verb	3 sg pres subj act	ferat	
+ferō	verb	pres inf act	ferre	
+ferō	verb	2 sg pres imp act	fer	
+ferō	verb	2 pl pres imp act	ferte	
+ferō	verb	3 sg pres ind pass	fertur	
+volō	verb	3 sg pres ind act	vult	
+volō	verb	3 pl pres ind act	volunt	
+volō	verb	3 sg impf ind act	volēbat	
+volō	verb	3 sg perf ind act	voluit	
+volō	verb	3 sg pres subj act	velit	
+volō	verb	3 sg impf subj act	vellet	
+volō	verb	pres inf act	velle	
+nōlō	verb	1 sg pres ind act	nōlō	
+nōlō	verb	3 sg pres ind act	nōn vult	
+nōlō	verb	3 pl pres ind act	nōlunt	
+nōlō	verb	3 sg perf ind act	nōluit	
+nōlō	verb	pres inf act	nōlle	
+nōlō	verb	2 sg pres imp act	nōlī	
+nōlō	verb	2 pl pres imp act	nōlīte	
+sequor	verb	3 sg pres ind act	sequitur	
+sequor	verb	3 pl pres ind pass	sequuntur	
+sequor	verb	3 sg impf ind act	sequēbātur	
+sequor	verb	3 sg fut ind act	sequētur	
+sequor	verb	3 sg perf ind act m	secūtus est	
+sequor	verb	3 sg perf ind act f	secūta est	
+sequor	verb	3 pl perf ind act m	secūtī sunt	
+sequor	verb	pres inf act	sequī	
+sequor	verb	2 sg pres imp act	sequere	
+sequor	verb	3 sg pres subj act	sequātur	
+dīcō	verb	2 sg pres imp act	dīc	
+dīcō	verb	2 pl pres imp act	dīcite	
+dūcō	verb	2 sg pres imp act	dūc	
+faciō	verb	2 sg pres imp act	fac	
+amō	verb	3 sg pres ind act	amat	
+amō	verb	3 sg impf ind act	amābat	
+amō	verb	3 sg fut ind act	amābit	
+amō	verb	3 sg perf ind act	amāvit	
+amō	verb	3 sg plup ind act	amāverat	
+amō	verb	3 sg futp ind act	amāverit	
+amō	verb	3 sg pres subj act	amet	
+amō	verb	3 sg impf subj act	amāret	
+amō	verb	2 sg pres imp act	amā	
+amō	verb	pres inf act	amāre	
+amō	verb	perf inf act	amāvisse	
+amō	verb	3 sg pres ind pass	amātur	
+amō	verb	3 sg perf ind pass f	amāta est	
+amō	verb	3 pl perf ind pass m	amātī sunt	
+amō	verb	3 sg plup ind pass m	amātus erat	
+amō	verb	pres inf pass	amārī	
+amō	verb	perf ptc pass acc sg f	amātam	
+videō	verb	3 sg perf ind act	vīdit	
+videō	verb	2 sg pres imp act	vidē	
+puella	noun	gen pl	puellārum	
+puella	noun	abl sg	puellā	
+hortus	noun	voc sg	horte	
+puer	noun	acc pl	puerōs	
+fēlēs	noun	acc sg	fēlem	
+bonus	adj	nom sg f	bona	
+bonus	adj	dat pl f	bonīs	
+bonus	adj	gen pl m	bonōrum	
+bonus	adj	nom sg m comp	melior	
+bonus	adj	nom sg f sup	optima	
+magnus	adj	nom sg m comp	maior	
+magnus	adj	acc pl m sup	maximōs	
+ego	pron	dat sg	mihi	
+tū	pron	dat sg	tibi	
+is	pron	acc sg f	eam	
+is	pron	gen sg m	eius	
+hic	pron	nom sg n	hoc	
+hic	pron	acc sg f	hanc	
+quī	pron	acc sg m	quem	
+meus	det	voc sg m	mī	
+duo	num	acc pl m	duōs	
+ūnus	adj	acc sg f	ūnam	
+nēmō	pron	acc sg	nēminem	
+falcō	verb	3 sg pres ind act	falcat	rule
+falcō	verb	3 sg perf ind act	falcāvit	rule
+lava	noun	acc sg	lavam	rule
+argus	adj	nom sg f	arga	rule
+tyrannosaurus	noun	acc sg	tyrannosaurum	rule
+cyprinum	noun	nom pl	cyprina	rule
+posterī	noun	acc pl	posterōs	rule
+argus	adj	nom sg m sup	argissimus	rule

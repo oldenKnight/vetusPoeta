@@ -1,0 +1,66 @@
+# Gold English for tests/regression/own_prose.la.txt (C36), one line per unit, written by the implementer before any
+# C36 rule and before the engine was run on the file. Our own Latin sentences in textbook-prose style (a farmer, a
+# slave, a sailor, a girl, a school day): copula with a postposed subject, postpositive autem / enim / igitur / vero /
+# quoque, non ... sed, implicit subjects with object-first clauses, predicate adjectives (liber "free" vs liberi
+# "children"), names, and three true existentials (43-45) that must stay "there is / there are". Plain literal
+# English; preferred rendering first, alternatives after " | ". Compared case- and punctuation-insensitively.
+Lucius is a farmer.
+But he lives not in the town but in a farmhouse. | However, he lives not in the town but in a farmhouse. | But he lives not in the town but in a country house. | But he lives not in the town but in a villa. | But he does not live in the town but in a farmhouse. | But he does not live in the town but in a country house.
+The farmhouse is small, but the field is large. | The farmhouse is small, but the field is big. | The country house is small, but the field is large. | The villa is small, but the field is large. | The country house is small, but the field is big.
+He grows grain and works in the field. | He grows grain and he works in the field. | He cultivates grain and works in the field. | He cultivates grain and he works in the field.
+So the farmer's life is hard. | So the life of the farmer is hard. | Therefore the life of the farmer is hard. | Therefore the life of the farmer is difficult. | So the life of the farmer is difficult. | Therefore the farmer's life is hard.
+But Lucius is not sad but happy. | Lucius, however, is not sad but happy. | However, Lucius is not sad but happy.
+For he loves the field and the house. | For he loves the field and the cottage. | For he loves the field and the hut.
+The wife also works. | His wife also works. | The wife works too. | His wife works too.
+She carries water from the river. | She carries water out of the river.
+The road is long and difficult. | The way is long and difficult. | The road is long and hard.
+Davus is a slave.
+The slave is not free.
+For he has a master.
+But the master is angry. | The master, however, is angry. | However, the master is angry.
+So he often calls the slave. | Therefore he often calls the slave.
+The slave is tired, but he works. | The slave is tired, but works.
+He wants to be free. | He desires to be free. | He longs to be free.
+One day he will be free. | Someday he will be free. | Some day he will be free.
+The Roman citizens are free. | Roman citizens are free.
+But the children play in the garden. | The children, however, play in the garden.
+Quintus is not a farmer but a sailor.
+For he has a ship.
+The ship is big and fast. | The ship is large and fast. | The ship is great and swift. | The ship is large and swift. | The ship is big and swift.
+But the sea is often dangerous. | The sea, however, is often dangerous. | But the sea is often perilous.
+The sea is dangerous.
+But Quintus is not afraid. | But Quintus does not fear. | Quintus, however, is not afraid. | However, Quintus is not afraid.
+For the man is brave. | For the man is strong.
+He carries wine and oil in the ship. | He carries wine and oil on the ship.
+He also carries grain. | He carries grain too. | He carries grain also.
+At last he comes to the harbour. | At last he comes to the harbor. | Finally he comes to the harbour. | At last he comes to the port.
+Cornelia is a Roman girl.
+She lives not in the fields but in the city. | She does not live in the fields but in the city.
+The city is beautiful and large. | The city is beautiful and big. | The city is beautiful and great.
+But Cornelia loves the countryside. | But Cornelia loves the country. | Cornelia, however, loves the countryside.
+For she is happy in the fields.
+She gives a gift to her father. | She gives a gift to the father. | She gives her father a gift. | She gives the father a gift.
+Jupiter is a great god.
+Cornelia is also happy. | Cornelia too is happy. | Cornelia is happy too.
+But the mother is not here. | But the mother is not present. | But mother is not here. | The mother, however, is not here.
+For the mother is sick. | For the mother is ill.
+The master is good, but the slave is bad. | The master is good, but the slave bad.
+The temple is large. | The temple is big. | The temple is great.
+There is an altar in the temple. | In the temple there is an altar.
+There are many trees in the forest. | There are many trees in the wood. | In the forest there are many trees.
+There is a large forum in the town. | There is a big forum in the town. | In the town there is a large forum. | There is a large marketplace in the town.
+The sky is clear. | The sky is bright.
+O Jupiter, the life of the slave is hard! | O Jupiter, the slave's life is hard! | Oh Jupiter, the life of the slave is hard! | O Jupiter, the life of the slave is heavy!
+The stone is heavy.
+So the boy does not carry the stone. | Therefore the boy does not carry the stone.
+He does not sleep but plays. | He is not sleeping but playing.
+The boy not only reads but also writes. | The boy does not only read but also writes.
+For the teacher is good.
+But the pupils are not happy. | But the students are not happy. | The pupils, however, are not happy.
+For the lesson is long. | For the reading is long.
+So they write many words. | Therefore they write many words.
+At last the boys are free. | Finally the boys are free.
+They run home and wait for dinner. | They run home and wait for the dinner. | They run home and await dinner.
+The dinner is good, but not big. | The dinner is good, but not large. | Dinner is good, but not big.
+But the boys love the dinner. | But the boys love dinner. | The boys, however, love the dinner.
+The family is happy. | The family is lucky. | The family is fortunate.

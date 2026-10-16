@@ -1,0 +1,253 @@
+describe('VP_Names, VP_Corrections, VP_Words', function () {
+  function boot() {
+    var env = load('all', { search: '?mock=1&debug=1' });
+    var W = env.window;
+    var D = W.VP_Dom;
+    env.app = D.el('div', { id: 'app', className: 'vp-app' });
+    env.main = D.el('main', { id: 'vp-main' });
+    env.app.appendChild(env.main);
+    env.document.body.appendChild(env.app);
+    W.VP_MockEngine.options.latencyMs = 1;
+    W.VP_App.boot({ root: env.main, status: D.el('div') });
+    env.clock.tick(500);
+    env.sent = [];
+    var call = W.VP_Bridge.call;
+    W.VP_Bridge.call = function (cmd, params) {
+      env.sent.push({ cmd: cmd, params: params });
+      return call(cmd, params);
+    };
+    env.cmds = function (name) { return env.sent.filter(function (s) { return s.cmd === name; }); };
+    env.q = function (sel) { return env.document.querySelector(sel); };
+    env.qa = function (sel) { return env.document.querySelectorAll(sel); };
+    env.copied = [];
+    W.navigator.clipboard = { writeText: function (t) { env.copied.push(t); return W.Promise.resolve(); } };
+    W.VP_Start.openSample();
+    env.clock.tick(300);
+    env.q('#vp-translate').click();
+    env.clock.tick(3000);
+    W.VP_Toast.clearAll();
+    return env;
+  }
+
+  it('Names: lists detected names with counts, policy radios and fields; Apply sends names.set, refetches the affected cues (now stale) and offers Undo', function () {
+    var env = boot();
+    var W = env.window;
+    W.VP_MockEngine.options.detectNames = true;
+    W.VP_Workspace.setTab('names');
+    env.clock.tick(100);
+    eq(env.cmds('names.list').length, 1);
+    var rows = env.qa('.vp-name');
+    eq(rows.length, 1);
+    eq(rows[0].querySelector('.vp-name-text').textContent, 'Marcus');
+    eq(rows[0].querySelector('.vp-name-count').textContent, '1 time');
+    var radio = function (row, v) { return row.querySelectorAll('[data-name-field="policy"]').filter(function (r) { return r.value === v; })[0]; };
+    eq(radio(rows[0], 'decline').checked, true);
+    eq(rows[0].querySelector('[data-name-field="form"]').value, 'Mārcus');
+    eq(rows[0].querySelector('[data-name-field="gender"]').value, 'masculine');
+    eq(rows[0].querySelector('[data-name-field="declension"]').value, '2');
+    radio(rows[0], 'keep').checked = true;
+    radio(rows[0], 'decline').checked = false;
+    rows[0].querySelector('[data-name-field="form"]').value = 'Marcus';
+    rows[0].querySelector('[data-names-action="apply"]').click();
+    env.clock.tick(100);
+    var set = env.cmds('names.set');
+    eq(set.length, 1);
+    deepEq(set[0].params, { name: 'Marcus', policy: 'keep', form: 'Marcus', gender: 'masculine', declension: '2' });
+    eq(env.cmds('cue.page').length >= 1, true, 'affected cues fetched again');
+    eq(W.VP_Store.getCue(3).state, 'stale', 'the cue with the name is stale (engine)');
+    eq(env.q('.vp-toast-text').textContent, 'Name applied: 1 cue will be translated again.');
+    env.q('.vp-toast-action').click();
+    env.clock.tick(100);
+    set = env.cmds('names.set');
+    eq(set.length, 2, 'Undo sends the previous policy');
+    eq(set[1].params.policy, 'decline');
+    eq(set[1].params.form, 'Mārcus');
+    eq(radio(env.q('.vp-name'), 'decline').checked, true);
+    env.q('[data-names-action="csv"]').click();
+    env.clock.tick(50);
+    eq(env.copied.length, 1);
+    eq(env.copied[0].split('\r\n')[0], 'name,policy,form,gender,declension,count');
+    eq(env.copied[0].split('\r\n')[1], 'Marcus,decline,Mārcus,masculine,2,');
+    eq(W.VP_Names.csv([{ name: 'A, B', policy: 'keep', form: 'x"y', count: 2 }]).split('\r\n')[1], '"A, B",keep,"x""y",,,2');
+    W.VP_Toast.clearAll();
+    deepEq(W.VP_I18n.missing(), []);
+    eq(env.errors().length, 0);
+  });
+
+  it('Corrections: lists source -> target with scope and count; Remove calls corrections.remove and Undo re-creates the entry through cue.set', function () {
+    var env = boot();
+    var W = env.window;
+    W.VP_Workspace.setTab('corrections');
+    env.clock.tick(100);
+    ok(env.q('.vp-corr-list').textContent.indexOf('No corrections yet') >= 0);
+    W.VP_Workspace.cmd.edit(0, 'Puella rosam amat.', 'phrase');
+    env.clock.tick(600);
+    var rows = env.qa('.vp-corr');
+    eq(rows.length, 1, 'a remembered edit shows up');
+    eq(rows[0].querySelector('.vp-corr-from').textContent, 'the girl sees the rose.');
+    eq(rows[0].querySelector('.vp-corr-from').getAttribute('lang'), 'en');
+    eq(rows[0].querySelector('.vp-corr-to').textContent, 'Puella rosam amat.');
+    eq(rows[0].querySelector('.vp-corr-to').getAttribute('lang'), 'la');
+    eq(rows[0].querySelector('.vp-corr-scope').textContent, 'this phrase');
+    eq(rows[0].querySelector('.vp-corr-count').textContent, 'applied 1 time');
+    rows[0].querySelector('[data-corr-action="remove"]').click();
+    env.clock.tick(100);
+    eq(env.cmds('corrections.remove').length, 1);
+    eq(env.qa('.vp-corr').length, 0);
+    eq(env.q('.vp-toast-text').textContent, 'Correction removed.');
+    env.q('.vp-toast-action').click();
+    env.clock.tick(600);
+    var set = env.cmds('cue.set');
+    eq(set[set.length - 1].params.remember, 'phrase');
+    eq(env.qa('.vp-corr').length, 1, 'restored');
+    W.VP_Toast.clearAll();
+    eq(env.errors().length, 0);
+  });
+
+  it('Words: sorted by count with tier badges, filter by tier, tier share bar, Copy as list and as CSV flashcards', function () {
+    var env = boot();
+    var W = env.window;
+    W.VP_Workspace.setTab('words');
+    env.clock.tick(100);
+    eq(env.cmds('words.list').length, 1);
+    var rows = env.qa('.vp-wordrow');
+    ok(rows.length >= 8, 'rows: ' + rows.length);
+    var counts = rows.map(function (r) { return Number(r.querySelector('.vp-wordrow-count').textContent); });
+    for (var i = 1; i < counts.length; i++) { ok(counts[i] <= counts[i - 1], 'sorted by count'); }
+    ok(rows[0].querySelector('.vp-tier'), 'tier badge');
+    ok(env.q('.vp-words-count').textContent.indexOf('words') > 0);
+    ok(!env.q('.vp-share').hidden);
+    var segs = env.qa('.vp-share-seg');
+    eq(segs.length, 4);
+    ok(/^\d+(\.\d+)?%$/.test(segs[0].style.width), segs[0].style.width);
+    ok(env.q('.vp-share-bar').getAttribute('aria-label').indexOf('Basic word') === 0);
+    env.q('[data-words-filter="2"]').click();
+    eq(W.VP_Words.filter(), '2');
+    var t2 = env.qa('.vp-wordrow');
+    eq(t2.length, 2);
+    deepEq(t2.map(function (r) { return r.querySelector('.vp-wordrow-head').textContent; }), ['avis', 'habitō'], 'same count: alphabetical');
+    eq(env.q('[data-words-filter="2"]').getAttribute('aria-pressed'), 'true');
+    env.q('[data-words-filter="3"]').click();
+    ok(env.q('.vp-word-list').textContent.indexOf('No words of this level') >= 0);
+    env.q('[data-words-filter="2"]').click();
+    env.q('[data-words-action="list"]').click();
+    env.clock.tick(50);
+    eq(env.copied[0], 'avis\nhabitō\n');
+    env.q('[data-words-filter="all"]').click();
+    env.q('[data-words-action="csv"]').click();
+    env.clock.tick(50);
+    var csv = env.copied[1].split('\r\n');
+    eq(csv[0], 'lemma,gloss,tier,count');
+    eq(csv[1], '"avis, avis",bird,2,1');
+    ok(csv.some(function (l) { return /^"puella, puellae",girl,1,\d+$/.test(l); }), 'puella row');
+    W.VP_App.setLang('es-MX');
+    env.clock.tick(50);
+    eq(env.qa('.vp-wordrow')[0].querySelector('.vp-wordrow-gloss').textContent, 'pájaro', 'gloss follows the UI language');
+    W.VP_App.setLang('en-US');
+    W.VP_Toast.clearAll();
+    deepEq(W.VP_I18n.missing(), []);
+    W.VP_Workspace.close();
+    env.clock.tick(300);
+    deepEq(W.VP_Debug.failures(), []);
+  });
+});
+
+describe('VP_Words defensive filter and fidelity scale (B9)', function () {
+  it('lists only entries whose lemma head has a letter, trims brackets stuck to a head, and reads the slider on the engine scale', function () {
+    var env = load('all', { search: '?mock=1&debug=1' });
+    var W = env.window;
+    var D = W.VP_Dom;
+    var main = D.el('main', { id: 'vp-main' });
+    env.document.body.appendChild(main);
+    W.VP_MockEngine.options.latencyMs = 1;
+    W.VP_App.boot({ root: main, status: D.el('div') });
+    env.clock.tick(500);
+    var call = W.VP_Bridge.call;
+    W.VP_Bridge.call = function (cmd, params) {
+      if (cmd !== 'words.list') { return call(cmd, params); }
+      return call(cmd, params).then(function (r) {
+        r.words = r.words.concat([
+          { lemma: { head: '((', glossEn: '' }, count: 99, tier: 0 },
+          { lemma: { head: ',', glossEn: '' }, count: 50, tier: 0 },
+          { lemma: { head: '\u00AB\u00BB', glossEn: '' }, count: 40, tier: 0 },
+          { lemma: { head: '((caelum', glossEn: 'sky' }, count: 98, tier: 1 }
+        ]);
+        return r;
+      });
+    };
+    W.VP_Start.openSample();
+    env.clock.tick(300);
+    env.document.querySelector('#vp-translate').click();
+    env.clock.tick(3000);
+    W.VP_Workspace.setTab('words');
+    env.clock.tick(100);
+    var heads = env.document.querySelectorAll('.vp-wordrow-head').map(function (h) { return h.textContent; });
+    eq(heads.indexOf('(('), -1, 'punctuation-only entry dropped');
+    eq(heads.indexOf(','), -1);
+    eq(heads.indexOf('\u00AB\u00BB'), -1);
+    eq(heads[0], 'caelum', 'brackets trimmed, the word kept');
+    heads.forEach(function (h) { ok(/[A-Za-z\u00C0-\u024F\u0370-\u03FF\u1F00-\u1FFF]/.test(h), 'letter in ' + h); });
+    var hint = function () { var ps = env.document.querySelectorAll('.vp-share > p.vp-hint'); return ps[ps.length - 1].textContent; };
+    W.VP_Engines.setFidelity(1);
+    env.clock.tick(50);
+    ok(hint().indexOf('above level 3') > 0, 'fidelity 1 (extremely faithful) allows level 3: ' + hint());
+    ok(hint().indexOf('0%') === 0, 'nothing is above level 3');
+    W.VP_Engines.setFidelity(3);
+    env.clock.tick(50);
+    ok(hint().indexOf('above level 1') > 0, 'fidelity 3 (flexible) keeps to level 1: ' + hint());
+    W.VP_Toast.clearAll();
+    W.VP_Workspace.close();
+    env.clock.tick(300);
+    deepEq(W.VP_Debug.failures(), []);
+    eq(env.errors().length, 0);
+  });
+});
+
+describe('VP_Names without detection (the real engine, B8)', function () {
+  it('no names yet: the list is hidden, the "Add a name" form sends names.set and the new name is listed without a count', function () {
+    var env = load('all', { search: '?mock=1&debug=1' });
+    var W = env.window;
+    var D = W.VP_Dom;
+    var app = D.el('div', { id: 'app', className: 'vp-app' });
+    var main = D.el('main', { id: 'vp-main' });
+    app.appendChild(main);
+    env.document.body.appendChild(app);
+    W.VP_MockEngine.options.latencyMs = 1;
+    W.VP_App.boot({ root: main, status: D.el('div') });
+    env.clock.tick(500);
+    var sent = [];
+    var call = W.VP_Bridge.call;
+    W.VP_Bridge.call = function (cmd, params) {
+      sent.push({ cmd: cmd, params: params });
+      return call(cmd, params);
+    };
+    var q = function (s) { return env.document.querySelector(s); };
+    W.VP_Start.openSample();
+    env.clock.tick(300);
+    W.VP_Workspace.setTab('names');
+    env.clock.tick(100);
+    eq(env.document.querySelectorAll('.vp-name').length, 0, 'the engine lists no names of its own');
+    eq(q('.vp-name-empty').hidden, false);
+    eq(q('.vp-name-empty').textContent, 'No names in the glossary yet. Add the ones the file uses below.');
+    eq(q('#vp-name-add-title').textContent, 'Add a name');
+    ok(q('label[for="vp-name-add-name"]') && q('label[for="vp-name-add-policy"]') && q('label[for="vp-name-add-form"]'), 'labelled fields');
+    q('[data-names-action="add"]').click();
+    env.clock.tick(50);
+    eq(q('#vp-name-add-error').hidden, false, 'an empty name is refused');
+    eq(sent.filter(function (s) { return s.cmd === 'names.set'; }).length, 0);
+    q('#vp-name-add-name').value = 'Marcus';
+    q('#vp-name-add-form').value = 'Mārcus';
+    q('[data-names-action="add"]').click();
+    env.clock.tick(100);
+    var set = sent.filter(function (s) { return s.cmd === 'names.set'; });
+    deepEq(set[0].params, { name: 'Marcus', policy: 'decline', form: 'Mārcus' });
+    eq(q('#vp-name-add-error').hidden, true);
+    var rows = env.document.querySelectorAll('.vp-name');
+    eq(rows.length, 1);
+    eq(rows[0].querySelector('.vp-name-text').textContent, 'Marcus');
+    eq(rows[0].querySelector('.vp-name-count'), null, 'no count from the engine, none shown');
+    eq(q('.vp-name-empty').hidden, true);
+    eq(q('#vp-name-add-name').value, '', 'the form is emptied');
+    ok(/Marcus is in the glossary/.test(q('.vp-toast-text').textContent));
+  });
+});

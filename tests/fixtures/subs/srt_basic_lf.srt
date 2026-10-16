@@ -1,0 +1,12 @@
+1
+00:00:01,000 --> 00:00:03,200
+The lighthouse keeper counts the boats every evening.
+
+2
+00:00:03,500 --> 00:00:06,000
+Tonight only three came home,
+and the fog is getting thicker.
+
+3
+00:00:06,400 --> 00:00:08,100
+He lights the lamp a little earlier.

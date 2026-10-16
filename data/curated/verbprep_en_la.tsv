@@ -1,0 +1,57 @@
+# verb	prep	latin	frame	note
+# English verb + preposition -> Latin verb and what happens to the prepositional phrase (C2b; teacher-editable).
+# latin "-" keeps the verb's own translation. frame: obj (the PP object becomes the direct object), pp (the PP is
+# translated as usual), prep:<latin>+<case> (the verb fixes the Latin preposition). Prepositions are the canonical
+# English ones (Spanish rows, with the same canonical prepositions: verbprep_es_la.tsv). Our own list.
+live	in	habitō	pp	"We live in a small house" -> In casā parvā habitāmus.
+live	at	habitō	pp	
+live	near	habitō	pp	
+live	with	habitō	pp	
+look	at	spectō	obj	"Look at the sky!" -> Spectā caelum!
+look	for	quaerō	obj	
+look	after	cūrō	obj	
+search	for	quaerō	obj	
+wait	for	exspectō	obj	"Wait for me" -> Exspectā mē.
+listen	to	audiō	obj	
+laugh	at	rīdeō	obj	
+ask	for	petō	obj	
+depend	on	pendeō	prep:ex+abl	"That depends on ..." -> pendet ex ...
+think	of	cōgitō	prep:dē+abl	
+think	about	cōgitō	prep:dē+abl	
+talk	about	loquor	prep:dē+abl	
+speak	about	loquor	prep:dē+abl	
+help	with	adiuvō	prep:in+abl	"Can you help me with the letter?" -> Potesne mē in epistulā adiuvāre?
+stare	at	-	obj	
+care	for	-	obj	
+hope	for	-	obj	
+pay	for	-	obj	
+call	for	-	obj	
+wish	for	-	obj	
+reach	for	-	obj	
+send	for	arcessō	obj	C15: "Oz will send for you" -> Oz tē arcesset.
+know	of	sciō	obj	"the magic arts I know of"
+tell	of	dīcō	prep:dē+abl	"the Great Wizard I told you of" -> dē quō tibi dīxī
+keep	from	servō	prep:ab+abl	"to keep you from harm" -> ut tē ā malō servem
+get	to	perveniō	pp	"till I get to Oz" -> dum ad Oz perveniam
+live	on	habitō	pp	C15: "The sailor lives on the island."
+# C17 (quality loop 3)
+admit	to	admittō	pp	"He admitted me to his presence." -> Mē ad sē admīsit.
+admit	into	admittō	pp	
+take	from	auferō	dat	"They took the ball from me." -> Pilam mihi abstulērunt. (person only; dative of separation)
+bark	at	lātrō	obj	"The dog barked at the stranger." -> Canis advenam lātrāvit.
+get	behind	stō	pp	C19: "get behind me" -> post mē stā (take a place behind)
+get	under	subeō	obj	C19: "get under the table" -> mēnsam subī
+knock	on	pulsō	obj	C20: "The wolf knocked on the door." -> Lupus iānuam pulsāvit.
+knock	at	pulsō	obj	C20: "Someone is knocking at the gate." -> Aliquis portam pulsat.
+fight	for	pugnō	prep:prō+abl	C22: "They fought for the king." -> Prō rēge pugnāvērunt.
+declare	for	stō	prep:prō+abl	C22: "The earls declared for him." -> prō eō stetērunt (took his side)
+put	on	induō	obj	C24: clothes: "The boy put on his hat." -> Puer pilleum suum induit
+make	of	-	prep:ex+abl	C26: "a crown made of gold" -> ex aurō facta
+build	of	-	prep:ex+abl	C26: "a house built of stone" -> ex saxō aedificāta
+arrive	at	perveniō	prep:ad+acc	C30: "When she arrived at the bank" -> ubi ad rīpam pervēnit
+arrive	in	perveniō	prep:in+acc	C30
+take	out of	prōmō	prep:ē+abl	C30: "She took the bread out of her basket." -> Pānem ē corbe suō prōmpsit.
+get	into	cōnscendō	obj	C30: "They got into the boat." -> Nāviculam cōnscendērunt (a boat, a cart, a horse)
+howl	at	ululō	prep:ad+acc	"The wolves howled at the moon." -> Lupī ad lūnam ululāvērunt. (C32)
+provide	for	praebeō	dat	C37: "The farm provides food for the family." -> Praedium familiae cibum praebet.
+pray	to	precor	obj	C37: "He prays to the gods." -> Deōs precātur.

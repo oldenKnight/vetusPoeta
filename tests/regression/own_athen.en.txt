@@ -1,0 +1,52 @@
+# C38: the English source of the reverse direction (EN -> GRC): the first alternative of expected/own_athen.en.gold.txt;
+# gold expected/own_athen.grc.gold.txt. Our own sentences.
+Stephen is a farmer.
+He lives not in the city but in the fields.
+For the farm is not large.
+Stephen unties the oxen and drives them to the field.
+The slave is lazy; for he does not work.
+O Zeus, the work is long.
+Timothy brings food to his father.
+Daphne stays in the house and prepares the dinner.
+The oxen are strong, but they walk slowly.
+The river provides water, not much but enough.
+The farmer often groans; for the sun is hot.
+Chloe works in the house and helps her mother.
+The dog sleeps in the road.
+Timothy, hurry; for father is waiting.
+The father works in the field, but the boy plays.
+Dikaeopolis calls the slave.
+The slave does not hear; for he is sleeping.
+Dicaeopolis gets angry and wakes the slave.
+The house is small, but beautiful.
+The children love the dog and play in the field.
+The farmer lifts the stone and carries it out of the field.
+The stone is big; so the farmer cannot lift it.
+O Zeus, help me.
+Stephen is tireless; for he always works.
+The slave does not work but sits in the shade.
+The woman carries a water jar and walks to the spring.
+Timothy runs into the house and calls his mother and says:
+So the mother is glad.
+The sun shines and the farmer is glad.
+Stephen is free, but Xanthias is a slave.
+Timothy sees his father and runs to him.
+Father, where is the dog?
+The dog chases the wolf.
+The wolf does not stay but flees.
+Daphne is wise and beautiful.
+The gods provide food for the farmers.
+The mother provides dinner for the children.
+The field is small, but the house is big.
+Why are you not working, Xanthias?
+For I am tired, master.
+Dikeopolis does not punish the slave; for he is good.
+Chloe and her mother walk to the market place.
+The father calls his son, but he does not hear.
+The plough is heavy; so the slave groans.
+Stephen loves his own house.
+Daphne loves her own children.
+The slave is lazy, and yet the master loves him.
+The field is small; and yet the farmer is glad.
+The grandfather is old and no longer works.
+O Athena, guard our home.

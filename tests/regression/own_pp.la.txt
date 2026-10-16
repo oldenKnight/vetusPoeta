@@ -1,0 +1,22 @@
+# C43: own Latin sentences, LA -> EN / ES: a prepositional phrase after the subject noun (copula and predicate
+# adjective, predicate noun, verbs of motion and of position, both readings possible) and the side items (mīlle,
+# arrive at, on the island). Our own sentences, written before any C43 change and before the engine was run on them.
+# Gold: expected/own_pp.en.gold.txt and expected/own_pp.es.gold.txt. Units 12-14 have two possible readings: the gold
+# lists both and the unit must be Check (flag pp-attach), never OK.
+Via per silvam angusta est.
+Iter ad urbem longum nōn est.
+Epistula ad mātrem brevis est.
+Pōns trāns flūmen novus est.
+Templum in colle antīquum est.
+Liber dē bellō longus est.
+Vir ex oppidō agricola est.
+Puer per silvam currit.
+Nautae ad īnsulam nāvigant.
+Puella in hortō sedet.
+Casa in monte stat.
+Puella in hortō laeta est.
+Mīlitēs in castrīs tūtī sunt.
+Agricola cum fīliō laetus est.
+Mīlle mīlitēs in urbe sunt.
+Nāvis ad īnsulam pervenit.
+Multī hominēs in īnsulā habitant.

@@ -1,0 +1,7 @@
+﻿1
+00:00:00,500 --> 00:00:02,500
+The bakery opens before sunrise.
+
+2
+00:00:02,700 --> 00:00:05,100
+By seven o'clock the long loaves are gone.

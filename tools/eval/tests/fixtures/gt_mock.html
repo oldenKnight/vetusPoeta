@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Translate mock</title></head>
+<body>
+<!-- Local stand-in for the translation page, used only by tools/eval/tests (no network). It mimics what
+     gt_compare.js relies on: a textarea labelled "Source text" inside a lang="en" panel, a target panel with the
+     placeholder "Translation", and a lang="la" result that appears after a delay. The "translation" is our own
+     marker ("LA: " + paragraph). Query: text=... (submitted on load), mode=merge (joins paragraphs, so the counts
+     differ), mode=nourl (ignores the text parameter; only typing works). -->
+<h2>Source text</h2>
+<span lang="en"><textarea aria-label="Source text" rows="8" cols="60"></textarea></span>
+<h2>Translation results</h2>
+<div id="target"><div id="ph">Translation</div></div>
+<script>
+var q = new URLSearchParams(location.search), mode = q.get('mode') || '', timer = null;
+var box = document.querySelector('textarea'), target = document.getElementById('target');
+function render(text) {
+  clearTimeout(timer);
+  timer = setTimeout(function () {
+    var parts = text.split(/\n\s*\n/).filter(function (p) { return p.trim(); });
+    var out = parts.map(function (p) { return 'LA: ' + p.trim(); }).join(mode === 'merge' ? ' ' : '\n\n');
+    target.innerHTML = '';
+    if (!out) { target.innerHTML = '<div id="ph">Translation</div>'; return; }
+    var span = document.createElement('span');
+    span.setAttribute('lang', 'la');
+    span.style.whiteSpace = 'pre-wrap';
+    span.textContent = out;
+    target.appendChild(span);
+  }, 500);
+}
+box.addEventListener('input', function () { render(box.value); });
+if (q.get('text') && mode !== 'nourl') { box.value = q.get('text'); render(box.value); }
+</script>
+</body>
+</html>

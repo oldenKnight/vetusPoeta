@@ -1,0 +1,26 @@
+{
+  "_about": "Key families the UI builds at run time, so a text search cannot see them (PREDESIGN 5.2). errorCodes: every engine error code of DESIGN section 9 plus the UI-only codes timeout and no_engine; each needs error.<code>.title and error.<code>.hint. families: keys under these prefixes are never reported as unused. Modules may also expose i18nKeys() for keys they build from their own tables (VP_Keys does).",
+  "errorCodes": [
+    "bad_params", "not_found", "io", "unsupported_format", "lexicon_missing", "lexicon_corrupt",
+    "lexicon_version", "project_corrupt", "model_missing", "model_load_failed", "model_unsupported_cpu",
+    "online_disabled", "online_failed", "busy", "internal", "timeout", "no_engine"
+  ],
+  "families": {
+    "error.": "error.<code>.title / .hint, chosen by VP_App.errorText(code)",
+    "key.": "shortcut labels, groups and key names, built by VP_Keys from its table",
+    "app.lexicon.lang.": "language names in the engine status line, by lexicon lang code",
+    "app.theme.": "theme names, by settings value",
+    "confidence.": "confidence chip words and tooltips, by CueView.confidence",
+    "tier.": "tier badge words, by LemmaView.tier",
+    "unit.": "counted units with .one/.other plurals",
+    "tour.demo.": "steps of the placeholder tour, by step id",
+    "grammar.": "grammar terms in the word card, by FeatureView / LemmaView value (VP_Panes; the B7 inspector reuses them)",
+    "target.alt.reason.": "alternative reasons, by AltView.reason code (VP_Panes); unknown codes show the engine text",
+    "start.pair.": "language pair names, by pair code (VP_Start.pairLabelKey)",
+    "cue.filter.": "cue list filter names with counts, by filter id (VP_CueList.FILTERS)",
+    "workspace.view.": "view toggle notices, by settings key and state (VP_Workspace)",
+    "why.evidence.": "evidence sources and states of the Word tab, by ReasonView.data.source / .state (VP_Inspector)",
+    "why.check.": "check names A1..A9, by CheckView.id (VP_Inspector)",
+    "app.shell.": "native messages of the Windows shell (gui/shell/shell_util.cpp reads i18n/<lang>.json, its own fallbacks are the same texts); the shell appends the log path after app.shell.engineCrashLoop.text, so the blank line before it is the shell's job (values may not end in whitespace)"
+  }
+}

@@ -1,0 +1,11 @@
+1
+00:00:01,000 --> 00:00:04,000
+♪ The wind is soft upon the hill ♪
+
+2
+00:00:04,200 --> 00:00:07,000
+♪ and the sheep are counting stars ♪
+
+3
+00:00:07,500 --> 00:00:09,000
+[gentle humming]

@@ -1,0 +1,47 @@
+# source	latin	kind	note
+# "be" + state adjective with a person subject -> Latin (C2b; teacher-editable).
+# kind verb: the Latin verb replaces be + adjective ("I am afraid" -> timeō, "You were wrong" -> errābās); its "of"
+# phrase becomes the object ("afraid of the dark" -> timēre tenebrās). kind adj: this Latin adjective is the
+# predicate ("I am tired" -> fessa sum). source: an English adjective lemma or verb + noun (Spanish rows: states_es_la.tsv). Our own list.
+afraid	timeō	verb	
+scared	timeō	verb	
+frightened	timeō	verb	
+cold	frīgeō	verb	"I'm cold." -> Frīgeō.
+hot	caleō	verb	
+hungry	ēsuriō	verb	
+thirsty	sitiō	verb	
+wrong	errō	verb	"You were wrong." -> Errābās.
+mistaken	errō	verb	
+tired	fessus	adj	
+ready	parātus	adj	C28: things too ("Dinner is ready." -> Cēna parāta est.)
+happy	laetus	adj	
+glad	laetus	adj	
+sad	trīstis	adj	
+angry	īrātus	adj	"the teacher was angry" -> magister īrātus erat
+ill	aeger	adj	
+sick	aeger	adj	
+have fear	timeō	verb	
+anxious	cupiō	verb	C15: "I am anxious to get back" -> Cupiō redīre (the infinitive stays)
+eager	cupiō	verb	
+asleep	dormiō	verb	"who is asleep" -> quī dormit
+# C17 (quality loop 3): light verbs, "verb noun" -> one Latin verb; words before the Latin verb are its fixed object
+make visit	aliquem vīsō	verb	"I am going away to make a visit." -> ut aliquem vīsam
+pay visit	aliquem vīsō	verb	
+take walk	ambulō	verb	"Let's take a walk." -> Ambulēmus.
+have rest	quiēscō	verb	
+take rest	quiēscō	verb	
+make mistake	errō	verb	"You made a mistake." -> Errāvistī.
+make noise	strepō	verb	
+give shout	clāmō	verb	
+have swim	natō	verb	
+have dream	somniō	verb	
+# C22 (acceptance loop 1)
+pay attention	animum attendō	verb	"Pay attention to the teacher!" -> Animum ad magistrum attende!
+strike match	facem accendō	verb	C26: "She struck a match." -> Facem accendit.
+light match	facem accendō	verb	C26
+open	apertus	adj	C28: things too ("The door was open." -> Iānua aperta erat.)
+shut	clausus	adj	C28: things too
+closed	clausus	adj	C28: things too
+silent	taceō	verb	C37: "He is silent." -> Tacet.
+delighted	dēlectō	pass	C37: "He is often delighted." -> Saepe dēlectātur. (kind pass: the verb in the passive)
+pleased	dēlectō	pass	C37

@@ -1,0 +1,111 @@
+# pattern	greek	tier	register	note
+# Spanish phrasebook for Attic Greek (C12; teacher-editable; our own rows). Same columns and syntax as
+# phrasebook_es_la.tsv (whose rows it mirrors): lower-case words matched against each token's lower form or lemma,
+# slots {NP} {NAME} {VP} {ADJ} {NUM} {WH}, optional tokens in (...), alternatives a|b; ¿ ¡ are punctuation.
+# Plural addressees: the engine replaces χαῖρε / ἔρρωσο with the plural of the note column.
+hola	χαῖρε	1	greet	plural χαίρετε
+buenos días	χαῖρε	1	greet	plural χαίρετε
+buenas tardes	χαῖρε	1	greet	plural χαίρετε
+buenas noches	χαῖρε	1	greet	plural χαίρετε
+adiós	χαῖρε	1	greet	plural χαίρετε; ἔρρωσο (fare well) is the alternative
+hasta luego	χαῖρε	1	greet	plural χαίρετε
+hasta pronto	αὖθίς σε ὄψομαι	1	greet	
+hasta mañana	αὔριόν σε ὄψομαι	1	greet	
+nos vemos	αὖθίς σε ὄψομαι	1	greet	
+nos vemos mañana	αὔριόν σε ὄψομαι	1	greet	
+bienvenido|bienvenida|bienvenidos|bienvenidas	χαῖρε	1	greet	plural χαίρετε
+gracias	χάριν οἶδα	1	polite	
+muchas gracias	πολλὴν χάριν σοι οἶδα	1	polite	
+mil gracias	πολλὴν χάριν σοι οἶδα	1	polite	
+de nada	οὐδὲν δεινόν	1	polite	"nothing terrible"
+por favor	ἀντιβολῶ	2	polite	"I beg you" (Aristophanic); omitted in flexible mode when the command is clear
+perdón	σύγγνωθί μοι	1	polite	
+perdona|perdóname|disculpa|disculpe	σύγγνωθί μοι	1	polite	
+con permiso	σύγγνωθί μοι	1	polite	
+lo siento	σύγγνωθί μοι	1	polite	
+sí	ναί	1	reply	
+no	οὔ	1	reply	
+claro	πάνυ γε	1	answer	
+claro que	πάνυ γε	1	adv	before a clause: particle δήπου ("Claro que podemos hablar." -> δυνάμεθα δήπου λαλεῖν)
+claro que sí	πάνυ γε	1	answer	
+claro que no	οὐδαμῶς	1	answer	
+por supuesto	πάνυ μὲν οὖν	1	answer	
+de acuerdo	καλῶς λέγεις	1	answer	
+está bien	καλῶς ἔχει	1	answer	
+bueno	εἶεν	1	answer	as a reply
+órale	ἄγε	1	excl	plural ἄγετε
+ándale	ἄγε	1	imp	plural ἄγετε
+para nada	οὐδαμῶς	1	answer	
+de ninguna manera	οὐδαμῶς	1	answer	
+quizás|quizá	ἴσως	1	answer	
+no sé	οὐκ οἶδα	1	answer	
+ya sé	οἶδα	1	answer	
+no importa	οὐδὲν διαφέρει	1	answer	
+basta	ἅλις	1	answer	
+tienes razón	ὀρθῶς λέγεις	1	answer	
+muy bien	πάνυ καλῶς	1	answer	C35: a reply ("Muy bien, gracias.") and praise (εὖ γε "well done" only praises)
+bien hecho	εὖ γε	1	praise	
+bravo	εὖ γε	1	praise	
+cómo estás	πῶς ἔχεις	1	q	
+cómo está usted	πῶς ἔχεις	1	q	
+cómo te llamas	τί ὄνομά σοι	1	q	
+me llamo {NAME}	{1} ὄνομά μοι	1	intro	
+mi nombre es {NAME}	{1} ὄνομά μοι	1	intro	
+quién sabe	τίς οἶδεν	1	q	
+qué hora es	πηνίκα ἐστίν	1	q	Attic "at what hour"
+llego tarde	ὀψὲ ἥκω	1	answer	
+ay	οἴμοι	1	excl	"Ay, ay, ..." -> οἴμοι, οἴμοι, ...
+ay de mí	οἴμοι	1	excl	
+dios mío	ὦ Ζεῦ	1	excl	
+ayuda	βοήθει	1	excl	plural βοηθεῖτε
+ayúdame	βοήθει μοι	1	excl	plural βοηθεῖτέ μοι
+silencio	σίγα	1	imp	plural σιγᾶτε
+escucha	ἄκουε	1	imp	plural ἀκούετε
+vamos	ἴωμεν	1	imp	
+jugar a las cartas	χάρταις παίζειν	2	vp	verb phrase: the last word is the verb
+que le corten {NP}	ἀποτέμετε {1:acc} αὐτοῦ	2	excl	"off with ..." (plural command); C18: "le" is the possessor (possessive dative)
+vete	ἄπελθε	1	imp	plural ἀπέλθετε
+váyase	ἄπελθε	1	imp	usted
+váyanse	ἀπέλθετε	1	imp	
+# C16 (quality loop 2): mirrors of the English rows
+aquí tienes|aquí tiene	ἰδού	1	give	
+demasiado tarde	ὀψὲ ἤδη	1	answer	
+un poco	ὀλίγον	1	answer	as a reply
+había una vez	ποτέ	1	narr	before a clause: particle ποτέ
+duerme bien	εὖ κάθευδε	1	imp	plural εὖ καθεύδετε
+su majestad	ὦ βασιλεῦ/βασίλεια	2	address	addressee gender as in the English row
+depende de {WH}	τοῦτο ἐξαρτᾶται ἐκ τοῦ {1}	1	state	
+no importa {WH}	οὐδὲν διαφέρει {1}	1	state	
+pasa me {NP}	δός μοι {1:acc}	1	imp	"Pásame ..." (the tokenizer splits the clitic)
+todas las mañanas	ἑκάστης ἡμέρας ἕωθεν	1	adv	
+cada mañana	ἑκάστης ἡμέρας ἕωθεν	1	adv	
+va a llover	ὕσει	1	state	
+# C18 (quality loop 3)
+que les corten {NP}	ἀποτέμετε {1:acc} αὐτῶν	2	excl	"les" is the possessor (possessive dative)
+# C35 (Greek loop 9: own_dialogue2.es.srt, Mexican Spanish)
+de veras	ἀληθῶς	1	answer	"¿De veras?" (αἱ οὐσίαι "the properties" was produced)
+fue sin querer	ἀκουσίως ἐποίησα	1	answer	"it was not on purpose" (no gender: ἄκων / ἄκουσα would need the speaker)
+te lo juro	ὄμνυμί σοι	1	answer	
+y ustedes	καὶ ὑμεῖς	1	q	"¿Y ustedes?" (καί alone was produced)
+y tú	καὶ σύ	1	q	
+y usted	καὶ σύ	1	q	usted: σύ
+que le vaya bien	εὖ πράττοις	1	greet	a wish at parting (optative)
+que te vaya bien	εὖ πράττοις	1	greet	
+en voz alta	μεγάλῃ τῇ φωνῇ	1	adv	"read aloud" (ἐν ὑψηλῇ φωνῇ was produced)
+en latín	Ῥωμαϊστί	1	adv	
+en griego	Ἑλληνιστί	1	adv	
+a la mañana siguiente	τῇ ὑστεραίᾳ	1	adv	the next day
+al día siguiente	τῇ ὑστεραίᾳ	1	adv	
+por fin	τέλος	1	adv	finally
+en la noche	νύκτωρ	1	adv	es-MX "at night" (as "de noche", "por la noche": C25 / C33)
+no es cierto	οὐκ ἀληθές ἐστιν	1	answer	
+no es verdad	οὐκ ἀληθές ἐστιν	1	answer	
+ahora mismo	αὐτίκα	1	adv	right now
+y colorín colorado , este cuento se ha acabado	καὶ οὗτος ὁ μῦθος τέλος ἔχει	1	narr	the closing formula of a tale
+y colorín colorado	καὶ	1	narr	before the closing line of a tale (the comma keeps it apart)
+este cuento se ha acabado	οὗτος ὁ μῦθος τέλος ἔχει	1	narr	
+un día	ἡμέρᾳ τινὶ	1	adv	"one day" in a story (ἡμέρᾳ alone was produced)
+cuidado	εὐλαβοῦ	1	excl	C35: "¡Cuidado, ...!" -> beware (ὦ μελέτη "o practice" was produced); plural εὐλαβεῖσθε
+cuántos años tienes	πόσων ἐτῶν εἶ	1	q	C35: the genitive of age (πόσοις ἔτεσιν ἔχεις was produced)
+cuántos años tiene usted	πόσων ἐτῶν εἶ	1	q	C35: usted
+cuántos años tienen ustedes	πόσων ἐτῶν ἐστε	1	q	C35

@@ -1,0 +1,289 @@
+# key	head	gloss_es	(es-MX register; seed; the pipeline adds DCC Spanish and es.wiktionary glosses)
+amo	amō	amar
+video	videō	ver
+habeo	habeō	tener
+do	dō	dar
+dico	dīcō	decir
+venio	veniō	venir
+eo	eō	ir
+sum	sum	ser, estar
+possum	possum	poder
+volo	volō	querer
+nolo	nōlō	no querer
+debeo	dēbeō	deber
+scio	sciō	saber
+puto	putō	pensar
+timeo	timeō	temer, tener miedo
+quaero	quaerō	buscar, preguntar
+invenio	inveniō	encontrar
+facio	faciō	hacer
+ago	agō	hacer, actuar
+capio	capiō	agarrar, capturar, atrapar
+pono	pōnō	poner
+sedeo	sedeō	estar sentado, sentarse
+sto	stō	estar de pie
+curro	currō	correr
+dormio	dormiō	dormir
+surgo	surgō	levantarse
+maneo	maneō	quedarse, esperar
+specto	spectō	mirar
+peto	petō	pedir, buscar
+rogo	rogō	preguntar, pedir
+iubeo	iubeō	ordenar, mandar
+pareo	pāreō	obedecer
+placeo	placeō	gustar, agradar
+utor	ūtor	usar
+memini	meminī	recordar
+licet	licet	está permitido, se puede
+oportet	oportet	hay que, es necesario
+gaudeo	gaudeō	alegrarse
+rideo	rīdeō	reír, sonreír
+fleo	fleō	llorar
+clamo	clāmō	gritar
+taceo	taceō	callar
+ambulo	ambulō	caminar, pasear
+canto	cantō	cantar
+lego	legō	leer
+scribo	scrībō	escribir
+aperio	aperiō	abrir
+claudo	claudō	cerrar
+bibo	bibō	beber
+edo	edō	comer
+puella	puella	niña, muchacha
+puer	puer	niño, muchacho
+vir	vir	hombre, varón
+femina	fēmina	mujer
+pater	pater	padre, papá
+mater	māter	madre
+filius	fīlius	hijo
+filia	fīlia	hija
+frater	frāter	hermano
+soror	soror	hermana
+amicus	amīcus	amigo
+amica	amīca	amiga
+rex	rēx	rey
+regina	rēgīna	reina
+domus	domus	casa, hogar
+hortus	hortus	jardín, huerto
+via	via	camino, calle
+aqua	aqua	agua
+terra	terra	tierra
+caelum	caelum	cielo
+sol	sōl	sol
+luna	lūna	luna
+dies	diēs	día
+nox	nox	noche
+hora	hōra	hora
+tempus	tempus	tiempo
+annus	annus	año
+liber	liber	libro
+verbum	verbum	palabra
+nomen	nōmen	nombre
+res	rēs	cosa, asunto
+locus	locus	lugar
+canis	canis	perro
+feles	fēlēs	gato
+equus	equus	caballo
+lepus	lepus	liebre
+avis	avis	ave, pájaro
+flos	flōs	flor
+arbor	arbor	árbol
+magnus	magnus	grande
+parvus	parvus	pequeño
+bonus	bonus	bueno
+malus	malus	malo
+pulcher	pulcher	bonito, hermoso
+novus	novus	nuevo
+vetus	vetus	viejo, antiguo
+longus	longus	largo
+brevis	brevis	breve, corto
+multus	multus	mucho
+omnis	omnis	todo
+nullus	nūllus	ninguno
+laetus	laetus	alegre, contento
+tristis	trīstis	triste
+fessus	fessus	cansado
+celer	celer	rápido
+tardus	tardus	lento, tardío
+sero	sērō	tarde
+nunc	nunc	ahora
+hodie	hodiē	hoy
+cras	crās	mañana
+heri	herī	ayer
+semper	semper	siempre
+numquam	numquam	nunca
+saepe	saepe	a menudo
+iam	iam	ya
+mox	mox	pronto
+statim	statim	en seguida
+hic	hīc	aquí
+ibi	ibi	allí
+ubi	ubi	dónde, donde
+quo	quō	a dónde
+cur	cūr	por qué
+quomodo	quōmodo	cómo
+quis	quis	quién
+quid	quid	qué
+et	et	y
+sed	sed	pero
+aut	aut	o
+quod	quod	porque, que
+quia	quia	porque
+si	sī	si
+cum	cum	con; cuando
+non	nōn	no
+# C11 additions (Latin -> Spanish readings; the library's pivot gloss was wrong or empty for these)
+rosa	rosa	rosa
+serva	serva	esclava, sirvienta
+magistra	magistra	maestra
+discipula	discipula	alumna
+liberi	līberī	hijos
+ianua	iānua	puerta
+cubiculum	cubiculum	recámara, cuarto
+scutum	scūtum	escudo
+pila	pila	pelota, bola
+ostium	ōstium	puerta, entrada
+appello	appellō	llamar, nombrar
+pulso	pulsō	tocar, golpear
+emo	emō	comprar
+aedifico	aedificō	construir, edificar
+pingo	pingō	pintar
+viridis	viridis	verde
+caeruleus	caeruleus	azul
+romanus	Rōmānus	romano
+piger	piger	perezoso, flojo
+inurbanus	inurbānus	grosero, maleducado
+candela	candēla	vela
+horologium	hōrologium	reloj
+thea	thea	té
+placenta	placenta	pastel
+pallium	pallium	abrigo, capa
+charta	charta	hoja de papel, naipe
+# C13 additions (Spanish source: the runtime reads these as the teacher's Spanish reverse index, es-MX)
+transeo	trānseō	pasar, cruzar, atravesar
+mirus	mīrus	extraño, maravilloso, asombroso
+carmen	carmen	canción, poema, canto
+sumo	sūmō	tomar, agarrar
+frango	frangō	romper, quebrar
+narro	narrō	contar, narrar, relatar
+fovea	fovea	hoyo, pozo, fosa
+altus	altus	alto, profundo, hondo
+imus	īmus	fondo
+adiuvo	adiuvō	ayudar
+color	color	color, pintura
+agricola	agricola	agricultor, campesino, granjero
+ludus	lūdus	escuela, juego
+pensum	pēnsum	tarea
+epistula	epistula	carta
+accendo	accendō	encender, prender
+obscurus	obscūrus	oscuro
+tenebrae	tenebrae	oscuridad, tinieblas
+benignus	benignus	amable, generoso, bondadoso
+cado	cadō	caer
+tremo	tremō	temblar
+fabula	fābula	cuento, historia, fábula
+cor	cor	corazón
+error	error	error, equivocación
+erro	errō	equivocarse, errar
+mane	māne	mañana (temprano)
+redeo	redeō	regresar, volver
+abeo	abeō	irse, marcharse
+aufugio	aufugiō	escaparse, huir
+loquor	loquor	hablar
+fenestra	fenestra	ventana
+pluit	pluit	llover
+intro	intrō	entrar
+cupio	cupiō	desear
+doceo	doceō	enseñar
+porta	porta	portón, puerta de la ciudad
+caput	caput	cabeza
+abscido	abscīdō	cortar
+ruber	ruber	rojo
+albus	albus	blanco
+niger	niger	negro
+flumen	flūmen	río
+prope	prope	cerca, cerca de
+habito	habitō	vivir, habitar
+magister	magister	maestro, profesor
+iratus	īrātus	enojado, enfadado
+nemo	nēmō	nadie
+sero	serō	plantar, sembrar
+avus	avus	abuelo
+avia	avia	abuela
+# C34 (Spanish loop 2): school and family words of the own_dialogue2 material; "hacer frío / calor" and "esperar que" are the frame builder's weather and hope readings
+stilus	stilus	lápiz
+conclave	conclāve	salón
+vicinus	vīcīnus	vecino
+vicina	vīcīna	vecina
+curiosus	cūriōsus	curioso
+convivium	convīvium	fiesta, banquete
+consilium	cōnsilium	idea, plan, consejo
+poculum	pōculum	vaso, copa
+desidero	dēsīderō	extrañar, echar de menos
+disco	discō	aprender, estudiar
+traho	trahō	jalar, arrastrar
+relinquo	relinquō	dejar, abandonar
+severus	sevērus	estricto, severo
+puerulus	puerulus	niñito
+catulus	catulus	perrito, cachorro
+apertus	apertus	abierto
+nato	natō	nadar
+venia	venia	perdón
+aufero	auferō	quitar, llevarse
+nosco	nōscō	conocer
+spero	spērō	esperar que, tener esperanza
+comedo	comedō	comerse
+frigeo	frīgeō	hacer frío
+caleo	caleō	hacer calor
+sollicitus	sollicitus	preocupado
+cubiculum	cubiculum	cuarto, recámara
+libellus	libellus	cuaderno
+litus	lītus	playa
+pergo	pergō	seguir haciendo, continuar haciendo
+exeo	exeō	salir
+absum	absum	estar lejos, estar ausente
+credo	crēdō	creer
+iter	iter	camino recorrido, viaje
+solus	sōlus	solo, sola
+purgo	pūrgō	limpiar
+periculosus	perīculōsus	peligroso
+vicus	vīcus	pueblo, aldea
+nascor	nāscor	nacer
+patina	patina	plato
+ningit	ningit	nevar
+vinco	vincō	ganar, vencer
+mitto	mittō	enviar, mandar (una cosa)
+finio	fīniō	terminar
+# C37: prayers and hymns (own lines; the teacher's Spanish glosses)
+precor	precor	rogar, suplicar, implorar
+oro	ōrō	orar, rezar
+custodio	custōdiō	guardar, custodiar, proteger
+consolor	cōnsōlor	consolar
+audio	audiō	oír, escuchar
+infirmus	īnfirmus	débil, enfermo
+servo	servō	salvar, conservar
+lux	lūx	luz
+plenus	plēnus	pleno, lleno
+mors	mors	muerte
+foeteo	foeteō	apestar, heder
+fidus	fīdus	fiel
+amen	āmēn	amén
+defendo	dēfendō	defender
+fugio	fugiō	huir
+pauper	pauper	pobre
+tristis	trīstis	triste
+dulcis	dulcis	dulce
+pius	pius	piadoso, pío
+mitis	mītis	manso, apacible
+peccator	peccātor	pecador
+bonitas	bonitās	bondad
+virgo	virgō	virgen, doncella
+duco	dūcō	guiar, conducir
+miser	miser	desdichado, mísero
+purus	pūrus	puro, limpio
+sanctus	sānctus	santo, sagrado
+vis	vīs	fuerza, vigor
+bonum	bonum	bien (lo bueno)
+quaero	quaerō	buscar
+malum	malum	mal (el mal)
+cuniculus	cunīculus	conejo

@@ -1,0 +1,194 @@
+#!/usr/bin/env python3
+"""Generates or verifies gui/shell/webview2_subset.h, the WebView2 declarations the shell
+uses when the real SDK (NuGet Microsoft.Web.WebView2) could not be downloaded.
+
+    python3 gui/shell/tools/webview2_subset.py gen    path/to/WebView2.h   # rewrite the subset
+    python3 gui/shell/tools/webview2_subset.py verify path/to/WebView2.h   # compare IIDs + vtables
+
+`gen` copies, from a genuine MIDL-generated WebView2.h, the IID and the C++ declaration
+(methods in vtable order) of every interface in INTERFACES, the enums and structs they use,
+and forward declarations for every other interface named in those signatures. The checked-in
+subset was generated from the Microsoft.Web.WebView2 1.0.2903.40 header (the version CMake
+downloads; see third_party/LICENSES.md). `verify` checks that every interface in the subset has
+the same IID, base and ordered method names as in the given header.
+Ported from the prototype's script (same owner); only the interface list changed.
+"""
+import re
+import sys
+
+SDK_VERSION = '1.0.2903.40'
+
+INTERFACES = [
+    'ICoreWebView2Environment',
+    'ICoreWebView2Controller', 'ICoreWebView2Controller2',
+    'ICoreWebView2', 'ICoreWebView2_2', 'ICoreWebView2_3',
+    'ICoreWebView2Settings', 'ICoreWebView2Settings2', 'ICoreWebView2Settings3',
+    'ICoreWebView2Settings4', 'ICoreWebView2Settings5', 'ICoreWebView2Settings6',
+    'ICoreWebView2Settings7', 'ICoreWebView2Settings8',
+    'ICoreWebView2WebMessageReceivedEventArgs', 'ICoreWebView2WebMessageReceivedEventArgs2',
+    'ICoreWebView2ObjectCollectionView', 'ICoreWebView2File',
+    'ICoreWebView2NavigationStartingEventArgs',
+    'ICoreWebView2NewWindowRequestedEventArgs',
+    'ICoreWebView2ProcessFailedEventArgs',
+    'ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler',
+    'ICoreWebView2CreateCoreWebView2ControllerCompletedHandler',
+    'ICoreWebView2AddScriptToExecuteOnDocumentCreatedCompletedHandler',
+    'ICoreWebView2WebMessageReceivedEventHandler',
+    'ICoreWebView2NavigationStartingEventHandler',
+    'ICoreWebView2NewWindowRequestedEventHandler',
+    'ICoreWebView2ProcessFailedEventHandler',
+]
+
+# Declared only (the shell passes a null pointer of this type to the loader).
+EXTRA_FORWARD = ['ICoreWebView2EnvironmentOptions']
+
+# Hand-written declarations for interfaces missing from the header given to `gen` (none are needed with the
+# 1.0.2903.40 header; kept so an older header can still be used): name -> (iid, base, [methods]).
+ADDENDUM = {}
+
+IFACE_RE = r'MIDL_INTERFACE\("([0-9A-Fa-f-]+)"\)\s*\n\s*%s\s*:\s*public\s*(\w+)\s*\{(.*?)\n\s*\};'
+
+
+def strip_comments(text):
+    return re.sub(r'/\*.*?\*/', '', text, flags=re.S)
+
+
+def parse_iface(src, name):
+    m = re.search(IFACE_RE % re.escape(name), src, re.S)
+    if not m:
+        return None
+    body = strip_comments(m.group(3))
+    methods = [re.sub(r'\s+', ' ', x).strip() + ';' for x in re.findall(r'(virtual[^;]*?)\s*;', body, re.S)]
+    return m.group(1).lower(), m.group(2), methods
+
+
+def method_names(methods):
+    return [re.search(r'STDMETHODCALLTYPE\s+(\w+)\s*\(', m).group(1) for m in methods]
+
+
+def iid_initializer(uuid):
+    h = uuid.replace('-', '')
+    parts = ['0x' + h[0:8], '0x' + h[8:12], '0x' + h[12:16]]
+    rest = ','.join('0x' + h[16 + 2 * i:18 + 2 * i] for i in range(8))
+    return '{%s,%s,%s,{%s}}' % (parts[0], parts[1], parts[2], rest)
+
+
+def collect_types(methods):
+    ifaces, enums = set(), set()
+    for m in methods:
+        ifaces.update(re.findall(r'\b(ICoreWebView2\w*)\b', m))
+        enums.update(re.findall(r'\b(COREWEBVIEW2_\w+)\b', m))
+    return ifaces, enums
+
+
+def gen(header_path, out):
+    src = open(header_path, encoding='utf-8', errors='replace').read()
+    ver = re.search(r'Compiler settings for ([^\n]*)', src)
+    decls = []
+    fwd, enums = set(), set()
+    for name in INTERFACES:
+        parsed = parse_iface(src, name)
+        if parsed is None:
+            if name not in ADDENDUM:
+                raise SystemExit('%s not found in %s' % (name, header_path))
+            uuid, base, methods = ADDENDUM[name]
+            methods = [re.sub(r'\s+', ' ', x) for x in methods]
+            origin = 'addendum'
+        else:
+            uuid, base, methods = parsed
+            origin = 'header'
+        i, e = collect_types(methods)
+        fwd |= i
+        enums |= e
+        decls.append((name, uuid, base, methods, origin))
+    fwd |= set(INTERFACES) | set(EXTRA_FORWARD)
+
+    blocks = []
+    for e in sorted(enums):
+        m = re.search(r'typedef\s*(?:/\*[^*]*\*/)?\s*enum\s+%s\s*\{.*?\}\s*%s\s*;' % (e, e), src, re.S)
+        if m:
+            blocks.append(strip_comments(m.group(0)).strip())
+            continue
+        m = re.search(r'typedef\s+struct\s+%s\s*\{.*?\}\s*%s\s*;' % (e, e), src, re.S)
+        if m:
+            blocks.append(strip_comments(m.group(0)).strip())
+            continue
+        raise SystemExit('type %s not found' % e)
+
+    o = []
+    o.append('// Generated by gui/shell/tools/webview2_subset.py from a genuine WebView2.h')
+    o.append('// (%s, Microsoft.Web.WebView2 %s).' % (ver.group(1).strip() if ver else 'unknown', SDK_VERSION))
+    o.append('// Used only when the WebView2 SDK could not be downloaded; see gui/shell/CMakeLists.txt.')
+    o.append('// Copyright (C) Microsoft Corporation. All rights reserved. Redistribution and use in')
+    o.append('// source and binary forms, with or without modification, are permitted under the')
+    o.append('// BSD-style license shipped with the Microsoft.Web.WebView2 package (LICENSE.txt).')
+    o.append('#pragma once')
+    o.append('#ifndef VP_WEBVIEW2_SUBSET_H')
+    o.append('#define VP_WEBVIEW2_SUBSET_H')
+    o.append('#include <windows.h>')
+    o.append('#include <objidl.h>')
+    o.append('#include <oaidl.h>')
+    o.append('#include <eventtoken.h>')
+    o.append('')
+    for n in sorted(fwd):
+        o.append('typedef interface %s %s;' % (n, n))
+    o.append('')
+    for b in blocks:
+        o.append(re.sub(r'\n\s*\n+', '\n', b))
+        o.append('')
+    for name, uuid, base, methods, origin in decls:
+        o.append('// %s (%s)' % (name, origin))
+        o.append('EXTERN_C __declspec(selectany) const IID IID_%s = %s;' % (name, iid_initializer(uuid)))
+        o.append('MIDL_INTERFACE("%s")' % uuid)
+        o.append('%s : public %s' % (name, base))
+        o.append('{')
+        o.append('public:')
+        for m in methods:
+            o.append('    ' + m)
+        o.append('};')
+        o.append('')
+    o.append('#endif  // VP_WEBVIEW2_SUBSET_H')
+    o.append('')
+    with open(out, 'w', encoding='utf-8', newline='\n') as f:
+        f.write('\n'.join(o))
+    print('wrote %s (%d interfaces, %d types)' % (out, len(decls), len(blocks)))
+
+
+def verify(subset_path, header_path):
+    sub = open(subset_path, encoding='utf-8').read()
+    src = open(header_path, encoding='utf-8', errors='replace').read()
+    bad = 0
+    for name in INTERFACES:
+        a = parse_iface(sub, name)
+        b = parse_iface(src, name)
+        if a is None:
+            print('MISSING in subset: ' + name)
+            bad += 1
+            continue
+        if b is None:
+            print('not in header (older SDK?): ' + name)
+            continue
+        if a[0] != b[0] or a[1] != b[1] or method_names(a[2]) != method_names(b[2]):
+            print('MISMATCH %s:\n  subset %s %s %s\n  header %s %s %s' % (
+                name, a[0], a[1], method_names(a[2]), b[0], b[1], method_names(b[2])))
+            bad += 1
+        else:
+            print('ok %s (%d methods)' % (name, len(a[2])))
+    return 1 if bad else 0
+
+
+def main():
+    if len(sys.argv) != 3 or sys.argv[1] not in ('gen', 'verify'):
+        print(__doc__)
+        return 2
+    import os
+    here = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+    subset = os.path.join(here, 'webview2_subset.h')
+    if sys.argv[1] == 'gen':
+        gen(sys.argv[2], subset)
+        return 0
+    return verify(subset, sys.argv[2])
+
+
+if __name__ == '__main__':
+    sys.exit(main())

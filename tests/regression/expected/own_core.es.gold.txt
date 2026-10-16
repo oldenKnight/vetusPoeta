@@ -1,0 +1,18 @@
+# Gold Spanish (es-MX) for tests/regression/own_core.la.txt (C41), written before any C41 change and before the engine
+# was run. Alternatives after " | ".
+# C41 proposed alternative added after the run (veto freely): unit 2 "una ciudad" (la2x: a first-mention object is indefinite).
+La verdad siempre vence. | La verdad siempre gana. | La verdad vence siempre. | La verdad gana siempre.
+Los soldados defienden la ciudad valientemente. | Los soldados defienden valientemente la ciudad. | Los soldados defienden la ciudad con valor. | Los soldados defienden la ciudad con valentía. | Los soldados defienden la ciudad fuertemente. | Los soldados defienden una ciudad valientemente.
+El anciano cuenta una historia larga. | El viejo cuenta una historia larga. | El anciano cuenta un cuento largo. | El anciano narra una historia larga. | El viejo cuenta un cuento largo. | El anciano cuenta una larga historia.
+El plan del general es bueno. | El consejo del general es bueno. | El plan del jefe es bueno. | El consejo del jefe es bueno. | El plan del líder es bueno. | El plan del comandante es bueno.
+La nave llega al puerto. | El barco llega al puerto. | La nave viene al puerto. | El barco viene al puerto. | El barco entra en el puerto. | La nave entra en el puerto. | El barco entra al puerto.
+El rey dio leyes nuevas. | El rey dio nuevas leyes. | El rey ha dado leyes nuevas.
+Los enemigos dejaron el campamento. | Los enemigos abandonaron el campamento. | El enemigo dejó el campamento. | El enemigo abandonó el campamento.
+Los ciudadanos buscan la paz. | Los ciudadanos piden la paz. | Los ciudadanos piden paz. | Los ciudadanos buscan paz.
+Nuestra esperanza es grande.
+El tiempo huye rápidamente. | El tiempo vuela rápidamente. | El tiempo huye rápido. | El tiempo vuela rápido. | El tiempo huye deprisa.
+La muerte es segura para todos. | La muerte es cierta para todos. | La muerte es segura para todo el mundo.
+El cuerpo está enfermo, pero el ánimo es fuerte. | El cuerpo está enfermo, pero la mente es fuerte. | El cuerpo está enfermo, pero el espíritu es fuerte. | El cuerpo está enfermo, pero el alma es fuerte. | El cuerpo está enfermo, pero el ánimo es valiente. | El cuerpo está enfermo, pero el espíritu es valiente.
+El maestro oye las palabras de los niños. | El maestro escucha las palabras de los niños. | El maestro oye las palabras de los muchachos. | El maestro escucha las palabras de los muchachos.
+Mi hermano navega en el mar. | Mi hermano navega por el mar.
+El templo está en el monte. | El templo está en la montaña. | El templo se alza en el monte. | El templo se alza en la montaña. | El templo está sobre el monte. | El templo está de pie en el monte.

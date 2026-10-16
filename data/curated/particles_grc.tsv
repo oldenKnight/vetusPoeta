@@ -1,0 +1,25 @@
+# particle	position	function	english	note
+# Connecting and discourse particles for the realiser's connector slot (order_grc.txt order.conn.*). position:
+# first (clause-initial) or second (postpositive: after the first word of the clause). Our own table.
+δέ	second	connect	and, but	the ordinary link between sentences in narrative
+μέν	second	contrast	on the one hand	answered by δέ ("ἐγὼ μὲν ..., σὺ δὲ ...")
+γάρ	second	cause	for, because	explains the previous sentence
+οὖν	second	inference	so, then, therefore	"ἄπιθι οὖν."
+τε	second	connect	and	enclitic; τε ... καί
+γε	second	emphasis	at least, indeed	enclitic; "αὕτη γε τρέχει"
+δή	second	emphasis	indeed, now	
+δήπου	second	assurance	of course, surely	
+τοίνυν	second	inference	well then	
+ἄρα	second	inference	then, so (it seems)	not the question particle ἆρα
+μέντοι	second	contrast	however	
+ἀλλά	first	contrast	but	after a negative: not ... but
+καί	first	connect	and, also, even	
+οὐδέ	first	connect-negative	and not, nor, not even	
+μηδέ	first	connect-negative	and not (with μή)	
+ἔπειτα	first	sequence	then, next	
+εἶτα	first	sequence	then, next	
+ἆρα	first	question	(yes/no question)	
+ἤ	first	alternative	or	
+καίτοι	first	contrast	and yet	
+οὐκοῦν	first	inference-question	so then?	
+ὥστε	first	result	so that, therefore	with the infinitive for result

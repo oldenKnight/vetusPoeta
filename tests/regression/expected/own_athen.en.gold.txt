@@ -1,0 +1,54 @@
+# C38: English gold for tests/regression/own_athen.grc.txt (GRC -> EN), one line per sentence, written by the implementer
+# before any C38 rule, alternatives after " | ". Matching as the other readable regressions: case- and
+# punctuation-insensitive. The first alternative is also the English source of the reverse direction (own_athen.en.txt).
+# Proposed alternatives added after the C38 run (veto freely; docs/rules_grc3_notes.md "Athenaze prose (C38)"): lines 14 17 21 26 42 43 (the last alternative of each).
+Stephen is a farmer.
+He lives not in the city but in the fields. | And he lives not in the city but in the fields. | He does not live in the city but in the fields. | And he does not live in the city but in the fields.
+For the farm is not large. | For the farm is not big. | For the plot is not large. | For the plot is not big.
+Stephen unties the oxen and drives them to the field. | Stephen unties the oxen and drives to the field. | Stephen looses the oxen and drives them to the field.
+The slave is lazy; for he does not work. | The slave is lazy; for he is not working. | The slave is idle; for he does not work. | The slave is idle; for he is not working.
+O Zeus, the work is long. | Oh Zeus, the work is long. | O Zeus, the toil is long. | O Zeus, the labor is long.
+Timothy brings food to his father. | Timothy brings food to the father. | Timothy carries food to his father. | Timothy is bringing food to his father. | Timothy brings his father food.
+Daphne stays in the house and prepares the dinner. | Daphne stays in the house and prepares dinner. | Daphne remains in the house and prepares the dinner. | Daphne remains in the house and prepares dinner.
+The oxen are strong, but they walk slowly. | The oxen are strong but walk slowly. | The oxen are strong, but they go slowly.
+The river provides water, not much but enough. | The river provides not much water but enough. | The river supplies water, not much but enough.
+The farmer often groans; for the sun is hot. | The farmer groans often; for the sun is hot. | The farmer often sighs; for the sun is hot.
+Chloe works in the house and helps her mother. | Chloe works in the house and helps the mother.
+The dog sleeps in the road. | The dog is sleeping in the road. | The dog sleeps on the road. | The dog is sleeping on the road.
+Timothy, hurry; for father is waiting. | Timothy, hurry; for your father is waiting. | O Timothy, hurry; for father is waiting. | Timothy, hurry; for the father is waiting. | Timothy, hurry; for the father waits.
+The father works in the field, but the boy plays. | The father works in the field, and the boy plays. | The father is working in the field, but the boy is playing.
+Dikaeopolis calls the slave. | Dicaeopolis calls the slave. | Dikaiopolis calls the slave. | Dicaeopolis is calling the slave.
+The slave does not hear; for he is sleeping. | The slave does not hear; for he sleeps. | The slave does not listen; for he is sleeping. | The slave does not listen; for he sleeps.
+Dicaeopolis gets angry and wakes the slave. | Dicaeopolis is angry and wakes the slave. | Dicaeopolis becomes angry and wakes the slave. | Dicaeopolis gets angry and wakes up the slave.
+The house is small, but beautiful. | The house is small but fine. | The house is small, but it is beautiful.
+The children love the dog and play in the field. | The boys love the dog and play in the field.
+The farmer lifts the stone and carries it out of the field. | The farmer lifts the stone and carries it from the field. | The farmer lifts the stone and brings it out of the field.
+The stone is big; so the farmer cannot lift it. | The stone is large; so the farmer cannot lift it. | The stone is big; so the farmer is not able to lift it.
+O Zeus, help me. | Oh Zeus, help me.
+Stephen is tireless; for he always works. | Stephen is industrious; for he always works. | Stephen is tireless; for he is always working.
+The slave does not work but sits in the shade. | The slave is not working but sits in the shade. | The slave does not work but is sitting in the shade.
+The woman carries a water jar and walks to the spring. | The woman carries a water jar and goes to the spring. | The woman carries a jar and walks to the spring. | The woman is carrying a water jar and walking to the spring. | The woman brings a water jar and walks to the fountain.
+Timothy runs into the house and calls his mother and says: | Timothy runs into the house and calls the mother and says:
+So the mother is glad. | So the mother rejoices. | So the mother is happy. | Therefore the mother rejoices.
+The sun shines and the farmer is glad. | The sun is shining and the farmer is glad. | The sun shines and the farmer rejoices. | The sun shines and the farmer is happy.
+Stephen is free, but Xanthias is a slave. | Stephen is free, and Xanthias is a slave.
+Timothy sees his father and runs to him. | Timothy sees the father and runs to him. | Timothy sees his father and runs toward him.
+Father, where is the dog? | O father, where is the dog?
+The dog chases the wolf. | The dog pursues the wolf. | The dog is chasing the wolf.
+The wolf does not stay but flees. | The wolf does not wait but flees. | The wolf does not stay but runs away.
+Daphne is wise and beautiful. | Daphne is wise and pretty.
+The gods provide food for the farmers. | The gods provide the farmers with food. | The gods provide food to the farmers.
+The mother provides dinner for the children. | The mother provides the children with dinner. | The mother provides dinner to the children.
+The field is small, but the house is big. | The field is small, and the house is big. | The field is small, but the house is large.
+Why are you not working, Xanthias? | Why do you not work, Xanthias? | Why are you not working, O Xanthias?
+For I am tired, master. | For I am weary, master. | Because I am tired, master.
+Dikeopolis does not punish the slave; for he is good. | Dicaeopolis does not punish the slave; for he is good. | Dicaeopolis does not punish the slave; for he is kind.
+Chloe and her mother walk to the market place. | Chloe and the mother walk to the market place. | Chloe and her mother walk to the marketplace. | Chloe and her mother are walking to the market place. | Chloe and the mother walk into the market place.
+The father calls his son, but he does not hear. | The father calls the son, but he does not hear. | The father calls his son, but the son does not hear. | The father calls the son, and he does not listen.
+The plough is heavy; so the slave groans. | The plow is heavy; so the slave groans. | The plough is heavy; so the slave sighs.
+Stephen loves his own house. | Stephen loves his house.
+Daphne loves her own children. | Daphne loves her children.
+The slave is lazy, and yet the master loves him. | The slave is lazy; and yet the master likes him. | The slave is lazy; nevertheless the master loves him. | The slave is lazy; yet the master loves him.
+The field is small; and yet the farmer is glad. | The field is small; yet the farmer is glad. | The field is small; nevertheless the farmer rejoices. | The field is small; and yet the farmer rejoices.
+The grandfather is old and no longer works. | Grandfather is old and no longer works. | The grandfather is an old man and no longer works.
+O Athena, guard our home. | O Athena, guard our house. | Oh Athena, guard our home. | O Athena, protect our home.

@@ -1,0 +1,16 @@
+1
+00:00:01,000 --> 00:00:03,000
+Puella in hortō ambulat.
+
+2
+00:00:03,200 --> 00:00:05,800
+Ubi est māter tua?
+Māter mea in vīllā labōrat.
+
+3
+00:00:06,000 --> 00:00:08,400
+Agricola equum ad flūmen dūcit.
+
+4
+00:00:08,600 --> 00:00:11,000
+Rōsae in hortō sunt pulchrae.

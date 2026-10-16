@@ -1,0 +1,673 @@
+# kind	source	greek	frame	note
+# Lexical rules of the EN/ES -> Greek transfer (C12; teacher-editable; our own rows). Columns:
+#   kind: phrasal (English verb + particle -> one Greek verb), verbprep (verb + preposition: frame "obj" = the PP's noun
+#         becomes the object, "prep:<greek>+<case>" = the verb fixes the Greek preposition), state ("be" + adjective
+#         with a person subject: frame "verb" = the Greek verb replaces be + adjective, "mid" = its middle voice, "adj" =
+#         this Greek adjective is the predicate), realia (no Attic word: the nearest hypernym, confidence Check,
+#         rules_grc_notes.md decision 1), verb (a fixed choice for a frequent English verb; frame "past" = only in
+#         the past tense), durative (imperatives and infinitives of this verb take the present stem: continuing or
+#         general action, decision 8; every other verb takes the aorist for a single act; a state verb of the kind
+#         "state" in the past: imperfect when durative, else aorist), perfect (C16: the perfect active of this Greek
+#         verb has the intransitive / passive sense: "the clock is broken" -> κατέαγεν), pp (C16: a fixed prepositional
+#         or adverbial phrase, source = preposition + determiner + noun as written in lower case: frame "adv" = the
+#         Greek adverb, "prep:<greek>+<case>" = the Greek preposition + the noun (" def" = with the article), "ptc" =
+#         the nominative participle agreeing with the subject, after the verb), weekday (C16: day name -> the god's
+#         name in the genitive + ἡμέρα, "Ἄρεως ἡμέρα"; frame = the day's ordinal counted from Sunday for the
+#         alternative "τρίτη ἡμέρα"), light (C18: a light verb or verb + object idiom, source = verb lemma + object
+#         noun lemma: the noun is the verb's meaning and is not translated, "make a mistake" -> ἁμαρτάνω; frame "mid" =
+#         the middle voice, "obj:<prep>" = the noun of that prepositional phrase is the Greek verb's object), subject
+#         (C18: the verb chosen by its subject, source = subject noun + verb lemma: "sun rise" -> ἀνατέλλω); phrasal rows
+#         may have frame "mid" / "pass" (the middle / passive voice: "wake up" -> ἠγέρθην).
+#   verb rows, frame (C16): "nonfinite" = used instead of the main row when the verb is an infinitive, a subjunctive,
+#         a future, or inside a subordinate clause / indirect question ("go" -> εἶμι: ἰέναι, ἴωμεν, εἶ); "sub" = used
+#         inside a subordinate clause only ("before she comes" -> πρὶν ἥκειν).
+#   C21: subject rows may have frame "mid" (the middle voice: "the rain stopped" -> ἐπαύσατο) or "mid-pres" (middle in the
+#         present system, active elsewhere: δύεται / ἔδυ); a subject row's voice overrides a Spanish "se" read as a
+#         passive; verb rows may have frame "mid" (the middle: "touch" -> ἅπτομαι + gen), "impers" (an impersonal weather
+#         verb: "it is snowing" -> νίφει; a Spanish "nieva" read as an imperative is a statement) or "thing" (only with an
+#         object that is a thing: "bring the water" -> φέρω); state rows may have frame "pass" (the passive: λυπεῖται,
+#         ἐλυπήθη); kind noun (a fixed noun used only when greek.vpl has the lemma, else the realia row of the same source).
+#   C29: verb rows may have frame "clause" (only when the verb has a that / que clause or an infinitive: "esperar que"
+#         -> ἐλπίζω, while "esperar a" stays μένω).
+#   C31: verb rows may have frame "noobj-mid" (the middle voice whenever the verb has no object, places allowed: "hid
+#         behind the door" -> ἐκρύψατο); state rows may give "adverb(s) + verb" ("right" -> ὀρθῶς λέγω: ὀρθῶς λέγεις).
+#   C35: verb rows may have frame "approx" (the nearest verb greek.vpl has: the cue is never OK); kinds adj / adv.
+#   C33: verb rows may have frame "pass" (the passive voice: "appear" -> φαίνομαι, ἐφάνη); verbprep sources may be a
+#         phrasal verb written with "_" ("go_out of" -> ἐκ + gen); state rows may have frame "adj-person" (as "adj",
+#         only with a person subject: "tall" -> μακρός of a person, a thing keeps ὑψηλός) or "adj-thing" (only with a
+#         subject that is a thing: "La cena está lista." -> ἕτοιμος, a person "listo" is clever).
+#   source: English (or Spanish) lemma(s), lower case. greek: the Greek lemma as in greek.vpl (headword without length
+#   marks). Spanish sources mirror the English rows (the Spanish frame builder keeps Spanish content lemmas).
+phrasal	come back	ἐπανέρχομαι		
+phrasal	go back	ἐπανέρχομαι		
+phrasal	get back	ἐπανέρχομαι		
+phrasal	get through	διέρχομαι		
+phrasal	go through	διέρχομαι		
+phrasal	go away	ἀπέρχομαι		
+phrasal	run away	φεύγω		
+phrasal	come in	εἰσέρχομαι		
+phrasal	go in	εἰσέρχομαι		
+phrasal	come out	ἐξέρχομαι		
+phrasal	go out	ἐξέρχομαι		
+phrasal	get out	ἐξέρχομαι		
+phrasal	sit down	καθίζω		
+phrasal	get up	ἀνίστημι	mid-pres	C29: greek.vpl has no lemma ἀνίσταμαι: ἀνίστημι, middle in the present system (ἀνίσταται), the intransitive root aorist elsewhere (ἀνέστη, ἀνάστηθι)
+phrasal	stand up	ἀνίστημι	mid-pres	
+phrasal	fall down	πίπτω		
+phrasal	pick up	αἴρω		
+phrasal	give back	ἀποδίδωμι		
+phrasal	look for	ζητέω		
+verbprep	wait for	μένω	obj	"wait for me" -> μένε με
+verbprep	look for	ζητέω	obj	
+verbprep	ask for	αἰτέω	obj	
+verbprep	listen to	ἀκούω	obj	person in the genitive by valency_grc.tsv
+verbprep	look at	βλέπω	prep:πρός+acc	"look at the sky" -> βλέπε πρὸς τὸν οὐρανόν
+verbprep	think about	-	prep:περί+gen	
+verbprep	talk about	-	prep:περί+gen	
+verbprep	esperar a	μένω	obj	
+verbprep	buscar a	ζητέω	obj	
+state	afraid	φοβέω	mid	"I am afraid" -> φοβοῦμαι; "don't be afraid" -> μὴ φοβοῦ
+state	scared	φοβέω	mid	
+state	angry	ὀργίζω	mid	
+state	hungry	πεινάω	verb	
+state	thirsty	διψάω	verb	
+state	glad	χαίρω	verb	
+state	happy	χαίρω	verb	
+state	tired	κάμνω	verb	
+state	tener miedo	φοβέω	mid	Spanish: "no tengas miedo" -> μὴ φοβοῦ
+state	miedo	φοβέω	mid	
+state	enojado	ὀργίζω	mid	
+state	cansado	κάμνω	verb	
+realia	tea	ποτόν		no Attic word for tea: "drink" (decision 1)
+realia	coffee	ποτόν		no Attic word for coffee: "drink"
+realia	té	ποτόν		Spanish: tea
+realia	café	ποτόν		Spanish: coffee
+realia	potato	λάχανον		no Attic word for potato: "vegetable"
+realia	chocolate	πέμμα		no Attic word for chocolate: "sweet"
+verb	go	βαίνω	present	"Where are you going?" -> ποῖ βαίνεις;
+verb	go	ἀπέρχομαι	past	"Where did everybody go?" -> ποῖ πάντες ἀπῆλθον;
+verb	come	ἔρχομαι		
+verb	know	οἶδα		
+verb	want	βούλομαι		
+verb	have	ἔχω		
+verb	do	ποιέω		
+verb	make	ποιέω		
+verb	say	λέγω		
+verb	tell	λέγω		
+verb	see	ὁράω		
+verb	ir	βαίνω	present	
+verb	ir	ἀπέρχομαι	past	
+verb	irse	ἀπέρχομαι		
+verb	venir	ἔρχομαι		
+verb	saber	οἶδα		
+verb	querer	βούλομαι		
+verb	tener	ἔχω		
+verb	hacer	ποιέω		
+verb	decir	λέγω		
+verb	ver	ὁράω		
+durative	wait	μένω		
+durative	stay	μένω		
+durative	remain	μένω		
+durative	listen	ἀκούω		
+durative	hear	ἀκούω		
+durative	bow	προσκυνέω		
+durative	talk	λαλέω		
+durative	speak	λέγω		
+durative	be	εἰμί		
+durative	have	ἔχω		
+durative	keep	ἔχω		
+durative	hold	ἔχω		
+durative	live	οἰκέω		
+durative	sleep	καθεύδω		
+durative	play	παίζω		
+durative	look	βλέπω		
+durative	watch	βλέπω		
+durative	work	πονέω		
+durative	love	φιλέω		
+durative	fear	φοβέω		
+durative	rejoice	χαίρω		
+durative	walk	βαδίζω		
+durative	run	τρέχω		
+durative	esperar	μένω		
+durative	quedar	μένω		
+durative	escuchar	ἀκούω		
+durative	hablar	λαλέω		
+durative	ser	εἰμί		
+durative	estar	εἰμί		
+durative	tener	ἔχω		
+durative	vivir	οἰκέω		
+durative	dormir	καθεύδω		
+durative	jugar	παίζω		
+durative	mirar	βλέπω		
+durative	trabajar	πονέω		
+durative	amar	φιλέω		
+durative	temer	φοβέω		
+durative	caminar	βαδίζω		
+durative	correr	τρέχω		
+durative	inclinar	προσκυνέω		
+verb	escapar	φεύγω		
+verb	inclinar	προσκυνέω		
+verb	pasar	διέρχομαι		
+# C16 (quality loop 2): rows for the regression lines 41-114 (our own rows)
+verb	go	εἶμι	nonfinite	ἰέναι, ἴωμεν, "which way you go" -> εἶ (εἶμι serves as the Attic future of ἔρχομαι)
+verb	ir	εἶμι	nonfinite	
+verb	come	ἥκω	sub	"before she comes" -> πρὶν ἥκειν αὐτήν
+verb	venir	ἥκω	sub	
+verb	break	κατάγνυμι		
+verb	romper	κατάγνυμι		
+verb	think	οἴομαι		"I thought it was Monday" -> ᾤμην Σελήνης ἡμέραν εἶναι
+verb	pensar	οἴομαι		
+verb	believe	πιστεύω		
+verb	creer	πιστεύω		
+verb	walk	βαδίζω		
+verb	caminar	βαδίζω		
+verb	find	εὑρίσκω		
+verb	encontrar	εὑρίσκω		
+verb	take	λαμβάνω		
+verb	tomar	λαμβάνω		
+verb	light	ἅπτω		"light the candle" -> ἅπτε τὸν λύχνον
+verb	encender	ἅπτω		
+verb	close	κλείω		
+verb	cerrar	κλείω		
+verb	write	γράφω		
+verb	escribir	γράφω		
+verb	smile	μειδιάω		
+verb	sonreír	μειδιάω		
+verb	help	βοηθέω		
+verb	ayudar	βοηθέω		
+verb	plant	φυτεύω		
+verb	plantar	φυτεύω		
+verb	teach	διδάσκω		
+verb	enseñar	διδάσκω		
+verb	shake	τρέμω	intr	intransitive "be shaking" (tremble); C25: frame intr (with an object σείω: "the boy shook the tree" was ἔτρεμεν, OK and wrong)
+verb	shake	σείω		C25: "the boy shook the tree" -> τὸ δένδρον ἔσεισεν
+verb	temblar	τρέμω		
+verb	paint	γράφω		γράφω "paint" (χρῴζω "colour" is the alternative)
+verb	pintar	γράφω		
+verb	hope	ἐλπίζω		C29: "I hope that you will come tomorrow" -> ἐλπίζω σε αὔριον ἥξειν (accusative + infinitive, the subject kept; οἴομαι came through the reverse index)
+verb	esperar	ἐλπίζω	clause	C29: frame clause = only with a que-clause or an infinitive ("espero que vengas"); "esperar a / el autobús" stays μένω
+verb	die	ἀποθνῄσκω		C29: "the horse died" -> ἀπέθανεν (ἔβη came through the reverse index: OK-capable and wrong)
+verb	morir	ἀποθνῄσκω		
+verb	win	νικάω		C29: "we hope to win" -> νικήσειν
+verb	ganar	νικάω		C29: ganar a game, a race (ἄρνυμαι "win a prize" is epic)
+verb	shine	λάμπω		C29: "the moon shone" -> ἔλαμπεν (φαίνω active "show" was OK and wrong)
+verb	brillar	λάμπω		
+verb	nacer	γίγνομαι		C29: "nací en México" -> ἐγενόμην (as English "be born")
+verb	need	δέω	mid	C29: "we need water" -> ὕδατος δεόμεθα (middle + genitive; the active δέω "bind" was OK and wrong: "Δέω σε" for "I need you")
+verb	necesitar	δέω	mid	
+noun	money	ἀργύριον		C29: money -> ἀργύριον (τέλος is a tax or an end; χρήματα "property, money" is the alternative)
+noun	dinero	ἀργύριον		
+realia	doll	παίγνιον		C29: greek.vpl has no πλαγγών; the toy (παίγνιον) is the nearest word (κόρη "doll" read as "girl"); Check
+realia	muñeca	παίγνιον		
+verbprep	weep for	κλαίω	obj	C29: "Mary wept for her brother" -> τὸν ἀδελφὸν ἔκλαυσεν (lament: the accusative, not the dative of interest)
+verbprep	cry for	κλαίω	obj	
+verbprep	llorar por	κλαίω	obj	
+verbobj	spend money	ἀναλίσκω		C29: "spent his money" -> τὸ ἀργύριον ἀνήλωσεν (διάγω "spend time" was chosen)
+verbobj	gastar dinero	ἀναλίσκω		
+noun	cart	ἅμαξα		C29: the farm cart / wagon (κάρρον, from Latin carrus, is late)
+noun	carreta	ἅμαξα		
+noun	carro	ἅμαξα		
+noun	village	κώμη		C29: a village (χωρίον "a place" lost the sense)
+noun	aldea	κώμη		
+noun	chicken	ὄρνις		C29: the domestic fowl (Attic ὄρνις; κόττος came through the reverse index and has no plural)
+noun	hen	ὄρνις		
+noun	gallina	ὄρνις		
+noun	rooster	ἀλεκτρυών		
+noun	gallo	ἀλεκτρυών		
+subject	rain start	ἄρχω	mid	C29: "the rain started" -> ὁ ὄμβρος ἤρξατο (ὁρμάω "rush" was OK and wrong)
+subject	rain begin	ἄρχω	mid	
+subject	lluvia empezar	ἄρχω	mid	
+subject	lluvia comenzar	ἄρχω	mid	
+verbprep	throw at	-	prep:εἰς+acc	C29: "throw stones at the birds" -> βάλλε λίθους εἰς τοὺς ὄρνιθας (παρά + dat "beside" was wrong)
+verbprep	tirar a	-	prep:εἰς+acc	
+phrasal	cut off	ἀποτέμνω		
+phrasal	go inside	εἰσέρχομαι		"let's go inside" -> εἰσίωμεν
+phrasal	come inside	εἰσέρχομαι		
+state	mad	μαίνομαι	verb	"everyone here is mad" -> πάντες ἐνθάδε μαίνονται
+state	cold	ῥιγέω	verb	"I'm cold" -> ῥιγῶ
+state	wrong	ἁμαρτάνω	verb	"you were wrong" -> ἥμαρτες (an event: aorist)
+state	kind	χρηστός	adj	
+state	loco	μαίνομαι	verb	
+state	equivocado	ἁμαρτάνω	verb	
+state	amable	χρηστός	adj	
+state	tener frío	ῥιγέω	verb	
+verbprep	help with	βοηθέω	prep:περί+gen	"help me with the letter" -> βοηθεῖν μοι περὶ τῆς ἐπιστολῆς
+verbprep	ayudar con	βοηθέω	prep:περί+gen	
+perfect	-	κατάγνυμι		κατέαγα "I am broken" (intransitive perfect active)
+pp	by mistake	ἁμαρτών	ptc	"we planted white roses by mistake" -> ... ἐφυτεύσαμεν ἁμαρτόντες
+pp	por error	ἁμαρτών	ptc	
+pp	in latin	ῥωμαϊστί	adv	
+pp	in greek	Ἑλληνιστί	adv	
+pp	en latín	ῥωμαϊστί	adv	
+pp	en griego	Ἑλληνιστί	adv	
+pp	at the bottom	βάθος	prep:ἐν+dat def	"at the bottom" -> ἐν τῷ βάθει (κάτω is the alternative)
+pp	to school	διδάσκαλος	prep:πρός+acc def	"to the teacher": greek.vpl has no διδασκαλεῖον (lexicon gap)
+pp	at school	διδάσκαλος	prep:παρά+dat def	
+pp	a la escuela	διδάσκαλος	prep:πρός+acc def	
+weekday	sunday	Ἥλιος	1	Ἡλίου ἡμέρα
+weekday	monday	Σελήνη	2	Σελήνης ἡμέρα
+weekday	tuesday	Ἄρης	3	Ἄρεως ἡμέρα
+weekday	wednesday	Ἑρμῆς	4	Ἑρμοῦ ἡμέρα
+weekday	thursday	Ζεύς	5	Διὸς ἡμέρα
+weekday	friday	Ἀφροδίτη	6	Ἀφροδίτης ἡμέρα
+weekday	saturday	Κρόνος	7	Κρόνου ἡμέρα
+weekday	domingo	Ἥλιος	1	
+weekday	lunes	Σελήνη	2	
+weekday	martes	Ἄρης	3	
+weekday	miércoles	Ἑρμῆς	4	
+weekday	jueves	Ζεύς	5	
+weekday	viernes	Ἀφροδίτη	6	
+weekday	sábado	Κρόνος	7	
+durative	smile	μειδιάω		"the cat could smile" -> μειδιᾶν (an ability, not one act)
+durative	help	βοηθέω		βοήθει ἡμῖν, βοηθεῖν
+durative	write	γράφω		γράφε
+durative	believe	πιστεύω		
+durative	close	κλείω		κλεῖε τὴν θυρίδα (present imperative of the gold)
+durative	light	ἅπτω		ἅπτε τὸν λύχνον
+durative	think	οἴομαι		
+durative	be angry	ὀργίζω		state in the past: ὠργίζετο
+durative	be mad	μαίνομαι		
+durative	be cold	ῥιγέω		
+durative	shake	τρέμω		
+durative	teach	διδάσκω		
+durative	know	οἶδα		
+durative	go	εἶμι		εἶμι has the present system only (ἰέναι, ἴωμεν, ἴθι)
+# C18 (quality loop 3): light verbs and verb + object idioms (our own rows); Spanish mirrors after the English ones
+light	make mistake	ἁμαρτάνω		"I made a mistake" -> ἥμαρτον (not ἁμαρτίαν ἐποίησα)
+light	take walk	περιπατέω		"let's take a walk" -> περιπατῶμεν
+light	go walk	περιπατέω		
+light	have rest	ἀναπαύω	mid	"let's have a rest" -> ἀναπαυώμεθα
+light	take rest	ἀναπαύω	mid	
+light	give shout	βοάω		"the boy gave a shout" -> ἐβόησεν
+light	give cry	βοάω		
+light	let out shout	βοάω		
+light	make visit	ἐπισκέπτομαι	obj:to	"make a visit to the king" -> τὸν βασιλέα ἐπεσκέψατο
+light	pay visit	ἐπισκέπτομαι	obj:to	
+light	take bath	λούω	mid	"took a bath" -> ἐλούσατο
+light	have bath	λούω	mid	
+light	have swim	νέω		
+light	take look	σκοπέω	obj:at	"take a look at the map" -> σκόπει τὸν πίνακα
+light	have look	σκοπέω	obj:at	
+light	tell lie	ψεύδω	mid	"don't tell lies" -> μὴ ψεύδου
+light	ask question	ἐρωτάω		
+light	give answer	ἀποκρίνω	mid	
+light	make promise	ὑπισχνέομαι		
+light	have dinner	δειπνέω		
+light	cometer error	ἁμαρτάνω		"cometí un error" -> ἥμαρτον
+light	dar paseo	περιπατέω		"demos un paseo" -> περιπατῶμεν
+light	tomar descanso	ἀναπαύω	mid	
+light	dar grito	βοάω		
+light	hacer visita	ἐπισκέπτομαι	obj:to	
+light	tomar baño	λούω	mid	
+light	decir mentira	ψεύδω	mid	
+light	hacer pregunta	ἐρωτάω		
+light	dar respuesta	ἀποκρίνω	mid	
+light	hacer promesa	ὑπισχνέομαι		
+state	late	ὑστερέω	verb	C18: "we will be late" -> ὑστερήσομεν (a person subject)
+state	late	ὀψέ	adv	C18: "it is late" -> ὀψέ ἐστιν (frame adv: the Greek adverb with an impersonal copula)
+state	early	πρωΐ	adv	"it is early" -> πρωΐ ἐστιν
+verbprep	bark at	ὑλακτέω	prep:πρός+acc	C18: "the dog barked at the moon" -> πρὸς τὴν σελήνην ὑλάκτει
+verbprep	laugh at	καταγελάω	obj	main agent after C21: "why are you laughing at me" -> διὰ τί μου καταγελᾷς; (genitive by valency_grc.tsv; παρὰ ἐμοί was wrong and OK)
+verbprep	reírse de	καταγελάω	obj	
+verbprep	reír of	καταγελάω	obj	the Spanish frame keeps the lemma reír (clitic se removed) and maps de -> of (as verbprep_es_la.tsv)
+verbprep	reír about	καταγελάω	obj	
+verbprep	burlar of	καταγελάω	obj	
+verbprep	burlarse de	καταγελάω	obj	
+realia	pizza	πλακοῦς		C18: no Attic word for pizza: "flat cake" (decision 1)
+realia	pizza	πλακοῦς		Spanish: pizza (the same word)
+phrasal	wake up	ἐγείρω	pass	C18: "the children woke up" -> ἠγέρθησαν (the passive aorist is "woke up")
+phrasal	get up	ἀνίστημι	mid	"get up!" -> ἀνάστηθι
+subject	sun rise	ἀνατέλλω		C18: "when the sun rose" -> ἀνέτειλεν
+subject	moon rise	ἀνατέλλω		
+subject	sol salir	ἀνατέλλω		"salió el sol"
+durative	be tired	κάμνω		state in the past: ἔκαμνεν
+durative	be hungry	πεινάω		state in the past: ἐπείνα
+verb	leave	ἀπέρχομαι	intr	C18: intransitive "leave" = depart ("we left early" -> ἀπήλθομεν); with an object λείπω
+subject	ship leave	ἀποπλέω		C18: "the ship is leaving" -> ἡ ναῦς ἀποπλεῖ
+subject	boat leave	ἀποπλέω		
+# C21 (Greek loop 4): weather and nature verbs (our own rows; Spanish mirrors after the English ones). Subject rows may
+# have frame "mid" (the middle voice: "the rain stopped" -> ὁ ὄμβρος ἐπαύσατο) or "mid-pres" (the middle in the present
+# system, the active elsewhere: "the sun is setting" -> δύεται, "the sun set" -> ἔδυ, the root aorist)
+subject	rain stop	παύω	mid	"the rain stopped" -> ὁ ὄμβρος ἐπαύσατο (not τὸ ὕδωρ ἔστησεν)
+subject	rain cease	παύω	mid	
+subject	wind stop	παύω	mid	"the wind stopped" -> ὁ ἄνεμος ἐπαύσατο
+subject	sun set	δύω	mid-pres	"the sun set" -> ὁ ἥλιος ἔδυ; "the sun is setting" -> ὁ ἥλιος δύεται
+subject	moon set	δύω	mid-pres	
+subject	star set	δύω	mid-pres	
+subject	wind blow	πνέω		"the wind blows" -> ὁ ἄνεμος πνεῖ
+subject	lluvia parar	παύω	mid	"la lluvia paró" -> ὁ ὄμβρος ἐπαύσατο
+subject	lluvia cesar	παύω	mid	
+subject	lluvia detener	παύω	mid	
+subject	sol poner	δύω	mid-pres	"el sol se puso" -> ὁ ἥλιος ἔδυ
+subject	luna poner	δύω	mid-pres	
+subject	viento soplar	πνέω		"el viento sopla" -> ὁ ἄνεμος πνεῖ
+verb	rain	ὕω	impers	"it rained yesterday" -> χθὲς ὗσεν (impersonal: the subject "it" is dropped)
+verb	snow	νίφω	impers	"it is snowing" -> νίφει
+verb	llover	ὕω	impers	"llueve" -> ὕει
+verb	nevar	νίφω	impers	"nieva" -> νίφει
+verb	touch	ἅπτω	mid	C21: "don't touch the fire" -> μὴ ἅπτου τοῦ πυρός (ἅπτομαι + genitive by valency mid:gen; the active ἅπτω is "fasten, kindle")
+verb	tocar	ἅπτω	mid	
+verb	bring	φέρω	thing	C21: a thing is carried ("bring me some water" -> ἔνεγκέ μοι ὕδωρ); a person or an animal is led (ἄγω)
+verb	traer	φέρω	thing	
+state	sad	λυπέω	pass	C21: "why are you so sad?" -> διὰ τί οὕτω λυπεῖ; (a person grieves: the passive, aorist ἐλυπήθη)
+state	triste	λυπέω	pass	
+pp	at home	οἴκοι	adv	C21: "we will stay at home" -> οἴκοι μενοῦμεν (not ἐν οἰκίᾳ)
+pp	in casa	οἴκοι	adv	Spanish "en casa" (the Spanish frame gives the preposition in English)
+durative	be sad	λυπέω		C21: state in the past: the imperfect (ἐλυπεῖτο; greek.vpl has no imperfect cells, so the aorist ἐλυπήθη)
+verb	poner	τίθημι		C21: "¿dónde pusiste la llave?" -> ποῦ τὴν κλεῖν ἔθηκας; (the reverse index chose ἐπαγιδεύω "trap")
+state	loud	βοάω	verb	C21: "don't be so loud!" -> μὴ οὕτω βόα (was μὴ ἴσθι οὕτω μέγα, "so big")
+state	ruidoso	βοάω	verb	
+verb	lose	ἀπόλλυμι		C21: "I lost my ring" -> τὸν δακτύλιόν μου ἀπώλεσα (the reverse index chose ἁμαρτάνω "miss")
+verb	perder	ἀπόλλυμι		
+durative	hurry	σπεύδω		C21: "Hurry, the ship is leaving!" -> σπεῦδε (present imperative, as Attic says it)
+# C21: nouns without a usable Greek word in greek.vpl. Kind noun = a fixed choice used only when greek.vpl has the
+# lemma (νεοττιά is in lexicon_supplement_grc.tsv for the next rebuild); until then the realia row below serves.
+noun	nest	νεοττιά		the Attic word for a bird's nest (Ar., Arist.)
+noun	nido	νεοττιά		
+realia	nest	καλιά		greek.vpl has no νεοττιά yet: καλιά "hut, nest" (Check) until the rebuild
+realia	nido	καλιά		
+# C25 (Greek loop 5): Spanish "anciano / anciana" (a noun in the frame; spanish.vpl knows only the adjective, and the
+# reverse index reaches ἀκτέα "elder tree" through the English pivot "elder") and "viejo / vieja" as nouns.
+noun	anciano	γέρων		C25: "el anciano duerme" -> ὁ γέρων καθεύδει (ἀκτέα, the elder tree, was a pivot ambiguity)
+noun	anciana	γραῦς		C25: "la anciana canta" -> ἡ γραῦς ᾄδει
+noun	viejo	γέρων		C25: "el viejo" as a noun
+noun	vieja	γραῦς		C25: "la vieja" as a noun
+noun	ancianos	γέρων		C25: the Spanish frame keeps the plural form as the head ("los ancianos hablan" -> οἱ γέροντες λαλοῦσιν)
+noun	ancianas	γραῦς		C25: "las ancianas" -> αἱ γρᾶες
+# C25: "have a good time" and its Spanish mirrors. Kind light, frame "manner": the object's evaluative adjective (or
+# the clause's adverb: "lo pasamos bien") becomes the manner adverb of the Greek verb through the rows of kind manner
+# (source = English / Spanish adjective or adverb, greek = one or two Greek adverbs); with no such word the row does
+# not apply ("we have time" -> χρόνον ἔχομεν). "such" / "so" before it -> οὕτως. A have / tener / pasar + time / tiempo
+# / rato with an adjective and no manner row is flagged light-verb (a calque, never OK).
+light	have time	διάγω	manner	"we had a good time" -> ἡδέως διηγάγομεν (Plato's ἡδέως διάγειν); "such a good time" -> οὕτως ἡδέως
+light	pasar lo	διάγω	manner	"lo pasamos bien" -> ἡδέως διηγάγομεν
+light	pasar tiempo	διάγω	manner	"pasamos un buen rato / tiempo" -> ἡδέως διηγάγομεν
+light	pasar rato	διάγω	manner	
+light	have fun	εὐφραίνω	pass	"we had fun" -> ηὐφράνθημεν (the passive "enjoy oneself")
+verb	divertirse	εὐφραίνω	pass	"nos divertimos" -> ηὐφράνθημεν; "se divirtieron" -> ηὐφράνθησαν
+manner	good	ἡδέως		
+manner	nice	ἡδέως		
+manner	lovely	ἡδέως		
+manner	pleasant	ἡδέως		
+manner	fun	ἡδέως		
+manner	great	πάνυ ἡδέως		
+manner	wonderful	πάνυ ἡδέως		
+manner	fantastic	πάνυ ἡδέως		
+manner	marvellous	πάνυ ἡδέως		
+manner	marvelous	πάνυ ἡδέως		
+manner	bad	κακῶς		
+manner	terrible	πάνυ κακῶς		
+manner	awful	πάνυ κακῶς		
+manner	hard	χαλεπῶς		
+manner	bien	ἡδέως		
+manner	bueno	ἡδέως		
+manner	genial	πάνυ ἡδέως		
+manner	estupendo	πάνυ ἡδέως		
+manner	mal	κακῶς		
+manner	malo	κακῶς		
+manner	fatal	πάνυ κακῶς		
+durative	pass time	διάγω		C25: "Have a good time!" -> ἡδέως διάγε (a continuing state: present imperative)
+# C25: "ride" is ἐλαύνω (intransitive "ride, drive on", Xen.) or ἱππεύω (ride a horse), never a verb of carrying;
+# "ride on X" -> ἐπί + genitive (ἐπ' ὄνου ἠλάσαμεν); Spanish cabalgar, "montar a caballo" (the noun is the verb's
+# meaning: ἱππεύω), "montar en burro".
+verb	ride	ἐλαύνω		C25: "the king rode to the city" -> εἰς τὴν πόλιν ἤλασεν; "ride a horse" -> ἵππον ἐλαύνειν
+verb	cabalgar	ἐλαύνω		C25: "el rey cabalgó" -> ἤλασεν
+verbprep	ride on	ἐλαύνω	prep:ἐπί+gen	C25: "we rode on a donkey" -> ἐπ' ὄνου ἠλάσαμεν
+verbprep	montar in	ἐλαύνω	prep:ἐπί+gen	C25: "monta en burro" -> ἐπ' ὄνου ἐλαύνει
+verbprep	montar on	ἐλαύνω	prep:ἐπί+gen	
+light	montar caballo	ἱππεύω		C25: "montábamos a caballo" -> ἱππεύομεν (the horse is the verb's meaning)
+light	ride horse	ἱππεύω		C25: "she rides a horse every day" -> ἑκάστης ἡμέρας ἱππεύει (ἵππον ἐλαύνει is the alternative)
+durative	ride	ἱππεύω		C25: "can you ride?" -> ἱππεύειν (an ability, a continuing activity)
+# C25: verb rows may have frame "intr-mid" (intransitive use, middle voice). "lie" without an object, a place or
+# "down" is "tell lies" ("One must not lie." was οὐ δεῖ κεῖσθαι, OK and
+# wrong); with a place it stays κεῖμαι ("the cat lies on the bed").
+verb	lie	ψεύδω	intr-mid	C25: "you must not lie" -> οὐ δεῖ σε ψεύδεσθαι; "don't lie!" -> μὴ ψεύδου
+durative	lie	ψεύδω		C25: a prohibition / general command: present (μὴ ψεύδου)
+verbprep	lie to	ψεύδω	obj	C25: "he lied to his mother" -> τὴν μητέρα ἔψευσεν (ψεύδω + acc "deceive"; κεῖμαι was OK and wrong)
+# C25: times of day as Attic adverbs ("this morning" was ταύτῃ τῇ ἠόϊ, the poetic ἠώς; "at night" the bare dative)
+pp	this morning	ἕωθεν	adv	C25: "we caught a fish this morning" -> ἕωθεν ἰχθὺν ... ("at dawn, early")
+pp	in the morning	ἕωθεν	adv	C25: "in the morning we go to school" -> ἕωθεν ...
+pp	at night	νύκτωρ	adv	C25: "they sailed at night" -> νύκτωρ ἔπλευσαν
+pp	by night	νύκτωρ	adv	
+pp	esta mañana	ἕωθεν	adv	Spanish "esta mañana" (this morning; "mañana" alone is tomorrow)
+pp	in la mañana	ἕωθεν	adv	Spanish "por / en la mañana"
+pp	by la mañana	ἕωθεν	adv	
+pp	by la noche	νύκτωρ	adv	Spanish "por la noche"
+pp	of noche	νύκτωρ	adv	Spanish "de noche"
+pp	in la noche	νύκτωρ	adv	
+# C25: kind verbobj (source = verb lemma + object noun lemma; the object is kept, unlike kind light; frame "mid" = the
+# middle voice): washing hands, feet, face is νίζομαι, a bath λούομαι.
+verbobj	wash hand	νίζω	mid	C25: "wash your hands" -> νίψαι τὰς χεῖρας (λοῦσον was OK and wrong)
+verbobj	wash foot	νίζω	mid	
+verbobj	wash face	νίζω	mid	
+verbobj	lavar mano	νίζω	mid	Spanish "lávate las manos"
+verbobj	lavar pie	νίζω	mid	
+verbobj	lavar cara	νίζω	mid	
+# C25: visiting a person is ἐπισκέπτομαι (ἐπιφοιτάω "come often" was chosen); meeting a person is ἐντυγχάνω + dative
+verb	visit	ἐπισκέπτομαι		C25: "we will visit grandfather tomorrow" -> αὔριον τὸν πάππον ἐπισκεψόμεθα
+verb	visitar	ἐπισκέπτομαι		
+verb	meet	ἐντυγχάνω		C25: "we met the king" -> τῷ βασιλεῖ ἐνετύχομεν (dative by valency_grc.tsv)
+# C25: kind ptc: a state adjective used attributively with a person or an animal is the present participle of the
+# Greek verb (frame mid / pass = the voice): "the hungry bird" -> ὁ πεινῶν ὄρνις, "to the hungry bird" -> τῷ πεινῶντι
+# ὄρνιθι (λιμηρός "famished, causing famine" was chosen). The oblique forms are derived by rule (Check).
+ptc	hungry	πεινάω		
+ptc	thirsty	διψάω		
+ptc	tired	κάμνω		
+ptc	angry	ὀργίζω	pass	
+ptc	afraid	φοβέω	mid	
+ptc	scared	φοβέω	mid	
+ptc	frightened	φοβέω	mid	
+ptc	hambriento	πεινάω		
+ptc	sediento	διψάω		
+ptc	cansado	κάμνω		
+ptc	enojado	ὀργίζω	pass	
+ptc	enfadado	ὀργίζω	pass	
+ptc	asustado	φοβέω	mid	
+# C31 (Greek loop 7): "muchacho / chico" -> παῖς (ὄρπηξ "sapling" and μικρόν "small" were chosen; νεανίας for a young
+# man), Spanish children's nouns the reverse index or the English pivot rendered with a wrong, poetic or figurative sense
+# (probe of 151 nouns: bebé -> ποτόν, cuerpo -> ψυχή, muerte -> πάθος, ejército -> στόμα, estrella -> λέμνα, roca ->
+# πέλεια, cabra -> κόρη, oveja -> μῆλον, mentira -> ἀλήθεια, verdad -> ναμέρτεια ...), intransitive "end" ->
+# τελευτάω (διοίσει was chosen), "end" + a thing -> παύω, "bleed" (engine: αἷμα ῥεῖ + the dative of the person).
+noun	muchacho	παῖς		C31: "el muchacho" -> ὁ παῖς, "¡ven, muchacho!" -> ὦ παῖ (ὄρπηξ is a poetic sapling)
+noun	muchachos	παῖς		
+noun	chico	παῖς		C31: "el chico" -> ὁ παῖς (μικρόν "the small thing" was chosen)
+noun	chicos	παῖς		
+noun	muchacha	κόρη		
+noun	chica	κόρη		
+noun	chicas	κόρη		
+noun	lad	νεανίας		
+noun	youth	νεανίας		
+noun	joven	νεανίας		C31: "el joven" as a noun (the adjective stays νέος)
+noun	jóvenes	νεανίας		
+noun	bebé	βρέφος		C31: ποτόν "a drink" came through the pivot (beber)
+noun	hija	θυγάτηρ		
+noun	oveja	πρόβατον		C31: μῆλον is the Homeric sheep (and the apple)
+noun	ovejas	πρόβατον		
+noun	cabra	αἴξ		
+noun	roca	πέτρα		C31: πέλεια "dove" came through the pivot
+noun	estrella	ἀστήρ		
+noun	hora	ὥρα		
+noun	ejército	στρατιά		C31: στόμα "mouth" (the front of an army) came through the reverse index
+noun	cuerpo	σῶμα		C31: ψυχή was chosen
+noun	vida	βίος		
+noun	muerte	θάνατος		C31: πάθος was chosen
+noun	verdad	ἀλήθεια		C31: ναμέρτεια is poetic
+noun	mentira	ψεῦδος		C31: ἀλήθεια "truth" was chosen
+noun	ira	ὀργή		
+noun	cueva	σπήλαιον		
+noun	mercado	ἀγορά		
+noun	fruta	καρπός		C31: σάρξ "flesh" was chosen
+noun	carne	κρέας		
+noun	batalla	μάχη		
+noun	escudo	ἀσπίς		
+noun	juguete	παίγνιον		
+noun	cuento	μῦθος		
+noun	nariz	ῥίς		
+noun	silla	καθέδρα		
+noun	sangre	αἷμα		
+noun	blood	αἷμα		
+verb	end	τελευτάω	intr	C31: "the war will end" -> ὁ πόλεμος τελευτήσει (διοίσει was chosen; παύσεται is the alternative)
+verb	end	παύω	thing	C31: "they ended the war" -> τὸν πόλεμον ἔπαυσαν
+verb	end	τελευτάω		C31: "the war ended in the spring"
+verb	terminar	τελευτάω	intr	C31: "la guerra terminará" -> ὁ πόλεμος τελευτήσει (περανεῖ was chosen)
+verb	acabar	τελευτάω	intr	C31: "la guerra acabó" -> ὁ πόλεμος ἐτελεύτησεν (ἧξεν was chosen)
+verb	hide	κρύπτω	noobj-mid	C31: frame noobj-mid = the middle without an object, places allowed ("The girl hid behind the door." -> ἐκρύψατο; ἔκρυψεν was produced)
+verb	esconderse	κρύπτω	mid	C31: "se escondió detrás de la puerta" -> ἐκρύψατο
+state	well	ὑγιαίνω	verb	C31: "I hope you are well" -> ἐλπίζω σε ὑγιαίνειν (σε ἄλλον εἶναι was produced)
+state	right	ὀρθῶς λέγω	verb	C31: "you are right" -> ὀρθῶς λέγεις (an adverb + verb state row; εὐθύς "straight" was produced)
+state	tener razón	ὀρθῶς λέγω	verb	C31: "tienes razón" -> ὀρθῶς λέγεις
+# C31, after the Spanish blind batch (each with two or more own sentences in test_rules_grc7.cpp "C31 after the blind
+# check"): Spanish family words (papá -> πατήρ: [papá] was unknown), maestra (κύριος "master" was chosen; frame f = the
+# noun is feminine: ἡ διδάσκαλος), monte (Ὀδόμαντοι, a Thracian tribe, came through the pivot), tener hambre / sed,
+# contar un cuento (ἀριθμέω "count" was chosen), gritar (κλαίω), quemarse, dormirse / fall asleep, older / mayor.
+noun	papá	πατήρ		C31: "con papá" -> μετὰ τοῦ πατρός ([papá] was unknown)
+noun	abuela	τήθη		
+noun	abuelita	τήθη		
+noun	abuelo	πάππος		
+noun	abuelito	πάππος		
+noun	maestra	διδάσκαλος	f	C31: frame f = the noun is feminine (ἡ διδάσκαλος; κύριος was chosen)
+noun	monte	ὄρος		C31: Ὀδόμαντοι (a Thracian tribe) came through the pivot
+noun	tarde	ἑσπέρα		C31: "la tarde" (the evening); "tarde" as an adverb stays ὀψέ
+state	tener hambre	πεινάω	verb	C31: "tengo hambre" -> πεινῶ (λιμὸν ἔχω was produced)
+state	tener sed	διψάω	verb	C31: "tengo mucha sed" -> σφόδρα διψῶ
+state	tener sueño	νυστάζω	verb	
+verbobj	contar cuento	λέγω		C31: "cuéntame un cuento" -> λέξον μοι μῦθον (ἀρίθμησον "count" was chosen)
+verbobj	contar historia	λέγω		
+verb	gritar	βοάω		C31: κλαίω "weep" was chosen
+verb	quemarse	καίω	pass	C31: "te vas a quemar" -> καυθήσει (θύσεις "you will sacrifice" was produced)
+verb	quemar	καίω		
+verb	dormirse	κοιμάω	pass	C31: "se durmieron" -> ἐκοιμήθησαν (fell asleep; ἐκάθευδον "were sleeping"; greek.vpl has no καταδαρθάνω)
+phrasal	fall asleep	κοιμάω	pass	C31: "fell asleep" -> ἐκοιμήθησαν ([asleep] was left)
+subject	night come	γίγνομαι		C31: "when night came" -> ἐπεὶ νὺξ ἐγένετο (ἧκεν, ἀφίκετο "arrived")
+subject	night fall	γίγνομαι		C31: "when night fell" -> ἐπεὶ νὺξ ἐγένετο (ἔπεσεν "fell down" was produced)
+subject	morning come	γίγνομαι		
+subject	day come	γίγνομαι		
+subject	winter come	γίγνομαι		
+subject	noche llegar	γίγνομαι		C31: "cuando llegó la noche" -> ἐπεὶ ἡ νὺξ ἐγένετο
+subject	noche caer	γίγνομαι		
+subject	mañana llegar	γίγνομαι		
+subject	día llegar	γίγνομαι		
+subject	invierno llegar	γίγνομαι		
+subject	verano llegar	γίγνομαι		
+verb	subir	ἀναβαίνω		C31: "subió al monte" -> εἰς τὸ ὄρος ἀνέβη (ὤφελλεν was produced)
+verb	bajar	καταβαίνω		
+noun	hierba	πόα		C31: ἄρωμα "spice" came through the pivot
+# C33: "begin / start" without a subject row -> the middle ἄρχομαι ("The war began." -> ὁ πόλεμος ἤρξατο; the active
+# ἦρξεν "ruled" was produced, OK and wrong, once readable_grc.tsv taught "rule" for ἄρχω); Spanish mirrors
+verb	begin	ἄρχω	mid	C33
+verb	start	ἄρχω	mid	C33
+verb	empezar	ἄρχω	mid	C33
+verb	comenzar	ἄρχω	mid	C33
+# C33: "go / come / get out of" and Spanish "salir de" -> ἐκ + genitive ("περὶ τοῦ ..." "about" was produced), salir ->
+# ἐξέρχομαι (unknown before); camp / campamento -> στρατόπεδον (ὅπλον "weapon" was produced)
+verbprep	go_out of	ἐξέρχομαι	prep:ἐκ+gen	C33
+verbprep	come_out of	ἐξέρχομαι	prep:ἐκ+gen	C33
+verbprep	get_out of	ἐξέρχομαι	prep:ἐκ+gen	C33
+verbprep	salir of	ἐξέρχομαι	prep:ἐκ+gen	C33
+verb	salir	ἐξέρχομαι		C33
+noun	camp	στρατόπεδον		C33
+noun	campamento	στρατόπεδον		C33
+# C33 (loop-7 Check faults): "tall / alto" of a person -> μακρός (LSJ "of stature, tall"; for alto βαθύς "deep" was OK
+# and wrong);
+# "appear / aparecer" -> φαίνομαι, the passive aorist ἐφάνη (ἐδόκει "seemed" was OK and wrong)
+state	tall	μακρός	adj-person	C33
+state	alto	μακρός	adj-person	C33
+state	listo	ἕτοιμος	adj-thing	C33: "la cena está lista" (σοφόν "clever" was OK and wrong)
+state	lista	ἕτοιμος	adj-thing	C33
+verb	appear	φαίνω	pass	C33
+verb	aparecer	φαίνω	pass	C33
+# C33 after the blind batch: street / calle -> ὁδός (πλατεῖα is Hellenistic), plaza -> ἀγορά (τόπος "place" was
+# chosen), reunirse -> συνέρχομαι (συνηνέχθησαν "were brought together" was produced)
+noun	street	ὁδός		C33
+noun	calle	ὁδός		C33
+noun	plaza	ἀγορά		C33
+verb	reunirse	συνέρχομαι		C33
+# C35 (Greek loop 9, Spanish source into Greek: own_dialogue2.es.srt). New kinds adj / adv: a fixed adjective / adverb for a source
+# word whose reverse-index sense is wrong (attributive and predicative uses; state rows still win for "be" + adj); a
+# pronominal verb row of frame "thing" applies only with a thing as the object.
+noun	cuarto	δωμάτιον		C35: "mi cuarto" (es-MX: the bedroom) -> τὸ δωμάτιον (τετράς "the fourth" was produced)
+noun	lápiz	γραφίς		C35: the writing stylus (γραφιοθήκη "pencil case" was produced)
+noun	perrito	κυνίδιον		C35: the diminutive puppy (unknown before)
+noun	perritos	κυνίδιον		C35
+noun	conejo	κύνικλος		C35: the rabbit (Hellenistic, Polybius; λαγώς is the hare)
+noun	conejito	κύνικλος		C35
+noun	niñito	παιδίον		C35: "el niñito" (unknown before)
+noun	niñita	παιδίον		C35
+noun	salón	διδασκαλεῖον		C35: es-MX "el salón" (de clases) -> the classroom
+noun	idea	γνώμη		C35: "¡Qué buena idea!" -> ὡς καλὴ ἡ γνώμη (λόγος was produced)
+noun	cama	κλίνη		C35: the bed (κοίτη is the lair or the marriage-bed)
+noun	vaso	ποτήριον		C35: a drinking cup (ἀγγεῖον "vessel" was produced)
+noun	mamá	μήτηρ		C35: ὦ μῆτερ; "su mamá" -> ἡ μήτηρ (μάμμη is a nursery word)
+noun	perdón	συγγνώμη		C35: "pedir perdón" -> συγγνώμην αἰτεῖν
+noun	cuaderno	δέλτος		C35: the writing tablet (greek.vpl has no γραμματεῖον)
+adj	flojo	ἀργός		C35: es-MX lazy (χαλαρός "slack" was produced)
+adj	azul	κυάνεος		C35: blue (πελιδνός "livid" was produced)
+adj	bonito	καλός		C35: pretty (ἁβρός "delicate" was produced)
+adj	estricto	χαλεπός		C35: strict, harsh (ἀτρεκής "exact" was produced)
+adj	cierto	ἀληθής		C35: "no es cierto" -> οὐκ ἀληθές ἐστιν
+adj	curioso	φιλομαθής		C35: a curious (inquisitive) child or animal (unknown before)
+adj	enough	ἱκανός		C39: enough, sufficient (βουπόρος "ox-piercing" came through the reverse index)
+adj	sufficient	ἱκανός		C39
+adj	bastante	ἱκανός		C39: bastante, suficiente
+adj	suficiente	ἱκανός		C39
+verb	ponerse	ἐνδύω	thing	C35: "Ponte el abrigo" -> put on oneself (θές "put" was produced); only with a thing as the object ("el sol se pone" keeps the subject row δύω)
+verb	levantarse	ἀνίστημι	mid-pres	C35: "¡levántate!" -> ἀνάστηθι (ἆρόν σε "lift yourself" was produced)
+verb	quitar	ἀφαιρέω	mid	C35: "me quitó mi lápiz" -> ἀφείλετο (ἐκίνησε "moved" was produced)
+verb	jurar	ὄμνυμι		C35: "te lo juro" -> ὄμνυμι (ἐξορκίζω "adjure" was produced)
+verbobj	pedir perdón	αἰτέω		C35: "pedirle perdón" -> συγγνώμην αἰτεῖν (ἐρωτῆσαι was produced)
+verb	callar	σιγάω		C35: "cállate" -> σίγα (κλεῖε "shut" was produced)
+verb	callarse	σιγάω		C35
+verb	enojarse	ὀργίζω	pass	C35: "se enojó" -> ὠργίσθη (ὤργισεν "angered someone" was produced)
+verb	temer	φοβέω	mid	C35: "temo que" -> φοβοῦμαι μή (ἅζομαι is poetic)
+verb	estudiar	μανθάνω		C35: to study, learn (μελετάω "practise" was produced)
+verb	gustar	ἀρέσκω		C35: "¿te gustó?" -> ἤρεσέ σοι (ἐπάσατο "tasted" was produced)
+verb	extrañar	ποθέω		C35: to miss someone (ἁμαρτάνω "miss the mark" was produced)
+verb	doler	ἀλγέω		C35: "me duele la cabeza" -> ἡ κεφαλή μοι ἀλγεῖ (λυπεῖ was produced)
+verb	jalar	ἕλκω		C35: es-MX to pull (κατασπάω "pull down" was produced)
+verb	meterse	εἰσέρχομαι		C35: "se metió en el agua" -> εἰς τὸ ὕδωρ εἰσῆλθεν (ἔσαξε "packed" was produced)
+state	preocupado	φροντίζω	verb	C35: "estaba muy preocupada" -> πάνυ ἐφρόντιζον (unknown before)
+state	preocupada	φροντίζω	verb	C35
+state	callado	σιγάω	verb	C35: "¿por qué estás tan callada?" -> οὕτω σιγᾷς (ἤρεμος "quiet" was produced)
+state	callada	σιγάω	verb	C35
+state	escondido	κρύπτω	pass	C35: "está escondido" -> κρύπτεται (κρυπτή ἐστιν was produced)
+state	escondida	κρύπτω	pass	C35
+state	dormido	καθεύδω	verb	C35: "todavía está dormido" -> ἔτι καθεύδει (ἐνύπνιόν ἐστιν was produced)
+state	dormida	καθεύδω	verb	C35
+adv	temprano	πρωΐ		C35: early (πρώϊμον "early-ripe" was produced)
+adv	lejos	μακράν		C35: far (τῆλε is poetic)
+adv	por fin	τέλος		C35: finally (ὧδε [fin] was produced)
+adv	otra vez	αὖθις		C35: again ([otra] was produced)
+adv	de nuevo	αὖθις		C35
+adv	ya_no	οὐκέτι		C35: "no lo vuelvo a hacer" (no + otra vez) -> οὐκέτι ποιήσω
+adv	still	ἔτι		C35: "seguía hablando" -> ἔτι ἐλάλει
+verbobj	lavarse mano	νίζω	mid	C35: "lavarse las manos" -> νίψασθαι τὰς χεῖρας (the middle: one's own hands)
+verbobj	lavar mano	νίζω	mid	C35
+verbobj	seguir camino	πορεύω	mid	C35: "siguió su camino" -> τὴν ὁδὸν ἐπορεύετο (ἕσπετο "followed" was produced)
+durative	estudiar	μανθάνω		C35
+durative	callar	σιγάω		C35: "cállate" -> σίγα
+verb	dejar	καταλείπω		C35: "dejó la puerta abierta" -> τὴν θύραν ἀνεῳγμένην κατέλιπεν (ἔλιπεν was produced)
+state	dormir	καθεύδω	verb	C35: the frame gives "estar dormido" the verb lemma (predadj=dormir)
+state	esconder	κρύπτω	pass	C35: "está escondido" (predadj=esconder) -> κρύπτεται
+state	callar	σιγάω	verb	C35: "estás tan callada" (predadj=callar) -> οὕτω σιγᾷς
+state	preocupar	φροντίζω	verb	C35: "estaba muy preocupada" (predadj=preocupar) -> πάνυ ἐφρόντιζον
+pp	to mesa	τράπεζα	prep:πρός+acc def	C35: "ven a la mesa" -> πρὸς τὴν τράπεζαν (εἰς "into" was produced)
+verb	llevar	φέρω	thing	C35: carry a thing; a person or an animal: ἄγω (the next row)
+verb	llevar	ἄγω		C35: "¿puedo llevar a mi perrito?" -> ἄγειν (λαβεῖν "take" was produced)
+verb	sentarse	καθίζω		C35: "se sentó" -> ἐκάθισεν (ἐκάθητο "was sitting" was produced); "siéntense" -> καθίζετε
+noun	señor	δεσπότης		C35: "¿Está usted enfermo, señor?" -> ὦ δέσποτα (δυναστεία was produced)
+verbprep	pensar in	ἐνθυμέομαι	prep:περί+gen	C35: "pensar en X" -> περὶ X ἐνθυμοῦμαι (ἐν ... οἴομαι was produced)
+noun	amiga	φίλος	f	C35: "mi amiga" -> ἡ φίλη (τοῦ φίλου was produced)
+noun	palabra	λέξις		C35: a word (written, taught): "Escriban la palabra" -> τὴν λέξιν (λόγος "speech, account" was produced)
+# C35 after the blind check (own sentences first; docs/rules_grc3_notes.md "Loop 9")
+verb	comprar	ἀγοράζω		C35: to buy (ὀψωνέω "buy provisions" was produced)
+verb	prestar	δίδωμι	approx	C35: greek.vpl has no κίχρημι / δανείζω: "give", never OK (new frame "approx"; ἀκούω was produced; LIB gap)
+noun	ruido	θόρυβος		C35: "no hagas ruido" -> μὴ ποίει θόρυβον (ψόφος "a sound")
+adj	delicioso	ἡδύς		C35: tasty (μελίφρων is poetic)
+pp	with valor	ἀνδρείως	adv	C35: "lucharon con valor" -> ἀνδρείως (λόγῳ "by word" was OK and wrong)
+pp	con valor	ἀνδρείως	adv	C35
+adv	despacio	βραδέως		C35: slowly (unknown before)
+verb	provide	παρέχω		C38: "provides" was derived to a seeing verb (pro + vide); the Greek row so the Greek side is right either way
+state	delighted	χαίρω	verb	C38: "he is often delighted" -> πολλάκις χαίρει (ἐπίχαρτος "delightful" was produced)
+state	pleased	χαίρω	verb	C38
+verb	groan	στενάζω		C38
+adj	lazy	ἀργός		C38: ἄπονος "effortless" was produced

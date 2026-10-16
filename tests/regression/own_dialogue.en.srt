@@ -1,0 +1,455 @@
+1
+00:00:01,000 --> 00:00:02,333
+Where are you going?
+
+2
+00:00:02,633 --> 00:00:03,899
+I'm late! I'm late!
+
+3
+00:00:04,199 --> 00:00:06,465
+Oh dear, oh dear, what shall I do?
+
+4
+00:00:06,765 --> 00:00:07,965
+Come back here!
+
+5
+00:00:08,265 --> 00:00:09,598
+Wait for me, please.
+
+6
+00:00:09,898 --> 00:00:11,098
+Who are you?
+
+7
+00:00:11,398 --> 00:00:12,598
+I don't know.
+
+8
+00:00:12,898 --> 00:00:14,298
+Have you seen my cat?
+
+9
+00:00:14,598 --> 00:00:16,731
+She's very small and very white.
+
+10
+00:00:17,031 --> 00:00:18,231
+Don't be afraid.
+
+11
+00:00:18,531 --> 00:00:19,997
+Open the door, please.
+
+12
+00:00:20,297 --> 00:00:21,763
+The door is too small.
+
+13
+00:00:22,063 --> 00:00:23,396
+I can't get through.
+
+14
+00:00:23,696 --> 00:00:24,896
+Drink this.
+
+15
+00:00:25,196 --> 00:00:26,396
+Now I'm too big!
+
+16
+00:00:26,696 --> 00:00:27,896
+Now I'm too small.
+
+17
+00:00:28,196 --> 00:00:29,729
+Where did everybody go?
+
+18
+00:00:30,029 --> 00:00:31,495
+What a strange garden.
+
+19
+00:00:31,795 --> 00:00:33,061
+Flowers can't talk.
+
+20
+00:00:33,361 --> 00:00:34,827
+Of course we can talk.
+
+21
+00:00:35,127 --> 00:00:36,327
+Sing us a song.
+
+22
+00:00:36,627 --> 00:00:38,160
+I don't know any songs.
+
+23
+00:00:38,460 --> 00:00:39,660
+Then go away.
+
+24
+00:00:39,960 --> 00:00:41,360
+You're all very rude.
+
+25
+00:00:41,660 --> 00:00:42,993
+The queen is coming!
+
+26
+00:00:43,293 --> 00:00:44,493
+Everyone bow!
+
+27
+00:00:44,793 --> 00:00:45,993
+Off with his head!
+
+28
+00:00:46,293 --> 00:00:48,093
+She is the Queen of Hearts.
+
+29
+00:00:48,393 --> 00:00:49,593
+Do you play cards?
+
+30
+00:00:49,893 --> 00:00:51,559
+I've never played before.
+
+31
+00:00:51,859 --> 00:00:53,059
+Give me the ball.
+
+32
+00:00:53,359 --> 00:00:54,559
+Where is the ball?
+
+33
+00:00:54,859 --> 00:00:56,059
+It ran away.
+
+34
+00:00:56,359 --> 00:00:57,559
+Balls don't run.
+
+35
+00:00:57,859 --> 00:00:59,059
+This one does.
+
+36
+00:00:59,359 --> 00:01:00,559
+Have some tea.
+
+37
+00:01:00,859 --> 00:01:02,192
+There isn't any tea.
+
+38
+00:01:02,492 --> 00:01:03,825
+Then have some cake.
+
+39
+00:01:04,125 --> 00:01:05,325
+I don't want cake.
+
+40
+00:01:05,625 --> 00:01:06,825
+What time is it?
+
+41
+00:01:07,125 --> 00:01:09,058
+It's always six o'clock here.
+
+42
+00:01:09,358 --> 00:01:11,291
+Why is it always six o'clock?
+
+43
+00:01:11,591 --> 00:01:13,457
+Because the clock is broken.
+
+44
+00:01:13,757 --> 00:01:15,090
+Who broke the clock?
+
+45
+00:01:15,390 --> 00:01:16,590
+Nobody knows.
+
+46
+00:01:16,890 --> 00:01:18,823
+Sit down and tell me a story.
+
+47
+00:01:19,123 --> 00:01:21,856
+Once upon a time there was a little girl.
+
+48
+00:01:22,156 --> 00:01:23,889
+She fell into a deep hole.
+
+49
+00:01:24,189 --> 00:01:26,255
+At the bottom she found a door.
+
+50
+00:01:26,555 --> 00:01:28,488
+Behind the door was a garden.
+
+51
+00:01:28,788 --> 00:01:30,521
+In the garden lived a cat.
+
+52
+00:01:30,821 --> 00:01:32,154
+The cat could smile.
+
+53
+00:01:32,454 --> 00:01:33,654
+Can cats smile?
+
+54
+00:01:33,954 --> 00:01:35,154
+This one can.
+
+55
+00:01:35,454 --> 00:01:36,920
+Which way should I go?
+
+56
+00:01:37,220 --> 00:01:39,686
+That depends on where you want to go.
+
+57
+00:01:39,986 --> 00:01:41,586
+I don't much care where.
+
+58
+00:01:41,886 --> 00:01:44,552
+Then it doesn't matter which way you go.
+
+59
+00:01:44,852 --> 00:01:46,252
+Everyone here is mad.
+
+60
+00:01:46,552 --> 00:01:47,752
+Am I mad?
+
+61
+00:01:48,052 --> 00:01:50,518
+You must be, or you wouldn't be here.
+
+62
+00:01:50,818 --> 00:01:52,751
+Good afternoon, Your Majesty.
+
+63
+00:01:53,051 --> 00:01:55,117
+Why are you painting the roses?
+
+64
+00:01:55,417 --> 00:01:57,683
+We planted white roses by mistake.
+
+65
+00:01:57,983 --> 00:01:59,716
+The queen wanted red ones.
+
+66
+00:02:00,016 --> 00:02:03,349
+If she sees white roses, she'll cut off our heads.
+
+67
+00:02:03,649 --> 00:02:04,849
+Help us, please!
+
+68
+00:02:05,149 --> 00:02:06,615
+Pass me the red paint.
+
+69
+00:02:06,915 --> 00:02:08,115
+Here you are.
+
+70
+00:02:08,415 --> 00:02:09,748
+Thank you very much.
+
+71
+00:02:10,048 --> 00:02:11,248
+You're welcome.
+
+72
+00:02:11,548 --> 00:02:13,348
+Let's run before she comes.
+
+73
+00:02:13,648 --> 00:02:15,114
+Too late. Here she is.
+
+74
+00:02:15,414 --> 00:02:17,080
+What is your name, child?
+
+75
+00:02:17,380 --> 00:02:19,446
+My name is Alice, Your Majesty.
+
+76
+00:02:19,746 --> 00:02:21,346
+Do you know how to play?
+
+77
+00:02:21,646 --> 00:02:22,846
+A little.
+
+78
+00:02:23,146 --> 00:02:24,346
+Then play!
+
+79
+00:02:24,646 --> 00:02:25,912
+This is impossible.
+
+80
+00:02:26,212 --> 00:02:27,945
+Only if you believe it is.
+
+81
+00:02:28,245 --> 00:02:31,511
+I believe six impossible things before breakfast.
+
+82
+00:02:31,811 --> 00:02:33,811
+How many brothers do you have?
+
+83
+00:02:34,111 --> 00:02:36,444
+I have two brothers and one sister.
+
+84
+00:02:36,744 --> 00:02:38,210
+My father is a farmer.
+
+85
+00:02:38,510 --> 00:02:40,310
+My mother teaches children.
+
+86
+00:02:40,610 --> 00:02:43,276
+We live in a small house near the river.
+
+87
+00:02:43,576 --> 00:02:45,642
+Every morning I walk to school.
+
+88
+00:02:45,942 --> 00:02:47,808
+Today the teacher was angry.
+
+89
+00:02:48,108 --> 00:02:50,041
+Nobody had done the homework.
+
+90
+00:02:50,341 --> 00:02:53,074
+Tomorrow we will write a letter in Latin.
+
+91
+00:02:53,374 --> 00:02:55,507
+Can you help me with the letter?
+
+92
+00:02:55,807 --> 00:02:57,007
+Yes, gladly.
+
+93
+00:02:57,307 --> 00:02:58,773
+First write your name.
+
+94
+00:02:59,073 --> 00:03:00,406
+Then write the date.
+
+95
+00:03:00,706 --> 00:03:02,106
+What day is it today?
+
+96
+00:03:02,406 --> 00:03:03,606
+It's Tuesday.
+
+97
+00:03:03,906 --> 00:03:05,506
+I thought it was Monday.
+
+98
+00:03:05,806 --> 00:03:07,006
+You were wrong.
+
+99
+00:03:07,306 --> 00:03:08,506
+I'm never wrong.
+
+100
+00:03:08,806 --> 00:03:10,672
+Everyone is wrong sometimes.
+
+101
+00:03:10,972 --> 00:03:12,172
+Look at the sky!
+
+102
+00:03:12,472 --> 00:03:13,738
+It's going to rain.
+
+103
+00:03:14,038 --> 00:03:15,238
+Let's go inside.
+
+104
+00:03:15,538 --> 00:03:16,738
+Close the window.
+
+105
+00:03:17,038 --> 00:03:18,238
+Light the candle.
+
+106
+00:03:18,538 --> 00:03:19,738
+It's dark in here.
+
+107
+00:03:20,038 --> 00:03:21,838
+Are you afraid of the dark?
+
+108
+00:03:22,138 --> 00:03:23,338
+Not at all.
+
+109
+00:03:23,638 --> 00:03:25,304
+Then why are you shaking?
+
+110
+00:03:25,604 --> 00:03:26,804
+I'm cold.
+
+111
+00:03:27,104 --> 00:03:28,304
+Take my coat.
+
+112
+00:03:28,604 --> 00:03:29,804
+You are very kind.
+
+113
+00:03:30,104 --> 00:03:31,637
+Good night, sleep well.
+
+114
+00:03:31,937 --> 00:03:33,137
+See you tomorrow.

@@ -1,0 +1,18 @@
+# C41: own Latin sentences of core (DCC) vocabulary, LA -> EN / ES (core vocabulary audit). Our own sentences,
+# written before any C41 change and before the engine was run on them.
+# Gold: expected/own_core.en.gold.txt and expected/own_core.es.gold.txt.
+Vēritās semper vincit.
+Mīlitēs urbem fortiter dēfendunt.
+Senex fābulam longam nārrat.
+Cōnsilium ducis bonum est.
+Nāvis in portum venit.
+Rēx lēgēs novās dedit.
+Hostēs castra relīquērunt.
+Cīvēs pācem petunt.
+Spēs nostra magna est.
+Tempus celeriter fugit.
+Mors omnibus certa est.
+Corpus aegrum est, sed animus fortis est.
+Magister verba puerōrum audit.
+Frāter meus in marī nāvigat.
+Templum in monte stat.

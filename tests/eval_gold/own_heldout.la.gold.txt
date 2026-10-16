@@ -1,0 +1,77 @@
+# Gold Latin for tests/heldout/own_heldout.en.txt, written by the main agent AFTER rule tuning ended and never shown
+# to implementers; used only by tools/eval. Same style rules as the regression gold. Speaker: a traveller (masculine
+# forms where the speaker's gender matters). Alternatives after " | ".
+Sistite equum illum! | Retinēte equum illum!
+Aliquis equum illum sistat! | Aliquis equum retineat!
+Ad flūmen currit.
+Pōns frāctus est.
+Salī!
+Tam longē salīre nōn possum.
+Natā igitur.
+Natāre nesciō.
+Dā mihi manum.
+Tenē firmē. | Firmiter tenē.
+Pervēnimus. | Effūgimus.
+Vītam meam servāvistī.
+Nihil erat. | Nihil fuit.
+Ubi habitās?
+In vīcō post collem.
+Estne procul?
+Ferē hōram pedibus. | Circiter hōra pedibus.
+Eāmus igitur.
+Pedēs mihi dolent.
+Sub arbore illā requiēscere possumus.
+Habēsne aquam?
+Paulum tantum.
+Bibe; nōn sitiō.
+Quid est ille sonus? | Quis est ille strepitus?
+Ventus tantum est.
+Vōcem audīvī.
+Nēmō in hāc silvā habitat.
+Aliquis habitat.
+Ecce, lūx!
+Parva casa est. | Casa parva est.
+Pulsā iānuam.
+Quis est?
+Duo viātōrēs quī viam āmīsērunt. | Duo viātōrēs quī errāvērunt.
+Intrāte et ad ignem sedēte.
+Valdē benigna es, domina.
+Ēsurītisne?
+Valdē.
+Ecce pānis et cāseus.
+Edite quantum vultis.
+Quō ītis tam sērō nocte?
+Ad urbem, ut frātrem meum inveniam.
+Urbs trēs diēs hinc abest. | Urbs hinc trium diērum iter abest.
+Māne igitur proficīscī dēbēmus. | Prīmā lūce igitur proficīscī dēbēmus.
+Nunc dormīte; prīmā lūce vōs excitābō.
+Sōl oritur.
+Avēs cantant.
+Bene dormīvistī?
+Ut lapis. | Sīcut lapis.
+Grātiās tibi agō prō omnibus. | Grātiās prō omnibus.
+Redī quandō vīs. | Redī quandōcumque vīs.
+Quae via ad urbem dūcit?
+Sinistra. | Illa ā sinistrā.
+Nōlī dextram capere. | Dextram nōlī sūmere.
+Cūr nōn?
+Lupī in illīs silvīs sunt.
+Lupōs nōn timēmus.
+Timēre dēbētis.
+Quantī hoc cōnstat? | Quantī est hoc?
+Decem nummīs.
+Nimium est.
+Octō igitur.
+Cōnsentiō. | Placet.
+Possumne rēgem vidēre?
+Nēmō rēgem videt.
+Dīc eī cōnsobrīnum eius adesse.
+Hīc manē.
+Rēx tē nunc vidēbit.
+Māiestās Tua, epistulam ā patre meō ferō.
+Lege eam mihi.
+Legere nesciō.
+Dā igitur eam mihi.
+Hoc omnia mūtat.
+Quid dīcit?
+Dīcit bellum fīnītum esse. | Dīcit bellum cōnfectum esse.

@@ -1,0 +1,399 @@
+1
+00:00:01,000 --> 00:00:02,200
+¿A dónde vas?
+
+2
+00:00:02,500 --> 00:00:04,300
+¡Llego tarde! ¡Llego tarde!
+
+3
+00:00:04,600 --> 00:00:06,266
+Ay, ay, ¿qué voy a hacer?
+
+4
+00:00:06,566 --> 00:00:07,766
+¡Regresa aquí!
+
+5
+00:00:08,066 --> 00:00:09,399
+Espérame, por favor.
+
+6
+00:00:09,699 --> 00:00:10,899
+¿Quién eres?
+
+7
+00:00:11,199 --> 00:00:12,399
+No sé.
+
+8
+00:00:12,699 --> 00:00:14,099
+¿Has visto a mi gato?
+
+9
+00:00:14,399 --> 00:00:16,265
+Es muy pequeño y muy blanco.
+
+10
+00:00:16,565 --> 00:00:17,765
+No tengas miedo.
+
+11
+00:00:18,065 --> 00:00:19,798
+Abre la puerta, por favor.
+
+12
+00:00:20,098 --> 00:00:22,164
+La puerta es demasiado pequeña.
+
+13
+00:00:22,464 --> 00:00:23,664
+No puedo pasar.
+
+14
+00:00:23,964 --> 00:00:25,164
+Bebe esto.
+
+15
+00:00:25,464 --> 00:00:27,330
+¡Ahora soy demasiado grande!
+
+16
+00:00:27,630 --> 00:00:29,496
+Ahora soy demasiado pequeña.
+
+17
+00:00:29,796 --> 00:00:31,462
+¿A dónde se fueron todos?
+
+18
+00:00:31,762 --> 00:00:33,362
+¡Qué jardín tan extraño!
+
+19
+00:00:33,662 --> 00:00:35,528
+Las flores no pueden hablar.
+
+20
+00:00:35,828 --> 00:00:37,494
+Claro que podemos hablar.
+
+21
+00:00:37,794 --> 00:00:39,194
+Cántanos una canción.
+
+22
+00:00:39,494 --> 00:00:40,960
+No sé ninguna canción.
+
+23
+00:00:41,260 --> 00:00:42,460
+Entonces vete.
+
+24
+00:00:42,760 --> 00:00:44,293
+Son todos muy groseros.
+
+25
+00:00:44,593 --> 00:00:45,793
+¡Viene la reina!
+
+26
+00:00:46,093 --> 00:00:47,359
+¡Todos, inclínense!
+
+27
+00:00:47,659 --> 00:00:49,325
+¡Que le corten la cabeza!
+
+28
+00:00:49,625 --> 00:00:51,625
+Ella es la Reina de Corazones.
+
+29
+00:00:51,925 --> 00:00:53,325
+¿Juegas a las cartas?
+
+30
+00:00:53,625 --> 00:00:54,825
+Nunca he jugado.
+
+31
+00:00:55,125 --> 00:00:56,325
+Dame la pelota.
+
+32
+00:00:56,625 --> 00:00:58,091
+¿Dónde está la pelota?
+
+33
+00:00:58,391 --> 00:00:59,591
+Se escapó.
+
+34
+00:00:59,891 --> 00:01:01,357
+Las pelotas no corren.
+
+35
+00:01:01,657 --> 00:01:02,857
+Esta sí.
+
+36
+00:01:03,157 --> 00:01:04,423
+Toma un poco de té.
+
+37
+00:01:04,723 --> 00:01:05,923
+No hay té.
+
+38
+00:01:06,223 --> 00:01:08,356
+Entonces toma un poco de pastel.
+
+39
+00:01:08,656 --> 00:01:09,856
+No quiero pastel.
+
+40
+00:01:10,156 --> 00:01:11,356
+¿Qué hora es?
+
+41
+00:01:11,656 --> 00:01:13,389
+Aquí siempre son las seis.
+
+42
+00:01:13,689 --> 00:01:15,689
+¿Por qué siempre son las seis?
+
+43
+00:01:15,989 --> 00:01:17,722
+Porque el reloj está roto.
+
+44
+00:01:18,022 --> 00:01:19,555
+¿Quién rompió el reloj?
+
+45
+00:01:19,855 --> 00:01:21,055
+Nadie sabe.
+
+46
+00:01:21,355 --> 00:01:23,355
+Siéntate y cuéntame un cuento.
+
+47
+00:01:23,655 --> 00:01:25,721
+Había una vez una niña pequeña.
+
+48
+00:01:26,021 --> 00:01:27,687
+Cayó en un hoyo profundo.
+
+49
+00:01:27,987 --> 00:01:30,120
+En el fondo encontró una puerta.
+
+50
+00:01:30,420 --> 00:01:32,820
+Detrás de la puerta había un jardín.
+
+51
+00:01:33,120 --> 00:01:34,920
+En el jardín vivía un gato.
+
+52
+00:01:35,220 --> 00:01:36,686
+El gato podía sonreír.
+
+53
+00:01:36,986 --> 00:01:38,719
+¿Pueden sonreír los gatos?
+
+54
+00:01:39,019 --> 00:01:40,219
+Este sí puede.
+
+55
+00:01:40,519 --> 00:01:42,319
+Buenas tardes, Su Majestad.
+
+56
+00:01:42,619 --> 00:01:44,885
+¿Por qué están pintando las rosas?
+
+57
+00:01:45,185 --> 00:01:47,451
+Plantamos rosas blancas por error.
+
+58
+00:01:47,751 --> 00:01:49,217
+La reina quería rojas.
+
+59
+00:01:49,517 --> 00:01:50,917
+¡Ayúdanos, por favor!
+
+60
+00:01:51,217 --> 00:01:52,750
+Pásame la pintura roja.
+
+61
+00:01:53,050 --> 00:01:54,250
+Aquí tienes.
+
+62
+00:01:54,550 --> 00:01:55,750
+Muchas gracias.
+
+63
+00:01:56,050 --> 00:01:57,250
+De nada.
+
+64
+00:01:57,550 --> 00:01:59,483
+Corramos antes de que llegue.
+
+65
+00:01:59,783 --> 00:02:01,583
+Demasiado tarde. Aquí está.
+
+66
+00:02:01,883 --> 00:02:03,349
+¿Cómo te llamas, niña?
+
+67
+00:02:03,649 --> 00:02:05,582
+Me llamo Alicia, Su Majestad.
+
+68
+00:02:05,882 --> 00:02:07,082
+¿Sabes jugar?
+
+69
+00:02:07,382 --> 00:02:08,582
+Un poco.
+
+70
+00:02:08,882 --> 00:02:10,082
+¡Entonces juega!
+
+71
+00:02:10,382 --> 00:02:11,582
+Esto es imposible.
+
+72
+00:02:11,882 --> 00:02:13,548
+¿Cuántos hermanos tienes?
+
+73
+00:02:13,848 --> 00:02:16,048
+Tengo dos hermanos y una hermana.
+
+74
+00:02:16,348 --> 00:02:17,881
+Mi padre es agricultor.
+
+75
+00:02:18,181 --> 00:02:20,047
+Mi madre enseña a los niños.
+
+76
+00:02:20,347 --> 00:02:23,147
+Vivimos en una casa pequeña cerca del río.
+
+77
+00:02:23,447 --> 00:02:25,980
+Todas las mañanas camino a la escuela.
+
+78
+00:02:26,280 --> 00:02:28,280
+Hoy el maestro estaba enojado.
+
+79
+00:02:28,580 --> 00:02:30,380
+Nadie había hecho la tarea.
+
+80
+00:02:30,680 --> 00:02:33,280
+Mañana escribiremos una carta en latín.
+
+81
+00:02:33,580 --> 00:02:34,780
+¿Qué día es hoy?
+
+82
+00:02:35,080 --> 00:02:36,280
+Es martes.
+
+83
+00:02:36,580 --> 00:02:37,913
+Pensé que era lunes.
+
+84
+00:02:38,213 --> 00:02:39,413
+Te equivocaste.
+
+85
+00:02:39,713 --> 00:02:40,913
+Nunca me equivoco.
+
+86
+00:02:41,213 --> 00:02:43,013
+Todos se equivocan a veces.
+
+87
+00:02:43,313 --> 00:02:44,513
+¡Mira el cielo!
+
+88
+00:02:44,813 --> 00:02:46,013
+Va a llover.
+
+89
+00:02:46,313 --> 00:02:47,513
+Entremos.
+
+90
+00:02:47,813 --> 00:02:49,013
+Cierra la ventana.
+
+91
+00:02:49,313 --> 00:02:50,513
+Enciende la vela.
+
+92
+00:02:50,813 --> 00:02:52,013
+Aquí está oscuro.
+
+93
+00:02:52,313 --> 00:02:54,313
+¿Tienes miedo de la oscuridad?
+
+94
+00:02:54,613 --> 00:02:55,813
+Para nada.
+
+95
+00:02:56,113 --> 00:02:57,913
+¿Entonces por qué tiemblas?
+
+96
+00:02:58,213 --> 00:02:59,413
+Tengo frío.
+
+97
+00:02:59,713 --> 00:03:00,913
+Toma mi abrigo.
+
+98
+00:03:01,213 --> 00:03:02,413
+Eres muy amable.
+
+99
+00:03:02,713 --> 00:03:04,513
+Buenas noches, duerme bien.
+
+100
+00:03:04,813 --> 00:03:06,013
+Nos vemos mañana.

@@ -1,0 +1,65 @@
+# Gold es-MX Spanish for tests/regression/own_prose.la.txt (C36), one line per unit, written by the implementer before
+# any C36 rule and before the engine was run on the file (see own_prose.en.gold.txt for the constructions). Plain
+# literal Spanish: no ... sino (sino que before a verb), ser / estar as readable_es.tsv, pero / porque / por eso /
+# también for autem / enim / igitur / quoque. Preferred rendering first, alternatives after " | ".
+# C36 review: alternative added to unit 15 ("Por lo tanto llama al esclavo a menudo"), accepted by the main agent.
+Lucio es agricultor. | Lucio es un agricultor. | Lucio es campesino. | Lucio es un campesino.
+Pero no vive en el pueblo sino en una granja. | Pero no vive en el pueblo sino en una casa de campo. | Pero no vive en la ciudad sino en una granja. | Pero no vive en la ciudad sino en una casa de campo.
+La granja es pequeña, pero el campo es grande. | La casa de campo es pequeña, pero el campo es grande.
+Cultiva trigo y trabaja en el campo. | Cultiva grano y trabaja en el campo.
+Por eso la vida del agricultor es difícil. | Así que la vida del agricultor es difícil. | Por lo tanto la vida del agricultor es difícil. | Por eso la vida del agricultor es dura.
+Pero Lucio no está triste sino contento. | Sin embargo, Lucio no está triste sino contento. | Pero Lucio no está triste sino alegre.
+Porque ama el campo y la casa. | Pues ama el campo y la casa. | Porque ama el campo y la choza.
+La esposa también trabaja. | Su esposa también trabaja. | La mujer también trabaja.
+Lleva agua del río. | Carga agua del río. | Trae agua del río.
+El camino es largo y difícil.
+Davo es esclavo. | Davo es un esclavo. | Davus es un esclavo. | Davus es esclavo.
+El esclavo no es libre.
+Porque tiene un amo. | Pues tiene un amo. | Porque tiene amo. | Porque tiene un dueño.
+Pero el amo está enojado. | Pero el dueño está enojado. | Sin embargo, el amo está enojado.
+Por eso llama a menudo al esclavo. | Por eso a menudo llama al esclavo. | Así que a menudo llama al esclavo. | Por lo tanto a menudo llama al esclavo. | Por lo tanto llama al esclavo a menudo.
+El esclavo está cansado, pero trabaja.
+Quiere ser libre. | Desea ser libre.
+Algún día será libre. | Un día será libre.
+Los ciudadanos romanos son libres.
+Pero los niños juegan en el jardín. | Pero los hijos juegan en el jardín.
+Quinto no es agricultor sino marinero. | Quinto no es un agricultor sino un marinero. | Quinto no es campesino sino marinero.
+Porque tiene un barco. | Porque tiene una nave. | Pues tiene un barco.
+El barco es grande y veloz. | El barco es grande y rápido. | La nave es grande y veloz. | La nave es grande y rápida.
+Pero el mar a menudo es peligroso. | Pero el mar es peligroso a menudo. | Pero el mar muchas veces es peligroso. | Pero el mar es a menudo peligroso.
+El mar es peligroso.
+Pero Quinto no tiene miedo. | Pero Quinto no teme.
+Porque el hombre es valiente. | Pues el hombre es valiente. | Porque el hombre es fuerte.
+Lleva vino y aceite en el barco. | Lleva vino y aceite en la nave.
+También lleva trigo. | Lleva también trigo. | También lleva grano.
+Por fin llega al puerto. | Por fin viene al puerto. | Finalmente llega al puerto.
+Cornelia es una niña romana. | Cornelia es una muchacha romana. | Cornelia es una chica romana.
+No vive en los campos sino en la ciudad.
+La ciudad es bonita y grande. | La ciudad es hermosa y grande.
+Pero Cornelia ama el campo.
+Porque está contenta en los campos. | Pues está contenta en los campos. | Porque está feliz en los campos.
+Da un regalo al padre. | Da un regalo a su padre. | Le da un regalo al padre. | Le da un regalo a su padre.
+Júpiter es un gran dios. | Júpiter es un dios grande.
+Cornelia también está contenta. | Cornelia también está feliz.
+Pero la madre no está. | Pero la madre no está aquí. | Pero la madre no está presente.
+Porque la madre está enferma. | Pues la madre está enferma.
+El amo es bueno, pero el esclavo es malo. | El amo es bueno, pero el esclavo malo.
+El templo es grande.
+En el templo hay un altar. | Hay un altar en el templo.
+Hay muchos árboles en el bosque. | En el bosque hay muchos árboles.
+Hay un foro grande en el pueblo. | En el pueblo hay un foro grande. | Hay una plaza grande en el pueblo. | Hay un gran foro en el pueblo.
+El cielo está claro. | El cielo es claro. | El cielo está despejado.
+¡Oh Júpiter, la vida del esclavo es dura! | ¡Oh Júpiter, la vida del esclavo es difícil! | ¡Oh Júpiter, la vida del esclavo es pesada!
+La piedra es pesada.
+Por eso el niño no lleva la piedra. | Así que el niño no lleva la piedra. | Por eso el niño no carga la piedra. | Por lo tanto el niño no lleva la piedra.
+No duerme sino que juega.
+El niño no solo lee sino que también escribe. | El niño no sólo lee sino que también escribe.
+Porque el maestro es bueno. | Pues el maestro es bueno.
+Pero los alumnos no están contentos. | Pero los discípulos no están contentos. | Pero los estudiantes no están contentos.
+Porque la lección es larga. | Pues la lección es larga. | Porque la lectura es larga.
+Por eso escriben muchas palabras. | Así que escriben muchas palabras. | Por lo tanto escriben muchas palabras.
+Por fin los niños son libres. | Por fin los niños están libres. | Finalmente los niños son libres.
+Corren a casa y esperan la cena.
+La cena es buena, pero no grande. | La cena es buena, pero no es grande.
+Pero los niños aman la cena.
+La familia es feliz. | La familia está feliz. | La familia es dichosa.

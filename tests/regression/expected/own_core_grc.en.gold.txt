@@ -1,0 +1,17 @@
+# Gold English for tests/regression/own_core_grc.grc.txt (C41), written before any C41 change and before the engine
+# was run. Alternatives after " | ".
+The wise seek the truth. | The wise men seek the truth. | The wise look for the truth. | The wise men look for the truth. | Wise men seek the truth. | The wise are seeking the truth.
+The soul is immortal.
+Time shows everything. | Time reveals everything. | Time shows all things. | Time reveals all things. | Time makes everything clear. | Time makes all things clear.
+The citizens guard the law. | The citizens keep the law. | The citizens protect the law. | The citizens observe the law.
+Peace is good, but war is bad. | Peace is beautiful, but war is bad. | Peace is fine, but war is bad. | Peace is good, and war is bad. | Peace is noble, but war is bad. | Peace is good, but war is evil. | Peace is beautiful, and war is bad.
+The teacher teaches the children. | The teacher teaches the boys.
+The ship comes into the harbour. | The ship comes into the harbor. | The ship goes into the harbour. | The ship goes into the harbor. | The ship is coming into the harbour. | The ship is coming into the harbor. | The ship comes into the port. | The ship is coming into the port.
+The old man does not find the road. | The old man does not find the way. | The old man cannot find the road. | The old man cannot find the way.
+The soldiers save the city. | The soldiers are saving the city. | The soldiers keep the city safe.
+Justice punishes the unjust. | Justice punishes the unjust men. | Justice punishes the wicked. | Justice punishes unjust men.
+The brother sends the letter to the mother. | His brother sends the letter to his mother. | The brother sends the letter to his mother. | The brother sends his mother the letter. | The brother sends the mother the letter.
+The gods love men. | The gods love people. | The gods love the people. | The gods love human beings. | The gods love mankind. | The gods love the men. | The gods love humans.
+The doctor heals the body. | The doctor treats the body. | The doctor cares for the body.
+The good man honours virtue. | The good man honors virtue. | The good man honours excellence. | The good man honors excellence. | The good man respects virtue.
+The night is long, but the day is short. | The night is long, and the day is short.

@@ -1,0 +1,47 @@
+# Gold Latin for tests/regression/own_prose.en.txt (C37), one line per unit, written by the implementer before any
+# C37 rule and before the engine was run on the file; our own English in the register of a beginner's reading book
+# (a farmer's life: simple causal and adversative clauses with for / but / so / and yet, vocatives to gods, predicate
+# adjectives, "not in A but in B", genitives of the farm and the farmer). No textbook text. Alternatives after " | ".
+# Register: classical Latin, macrons on long vowels. Characters: Titus (a farmer), his wife Claudia, their son Lūcius.
+# farm = praedium (vīlla accepted), and yet = tamen / autem, so = itaque / igitur, for = nam / enim.
+# C37 proposed gold alternatives (the last alternative of units 10 11 28 32 33 38), added after the engine run: correct Latin the gold did not list (in domō, ignāva, prōtege, terrā propriā suā, magna nōn est, prūdēns). Veto freely.
+Titus agricola est.
+Nōn in urbe sed rūrī habitat. | Nōn in urbe sed in agrīs habitat. | Habitat nōn in urbe sed rūrī. | Habitat nōn in urbe sed in agrīs.
+Praedium parvum est, sed terra bona est. | Vīlla parva est, sed terra bona est.
+Cotīdiē in agrīs labōrat. | In agrīs cotīdiē labōrat. | Omnī diē in agrīs labōrat. | In agrīs omnī diē labōrat.
+Nam labor longus et difficilis est. | Labor enim longus et difficilis est. | Nam labor longus et dūrus est.
+Titus tamen laetus est. | Tamen Titus laetus est. | Et tamen Titus laetus est. | Titus autem laetus est.
+Praedium suum et bovēs suōs amat. | Vīllam suam et bovēs suōs amat. | Praedium et bovēs suōs amat. | Vīllam et bovēs suōs amat.
+Bovēs validī sed tardī sunt. | Bovēs fortēs sed tardī sunt. | Bovēs validī sunt sed tardī.
+Itaque Titus post bovēs lentē ambulat. | Itaque Titus lentē post bovēs ambulat. | Titus igitur post bovēs lentē ambulat.
+Claudia uxor eius domī labōrat. | Uxor eius Claudia domī labōrat. | Claudia uxor eius in casā labōrat. | Uxor eius Claudia in casā labōrat. | Uxor eius, Claudia, in domō labōrat.
+Nōn pigra sed industria est. | Nōn pigra est sed industria. | Nōn pigra sed sēdula est. | Nōn pigra est sed sēdula. | Nōn ignāva sed sēdula est.
+Praedium parvum familiae cibum praebet. | Parvum praedium familiae cibum praebet. | Vīlla parva familiae cibum praebet. | Praedium parvum cibum familiae praebet. | Vīlla parva cibum familiae praebet.
+Fīlius eōrum Lūcius parvus est, | Lūcius fīlius eōrum parvus est,
+sed aquam ā flūmine portat. | sed aquam ex flūmine portat. | sed aquam dē flūmine portat.
+Calidus est sōl, et longa est via. | Sōl calidus est, et via longa est. | Sōl calidus est et via longa est.
+Lūcius fessus est, nam aqua gravis est. | Lūcius fessus est; aqua enim gravis est.
+"Ō Iuppiter, diēs calidus est!" | "Iuppiter, diēs calidus est!"
+"Ō Cerēs, dā nōbīs bonam messem!" | "Ō Cerēs, dā nōbīs messem bonam!" | "Cerēs, dā nōbīs messem bonam!"
+Titus saepe deōs ōrat. | Titus saepe deōs precātur. | Titus deōs saepe ōrat. | Titus deōs saepe precātur.
+Nam deī pluviam et sōlem dant. | Deī enim pluviam et sōlem dant. | Nam dī pluviam et sōlem dant.
+Agricola pauper est, tamen līber est. | Agricola pauper est, et tamen līber est. | Agricola pauper est, līber tamen est.
+Dominum nōn habet. | Nūllum dominum habet. | Dominum nūllum habet.
+Itaque saepe contentus est. | Saepe igitur contentus est. | Itaque contentus saepe est.
+Vesperī familia pānem et cāseum edit. | Vesperī familia pānem et cāseum ēst. | Vesperī familia pānem et cāseum comedit.
+Pānis dūrus est, sed cāseus bonus est.
+Post cēnam Titus ante casam sedet. | Post cēnam Titus ante domum sedet. | Post cēnam Titus ante vīllam sedet.
+Stēllās spectat et tacet. | Sīdera spectat et tacet.
+"Ō Mars, agrōs meōs dēfende!" | "Ō Mars, dēfende agrōs meōs!" | "Mars, agrōs meōs dēfende!" | "Ō Mārs, prōtege agrōs meōs!"
+Labor praediī numquam fīnītur. | Labor praediī numquam dēsinit. | Labor vīllae numquam fīnītur. | Labor vīllae numquam dēsinit.
+Agrī agricolae lātī et viridēs sunt.
+Titus senex est, sed adhūc validus est. | Titus senex est, sed etiam nunc validus est. | Titus senex est, sed adhūc fortis est.
+Nōn in oppidō sed in terrā suā labōrat. | Nōn in oppidō sed in agrō suō labōrat. | Nōn in oppidō labōrat sed in terrā suā. | Nōn in oppidō labōrat sed in agrō suō. | Nōn in oppidō sed in terrā propriā suā labōrat.
+Terra agricolae nōn magna est, sed satis est. | Ager agricolae nōn magnus est, sed satis est. | Terra agricolae magna nōn est, sed satis est.
+Nam sibi sufficiēns est. | Nam suī contentus est. | Suī enim contentus est. | Sibi enim sufficiēns est.
+Hiems tamen longa et frīgida est. | Tamen hiems longa et frīgida est. | Hiems autem longa et frīgida est. | Et tamen hiems longa et frīgida est.
+Hieme bovēs in stabulō manent.
+"Ō Minerva, uxōrem meam adiuvā!" | "Ō Minerva, adiuvā uxōrem meam!" | "Ō Minerva, uxōrem meam iuvā!"
+Claudia sapiēns est, itaque familia laeta est. | Claudia sapiēns est; itaque familia laeta est. | Claudia prūdēns est, itaque familia laeta est.
+Vīta agricolae difficilis est, | Vīta agricolae dūra est,
+sed bona et lībera est.

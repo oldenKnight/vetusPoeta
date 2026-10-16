@@ -1,0 +1,65 @@
+# Analysis expectations for engine/tests/test_rules_la.cpp (real data/work/latin.vpl). Our own list.
+# word	lemma head	lemma pos	features (subset that must match one reading)	flags
+# features: case nom gen dat acc abl voc; number sg pl; gender m f n; person 1 2 3; tense pres impf fut perf plup
+# futp; mood ind subj imp inf ptc; voice act pass; degree comp sup. flags: enclitic=X, capital, unknown, name, rule
+puellamque	puella	noun	acc sg	enclitic=que
+amāsne	amō	verb	2 sg pres ind act	enclitic=ne
+vīsne	volō	verb	2 sg pres ind act	enclitic=ne
+Vīdistīne	videō	verb	2 sg perf ind act	enclitic=ne,capital
+Possuntne	possum	verb	3 pl pres ind	enclitic=ne,capital
+māterque	māter	noun	nom sg	enclitic=que
+Lūdisne	lūdō	verb	2 sg pres ind act	enclitic=ne,capital
+rosāsne	rosa	noun	acc pl	enclitic=ne
+pater	pater	noun	nom sg	
+ianua	iānua	noun	nom sg	
+janua	iānua	noun	nom sg	
+iam	iam	adv		
+jam	iam	adv		
+uir	vir	noun	nom sg	
+vir	vir	noun	nom sg	
+uenit	veniō	verb	3 sg pres ind act	
+vēnit	veniō	verb	3 sg perf ind act	
+iuvenis	iuvenis	noun	nom sg	
+juvenis	iuvenis	noun	nom sg	
+Puella	puella	noun	nom sg	capital
+Rōma	Rōma	name	nom sg	capital
+puellae	puella	noun	dat sg	
+puellīs	puella	noun	abl pl	
+amo	amō	verb	1 sg pres ind act	
+est	sum	verb	3 sg pres ind	
+sunt	sum	verb	3 pl pres ind	
+erat	sum	verb	3 sg impf ind	
+fuit	sum	verb	3 sg perf ind	
+it	eō	verb	3 sg pres ind	
+eunt	eō	verb	3 pl pres ind	
+fert	ferō	verb	3 sg pres ind act	
+tulit	ferō	verb	3 sg perf ind	
+vult	volō	verb	3 sg pres ind	
+nōlunt	nōlō	verb	3 pl pres ind	
+potest	possum	verb	3 sg pres ind	
+sequitur	sequor	verb	3 sg pres ind	
+loquuntur	loquor	verb	3 pl pres ind	
+mihi	ego	pron	dat sg	
+nōbīs	nōs	pron	dat pl	
+eius	is	pron	gen sg	
+huius	hic	pron	gen sg	
+quem	quī	pron	acc sg m	
+mēcum	mēcum	adv		
+fēlem	fēlēs	noun	acc sg	
+fēlēs	fēlēs	noun	nom pl	
+hortō	hortus	noun	abl sg	
+bonārum	bonus	adj	gen pl f	
+pulchrae	pulcher	adj	nom pl f	
+omnēs	omnis	adj	nom pl	
+dīc	dīcō	verb	2 sg pres imp	
+fac	faciō	verb	2 sg pres imp	
+fer	ferō	verb	2 sg pres imp	
+dūc	dūcō	verb	2 sg pres imp	
+amāvērunt	amō	verb	3 pl perf ind act	
+amātur	amō	verb	3 sg pres ind pass	
+dedit	dō	verb	3 sg perf ind act	
+nōn	nōn	particle		
+haec	hic	pron	nom sg f	
+xyzzy	-	-	-	unknown
+Qwertus	-	-	-	unknown,name
+falcat	falcō	verb	3 sg pres ind act	rule

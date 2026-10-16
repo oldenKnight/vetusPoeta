@@ -1,0 +1,6 @@
+# C40: own Attic sentences, GRC -> EN / ES, item (b) (αὐτουργός used as a noun with the article, as subject and as
+# object; and as a predicate). Our own sentences, written before any C40 rule.
+# Gold: expected/own_last_grc.en.gold.txt and expected/own_last_grc.es.gold.txt.
+ὁ αὐτουργὸς τὸν σῖτον εἰς τὴν οἰκίαν φέρει.
+ὁ δοῦλος τοὺς αὐτουργοὺς ἐν τῷ ἀγρῷ ὁρᾷ.
+ὁ ἀνὴρ αὐτουργός ἐστιν.

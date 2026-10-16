@@ -1,0 +1,18 @@
+# Gold English for tests/regression/own_core.la.txt (C41), written before any C41 change and before the engine was
+# run. Alternatives after " | ".
+# C41 proposed alternative added after the run (veto freely): unit 2 "a city" (la2x: a first-mention object is indefinite).
+Truth always wins. | The truth always wins. | Truth always conquers. | The truth always conquers. | Truth always prevails. | The truth always prevails.
+The soldiers defend the city bravely. | The soldiers bravely defend the city. | The soldiers defend the city strongly. | The soldiers defend the city courageously. | The soldiers defend a city bravely.
+The old man tells a long story. | An old man tells a long story. | The old man tells a long tale. | The old man narrates a long story.
+The plan of the general is good. | The general's plan is good. | The plan of the leader is good. | The leader's plan is good. | The advice of the leader is good. | The advice of the general is good. | The plan of the commander is good.
+The ship comes into the harbour. | The ship comes into the harbor. | The ship comes into the port. | The ship comes to the harbour. | The ship comes to the harbor. | The ship comes to the port.
+The king gave new laws. | The king has given new laws.
+The enemy left the camp. | The enemies left the camp. | The enemy abandoned the camp. | The enemies abandoned the camp.
+The citizens seek peace. | The citizens ask for peace. | The citizens look for peace. | The citizens are seeking peace. | The citizens seek the peace. | The citizens ask for the peace.
+Our hope is great. | Our hope is big.
+Time flees quickly. | Time flies quickly. | Time flees swiftly. | Time flies swiftly. | Time runs away quickly. | The time flees quickly.
+Death is certain for everyone. | Death is certain for all. | Death is certain to everyone. | Death is certain to all. | Death is sure for everyone. | Death is certain for all people.
+The body is sick, but the mind is strong. | The body is ill, but the mind is strong. | The body is sick, but the spirit is strong. | The body is ill, but the spirit is strong. | The body is sick, but the mind is brave. | The body is sick, but the spirit is brave. | The body is sick, but the soul is strong. | The body is ill, but the soul is strong.
+The teacher hears the words of the boys. | The teacher listens to the words of the boys. | The teacher hears the boys' words. | The teacher listens to the boys' words. | The teacher hears the words of the children.
+My brother sails on the sea. | My brother sails in the sea. | My brother is sailing on the sea.
+The temple stands on the mountain. | The temple stands on the hill. | A temple stands on the mountain. | The temple stands on a mountain.

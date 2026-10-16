@@ -1,0 +1,64 @@
+# Orbergise fixture (task C14): our own sentences of a higher register with the beginner rewrite we expect.
+# Columns: id	ceiling	latin	expected	english	what
+# ceiling: tier ceiling of the run (1 = Familia Romana core, 2). Expected outputs keep everything that is already
+# beginner Latin and change only what the rule names; they must pass A1/A3/A4 and the tier ceiling (names exempt).
+1	1	Epistulā lēctā, puer domum cucurrit.	Postquam epistula lēcta est, puer domum cucurrit.	When the letter had been read, the boy ran home.	ablabs perfect
+2	1	Portā apertā, servī in ātrium intrāvērunt.	Postquam porta aperta est, servī in ātrium intrāvērunt.	When the door had been opened, the slaves went into the hall.	ablabs perfect
+3	1	Librīs relictīs, discipulī in hortum cucurrērunt.	Postquam librī relictī sunt, discipulī in hortum cucurrērunt.	The books left behind, the pupils ran into the garden.	ablabs perfect plural
+4	1	Oppidō captō, agricolae in silvam fūgērunt.	Postquam oppidum captum est, agricolae in silvam fūgērunt.	When the town had been taken, the farmers fled into the forest.	ablabs perfect neuter
+5	1	Mīlite occīsō, rēx īrātus erat.	Postquam mīles occīsus est, rēx īrātus erat.	After the soldier had been killed, the king was angry.	ablabs perfect
+6	1	Patre profectō, fīlius sōlus in vīllā mānsit.	Postquam pater abiit, fīlius sōlus in vīllā mānsit.	When the father had set out, the son stayed alone in the house.	ablabs deponent + swap
+7	1	Ovibus inventīs, pāstor laetus est.	Postquam ovēs inventae sunt, pāstor laetus est.	Now that the sheep have been found, the shepherd is happy.	ablabs perfect feminine plural
+8	1	Puer, epistulā scrīptā, dormīvit.	Puer, postquam epistula scrīpta est, dormīvit.	The boy, when the letter had been written, slept.	ablabs inside the clause
+9	1	Hīs verbīs dictīs, magister tacuit.	Postquam haec verba dicta sunt, magister tacuit.	These words said, the teacher fell silent.	ablabs with a demonstrative
+10	1	Sōle oriente, avēs cantābant.	Dum sōl surgit, avēs cantābant.	While the sun was rising, the birds were singing.	ablabs present + swap
+11	1	Patre dormiente, puerī in hortō lūdēbant.	Dum pater dormit, puerī in hortō lūdēbant.	While the father was sleeping, the boys were playing in the garden.	ablabs present
+12	1	Puerīs clāmantibus, canis fūgit.	Dum puerī clāmant, canis fūgit.	While the boys were shouting, the dog ran away.	ablabs present plural
+13	1	Mārcō dormiente, Iūlia cantābat.	Dum Mārcus dormit, Iūlia cantābat.	While Marcus was sleeping, Julia was singing.	ablabs present with names
+14	1	Mihi epistula scrībenda est.	Epistulam scrībere dēbeō.	I have to write a letter.	gerundive, pronoun agent
+15	1	Puerō liber legendus est.	Puer librum legere dēbet.	The boy has to read the book.	gerundive, noun agent
+16	1	Nōbīs cēna coquenda est.	Cēnam coquere dēbēmus.	We have to cook dinner.	gerundive, plural agent
+17	1	Discipulīs verba discenda sunt.	Discipulī verba discere dēbent.	The pupils have to learn the words.	gerundive, plural
+18	1	Tibi pater adiuvandus erat.	Patrem adiuvāre dēbēbās.	You had to help your father.	gerundive, past
+19	1	Porta claudenda est.	Porta claudī dēbet.	The door must be closed.	gerundive without agent
+20	1	Nōbīs domum eundum est.	Domum īre dēbēmus.	We must go home.	gerund of obligation
+21	1	Mīlitibus pugnandum erat.	Mīlitēs pugnāre dēbēbant.	The soldiers had to fight.	gerund of obligation, past
+22	1	Servī aquam petītum ad flūmen iērunt.	Servī ad flūmen iērunt ut aquam peterent.	The slaves went to the river to fetch water.	supine with object
+23	1	Puer dormītum it.	Puer it ut dormiat.	The boy goes to sleep.	supine
+24	1	Puellae ambulātum in hortum veniunt.	Puellae in hortum veniunt ut ambulent.	The girls come into the garden to walk.	supine, present
+25	1	Mīles pācem petītum ad rēgem vēnit.	Mīles ad rēgem vēnit ut pācem peteret.	The soldier came to the king to ask for peace.	supine, past
+26	1	Puer ad urbem itūrus est.	Puer ad urbem ībit.	The boy is going to go to the city.	future participle + est
+27	1	Nautae crās abitūrī sunt.	Nautae crās abībunt.	The sailors are going to leave tomorrow.	future participle plural
+28	1	Ego tē adiūtūrus sum.	Ego tē adiuvābō.	I am going to help you.	future participle, first person
+29	1	Puella epistulam scrīptūra erat.	Puella epistulam scrībere volēbat.	The girl was about to write a letter.	future participle + erat
+30	1	Puerī clāmāre, puellae rīdēre.	Puerī clāmābant, puellae rīdēbant.	The boys shouted, the girls laughed.	historic infinitive
+31	1	Mīlitēs pugnāre, rēx flēre.	Mīlitēs pugnābant, rēx flēbat.	The soldiers fought, the king wept.	historic infinitive
+32	1	Omnēs currere et clāmāre.	Omnēs currēbant et clāmābant.	Everyone was running and shouting.	historic infinitive with et
+33	1	Cum puer domum vēnisset, māter eum salūtāvit.	Postquam puer domum vēnit, māter eum salūtāvit.	When the boy had come home, his mother greeted him.	cum + pluperfect subjunctive
+34	1	Cum epistulam lēgisset, puella flēvit.	Postquam epistulam lēgit, puella flēvit.	When she had read the letter, the girl cried.	cum + pluperfect subjunctive
+35	1	Cum servus in hortō labōrāret, dominus eum vocāvit.	Dum servus in hortō labōrat, dominus eum vocāvit.	While the slave was working in the garden, the master called him.	cum + imperfect subjunctive
+36	1	Cum mīlitēs pugnārent, rēx fūgit.	Dum mīlitēs pugnant, rēx fūgit.	While the soldiers were fighting, the king fled.	cum + imperfect subjunctive
+37	1	Cum nox vēnisset, omnēs dormīvērunt.	Postquam nox vēnit, omnēs dormīvērunt.	When night had come, everyone slept.	cum + pluperfect subjunctive
+38	1	Haud longa est via.	Nōn longa est via.	The road is not long.	haud
+39	1	Nōn nūllī puerī in hortō lūdunt.	Aliquī puerī in hortō lūdunt.	Some boys are playing in the garden.	double negative
+40	1	Nōn numquam pater ad forum ambulat.	Saepe pater ad forum ambulat.	Father sometimes walks to the forum.	double negative
+41	1	Nōn nihil timeō.	Aliquid timeō.	I am somewhat afraid.	double negative
+42	1	Puella hoc nōn nescit.	Puella hoc scit.	The girl knows this.	litotes
+43	1	Puer lupum in silvā cōnspexit.	Puer lupum in silvā vīdit.	The boy caught sight of a wolf in the forest.	vocabulary verb
+44	1	Nauta nāvigium in ōceanō vīdit.	Nauta nāvem in marī vīdit.	The sailor saw a vessel on the ocean.	vocabulary nouns, gender change
+45	1	Mīles rēgem interfēcit.	Mīles rēgem necāvit.	The soldier killed the king.	vocabulary verb
+46	1	Puella maesta lacrimat.	Puella trīstis flet.	The sad girl weeps.	vocabulary adjective and verb
+47	1	Pater cum fīliō advēnit.	Pater cum fīliō vēnit.	The father arrived with his son.	vocabulary verb
+48	1	Puer parvulus mātrem metuit.	Puer parvus mātrem timet.	The little boy fears his mother.	vocabulary adjective and verb
+49	1	Servus in cubiculum ingressus est.	Servus in cubiculum intrāvit.	The slave went into the bedroom.	deponent perfect -> active
+50	1	Puerī ē vīllā ēgrediuntur.	Puerī ē vīllā exeunt.	The boys go out of the house.	deponent present -> active
+51	1	Agricola pecūniam in agrō reperit.	Agricola pecūniam in agrō invenit.	The farmer finds money in the field.	vocabulary verb
+52	1	Mercātor festīnat.	Mercātor celeriter it.	The merchant hurries.	periphrasis of two words
+53	1	Puer lupum in silva conspexit.	Puer lupum in silva vidit.	The boy caught sight of a wolf in the forest.	input without macrons
+54	1	Patrem existimō bonum esse.	Patrem putō bonum esse.	I think that my father is good.	acc + inf kept, verb swapped
+55	1	Puer in hortum cucurrit et ibi cum amīcīs lūdēbat et sorōrem vocantem nōn audīvit.	Puer in hortum cucurrit. Ibi cum amīcīs lūdēbat. Sorōrem vocantem nōn audīvit.	The boy ran into the garden and played there with his friends and did not hear his sister calling.	long sentence split
+56	1	Puer librum legit quem pater ēmit quī in urbe labōrat.	Puer librum legit quem pater ēmit. Pater in urbe labōrat.	The boy reads the book which his father bought, who works in the city.	relative chain
+57	1	Vīdī puellam quae rosās portābat quās in hortō invēnerat.	Vīdī puellam quae rosās portābat. Rosās in hortō invēnerat.	I saw the girl who was carrying roses which she had found in the garden.	relative chain, accusative
+58	1	Puella rosam amat.	Puella rosam amat.	The girl loves the rose.	already simple
+59	1	Mārcus ad forum ambulat et Iūlia cantat.	Mārcus ad forum ambulat et Iūlia cantat.	Marcus walks to the forum and Julia sings.	already simple, names
+60	2	Puer lupum in silvā cōnspexit.	Puer lupum in silvā cōnspexit.	The boy caught sight of a wolf in the forest.	ceiling 2 keeps a tier 2 word

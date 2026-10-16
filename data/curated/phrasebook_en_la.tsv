@@ -1,0 +1,355 @@
+# pattern	latin	tier	register	note
+# C23 (D18): register "eccl" or "eccl+<register>" marks a Medieval / ecclesiastical row, matched only with latinity "wide" (default); a row of the same pattern without it is the classical rendering, offered as the alternative (the earlier row of the two is chosen).
+hello	salvē	1	greet	plural: salvēte when addressee count > 1 (engine picks by glossary)
+hi	salvē	1	greet	
+good morning	salvē	1	greet	
+good day	salvē	1	greet	
+good evening	salvē	1	greet	
+good afternoon	salvē	1	greet	
+good night	bene dormī	1	greet	plural: bene dormīte (C28)
+goodbye	valē	1	greet	plural valēte
+goodbye	deus tē servet	1	eccl+greet	D18 (C23): ecclesiastical farewell, latinity "wide" only; offered as the alternative of valē, which stays first
+bye	valē	1	greet	
+farewell	valē	1	greet	
+see you (soon|later)	mox tē vidēbō	1	greet	
+see you tomorrow	crās tē vidēbō	1	greet	
+welcome	salvē	1	greet	
+thank you	grātiās (tibi) agō	1	polite	
+thanks	grātiās	1	polite	
+thank you very much	grātiās tibi maximās agō	1	polite	
+thank god	deō grātiās	1	eccl+excl	D18 (C23): ecclesiastical, latinity "wide" only
+thank god	deō grātiās agō	1	excl	C23: the classical rendering (latinity "classical"; the alternative in "wide")
+you're welcome	libenter	1	polite	
+please	quaesō	1	polite	
+excuse me	ignōsce mihi	1	polite	
+i am sorry	habeās mē excūsātum/excūsātam	1	eccl+polite	D18 (C23): the owner's choice, latinity "wide" only (chosen there, the classical row below is its alternative); gender from the speaker
+i am sorry	ignōsce mihi	1	polite	
+sorry	ignōsce	1	polite	
+i beg your pardon	ignōsce mihi	1	polite	
+pardon me	ignōsce mihi	1	polite	
+yes	ita	1	answer	or "certē", "sīc"
+no	nōn	1	answer	or "minimē"
+of course	certē	1	answer	
+certainly	certē	1	answer	
+not at all	minimē	1	answer	
+a little	paulum	1	answer	as a reply ("a little girl" is not matched: the phrase must stand alone)
+maybe	fortasse	1	answer	
+perhaps	fortasse	1	answer	
+i don't know	nesciō	1	answer	
+i know	sciō	1	answer	
+i see	intellegō	1	answer	
+all right	bene	1	answer	
+okay	bene	1	answer	
+very well	optimē	1	answer	
+good	bene	1	answer	as a reply
+fine	bene	1	answer	
+well done	bene fēcistī	1	praise	
+bravo	euge	1	praise	
+how are you	quid agis	1	q	
+what is your name	quid est nōmen tibi	1	q	
+my name is {NAME}	nōmen mihi est {1}	1	intro	
+i am {NAME}	ego sum {1}	1	intro	
+who are you	quis es	1	q	
+who is that	quis est ille/illa	1	q	
+what is that	quid est illud	1	q	
+what is this	quid est hoc	1	q	
+what is it	quid est	1	q	
+what is the matter	quid est	1	q	
+what happened	quid factum est	1	q	
+what time is it	quota hōra est	1	q	
+where am i	ubi sum	1	q	
+where are you	ubi es	1	q	
+where are we	ubi sumus	1	q	
+where are you going	quō īs	1	q	plural: quō ītis (C28)
+where is {NP}	ubi est {1:nom}	1	q	
+why	cūr	1	q	
+why not	cūr nōn	1	q	
+how	quōmodo	1	q	
+how much	quantum	1	q	
+how many	quot	1	q	
+what do you want	quid vīs	1	q	
+what do you mean	quid dīcis	1	q	
+do you understand	intellegis	1	q	
+really	vērō	1	excl	
+truly	vērē	1	excl	
+indeed	vērō	1	excl	
+oh	ō	1	excl	
+o	ō	1	excl	C39: the address word before a name or a noun (O Jupiter, ...)
+oh dear	ō mē miserum/miseram	1	excl	gender of speaker
+oh my	ō mē miserum/miseram	1	excl	
+oh no	heu	1	excl	
+alas	ēheu	1	excl	
+dear me	heu mē	1	excl	
+goodness	dī bonī	1	excl	
+good heavens	dī bonī	1	excl	
+my goodness	dī bonī	1	excl	
+good gracious	dī immortālēs	1	excl	
+heavens	dī bonī	1	excl	
+wow	papae	1	excl	
+hooray	iō	1	excl	
+hurrah	iō	1	excl	
+ouch	ei	1	excl	
+ow	ei	1	excl	
+ugh	vah	1	excl	
+hey	heus	1	excl	
+look	ecce	1	excl	when used as attention word, not the verb
+behold	ecce	1	excl	
+listen	audī	1	imp	
+come on	age	1	imp	plural agite
+come here	venī hūc	1	imp	
+come in	intrā	1	imp	
+come with me	venī mēcum	1	imp	
+go away	abī	1	imp	
+get out	exī	1	imp	
+go on	perge	1	imp	
+hurry	festīnā	1	imp	
+hurry up	festīnā	1	imp	
+quick	celeriter	1	imp	
+quickly	celeriter	1	imp	
+stop	dēsine	1	imp	
+wait	manē	1	imp	
+wait a minute	manē paulum	1	imp	
+be quiet	tacē	1	imp	
+silence	tacēte	1	imp	
+shut up	tacē	1	imp	
+sit down	sedē	1	imp	
+stand up	surge	1	imp	
+get up	surge	1	imp	
+wake up	ēvigilā	2	imp	flexible: surge
+help	auxilium	1	excl	as a cry: "auxilium!"
+help me	adiuvā mē	1	imp	
+off with {NP}	{1:acc} abscīdite	2	imp	command to a group: "Off with his head!"
+be careful	cavē	1	imp	
+watch out	cavē	1	imp	
+take care	cūrā ut valeās	1	imp	
+don't worry	nōlī timēre	1	imp	
+never mind	nihil est	1	answer	
+no matter	nihil est	1	answer	
+of course not	minimē	1	answer	
+that's right	rēctē dīcis	1	answer	
+you're right	rēctē dīcis	1	answer	
+that's all	id est omne	1	answer	
+that's enough	satis est	1	answer	
+enough	satis	1	answer	
+too late	sērō	1	answer	
+i am late	sērō veniō	1	state	
+i'm late	sērō veniō	1	state	
+we are late	sērō venīmus	1	state	
+in time	tempore	1	adv	
+on time	tempore	1	adv	
+at once	statim	1	adv	
+right now	nunc statim	1	adv	
+at last	tandem	1	adv	
+of course	certē	1	adv	
+by the way	cēterum	1	adv	
+for example	exemplī grātiā	2	adv	
+in fact	rē vērā	1	adv	
+after all	nam	1	adv	C22: gives a reason ("After all, he is only a boy." -> Nam puer tantum est.); not tamen
+first of all	prīmum	1	adv	
+so what	quid tum	1	q	
+what for	cūr	1	q	
+nonsense	nūgae	1	excl	
+rubbish	nūgae	1	excl	
+you fool	stulte	1	insult	vocative; stulta for feminine
+silly	stulte	1	insult	
+i love you	tē amō	1	state	
+i like {NP}	{1:nom} mihi placet	1	state	plural: placent
+i want {NP}	{1:acc} volō	1	state	
+i need {NP}	{1:abl} mihi opus est	1	state	
+i am hungry	ēsuriō	1	state	
+i am thirsty	sitiō	1	state	
+i am tired	fessus/fessa sum	1	state	
+i am afraid	timeō	1	state	
+i am cold	frīgeō	1	state	
+i am hot	caleō	1	state	
+i am happy	laetus/laeta sum	1	state	
+i am sad	trīstis sum	1	state	
+i am ready	parātus/parāta sum	1	state	
+it is time	tempus est	1	state	
+it's time to {VP}	tempus est {1:inf}	1	state	
+let's go	eāmus	1	imp	
+let's see	videāmus	1	imp	
+here you are	ecce	1	give	
+here it is	ecce	1	give	
+there it is	ecce	1	give	
+here she|he is|comes	ecce venit	1	give	"Here she is!" of someone arriving
+once upon a time	ōlim	1	narr	
+long ago	ōlim	1	narr	
+the end	fīnis	1	narr	
+happy birthday	fēlīx diēs nātālis	1	greet	
+merry christmas	fēlīx diēs nātālis Chrīstī	2	greet	
+your majesty	Māiestās Tua	2	address	vocative phrase
+your highness	Celsitūdō Tua	2	address	
+my dear	mī/mea cāre/cāra	1	address	
+my friend	mī amīce/mea amīca	1	address	
+my lord	domine	1	address	
+my lady	domina	1	address	
+ladies and gentlemen	dominae ac dominī	1	address	
+pass me {NP}	dā mihi {1:acc}	1	imp	
+hand me {NP}	dā mihi {1:acc}	1	imp	
+play cards	chartīs lūdere	1	vp	do you play cards -> Lūdisne chartīs?
+this is impossible	hoc fierī nōn potest	1	state	
+that is impossible	id fierī nōn potest	1	state	
+impossible	fierī nōn potest	1	state	as a one-word reply
+it doesn't matter	nihil interest	1	answer	
+it does not matter	nihil interest	1	answer	
+which way	quā viā	1	q	
+what a {ADJ} {NP}	quam {1} {2:nom}	1	excl	exclamation with adjective + noun
+take my coat	sūme pallium meum	1	imp	
+go to school	ad lūdum īre	1	vp	
+at school	in lūdō	1	pp	
+in latin	Latīnē	1	adv	
+in greek	Graecē	1	adv	
+in english	Anglicē	1	adv	
+in spanish	Hispānicē	1	adv	
+that depends on {WH}	id pendet ex eō {1}	1	state	{WH}: indirect question ("where you want to go" -> quō īre vīs)
+it depends on {WH}	id pendet ex eō {1}	1	state	
+that depends	id pendet	1	answer	
+it depends	id pendet	1	answer	
+it doesn't matter {WH}	nihil interest {1:subj}	1	state	"it doesn't matter which way you go" -> nihil interest quā viā eās
+it does not matter {WH}	nihil interest {1:subj}	1	state	
+# C15 (quality loop 2). Registers: paren = a parenthetical between commas, kept where the source has it; conn = a
+# connector between commas, moved to the front of the clause before it ("..., however;" -> Tamen ...); lead = a word
+# that opens the sentence before a comma ("Why, ..." -> Quid? ...); tail = an adverbial phrase that ends a clause.
+you know	ut scīs	1	paren	"My head is stuffed with straw, you know," -> ..., ut scīs,
+as you know	ut scīs	1	paren	
+as i said	ut dīxī	1	paren	
+i am sure	certē	1	adv	"I am sure I do not want ..." -> Certē ... nōlō
+however	tamen	1	conn	
+why	quid?	1	lead	"Why, don't you know?" -> Quid? Nescīs?
+exactly so	ita plānē	1	answer	
+just so	ita plānē	1	answer	
+there is no place like home	nūllus locus est sīcut domus	1	idiom	
+as soon as you can	quam prīmum	1	tail	
+as soon as possible	quam prīmum	1	tail	
+in reality	rē vērā	1	adv	
+in my day	in diēbus meīs	1	tail	
+i feel like a new man|woman|person	novus homō mihi videor	1	stmt	idiom: renewed; "I feel like a new man." -> Novus homō mihi videor.
+i feel like {NP}	{1:nom} mihi videor	1	stmt	"I feel like a new man." -> Novus homō mihi videor.
+in trouble	in perīculō	1	tail	"anyone in trouble"
+well	bene	1	lead	"Well, come to me tomorrow" -> Bene, ...
+for my part	ego	1	adv	"For my part, I have no heart" -> Ego cor nōn habeō
+i am not much of a {NP}	nōn magnus {1:nom} sum	1	stmt	"I'm not much of a magician" -> Nōn magnus magus sum
+# C17 (quality loop 3). vp rows noted "(transitive)" apply only when the verb has an object.
+starve	famē cōnficere	2	vp	(transitive) "The cruel king starved the prisoners." -> captīvōs famē cōnfēcit
+you have no right to {VP}	nōn licet tibi {1}	1	stmt	"You have no right to take my shoe." -> Nōn licet tibi calceum meum auferre.
+i have no right to {VP}	nōn licet mihi {1}	1	stmt	
+he has no right to {VP}	nōn licet eī {1}	1	stmt	
+she has no right to {VP}	nōn licet eī {1}	1	stmt	
+we have no right to {VP}	nōn licet nōbīs {1}	1	stmt	
+they have no right to {VP}	nōn licet eīs {1}	1	stmt	
+it will be no trouble to {VP}	nūllus labor erit {1}	1	stmt	"It will be no trouble to make the balloon." -> Nūllus labor erit follem facere.
+it is no trouble to {VP}	nūllus labor est {1}	1	stmt	
+it was no trouble to {VP}	nūllus labor erat {1}	1	stmt	
+in a few minutes	mox	1	adv	
+in a minute	mox	1	adv	
+in a moment	mox	1	adv	
+find my|your|his|her|our|their way	viam invenīre	1	vp	"Can you help me find my way?" -> ut viam inveniam
+at all	omnīnō	1	adv	"I cannot move them at all" -> eōs omnīnō movēre nōn possum
+hush	tacē	1	imp	plural tacēte
+before dark	ante noctem	1	tail	"We must be home before dark." -> ante noctem
+let me {VP}	sine mē {1}	1	stmt	"Let me see." -> Sine mē vidēre. (C19)
+how have you been	quōmodo valuistī	1	q	"How have you been?" (C19)
+how old are you	quot annōs nātus es/quot annōs nāta es	1	q	"How old are you?" (C19; gender of the person asked: the speaker glossary)
+# C22 (acceptance loop 1): idioms of children's dialogue. Our own example sentences in the notes.
+i am late for {NP}	ad {1:acc} sērō veniō	1	state	"I'm late for dinner." -> Ad cēnam sērō veniō.
+we are late for {NP}	ad {1:acc} sērō venīmus	1	state	"We are late for school." -> Ad lūdum sērō venīmus.
+no time to say hello , goodbye	nōn possum salūtāre neque valēre iubēre	1	stmt	the teacher's rendering: "I cannot greet nor bid farewell"
+no time to say goodbye , hello	nōn possum valēre iubēre neque salūtāre	1	stmt	
+no time to say hello	nōn possum salūtāre	1	stmt	
+no time to say goodbye	nōn possum valēre iubēre	1	stmt	
+there is no time to {VP}	nōn est tempus {1:inf}	1	stmt	"There is no time to play." -> Nōn est tempus lūdere.
+no time to {VP}	nōn est tempus {1:inf}	1	stmt	
+i am in a stew	perturbātus/perturbāta sum	1	state	idiom: upset, flustered
+i am really in a stew	valdē perturbātus/perturbāta sum	1	state	
+that's it	ita est	1	answer	"That's it, Tom." -> Ita est, Tom.
+that is it	ita est	1	answer	
+what nonsense	quae nūgae	1	excl	
+once more	rūrsus	1	adv	"Sing it once more." -> Rūrsus id cane. (the teacher's choice)
+once again	iterum	1	adv	
+from the beginning	ab initiō	1	tail	"Once more, from the beginning." -> Iterum, ab initiō.
+my	papae	1	excl	"My!" alone as surprise (a possessive never matches: the word must stand alone)
+at first	prīmō	1	adv	"At first the dog was shy." -> Prīmō canis timidus erat.
+late	sērō	1	answer	a bare "late" repeated after "I am late" ("late, late!")
+upside down	capite deorsum	2	tail	C24: "The bat hangs upside down." -> capite deorsum (head downwards); "The cup is upside down." -> Pōculum capite deorsum est.
+of late	nūper	1	adv	"He had of late been ill." -> nūper
+lately	nūper	1	adv	
+i am late for {NP} again	iterum ad {1:acc} sērō veniō	1	state	"I am late for the bus again." -> Iterum ad raedam sērō veniō.
+very much	valdē	1	adv	"She loved it very much." -> valdē (not valdē multum)
+# C24 (acceptance loop 2): time of day and other phrases of children's songs and stories. Our own example sentences.
+in the afternoon	post merīdiem	1	tail	"We play in the afternoon." -> Post merīdiem lūdimus.
+this afternoon	hodiē post merīdiem	1	adv	"Come back this afternoon." -> Hodiē post merīdiem redī.
+every afternoon	cotīdiē post merīdiem	1	adv	"Every afternoon we sleep." -> Cotīdiē post merīdiem dormīmus.
+in|on a|an {ADJ} afternoon	diē {1:abl.m} post merīdiem	1	tail	"On a cold afternoon the cat slept." -> Diē frīgidō post merīdiem fēlēs dormīvit.
+at dawn	prīmā lūce	1	tail	"We leave the town at dawn." -> Oppidum prīmā lūce relinquimus.
+for a long time	diū	1	adv	C26: "We waited for a long time." -> Diū exspectāvimus.
+for a while	aliquamdiū	2	adv	C26
+all day long	tōtum diem	1	adv	C26
+thank goodness	dīs grātiās	1	excl	C26
+goodness gracious	dī bonī	1	excl	C26
+goodness me	dī bonī	1	excl	C26
+bother	vah	1	excl	C26: "Oh, bother!" -> Ō, vah!
+gee	papae	1	excl	C26
+gosh	papae	1	excl	C26
+golly	papae	1	excl	C26
+anything you want me to	quidquid vīs	1	tail	C26: "I will do anything you want me to." -> Faciam quidquid vīs.
+anything you want	quidquid vīs	1	tail	C26
+anything you like	quidquid tibi placet	1	tail	C26
+whatever you want	quidquid vīs	1	tail	C26
+whatever you like	quidquid tibi placet	1	tail	C26
+anyone in trouble	eōs quī in perīculō sunt	1	tail	C26: "I like to help anyone in trouble." -> Libenter adiuvō eōs quī in perīculō sunt (object at the end of its clause)
+people in trouble	eōs quī in perīculō sunt	1	tail	C26
+i would like {NP}	{1:acc} velim	1	state	C28: the polite wish (present subjunctive): "I would like some bread." -> Pānem velim.
+so would i	et ego	1	answer	C28: "- So would I." -> Et ego. (the verb understood)
+so do i	et ego	1	answer	C28
+so am i	et ego	1	answer	C28
+so can i	et ego	1	answer	C28
+so did i	et ego	1	answer	C28
+so will i	et ego	1	answer	C28
+me too	et ego	1	answer	C28
+anything else	aliquid aliud	1	q	C28: "Anything else?" (in a shop)
+nothing else	nihil aliud	1	answer	C28
+that way ,	illūc,	1	adv	C28: "That way, past the temple!" -> Illūc, praeter templum!
+this way ,	hūc,	1	adv	C28: "This way, children!" -> Hūc, puerī!
+last night	hesternā nocte	1	adv	C28
+last year	annō superiōre	1	adv	C28: ultimō was "in the last year (of a series)"
+last month	mēnse superiōre	1	adv	C28
+last week	superiōre hebdomade	1	adv	C28
+last summer	aestāte superiōre	1	adv	C28
+last winter	hieme superiōre	1	adv	C28
+got him	eum cēpī	1	excl	C28: "Got him!" (I've got him) -> Eum cēpī!
+got her	eam cēpī	1	excl	C28
+got you	tē cēpī	1	excl	C28
+stop , thief	cōnsiste, fūr	1	excl	C28: the shout at a thief who runs away (dēsine is "stop doing it")
+stop thief	cōnsiste, fūr	1	excl	C28
+here ,	ecce,	1	adv	C28: offering something ("Here, take this bread." -> Ecce, cape hunc pānem.)
+a lot	multum	1	answer	C28: "Yes, a lot." -> Ita, multum. (alone; "a lot of" stays the partitive)
+very much	valdē	1	answer	C28: "- Yes, very much."
+# C30 (Latin loop 7): narrative register: connectors, time phrases and frames of a told story
+called {NAME}	nōmine {1}	1	narr	C30: "a little girl called Anna" -> puella nōmine Anna (ablative of respect)
+named {NAME}	nōmine {1}	1	narr	C30
+every night	omnī nocte	1	adv	C30
+one day	quōdam diē	1	narr	C30: the opening of an episode ("One day, however, the goat ...")
+that night	eā nocte	1	narr	C30
+the next morning	postrīdiē māne	1	narr	C30
+the next day	postrīdiē	1	narr	C30
+meanwhile	intereā	1	narr	C30: narrative connector (also interim)
+sometimes	interdum	1	adv	C30
+again and again	iterum atque iterum	1	adv	C30
+come closer	propius accēdere	1	vp	C30: "Anna came closer very quietly." -> Anna valdē tacitē propius accessit.
+work hard	multum labōrāre	1	vp	C39: "Sextus honours the gods and works hard." -> ... et multum labōrat (hard was propter, "hard by")
+came closer	propius accēdere	1	vp	C30
+eat (their|his|her|our|my|your) supper	cēnāre	1	vp	C30: "while they ate their supper" -> dum cēnābant
+have supper	cēnāre	1	vp	C30
+it was becoming dark	advesperāscēbat	1	narr	C30: "Meanwhile it was becoming dark," -> Intereā advesperāscēbat,
+it was getting dark	advesperāscēbat	1	narr	C30
+it is getting dark	advesperāscit	1	narr	C30
+# C37: textbook prose (a farmer's life): time and place adverbs
+in the country	rūrī	1	adv	C37: "He lives in the country." -> Rūrī habitat. (the countryside, not a land)
+to the country	rūs	1	adv	C37
+from the country	rūre	1	adv	C37
+in the evening	vesperī	1	adv	C37
+in winter	hieme	1	adv	C37
+in summer	aestāte	1	adv	C37
+in spring	vēre	1	adv	C37
+after dinner	post cēnam	1	adv	C37

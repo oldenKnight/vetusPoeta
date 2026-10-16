@@ -1,6 +1,6 @@
 # HANDOFF — read on restart
 
-Last updated: 2026-10-05 (session 1, step 1 of the production process).
+Last updated: 2026-10-15.
 
 ## Where we are
 - Owner approved the plan ("start"). Decisions in `docs/DECISIONS.md`. Ledger in `docs/STATUS.md`.
@@ -17,9 +17,56 @@ Last updated: 2026-10-05 (session 1, step 1 of the production process).
   404 MB, English 3.3 GB, es.wiktionary extract 103 MB gz. If `data/raw/dl-done.flag` is
   missing, check `data/raw/dl-*.log` and rerun the curl commands (they resume with `-C -`).
 
-## Next step
-- M0.3: Sonnet pre-plan. Then M0.4: main agent writes DESIGN.md with [CONTRACT] sections and
-  opens implementation tasks (M1, M2) for Opus implementers.
+## Next step (updated 2026-10-15)
+- Tasks DONE through C43 / E22 (after R8: E19-E22 on the owner's second material, C36-C41, C43, B4d). C42 (Spanish ->
+  Latin hymn verse) is DEFERRED: the first task of the next session. No implementer running; everything is pushed to
+  claude/fervent-cannon-6qif8i.
+- Quality state (honest): owner's second material (Athenaze ch. 1 + medieval hymn, 100 units, tuned on) 17 -> 79/100,
+  wrong among OK 8 -> 0; held-out automatic errors own 2/74, Oz 98/700, wrong among OK 0 in every run. Known weak spot:
+  Spanish -> Latin verse (8/22, all misses rated Check / Fix). Text projects are no longer wrapped like subtitles (C39).
+- Before the next release: run R9 (full build, ctest, ASan, xcompile with GUI + LLM, make_dist) on a clean archive.
+- Waiting on the owner: an unseen file (>= 370 units) for an honest < 1 % test, a `main` branch for the draft pull
+  request, the Google Translate side-by-side on his machine (docs/EVAL.md §5), the Windows smoke checklist
+  (docs/BUILD.md).
+- Review protocol: `git archive HEAD | tar -x -C <scratch>` then build + ctest + ASan + xcompile there. Commit the
+  ledger with pathspecs. After a usage-limit interruption: checkpoint the implementer's files in a `wip:` commit, push,
+  and resume the same implementer with a message. Run implementers one at a time (parallel runs exhaust the limit).
+- Gold: tests/regression/expected/*.gold.txt; implementers append alternatives only, the main agent reviews them.
+  Held-out hygiene: nobody reads tests/heldout, tests/eval_gold or data/work/eval/heldout-*.
 
 ## Open items for the owner
+- The owner's PARTIAL Alice file arrived 2026-10-07 13:13 UTC (82 cues) with his own free Latin version; both are in
+  data/acceptance/ (gitignored). First run measured: STATUS E5 (expert wrong rate 79 %). Tuning loop C22 opened.
+  The intake plan that was followed: save it under data/acceptance/ (gitignored: the file is copyrighted and never enters the repo or the
+  docs; only our own Latin output lines and numbers are recorded), run `vpengine check` on it, then
+  `tools/eval/run_eval.py --tuned --file data/acceptance/<file> --pair en-la --combos R,RM,RO,RMO --fidelity 1,2,3`
+  (every engine combination, first run, per-cue error with intervals; the online cells only if the owner toggles
+  them), write the expert review sheet (docs/EVAL.md §3), review every cue as the four reviewers of DECISIONS D15,
+  report the true first-run error rate per cell, then open the tuning loop on its mismatches (C20) and re-measure
+  on the held-out files. The partial file gives a wider interval; the protocol is unchanged.
+- Create the `main` branch so a draft pull request can be opened for claude/fervent-cannon-6qif8i.
+- Run tools/eval/gt_compare.js headful on your machine (the container cannot trust the proxy CA).
 - Upload the Alice subtitle file (acceptance test) and a second subtitle file (held-out test).
+
+## Measured data facts (2026-10-05, full passes over the raw dumps)
+- Latin (en.wiktionary via Kaikki): 892,320 entries; 54,199 lemma entries; 838,121 form-of
+  entries; 61,224 entries with inflection tables; 2,051,746 table forms. Macrons live in
+  `forms[].form` and `head_templates[].expansion`, not in `word` (only 7 words carry one).
+- Ancient Greek: 68,196 entries; 23,169 lemmas; 1,465,603 table forms. Verb tables use
+  `forms[].source == "inflection"` (not "conjugation") and carry dialect variants (Attic,
+  Ionic, Epic): filter by dialect tag when building Attic paradigms. Contract verbs list
+  uncontracted forms in the non-Attic tables.
+- English: 1,492,836 entries; 18,774 distinct English words have a Latin translation
+  (20,003 entries), 11,543 entries have an Ancient Greek translation.
+- Spanish Wiktionary extract: only 7,022 Latin and 278 Greek entries, so Spanish glosses come
+  mainly from the English pivot and the hand-written tier vocabulary (decision D8).
+- Treebank licences: UD_English-EWT, UD_Spanish-GSD, UD_Spanish-AnCora, UD_Latin-LLCT,
+  UD_Latin-CIRCSE are CC BY(-SA) and usable; UD_English-GUM and all Perseus/PROIEL/ITTB Latin
+  and Greek treebanks are CC BY-NC-SA and must not be used.
+- No pull request yet: the repo has no default branch besides ours, so there is no base to
+  open a PR against. The owner should create `main` (or say which base to use).
+
+## Interruption protocol (used 2026-10-06 03:30 UTC after an API session limit)
+When implementers die mid-task: `git add` their task paths and commit one `wip: checkpoint ...` commit, push,
+then resume each agent (same agent, same context) with a message naming the checkpoint commit and asking it to
+re-check `git status` and re-run its tests before continuing. Done so for B2, B7, C1, C4 (commit 196d87d).

@@ -1,0 +1,41 @@
+# Checker expectations (engine/tests/test_rules_la.cpp, real latin.vpl). Our own sentences.
+# text	checks that must fail ("-" none)	tier ceiling
+Puella parva rosam amat.	-	3
+Puella parvus est.	A3	3
+Puella parvam est.	A3	3
+Puellae parva rosam amant.	A3	3
+Puella amant.	A3	3
+Puella amās.	A3	3
+Puella et puer currunt.	-	3
+Puella et puer currit.	A3	3
+Iānua nimis parva est.	-	3
+Iānua nimis parvae est.	A3	3
+Pater meus agricola est.	-	3
+Pater mea agricola est.	A3	3
+Duōs frātrēs et ūnam sorōrem habeō.	-	3
+Duās frātrēs habeō.	A3	3
+In casā parvā prope flūmen habitāmus.	-	3
+In casā parvam habitāmus.	A3	3
+Puellae quae rosās amant in hortō ambulant.	-	3
+Puella quī rosās amat in hortō ambulat.	A3	3
+Puer in hortum ambulat.	-	3
+Puer in hortō ambulat.	-	3
+Puer cum puellam ambulat.	A4	3
+Puer ad hortō ambulat.	A4	3
+Magistrō pāret.	-	3
+Magistrum pāret.	A4	3
+Gladiō ūtitur.	-	3
+Puella gladium ūtitur.	A4	3
+Puer amīcō amat.	A4	3
+Puella ā mē vocāta est.	-	3
+Puella mē vocāta est.	A4	3
+Xyzzy est.	A1	3
+Rosam Qwertus amat.	-	3
+Puella vespertīliōnem videt.	A6	1
+Puella rosam videt.	-	1
+Nōlī timēre.	-	3
+Possuntne fēlēs rīdēre?	-	3
+Sī rosās albās videt, capita nostra abscīdet.	-	3
+Sex rēs quae fierī nōn possunt ante ientāculum crēdō.	-	3
+Omnēs hīc īnsānī sunt.	-	3
+Venī mēcum!	-	3

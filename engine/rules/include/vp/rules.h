@@ -1,0 +1,113 @@
+// vp::rules::Engine — the one interface the CLI server uses to translate, inspect and check. [CONTRACT, DESIGN §9, §10]
+// Implemented by engine/rules (RULES tasks). Until then engine/cli links the stub in engine/cli/src/rules_stub.cpp,
+// which echoes the source text and marks every cue Check. Nothing here throws; every failure is a Result.
+#pragma once
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "vp/result.h"
+
+namespace vp::lex { class Lexicon; }
+
+namespace vp::rules {
+
+enum class Lang { En, Es, La, Grc };
+enum class Confidence { Ok, Check, Fix };
+// C23 (D18): "wide" accepts Medieval / Late / ecclesiastical / New Latin senses and phrasebook rows (register `eccl`)
+// as first-class choices; "classical" keeps them penalised and marks a choice that still lands on one Check.
+enum class Latinity { Wide, Classical };
+
+struct Options {
+  Lang source = Lang::En, target = Lang::La;
+  int fidelity = 2;              // 1 extremely faithful (tier 3 allowed) .. 3 flexible (tier 1, paraphrase)
+  bool useModel = false;         // engine ii (closed choices only)
+  bool useOnline = false;        // engine iii (evidence only)
+  bool emoji = true;             // attach emoji to depictable nouns (display)
+  bool macrons = true;           // display forms with length marks
+  bool orbergise = false;        // rewrite Latin input with tier ceiling
+  int orbergTier = 1;
+  char speakerGender = 'm';     // 'm' | 'f' | 'u' (unknown): gender of first-person predicate forms (rules_la_notes.md decision 1)
+  // C14 addition (Orbergise options of orbergise.start; see vp/orberg.h)
+  bool orbergKeepNames = true;   // names are left as they are
+  bool orbergSimplify = true;    // structure rewrites (false: vocabulary swaps only)
+  // C23 addition: settings key `latinity` ("wide" default | "classical"), set by the CLI for translate / orbergise
+  Latinity latinity = Latinity::Wide;
+  // C39 addition: the project is a text project (kind "text": any non-subtitle file), set by the CLI. Its units are
+  // never wrapped at the subtitle line length and keep the line structure of their source (a sentence that begins a
+  // new source line begins a new line); no line-length check. Subtitle projects (false, the default) are unchanged.
+  bool textProject = false;
+};
+
+struct Features { std::string pos, case_, number, gender, person, tense, mood, voice, degree; };
+
+struct TokenView {
+  std::string text, display;     // surface as written / with macrons
+  int start = 0, end = 0;        // byte offsets in the cue target text
+  uint32_t lemmaId = 0; bool hasLemma = false;
+  Features features;
+  uint8_t tier = 0; std::string emoji;
+  bool unknown = false, fromRule = false;
+  // C23 addition: the register of the chosen sense when the lexicon tags it: "medieval" (Medieval / Late /
+  // ecclesiastical / Vulgar Latin) or "new-latin"; empty otherwise (views: TokenView.register)
+  std::string registerTag;
+};
+struct Check  { std::string id; bool ok = true; std::string detail; };       // "A1".."A9"
+struct Reason { int tokenIndex = -1; std::string kind, text, data; };         // kind per DESIGN §9.2
+struct Alternative { std::string text, reason; double score = 0; };
+
+struct SpanIn    { bool tag = false; std::string raw; };    // source cue spans: text or an opaque tag (vp::subs::Span)
+struct CueInput  { uint32_t index = 0; std::string sourceText; int64_t startMs = 0, endMs = 0; std::string prevSource, nextSource;
+                   std::vector<SpanIn> spans; /* optional: when present the cue assembly can report tag positions (A5) */
+                   // C14 addition (Orbergise, pair la-la): sourceText holds the Latin; the aligned original-language cue
+                   // (by cue index, then by time overlap; empty when no original file is loaded) and its language
+                   std::string originalText; Lang originalLang = Lang::En; };
+struct CueOutput {
+  uint32_t index = 0;
+  std::string target;                       // one or more lines joined with '\n'
+  Confidence confidence = Confidence::Check; double score = 0;
+  std::vector<Alternative> alternatives;
+  std::vector<TokenView> tokens;
+  std::vector<Check> checks;
+  std::vector<Reason> reasons;
+  std::vector<std::string> flags;           // "song", "nonverbal", "name-guessed", "cps", ...
+  // C14 addition (Orbergise): the meaning check (content-lemma overlap with the input Latin or the original's
+  // transfer) in percent, -1 when not computed; the input content lemmas not accounted for; the original-language cue
+  int meaningPercent = -1;
+  std::vector<std::string> meaningMissing;
+  std::string original;
+};
+
+struct GlossaryEntry { std::string name, policy, form, gender; int declension = 0; };
+struct Correction    { std::string sourceKey, target, scope; int count = 0; };
+
+struct Context {                             // per-project data the engine consults; owned by the caller
+  std::vector<GlossaryEntry> glossary;
+  std::vector<Correction> corrections;
+};
+
+struct Analysis { uint32_t lemmaId = 0; std::string head, glossEn, glossEs; Features features; std::string display; uint8_t tier = 0; };
+struct InspectResult { std::vector<Analysis> analyses; std::vector<std::string> suggestions; };
+
+class Engine {
+ public:
+  virtual ~Engine() = default;
+  // Lexicons are opened by the caller (CLI) and handed in; null pointers mean "not available" and must not crash.
+  virtual Result<void> setLexicons(const lex::Lexicon* latin, const lex::Lexicon* greek,
+                                   const lex::Lexicon* english, const lex::Lexicon* spanish) = 0;
+  // Translates a batch of cues in order; `progress(done)` may be called after each cue; `cancelled()` is polled.
+  virtual Result<std::vector<CueOutput>> translate(const std::vector<CueInput>& cues, const Options&, const Context&,
+                                                   const std::function<void(size_t)>& progress,
+                                                   const std::function<bool()>& cancelled) = 0;
+  // Re-check a user-edited cue (A1..A9) without translating it.
+  virtual Result<CueOutput> check(const CueInput&, const std::string& target, const Options&, const Context&) = 0;
+  virtual Result<InspectResult> inspect(const std::string& word, Lang lang, const Options&) = 0;
+  virtual std::string version() const = 0;
+};
+
+std::unique_ptr<Engine> makeStubEngine();   // engine/cli/src/rules_stub.cpp until RULES provides makeEngine()
+std::unique_ptr<Engine> makeEngine();       // engine/rules (RULES tasks); the CLI prefers it when VP_HAVE_RULES
+
+}  // namespace vp::rules

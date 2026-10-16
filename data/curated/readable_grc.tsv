@@ -1,0 +1,637 @@
+# head	pos	english	spanish	es_gender	tags
+# Greek -> English / Spanish glosses for the readable sentence and the interlinear view of grc2x (C12; teacher-editable;
+# our own rows). head: the Greek lemma (as greek.vpl writes it, without length marks); pos: noun, verb, adj, adv, pron,
+# prep, conj, particle, or "mid" for the middle voice of a verb with its own meaning; English: verbs in the base form
+# ("look for"), nouns singular; Spanish: verbs in the infinitive ("tener miedo" inflects its first word), nouns
+# singular with the gender column; tags: person, animal (Spanish personal "a" for objects), mass (no "a"), motion
+# (present progressive in English: "is coming"), plural:<form> (an irregular English plural), reverse-only (C33: the row
+# reads Greek back but is not a taught gloss of the EN / ES -> Greek path).
+# C40: tags noun:<english>|<spanish> and noun-pl:<english>|<spanish> (an adjective used as a noun with the article;
+# "_" for a space; a masculine / feminine one is a person) and alt:<english>|<spanish> (a second reading, offered as an
+# alternative sentence).
+# C38: tag "generic" (the Greek generic article is no English article: ὁ βίος "life"). Rows for the core words of a beginners' reader, chapters 1-5.
+δοῦλος	noun	slave	esclavo	m	person
+λίθος	noun	stone	piedra	f	
+κόρη	noun	girl	muchacha	f	person
+μήτηρ	noun	mother	madre	f	person
+πατήρ	noun	father	padre	m	person
+παῖς	noun	boy	niño	m	person plural:boys
+παιδίον	noun	child	niño	m	person plural:children
+ἀγρός	noun	field	campo	m	
+γυνή	noun	woman	mujer	f	person plural:women
+οἰκία	noun	house	casa	f	
+γεωργός	noun	farmer	campesino	m	person
+βοῦς	noun	ox	buey	m	animal plural:oxen
+σφαῖρα	noun	ball	pelota	f	
+γαλῆ	noun	cat	gato	m	animal
+φίλος	noun	friend	amigo	m	person
+ἀνήρ	noun	man	hombre	m	person plural:men
+ἄρτος	noun	bread	pan	m	mass
+κῆπος	noun	garden	jardín	m	
+δεσπότης	noun	master	amo	m	person
+ἵππος	noun	horse	caballo	m	animal
+βιβλίον	noun	book	libro	m	
+θύρα	noun	door	puerta	f	
+πόλις	noun	city	ciudad	f	
+ἄνθρωπος	noun	man	hombre	m	person plural:men
+θεός	noun	god	dios	m	person
+ὕδωρ	noun	water	agua	f	mass
+ἀδελφός	noun	brother	hermano	m	person
+ἀδελφή	noun	sister	hermana	f	person
+λύκος	noun	wolf	lobo	m	animal plural:wolves
+διδάσκαλος	noun	teacher	maestro	m	person
+ἄνθος	noun	flower	flor	f	
+ᾠδή	noun	song	canción	f	
+βασίλεια	noun	queen	reina	f	person
+καρδία	noun	heart	corazón	m	
+κεφαλή	noun	head	cabeza	f	
+πλακοῦς	noun	cake	pastel	m	
+ποτόν	noun	drink	bebida	f	
+οἶκος	noun	house	casa	f	
+ἡμέρα	noun	day	día	m	
+νύξ	noun	night	noche	f	
+ὁδός	noun	road	camino	m	
+θάλαττα	noun	sea	mar	m	
+δένδρον	noun	tree	árbol	m	
+ὄνομα	noun	name	nombre	m	
+ἀγορά	noun	market place	plaza	f	
+αἴρω	verb	lift	levantar		
+φιλέω	verb	love	amar		
+εἰμί	verb	be	ser		
+βαίνω	verb	go	ir		motion
+ἔρχομαι	verb	come	venir		motion
+ἥκω	verb	have come	haber llegado		
+λύω	verb	untie	desatar		
+ὁράω	verb	see	ver		
+οἶδα	verb	know	saber		
+ἀκούω	verb	listen to	escuchar		
+φοβέω	mid	be afraid	tener miedo		
+φοβέω	verb	frighten	asustar		
+δίδωμι	verb	give	dar		
+τρέχω	verb	run	correr		
+παίζω	verb	play	jugar		
+καλέω	verb	call	llamar		
+ἀνοίγω	verb	open	abrir		
+καθεύδω	verb	sleep	dormir		
+τιμάω	verb	honour	honrar		
+λαλέω	verb	talk	hablar		
+λέγω	verb	say	decir		
+ἔχω	verb	have	tener		
+ζητέω	verb	look for	buscar		
+διώκω	verb	chase	perseguir		
+σπεύδω	verb	hurry	apresurarse		
+ἀπέρχομαι	verb	go away	irse		motion
+ἐπανέρχομαι	verb	come back	regresar		motion
+διέρχομαι	verb	get through	pasar		
+μένω	verb	wait	esperar		
+πίνω	verb	drink	beber		
+λαμβάνω	verb	take	tomar		
+δύναμαι	verb	can	poder		
+βούλομαι	verb	want	querer		
+ᾄδω	verb	sing	cantar		
+φεύγω	verb	flee	huir		
+προσκυνέω	verb	bow	inclinarse		
+ἀποτέμνω	verb	cut off	cortar		
+ποιέω	verb	do	hacer		
+οἰκέω	verb	live	vivir		
+χαίρω	verb	rejoice	alegrarse		
+μικρός	adj	small	pequeño		
+μέγας	adj	big	grande		
+καλός	adj	beautiful	hermoso		
+σοφός	adj	wise	sabio		noun:wise_man|sabio noun-pl:wise_men|sabios	C41: with the article a person ("the wise man", not "the wise trusts")
+λευκός	adj	white	blanco		
+ἀγαθός	adj	good	bueno		
+κακός	adj	bad	malo		
+θαυμαστός	adj	strange	extraño		
+ἄγροικος	adj	rude	grosero		
+πᾶς	adj	all	todo		
+πολύς	adj	much	mucho		
+δύο	num	two	dos		
+τρεῖς	num	three	tres		
+εἷς	num	one	uno		
+πόσος	adj	how many	cuánto		
+οὐδείς	adj	no	ninguno		
+νῦν	adv	now	ahora		
+ἀεί	adv	always	siempre		
+δεῦρο	adv	here	aquí		
+ἐνθάδε	adv	here	aquí		
+ἐκεῖ	adv	there	allí		
+πάνυ	adv	very	muy		
+λίαν	adv	too	demasiado		
+ὀψέ	adv	late	tarde		
+οὐδέποτε	adv	never	nunca		
+πρότερον	adv	before	antes		
+ταχέως	adv	quickly	rápido		
+ποῦ	adv	where	dónde		
+ποῖ	adv	where	adónde		
+πόθεν	adv	where from	de dónde		
+πῶς	adv	how	cómo		
+πότε	adv	when	cuándo		
+πηνίκα	adv	at what time	a qué hora		
+ἐν	prep	in	en		
+εἰς	prep	into	a		
+ἐκ	prep	out of	de		
+ἀπό	prep	from	de		
+πρός	prep	towards	hacia		
+μετά	prep	with	con		
+σύν	prep	with	con		
+περί	prep	about	sobre		
+ὑπό	prep	by	por		
+παρά	prep	beside	junto a		
+ἐπί	prep	on	sobre		
+διά	prep	through	por		
+ἄνευ	prep	without	sin		
+πρό	prep	before	ante		
+καί	conj	and	y		
+ἀλλά	conj	but	pero		
+ἤ	conj	or	o		
+ὅτι	conj	because	porque		
+ἐπεί	conj	when	cuando		
+ὅτε	conj	when	cuando		
+εἰ	conj	if	si		
+ἐάν	conj	if	si		
+ἵνα	conj	so that	para que		
+δέ	particle	and	y		
+γάρ	particle	for	pues		
+οὖν	particle	so	así que		
+μέν	particle	-	-		
+γε	particle	-	-		
+δή	particle	-	-		
+δήπου	particle	of course	claro que		
+οὐ	particle	not	no		
+μή	particle	not	no		
+ἆρα	particle	-	-		
+ὁ	article	the	el		
+ἐγώ	pron	I	yo		
+σύ	pron	you	tú		
+ἡμεῖς	pron	we	nosotros		
+ὑμεῖς	pron	you	ustedes		
+αὐτός	pron	he, she, it	él, ella, ello		
+οὗτος	pron	this	este		
+ἐκεῖνος	pron	that	aquel		
+τίς	pron	who, what	quién, qué		
+τις	pron	someone, something	alguien, algo		
+ὅς	pron	who, which	que		
+ὦ	intj	O	oh		
+οἴμοι	intj	alas	ay		
+φεῦ	intj	alas	ay		
+# C21 (Greek loop 4): weather and nature words, the gloss gaps of loop 3 (our own rows)
+ὄμβρος	noun	rain	lluvia	f	mass
+ἄνεμος	noun	wind	viento	m	
+πνέω	verb	blow	soplar		
+νίφω	verb	snow	nevar		
+ὕω	verb	rain	llover		
+δύω	mid	set	ponerse		
+τράπεζα	noun	table	mesa	f	
+κιβώτιον	noun	box	caja	f	
+βακτηρία	noun	stick	bastón	m	
+παιδιά	noun	game	juego	m	
+δακτύλιος	noun	ring	anillo	m	
+σφραγίς	noun	seal	sello	m	
+ἥσυχος	adj	quiet	tranquilo		C29: "a quiet village" (ἤρεμος came through the reverse index: late)
+κώμη	noun	village	aldea	f	C29
+ἅμαξα	noun	cart	carreta	f	C29: (κάρρον, the Latin carrus, is late)
+ἐλπίζω	verb	hope	esperar		C29
+ἀργύριον	noun	money	dinero	m	mass; C29
+λάμπω	verb	shine	brillar		C29
+πικρός	adj	bitter	amargo		C29: "wept bitterly" -> πικρῶς ἔκλαυσαν
+βασιλεύς	noun	king	rey	m	person	C31 (lexicon gloss "chief")
+φημί	verb	say	decir		C31 (read as "think")
+νομίζω	verb	think	creer		C31 (lexicon gloss "use customarily")
+οἴομαι	verb	think	creer		C31
+κελεύω	verb	order	ordenar		C31
+τελευτάω	verb	end	terminar		C31 (lexicon gloss "accomplish")
+παύω	mid	stop	cesar		C31 (the middle: "the rain will stop")
+αὔριον	adv	tomorrow	mañana		C31 (Spanish was "cras")
+νικάω	verb	win	ganar		C31 (lexicon gloss "prevail")
+αἷμα	noun	blood	sangre	f	mass	C31
+ῥέω	verb	flow	correr		C31 (αἷμα ῥεῖ: "blood flows")
+νεανίας	noun	young man	joven	m	person	C31
+ναύτης	noun	sailor	marinero	m	person	C31 (Spanish was "grumete")
+στρατιώτης	noun	soldier	soldado	m	person	C31 (Spanish was "campeón")
+# C33: the commonest military, political, family and everyday words that printed a long or wrong dictionary gloss in
+# grc2x (probe of 60 own Attic sentences, docs/rules_grc3_notes.md "Loop 8"); the lexicon's gloss in the note.
+στρατηγός	noun	general	general	m	person	C33 ("leader or commander of an army: general")
+πολέμιος	adj	enemy	enemigo		person plural:enemy reverse-only	C33 (οἱ πολέμιοι "the enemy"; lexicon "belonging to war", Spanish "artículos personales")
+ἐχθρός	adj	enemy	enemigo		person reverse-only	C33 (a personal enemy; lexicon "hated")
+σύμμαχος	adj	ally	aliado		person reverse-only	C33 ("fighting along with")
+ὁπλίτης	noun	hoplite	hoplita	m	person	C33 ("one who is armed")
+ἡγεμών	noun	leader	jefe	m	person	C33 ("one who goes first", Spanish "ser de")
+ἱππεύς	noun	horseman	jinete	m	person	C33 ("charioteer")
+ναύαρχος	noun	admiral	almirante	m	person	C33 ("commander of a fleet")
+μάχομαι	verb	fight	luchar		C33 ("make war", Spanish "hacer")
+τεῖχος	noun	wall	muralla	f		C33 (the city wall)
+γέφυρα	noun	bridge	puente	m		C33 ("beam")
+πύλη	noun	gate	puerta	f		C33 ("a wing of gates")
+φύλαξ	noun	guard	guardia	m	person	C33 (Spanish "guarda")
+φυλάττω	verb	guard	guardar		C33 (Spanish "aguaitar")
+μάχαιρα	noun	knife	cuchillo	m		C33 ("large knife", Spanish "grande")
+νίκη	noun	victory	victoria	f		C33 ("things won in victory", Spanish "fruto")
+δῆμος	noun	people	pueblo	m	plural:peoples	C33 ("a district")
+βουλή	noun	council	consejo	m		C33 ("will")
+πολίτης	noun	citizen	ciudadano	m	person	C33 (Spanish "ciudadana")
+νόμος	noun	law	ley	f		C33 ("usage")
+τύραννος	noun	tyrant	tirano	m	person	C33 ("absolute ruler", Spanish "absoluto")
+ἄρχω	verb	rule	gobernar		C33 (ἄρχω + gen; the middle is "begin")
+ἄρχω	mid	begin	comenzar		C33
+ἀγγέλλω	verb	announce	anunciar		C33 ("carry")
+κριτής	noun	judge	juez	m	person	C33 ("umpire")
+κολάζω	verb	punish	castigar		C33 ("check")
+συνέρχομαι	verb	come together	reunirse		motion	C33 (Spanish "acabar")
+γονεύς	noun	parent	padre	m	person	C33 (Spanish "madre")
+οἰκέτης	noun	servant	criado	m	person	C33 ("household slave", Spanish "agregado familiar")
+τροφός	noun	nurse	nodriza	f	person	C33 (Spanish "enfermera")
+βρέφος	noun	baby	bebé	m	person	C33 (Spanish "nene")
+ξένος	noun	stranger	extranjero	m	person	C33 ("of parties giving or receiving hospitality: host ...")
+μαθητής	noun	pupil	alumno	m	person	C33 ("learner")
+ἰατρός	noun	doctor	médico	m	person	C33 ("physician", Spanish "doctora")
+νοσέω	verb	be sick	estar enfermo		C33 (Spanish "cagante")
+θεραπεύω	verb	heal	curar		C33 ("wait on")
+ἔμπορος	noun	merchant	comerciante	m	person	C33 ("one who is on a journey: wayfarer")
+πωλέω	verb	sell	vender		C33 (Spanish "actuar")
+κρήνη	noun	fountain	fuente	f		C33 ("well", Spanish "aljibe")
+συλλέγω	verb	gather	recoger		C33 (Spanish "allegar")
+πεδίον	noun	plain	llanura	f		C33 ("open country", Spanish "open")
+ἕτοιμος	adj	ready	listo		C33 ("at hand", Spanish "mano")
+οὐρανός	noun	sky	cielo	m		C33 ("the vaulted sky, on which the stars ...")
+κομίζω	verb	bring	llevar		C33 ("take care of")
+σέβομαι	verb	revere	venerar		C33 ("be moved by awe")
+ἱερεύς	noun	priest	sacerdote	m	person	C33 (Spanish "cura")
+θύω	verb	sacrifice	sacrificar		C33 (the lexicon mixes in θύω "rush in")
+θυσία	noun	sacrifice	sacrificio	m		C33 ("offering")
+γυμνάσιον	noun	gymnasium	gimnasio	m		C33 ("bodily exercises")
+γυμνάζω	verb	train	entrenar		C33 ("train naked")
+γυμνάζω	mid	exercise	ejercitarse		C33
+κεῖμαι	verb	lie	yacer		C33 ("lie asleep")
+πλοῖον	noun	boat	barco	m	reverse-only	C33 ("a floating vessel"; reverse-only: "boat" stays ναῦς)
+ἐπιστολή	noun	letter	carta	f		C33 ("message")
+σῖτος	noun	food	alimento	m	mass	C33 (Spanish "grano, callo"); C38: food (the beginners' reader's sense; "grain" before)
+πρόβατον	noun	sheep	oveja	f	animal plural:sheep	C33 ("cattle")
+τρέφω	verb	raise	criar		C33 ("rear and keep")
+εἰσπλέω	verb	sail	navegar		C33 ("sail into": εἰσέπλευσεν εἰς τὸν λιμένα "sailed into the harbour")
+θεῖος	adj	divine	divino		C33 ("of or from the gods or God")
+γράφω	verb	write	escribir		C33 ("scratch")
+πορεύω	mid	march	marchar		motion reverse-only	C33 (ἐπορεύετο "was causing to go"; reverse-only: "march" stays βαδίζω, the aorist would be ἐπορεύσαντο)
+μῦθος	noun	story	cuento	m		C33 ("something said: word"; a tale, a fable in Attic)
+κόπτω	verb	strike	golpear		C33 (Spanish "acuñar")
+κλέπτης	noun	thief	ladrón	m	person	C33 (Spanish "amigo de lo ajeno")
+ποιμήν	noun	shepherd	pastor	m	person	C33 (Spanish "ovejero")
+ἰχθύς	noun	fish	pez	m	animal plural:fish	C33 (Spanish "pescado", the food)
+ἁλιεύς	noun	fisherman	pescador	m	person	C33 ("fisher")
+τέκνον	noun	child	hijo	m	person plural:children reverse-only	C33 (Spanish "niña"; reverse-only: "child" stays παῖς)
+χαλεπός	adj	difficult	difícil		C33 (Spanish "dificultoso")
+ἰχθῦς	noun	fish	pez	m	animal plural:fish	C33 (Spanish "pescado", the food; two lemmas ἰχθύς / ἰχθῦς)
+ἑσπέρα	noun	evening	tarde	f		C33 (Spanish "véspero")
+μεσημβρία	noun	noon	mediodía	m		C33
+νύκτωρ	adv	at night	de noche		C33 (Spanish "cheno")
+ἕως	noun	dawn	amanecer	m		C33 (the lexicon also has "the goddess Eos")
+φαίνω	verb	show	mostrar		C33 ("cause to appear")
+φαίνω	mid	appear	aparecer		C33 (φαίνεται, ἐφάνθη "appears, appeared")
+ἀστήρ	noun	star	estrella	f	reverse-only	C33 ("celestial body", Spanish "celeste"; reverse-only: "star" stays ἄστρον)
+ἄγω	verb	lead	llevar		reverse-only	C33 (Spanish "liderar"; reverse-only: "llevar" a thing is φέρω)
+κλῆρος	noun	farm	finca	f	reverse-only	C38 ("lot"; reverse-only: "farm" stays ἀγρός on the forward path)
+γεωργέω	verb	till	cultivar		reverse-only	C38 (greek.vpl lacks the lemma: lexicon_supplement_grc.tsv)
+στενάζω	verb	groan	gemir			C38 ("sigh, moan")
+ἄοκνος	adj	tireless	incansable			C38 ("resolute")
+αὐτουργός	adj	self-employed	autónomo		reverse-only noun:farmer_who_works_his_own_land|campesino_que_trabaja_su_propia_tierra noun-pl:farmers_who_work_their_own_land|campesinos_que_trabajan_su_propia_tierra alt:self-sufficient|autosuficiente	C38 (greek.vpl lacks the lemma: lexicon_supplement_grc.tsv); C40: with the article a noun (the small farmer of Attica), as a predicate self-employed / self-sufficient
+παρέχω	verb	provide	proporcionar			C38 ("hold beside")
+ἱκανός	adj	enough	suficiente		reverse-only	C38 ("competent")
+πόνος	noun	work	trabajo	m	mass reverse-only	C38 ("labor")
+πονέω	verb	work	trabajar		reverse-only	C38 ("toil"; reverse-only: "work" stays ἐργάζομαι)
+βίος	noun	life	vida	f	generic reverse-only	C38 (no English article: "life is hard")
+Ἀθηναῖος	adj	Athenian	ateniense			C38 ("of or relating to Athens")
+ἀπέραντος	adj	endless	interminable		reverse-only	C38 (greek.vpl lacks the lemma: lexicon_supplement_grc.tsv)
+ἀργός	adj	lazy	perezoso		reverse-only	C38 ("shining", the other ἀργός)
+παρασκευάζω	verb	prepare	preparar		reverse-only	C38
+ὑδρία	noun	water jar	cántaro	m	reverse-only	C38 ("hydria")
+βαδίζω	verb	walk	caminar		reverse-only	C38 ("go")
+καθίζω	verb	sit	sentarse		reverse-only	C38
+σκιά	noun	shade	sombra	f	reverse-only	C38 ("shadow")
+θερμός	adj	hot	caliente		reverse-only	C38 ("warm")
+πάππος	noun	grandfather	abuelo	m	person reverse-only	C38
+ἐγείρω	verb	wake	despertar		reverse-only	C38
+ὀργίζω	mid	get angry	enojarse		reverse-only	C38 (ὀργίζεται; "anger" was printed)
+ἄροτρον	noun	plough	arado	m	reverse-only	C38
+βαρύς	adj	heavy	pesado		reverse-only	C38
+γέρων	noun	old man	viejo	m	person reverse-only	C38
+οὐκέτι	adv	no longer	ya no		reverse-only	C38 ("no more")
+σῴζω	verb	save	salvar		reverse-only	C38 (Spanish "ahorrar")
+κάμνω	verb	be tired	estar cansado		reverse-only	C38 ("exert oneself")
+πάρειμι	verb	be here	estar aquí		reverse-only	C38 ("be by or present")
+# C39: ἔργον has its own row, so the noun wins over the imperfect / participle of ἔργω (εἴργω, "close off") when
+# nothing else decides ("ἔργον ἔχει" was "I was closing off"); after an article or an adjective it was already the noun
+ἔργον	noun	work	trabajo	m	reverse-only	C39 (the EN / ES -> Greek choice for "work" is unchanged)
+# C41: core vocabulary audit (the DCC core list run through grc2x; the Spanish of a lemma without a row came through
+# the English pivot and was often not a sense of the Greek word at all: castellano, chibolo, dispuesen, consuetud).
+# Every row here is reverse-only: it reads Greek back and does not change the EN / ES -> Greek choice.
+γίγνομαι	verb	become	llegar a ser		reverse-only
+ἄλλος	adj	other	otro		reverse-only
+λόγος	noun	word	palabra	f	reverse-only
+οὕτως	adv	thus	así		reverse-only
+πρότερος	adj	former	anterior		reverse-only
+τοιοῦτος	adj	such	tal		reverse-only
+εἶπον	verb	say	decir		reverse-only
+ἵημι	verb	send	enviar		reverse-only
+μόνος	adj	alone	solo		reverse-only
+δοκέω	verb	seem	parecer		reverse-only
+ἕτερος	adj	other	otro		reverse-only
+ὅσος	adj	as much as	cuanto		reverse-only
+σῶμα	noun	body	cuerpo	m	reverse-only
+δεῖ	verb	be necessary	ser necesario		reverse-only
+ἔτι	adv	still	todavía		reverse-only
+φύσις	noun	nature	naturaleza	f	generic reverse-only
+ἀρχή	noun	beginning	principio	m	reverse-only
+φύω	verb	produce	producir		reverse-only
+ἅπας	adj	all	todo		reverse-only
+ὅμοιος	adj	similar	semejante		reverse-only
+γῆ	noun	earth	tierra	f	reverse-only
+δύναμις	noun	power	poder	m	reverse-only
+κύριος	noun	lord	señor	m	person reverse-only
+μᾶλλον	adv	more	más		reverse-only
+ὅλος	adj	whole	entero		reverse-only
+μέρος	noun	part	parte	f	reverse-only
+χράομαι	verb	use	usar		reverse-only
+χρόνος	noun	time	tiempo	m	generic reverse-only
+ἴσος	adj	equal	igual		reverse-only
+μόνον	adv	only	solo		reverse-only
+ψυχή	noun	soul	alma	f	reverse-only
+αἴτιος	adj	responsible	responsable		reverse-only
+μάλιστα	adv	especially	sobre todo		reverse-only
+ὑπάρχω	verb	exist	existir		reverse-only
+ποτε	adv	once	una vez		reverse-only
+ἤδη	adv	already	ya		reverse-only
+γένος	noun	family	familia	f	reverse-only
+τόπος	noun	place	lugar	m	reverse-only
+πράσσω	verb	do	hacer		reverse-only
+πράττω	verb	do	hacer		reverse-only
+πρῶτος	adj	first	primero		reverse-only
+εὑρίσκω	verb	find	encontrar		reverse-only
+υἱός	noun	son	hijo	m	person reverse-only
+ἴδιος	adj	own	propio		reverse-only
+γιγνώσκω	verb	know	conocer		reverse-only
+τυγχάνω	verb	happen	suceder		reverse-only
+ἅμα	adv	at the same time	al mismo tiempo		reverse-only
+τρόπος	noun	way	manera	f	reverse-only
+μέσος	adj	middle	medio		reverse-only
+συμβαίνω	verb	happen	suceder		reverse-only
+πλέω	verb	sail	navegar		reverse-only
+τότε	adv	then	entonces		reverse-only
+χρή	verb	be necessary	ser necesario		reverse-only
+ζῷον	noun	animal	animal	m	animal reverse-only
+πρᾶγμα	noun	thing	cosa	f	plural:affairs reverse-only
+ἐναντίος	adj	opposite	contrario		reverse-only
+τίθημι	verb	put	poner		reverse-only
+εἶδον	verb	see	ver		reverse-only
+χείρ	noun	hand	mano	f	reverse-only
+ὀλίγος	adj	little	poco		reverse-only
+κοινός	adj	common	común		reverse-only
+κινέω	verb	move	mover		reverse-only
+πάσχω	verb	suffer	sufrir		reverse-only
+τοσοῦτος	adj	so much	tanto		reverse-only
+εἶτα	adv	then	luego		reverse-only
+ἀληθής	adj	true	verdadero		reverse-only
+δίκαιος	adj	just	justo		noun:just_man|hombre_justo noun-pl:just|justos reverse-only
+μέλλω	verb	be about to	ir a		reverse-only
+ἐθέλω	verb	want	querer		reverse-only
+λοιπός	adj	remaining	restante		reverse-only
+ἀνάγκη	noun	necessity	necesidad	f	generic reverse-only
+δεύτερος	adj	second	segundo		reverse-only
+πόλεμος	noun	war	guerra	f	generic reverse-only
+χώρα	noun	country	país	m	reverse-only
+ζάω	verb	live	vivir		reverse-only
+ζῶ	verb	live	vivir		reverse-only
+πλῆθος	noun	crowd	multitud	f	reverse-only
+ἥλιος	noun	sun	sol	m	reverse-only
+αἰτία	noun	cause	causa	f	reverse-only
+πείθω	verb	persuade	persuadir		reverse-only
+πείθω	mid	obey	obedecer		reverse-only
+πλεῖστος	adj	most	muchísimo		reverse-only
+εἶδος	noun	form	forma	f	reverse-only
+κύκλος	noun	circle	círculo	m	reverse-only
+πάθος	noun	suffering	sufrimiento	m	reverse-only
+ὀνομάζω	verb	name	nombrar		reverse-only
+ἀρετή	noun	virtue	virtud	f	generic reverse-only
+ἔτος	noun	year	año	m	reverse-only
+τρίτος	adj	third	tercero		reverse-only
+πνεῦμα	noun	breath	aliento	m	reverse-only
+ὀρθός	adj	straight	recto		reverse-only
+θάλασσα	noun	sea	mar	m	reverse-only
+διαφέρω	verb	differ	diferir		reverse-only
+δόξα	noun	opinion	opinión	f	reverse-only
+πῦρ	noun	fire	fuego	m	reverse-only
+ἐλάσσων	adj	smaller	menor		reverse-only
+ἐλάττων	adj	smaller	menor		reverse-only
+πούς	noun	foot	pie	m	reverse-only
+ἱερός	adj	holy	sagrado		reverse-only noun:temple|templo noun-pl:sacrifices|sacrificios	C43: τὸ ἱερόν = the temple
+εὐθύς	adj	straight	recto		reverse-only
+εἶμι	verb	go	ir		reverse-only
+ταχύς	adj	fast	rápido		reverse-only
+ποταμός	noun	river	río	m	reverse-only
+οὐσία	noun	property	propiedad	f	reverse-only
+ἀριθμός	noun	number	número	m	reverse-only
+ὕστερος	adj	later	posterior		reverse-only
+φυλάσσω	verb	guard	guardar		reverse-only
+καιρός	noun	right time	momento oportuno	m	reverse-only
+ἀμφότερος	adj	both	ambos		reverse-only
+σημεῖον	noun	sign	señal	f	reverse-only
+δηλόω	verb	show	mostrar		reverse-only
+οἰκεῖος	adj	own	propio		reverse-only
+τέλος	noun	end	fin	m	reverse-only
+ἡγέομαι	verb	lead	guiar		reverse-only
+ἄξιος	adj	worthy	digno		reverse-only
+δῆλος	adj	clear	claro		reverse-only
+ἔρομαι	verb	ask	preguntar		reverse-only
+μέγεθος	noun	size	tamaño	m	reverse-only
+πολλάκις	adv	often	a menudo		reverse-only
+χάρις	noun	favour	favor	m	reverse-only
+ἔπειτα	adv	then	después		reverse-only
+σχῆμα	noun	form	forma	f	reverse-only
+τροφή	noun	food	alimento	m	mass reverse-only
+μανθάνω	verb	learn	aprender		reverse-only
+ἐνταῦθα	adv	here	aquí		reverse-only
+κόσμος	noun	order	orden	m	reverse-only
+αἱρέω	verb	take	tomar		reverse-only
+αἱρέω	mid	choose	elegir		reverse-only
+προστίθημι	verb	add	añadir		reverse-only
+ἀξιόω	verb	think worthy	considerar digno		reverse-only
+νέος	adj	young	joven		noun:young_man|joven noun-pl:young_men|jóvenes reverse-only
+ἔοικα	verb	seem	parecer		reverse-only
+καθίστημι	verb	establish	establecer		reverse-only
+τέχνη	noun	skill	arte	m	reverse-only
+χρῆμα	noun	thing	cosa	f	plural:money reverse-only
+πέμπω	verb	send	enviar		reverse-only
+φωνή	noun	voice	voz	f	reverse-only
+ἀπόλλυμι	verb	destroy	destruir		reverse-only
+ἀπόλλυμι	mid	perish	morir		reverse-only
+θάνατος	noun	death	muerte	f	generic reverse-only
+ἔθνος	noun	nation	nación	f	reverse-only
+ἀποδίδωμι	verb	give back	devolver		reverse-only
+νοῦς	noun	mind	mente	f	reverse-only
+ἀποθνῄσκω	verb	die	morir		reverse-only
+εὖ	adv	well	bien		reverse-only
+κρίνω	verb	judge	juzgar		reverse-only
+ἀναιρέω	verb	take up	recoger		reverse-only
+μακρός	adj	long	largo		reverse-only
+ἡδονή	noun	pleasure	placer	m	generic reverse-only
+δεινός	adj	terrible	terrible		reverse-only
+διαφορά	noun	difference	diferencia	f	reverse-only
+κρατέω	verb	rule	dominar		reverse-only
+ἕπομαι	verb	follow	seguir		reverse-only
+ἥσσων	adj	weaker	más débil		reverse-only
+ἥττων	adj	weaker	más débil		reverse-only
+ὄρος	noun	mountain	montaña	f	reverse-only
+δυνατός	adj	powerful	poderoso		reverse-only
+ἄριστος	adj	best	mejor		reverse-only
+ῥᾴδιος	adj	easy	fácil		reverse-only
+ἀφαιρέω	verb	take away	quitar		reverse-only
+τύχη	noun	fortune	fortuna	f	reverse-only
+φανερός	adj	clear	evidente		reverse-only
+πρόσωπον	noun	face	cara	f	reverse-only
+πιστεύω	verb	trust	confiar en		reverse-only
+διδάσκω	verb	teach	enseñar		reverse-only
+ἄνω	adv	up	arriba		reverse-only
+τάσσω	verb	arrange	ordenar		reverse-only
+τάττω	verb	arrange	ordenar		reverse-only
+ὀφθαλμός	noun	eye	ojo	m	reverse-only
+δέχομαι	verb	receive	recibir		reverse-only
+ἀφικνέομαι	verb	arrive	llegar		reverse-only
+ἐργάζομαι	verb	work	trabajar		reverse-only
+μάχη	noun	battle	batalla	f	reverse-only
+ἀδύνατος	adj	impossible	imposible		reverse-only
+ἀκριβής	adj	exact	exacto		reverse-only
+στόμα	noun	mouth	boca	f	reverse-only
+χωρίς	adv	apart	aparte		reverse-only
+κρείσσων	adj	stronger	más fuerte		reverse-only
+κρείττων	adj	stronger	más fuerte		reverse-only
+βραχύς	adj	short	corto		reverse-only
+ἰσχυρός	adj	strong	fuerte		reverse-only
+ἀλήθεια	noun	truth	verdad	f	reverse-only
+ἀθάνατος	adj	immortal	inmortal		reverse-only
+δίκη	noun	justice	justicia	f	generic reverse-only
+χωρίον	noun	place	lugar	m	reverse-only
+ἡδύς	adj	sweet	dulce		reverse-only
+νόσος	noun	disease	enfermedad	f	reverse-only
+παλαιός	adj	old	antiguo		reverse-only
+ἀφίημι	verb	let go	soltar		reverse-only
+ἄλλως	adv	otherwise	de otro modo		reverse-only
+πρᾶξις	noun	action	acción	f	reverse-only
+σαφής	adj	clear	claro		reverse-only
+ὁμολογέω	verb	agree	estar de acuerdo		reverse-only
+ναός	noun	temple	templo	m	reverse-only
+πατρίς	noun	fatherland	patria	f	reverse-only
+ὀξύς	adj	sharp	agudo		reverse-only
+γνώμη	noun	opinion	opinión	f	reverse-only
+τιμή	noun	honour	honor	m	reverse-only
+προσήκω	verb	belong	corresponder		reverse-only
+ἀδικέω	verb	wrong	dañar		reverse-only
+πρέσβυς	noun	old man	anciano	m	person reverse-only
+μίγνυμι	verb	mix	mezclar		reverse-only
+λαός	noun	people	pueblo	m	reverse-only
+θυγάτηρ	noun	daughter	hija	f	person reverse-only
+παραδίδωμι	verb	hand over	entregar		reverse-only
+ἔξω	adv	outside	fuera		reverse-only
+νῆσος	noun	island	isla	f	reverse-only
+ἐπιστήμη	noun	knowledge	conocimiento	m	reverse-only
+ἐάω	verb	allow	permitir		reverse-only
+θαυμάζω	verb	admire	admirar		reverse-only
+αἰσθάνομαι	verb	perceive	percibir		reverse-only
+καταλαμβάνω	verb	seize	tomar		reverse-only
+μιμνήσκω	verb	remind	recordar		reverse-only
+θνῄσκω	verb	die	morir		reverse-only
+ἀποκτείνω	verb	kill	matar		reverse-only
+ἁπλῶς	adv	simply	simplemente		reverse-only
+πίπτω	verb	fall	caer		reverse-only
+κατασκευάζω	verb	prepare	preparar		reverse-only
+ἀγών	noun	contest	certamen	m	reverse-only
+κωλύω	verb	prevent	impedir		reverse-only
+ἁμαρτάνω	verb	make a mistake	equivocarse		reverse-only
+διαφθείρω	verb	destroy	destruir		reverse-only
+τάξις	noun	order	orden	m	reverse-only
+πειράω	verb	try	intentar		reverse-only
+βάλλω	verb	throw	lanzar		reverse-only
+πονηρός	adj	wicked	malvado		reverse-only
+βάρβαρος	adj	barbarian	bárbaro		noun:barbarian|bárbaro noun-pl:barbarians|bárbaros reverse-only
+συμφέρω	verb	be useful	ser útil		reverse-only
+πυνθάνομαι	verb	learn	enterarse de		reverse-only
+τέμνω	verb	cut	cortar		reverse-only
+χρήσιμος	adj	useful	útil		reverse-only
+ὅπλον	noun	weapon	arma	f	reverse-only
+πίστις	noun	trust	confianza	f	reverse-only
+ὑπολαμβάνω	verb	suppose	suponer		reverse-only
+ποιητής	noun	poet	poeta	m	person reverse-only
+βελτίων	adj	better	mejor		reverse-only
+ἀποκρίνω	verb	separate	separar		reverse-only
+ἀποκρίνω	mid	answer	responder		reverse-only
+κίνδυνος	noun	danger	peligro	m	reverse-only
+κατηγορέω	verb	accuse	acusar		reverse-only
+τρέπω	verb	turn	volver		reverse-only
+κτάομαι	verb	acquire	adquirir		reverse-only
+λείπω	verb	leave	dejar		reverse-only
+ἐλπίς	noun	hope	esperanza	f	generic reverse-only
+γραφή	noun	writing	escrito	m	reverse-only
+τίκτω	verb	give birth to	dar a luz		reverse-only
+θυμός	noun	spirit	ánimo	m	reverse-only
+βλέπω	verb	see	ver		reverse-only
+φόβος	noun	fear	miedo	m	generic reverse-only
+πολιτεία	noun	constitution	constitución	f	reverse-only
+στάδιον	noun	stade	estadio	m	reverse-only
+φρονέω	verb	think	pensar		reverse-only
+τοιόσδε	adj	such	tal		reverse-only
+ὁρμάω	verb	set out	partir		reverse-only
+δράω	verb	do	hacer		reverse-only
+σκοπέω	verb	examine	examinar		reverse-only
+γράμμα	noun	letter	letra	f	reverse-only
+ἐρωτάω	verb	ask	preguntar		reverse-only
+πολεμέω	verb	make war	hacer la guerra		reverse-only
+ἐλαύνω	verb	drive	conducir		reverse-only
+δέδοικα	verb	fear	temer		reverse-only
+ὧδε	adv	thus	así		reverse-only
+αἰσχρός	adj	shameful	vergonzoso		reverse-only
+εἰρήνη	noun	peace	paz	f	generic reverse-only
+ἁλίσκομαι	verb	be captured	ser capturado		reverse-only
+ἀμείνων	adj	better	mejor		reverse-only
+χείρων	adj	worse	peor		reverse-only
+βοηθέω	verb	help	ayudar		reverse-only
+λαμπρός	adj	bright	brillante		reverse-only
+ἀπαλλάσσω	verb	set free	liberar		reverse-only
+ἀπαλλάττω	verb	set free	liberar		reverse-only
+βουλεύω	verb	plan	planear		reverse-only
+μάλα	adv	very	muy		reverse-only
+αἰτέω	verb	ask for	pedir		reverse-only
+σωτηρία	noun	safety	salvación	f	reverse-only
+γλῶσσα	noun	tongue	lengua	f	reverse-only
+γλῶττα	noun	tongue	lengua	f	reverse-only
+τολμάω	verb	dare	atreverse		reverse-only
+ἄδικος	adj	unjust	injusto		reverse-only
+μυρίος	adj	countless	innumerable		reverse-only
+αὐτίκα	adv	at once	enseguida		reverse-only
+ἐλεύθερος	adj	free	libre		noun:free_man|hombre_libre noun-pl:free_men|hombres_libres reverse-only
+στρατιά	noun	army	ejército	m	reverse-only
+συμφορά	noun	misfortune	desgracia	f	reverse-only
+ἔπος	noun	word	palabra	f	reverse-only
+στρατός	noun	army	ejército	m	reverse-only
+φράζω	verb	tell	decir		reverse-only
+πέμπτος	adj	fifth	quinto		reverse-only
+μάρτυς	noun	witness	testigo	m	person reverse-only
+χαλκοῦς	adj	bronze	de bronce		reverse-only
+ἕβδομος	adj	seventh	séptimo		reverse-only
+φῶς	noun	light	luz	f	reverse-only
+ἕκτος	adj	sixth	sexto		reverse-only
+ἔνατος	adj	ninth	noveno		reverse-only
+εἰκοστός	adj	twentieth	vigésimo		reverse-only
+ἑκατόν	adj	hundred	cien		reverse-only
+δείδω	verb	fear	temer		reverse-only
+ἐμός	adj	my	mi		reverse-only
+σός	adj	your	tu		reverse-only
+ἡμέτερος	adj	our	nuestro		reverse-only
+ὑμέτερος	adj	your	su		reverse-only
+φέρω	verb	bring	traer		reverse-only	C41: the lexicon's own words, now reviewed (carry is the other sense)
+# ---- C43: prepositional phrases after the subject (own sentences tests/regression/own_pp_grc.grc.txt) ----
+ὕλη	noun	forest	bosque	m	reverse-only
+στενός	adj	narrow	estrecho		reverse-only
+λόφος	noun	hill	colina	f	reverse-only
+κάθημαι	verb	sit	estar sentado		reverse-only
+κάθημαι	mid	sit	estar sentado		reverse-only
+ἀσφαλής	adj	safe	seguro		reverse-only
+εὐδαίμων	adj	happy	feliz		reverse-only
+στρατόπεδον	noun	camp	campamento	m	reverse-only

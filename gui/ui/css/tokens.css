@@ -1,0 +1,139 @@
+/* tokens.css - colours (PREDESIGN 2.1, contrast checked by tools/jstest), fonts (2.2),
+   spacing (8 px grid), radii, motion. Light is :root; dark is [data-theme="dark"] or the
+   system setting when the user chose "Auto" (no data-theme="light"). */
+
+@font-face {
+  font-family: "Gentium Plus";
+  src: url("../fonts/GentiumPlus-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Gentium Plus";
+  src: url("../fonts/GentiumPlus-Italic.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Gentium Plus";
+  src: url("../fonts/GentiumPlus-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+  --bg: #FBF7F0;
+  --surface: #FFFFFF;
+  --surface-2: #F3ECDF;
+  --border: #D9CDB8;
+  --border-strong: #8A7F6D;
+  --text: #2A2622;
+  --muted: #6B6157;
+  --accent: #B3452A;
+  --on-accent: #FFFFFF;
+  --greek: #2B6A9B;
+  --ok: #2F6F44;
+  --warn: #8A5A00;
+  --bad: #A8322B;
+  --focus: #1F5FBF;
+  --accent-soft: #F6DDD3;
+  --greek-soft: #DCE8F3;
+  --overlay: rgba(27, 24, 21, 0.5);
+  --shadow-1: 0 1px 2px rgba(42, 38, 34, 0.08), 0 2px 6px rgba(42, 38, 34, 0.06);
+  --shadow-2: 0 6px 24px rgba(42, 38, 34, 0.18);
+
+  /* Latin, Greek and cue text: bundled, always the same on every PC */
+  --font-text: "Gentium Plus", "Cardo", "Cambria", "Palatino Linotype", "Times New Roman",
+               "Noto Serif", "Segoe UI Emoji", "Noto Color Emoji", serif;
+  /* application chrome: the system UI font, no download */
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", "Noto Sans", system-ui, sans-serif;
+  /* emoji only (used on the emoji span so it never changes line height) */
+  --font-emoji: "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", sans-serif;
+  /* numbers: timing and counts */
+  --font-mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+
+  /* user text size 90..140 % (settings.textScale / 100), applied on <html> */
+  --text-scale: 1;
+  --fs-cue: 1.125rem;
+  --fs-row: 1rem;
+  --fs-head: 1.5rem;
+  --fs-ui: 0.875rem;
+  --fs-mono: 0.8125rem;
+  --fs-preview: 1.25rem;
+  --lh-text: 1.5;
+
+  --space-half: 4px;
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-6: 48px;
+  --radius-panel: 12px;
+  --radius-control: 8px;
+  --radius-pill: 999px;
+  --target: 44px;
+  --row: 48px;
+  --header-h: 56px;
+
+  --motion-fast: 120ms;
+  --motion: 180ms;
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1B1815;
+  --surface: #25211D;
+  --surface-2: #2E2924;
+  --border: #3F3830;
+  --border-strong: #8C8173;
+  --text: #F0E9DE;
+  --muted: #B5AA9B;
+  --accent: #E8825F;
+  --on-accent: #1B1815;
+  --greek: #86B8E3;
+  --ok: #7FC48F;
+  --warn: #E6B35C;
+  --bad: #F08A80;
+  --focus: #8DB8FF;
+  --accent-soft: #3A2620;
+  --greek-soft: #1F2C38;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #1B1815;
+    --surface: #25211D;
+    --surface-2: #2E2924;
+    --border: #3F3830;
+    --border-strong: #8C8173;
+    --text: #F0E9DE;
+    --muted: #B5AA9B;
+    --accent: #E8825F;
+    --on-accent: #1B1815;
+    --greek: #86B8E3;
+    --ok: #7FC48F;
+    --warn: #E6B35C;
+    --bad: #F08A80;
+    --focus: #8DB8FF;
+    --accent-soft: #3A2620;
+    --greek-soft: #1F2C38;
+    --overlay: rgba(0, 0, 0, 0.6);
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 6px 24px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Greek pairs swap the accent at the workspace root (PREDESIGN 2.3). */
+.pair-grc {
+  --accent: var(--greek);
+  --accent-soft: var(--greek-soft);
+}

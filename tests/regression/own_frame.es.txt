@@ -1,0 +1,6 @@
+# C39: own Spanish sentences, ES -> LA, items (e) (adjectives of proper names) and (d) (a long sentence in a text
+# project). Our own sentences. Gold: expected/own_frame.es.la.gold.txt.
+El maestro es griego.
+Los soldados romanos son fuertes.
+La niña ateniense canta en el jardín.
+El campesino camina cada mañana con su hijo desde la pequeña granja hasta la gran ciudad.

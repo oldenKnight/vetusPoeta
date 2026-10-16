@@ -1,0 +1,11 @@
+1
+00:00:01,000 --> 00:00:04,000
+{\an8}Platform four: the train is delayed.
+
+2
+00:00:04,100 --> 00:00:06,000
+We missed the last bus again.
+
+3
+00:00:06,300 --> 00:00:08,600
+{\an8}<i>Closed for repairs</i>
